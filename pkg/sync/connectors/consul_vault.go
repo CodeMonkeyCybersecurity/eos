@@ -514,7 +514,25 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 		logger.Info("Consul ACLs already bootstrapped, retrieving master token from Vault")
 		masterToken, err = acl.GetBootstrapTokenFromVault(rc, vaultClient)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve Consul bootstrap token from Vault: %w", err)
+			// Token not in Vault - need to prompt user for it
+			logger.Warn("Bootstrap token not found in Vault, prompting user for recovery",
+				zap.Error(err))
+
+			// Use recovery flow: prompt user for token and store it
+			recoveryResult, recoveryErr := acl.PromptAndStoreBootstrapToken(rc, vaultClient)
+			if recoveryErr != nil {
+				return fmt.Errorf("failed to recover bootstrap token: %w\n\n"+
+					"Consul ACLs are already initialized but the bootstrap token is not in Vault.\n"+
+					"You provided an invalid token or cancelled the operation.\n\n"+
+					"Remediation:\n"+
+					"  1. Find your Consul bootstrap token (created during initial 'consul acl bootstrap')\n"+
+					"  2. Verify it works: consul acl token read -self -token=<your-token>\n"+
+					"  3. Run this command again and provide the correct token when prompted",
+					recoveryErr)
+			}
+
+			masterToken = recoveryResult.MasterToken
+			logger.Info("Bootstrap token recovered and stored in Vault successfully")
 		}
 	} else {
 		masterToken = bootstrapResult.MasterToken

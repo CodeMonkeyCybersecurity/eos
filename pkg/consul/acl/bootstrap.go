@@ -13,9 +13,11 @@ package acl
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	consulapi "github.com/hashicorp/consul/api"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -24,12 +26,12 @@ import (
 
 // BootstrapResult contains the result of ACL bootstrap operation
 type BootstrapResult struct {
-	MasterToken    string    // The bootstrap/master token (global-management)
-	Accessor       string    // Token accessor ID
-	AlreadyDone    bool      // True if ACLs were already bootstrapped
-	BootstrapTime  time.Time // When bootstrap occurred
-	StoredInVault  bool      // True if token was stored in Vault
-	VaultPath      string    // Path where token is stored in Vault
+	MasterToken   string    // The bootstrap/master token (global-management)
+	Accessor      string    // Token accessor ID
+	AlreadyDone   bool      // True if ACLs were already bootstrapped
+	BootstrapTime time.Time // When bootstrap occurred
+	StoredInVault bool      // True if token was stored in Vault
+	VaultPath     string    // Path where token is stored in Vault
 }
 
 // BootstrapConsulACLs initializes the Consul ACL system
@@ -79,8 +81,11 @@ func BootstrapConsulACLs(
 
 	if err != nil {
 		// Check if error is because already bootstrapped
-		if err.Error() == "Unexpected response code: 403 (Permission denied: ACL bootstrap no longer allowed (reset index: 1))" ||
-			err.Error() == "Unexpected response code: 403 (Permission denied: ACL system already initialized)" {
+		// P0 FIX: Use strings.Contains() instead of exact match to handle ANY reset index
+		// Reset index can be 1, 3117, or any number depending on how many operations occurred
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "ACL bootstrap no longer allowed") ||
+			strings.Contains(errMsg, "ACL system already initialized") {
 
 			logger.Info("Consul ACLs already bootstrapped",
 				zap.String("note", "This is expected if ACLs were previously initialized"))
@@ -215,4 +220,176 @@ func GetBootstrapTokenFromVault(rc *eos_io.RuntimeContext, vaultClient *vaultapi
 	logger.Info("Retrieved Consul bootstrap token from Vault")
 
 	return token, nil
+}
+
+// PromptAndStoreBootstrapToken prompts user for existing bootstrap token and stores it in Vault
+//
+// This function is used when:
+//  1. Consul ACLs are already bootstrapped (can't bootstrap again)
+//  2. Bootstrap token is NOT in Vault (can't retrieve it)
+//  3. Need the token to continue with Vault-Consul integration
+//
+// Parameters:
+//   - rc: Runtime context
+//   - vaultClient: Authenticated Vault client
+//
+// Returns:
+//   - BootstrapResult with the token and metadata
+//   - Error if user doesn't provide token or storage fails
+//
+// Example:
+//
+//	result, err := acl.PromptAndStoreBootstrapToken(rc, vaultClient)
+//	if err != nil {
+//	    return fmt.Errorf("failed to recover bootstrap token: %w", err)
+//	}
+//	consulClient.SetToken(result.MasterToken)
+func PromptAndStoreBootstrapToken(
+	rc *eos_io.RuntimeContext,
+	vaultClient *vaultapi.Client,
+) (*BootstrapResult, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Consul ACLs already bootstrapped, but token not found in Vault")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: CONSUL BOOTSTRAP TOKEN REQUIRED")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: Your Consul ACLs are already initialized, but the bootstrap token")
+	logger.Info("terminal prompt: is not stored in Vault. This token was created when you first ran:")
+	logger.Info("terminal prompt:   consul acl bootstrap")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: To complete Vault-Consul integration, please provide the token.")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: WHERE TO FIND THE TOKEN:")
+	logger.Info("terminal prompt:   - Check your initial Consul setup notes/documentation")
+	logger.Info("terminal prompt:   - Look in: /etc/consul.d/acl-token (if you saved it there)")
+	logger.Info("terminal prompt:   - Check environment: echo $CONSUL_HTTP_TOKEN")
+	logger.Info("terminal prompt:   - Look for 'SecretID' in your bootstrap output")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: SECURITY NOTE:")
+	logger.Info("terminal prompt:   - This token will be securely stored in Vault")
+	logger.Info("terminal prompt:   - Path: secret/consul/bootstrap-token")
+	logger.Info("terminal prompt:   - Once stored, you won't need to provide it again")
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ═══════════════════════════════════════════════════════════════════════")
+	logger.Info("terminal prompt: ")
+
+	// Prompt for the token
+	fmt.Print("Enter Consul bootstrap token (or 'cancel' to abort): ")
+
+	var token string
+	_, err := fmt.Scanln(&token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token from stdin: %w", err)
+	}
+
+	token = strings.TrimSpace(token)
+
+	// Check if user wants to cancel
+	if strings.ToLower(token) == "cancel" {
+		return nil, fmt.Errorf("user cancelled token recovery")
+	}
+
+	// Validate token is not empty
+	if token == "" {
+		return nil, fmt.Errorf("bootstrap token cannot be empty")
+	}
+
+	// Validate token format (Consul tokens are UUIDs: 8-4-4-4-12 format)
+	if len(token) != 36 {
+		logger.Warn("Token does not appear to be a valid UUID format (expected 36 characters)",
+			zap.Int("length", len(token)))
+	}
+
+	logger.Info("Received bootstrap token, verifying with Consul...")
+
+	// EVALUATE - Verify the token works by trying to use it
+	// Create a test Consul client with this token
+	consulConfig := consulapi.DefaultConfig()
+	consulConfig.Address = shared.GetConsulHostPort()
+	consulConfig.Token = token
+
+	testClient, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
+
+	// Try to read our own token (requires the token to be valid)
+	selfToken, _, err := testClient.ACL().TokenReadSelf(nil)
+	if err != nil {
+		return nil, fmt.Errorf("token verification failed: %w\n"+
+			"The provided token does not have valid ACL permissions.\n"+
+			"Make sure you're providing the BOOTSTRAP token (global-management policy).\n"+
+			"Remediation:\n"+
+			"  - Verify token with: consul acl token read -self -token=<your-token>\n"+
+			"  - Check token has 'global-management' policy",
+			err)
+	}
+
+	// Verify it's actually a bootstrap/management token
+	hasGlobalManagement := false
+	for _, policy := range selfToken.Policies {
+		if policy.Name == "global-management" {
+			hasGlobalManagement = true
+			break
+		}
+	}
+
+	if !hasGlobalManagement {
+		logger.Warn("WARNING: Token does not have 'global-management' policy",
+			zap.String("accessor", selfToken.AccessorID),
+			zap.Int("policy_count", len(selfToken.Policies)))
+		logger.Warn("This may not be the bootstrap token. Vault-Consul integration requires a management token.")
+
+		// Don't fail - just warn. User might know what they're doing.
+	}
+
+	logger.Info("Token verified successfully",
+		zap.String("accessor", selfToken.AccessorID),
+		zap.String("description", selfToken.Description))
+
+	// INTERVENE - Store the token in Vault
+	logger.Info("Storing bootstrap token in Vault for future use")
+
+	vaultPath := "secret/consul/bootstrap-token"
+	data := map[string]interface{}{
+		"token":          token,
+		"accessor":       selfToken.AccessorID,
+		"description":    selfToken.Description,
+		"recovered_at":   time.Now().Format(time.RFC3339),
+		"policies":       []string{"global-management"},
+		"warning":        "This is the Consul master token - protect it carefully!",
+		"recovery_steps": "To retrieve: vault kv get -field=token secret/consul/bootstrap-token",
+		"source":         "user-provided (eos sync recovery)",
+	}
+
+	_, err = vaultClient.KVv2("secret").Put(rc.Ctx, "consul/bootstrap-token", data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store bootstrap token in Vault: %w\n"+
+			"Remediation:\n"+
+			"  - Check Vault is unsealed: vault status\n"+
+			"  - Verify Vault token has write permissions to secret/consul/*\n"+
+			"  - Check Vault logs for errors",
+			err)
+	}
+
+	logger.Info("Bootstrap token stored in Vault successfully",
+		zap.String("vault_path", vaultPath))
+
+	logger.Info("terminal prompt: ")
+	logger.Info("terminal prompt: ✓ Bootstrap token verified and stored in Vault")
+	logger.Info("terminal prompt: ")
+
+	result := &BootstrapResult{
+		MasterToken:   token,
+		Accessor:      selfToken.AccessorID,
+		AlreadyDone:   true,
+		BootstrapTime: time.Now(),
+		StoredInVault: true,
+		VaultPath:     vaultPath,
+	}
+
+	return result, nil
 }
