@@ -10,7 +10,7 @@
 
 **Solution:** Added `AddServiceSecrets()` method to policy builder and included it in the default eos policy.
 
-**User Action Required:** Run `sudo eos update vault --update-policies` to apply the fix to existing installations.
+**User Action Required:** Run `sudo eos update vault --policies` to apply the fix to existing installations.
 
 ---
 
@@ -81,9 +81,9 @@ func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 
 **File 3:** [cmd/update/vault.go](../cmd/update/vault.go#L264-L311)
 
-Added `--update-policies` flag and handler:
+Added `--policies` flag and handler:
 ```bash
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 ```
 
 This command:
@@ -164,7 +164,7 @@ sudo eos create vault
 #### Step 1: Update Policies
 
 ```bash
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 ```
 
 **Expected Output:**
@@ -336,7 +336,7 @@ sudo eos create bionicgpt
 ### Policy update doesn't include services path
 
 **Symptoms:**
-After running `--update-policies`, `vault policy read eos-policy` doesn't show `secret/data/services/*`.
+After running `--policies`, `vault policy read eos-policy` doesn't show `secret/data/services/*`.
 
 **Cause:** Old version of Eos code (before this fix).
 
@@ -348,7 +348,7 @@ git pull
 go build -o /usr/local/bin/eos ./cmd/
 
 # Run policy update again
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 ```
 
 ---
@@ -465,7 +465,7 @@ The Vault services policy fix adds `secret/data/services/*` access to the defaul
 **For Users:**
 ```bash
 # One command fixes the permission issue
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 
 # Then services work
 sudo eos create bionicgpt

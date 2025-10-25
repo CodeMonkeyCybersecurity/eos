@@ -26,7 +26,7 @@ CGO_ENABLED=0 go build -o /usr/local/bin/eos ./cmd/
 
 ### Step 2: Update Vault Policies
 ```bash
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 ```
 
 **Expected Output:**
@@ -114,9 +114,9 @@ path "secret/metadata/services/*" {
 
 **File:** [cmd/update/vault.go](../cmd/update/vault.go#L79-L311)
 
-**Solution:** Added `--update-policies` flag:
+**Solution:** Added `--policies` flag:
 ```bash
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 ```
 
 **Impact:** Users can apply policy fixes without reinstalling Vault.
@@ -245,11 +245,11 @@ User runs: sudo eos create bionicgpt
 - [x] Default policy includes `AddServiceSecrets()` - [Verified](../pkg/vault/policy_presets.go#L20)
 - [x] Consul uses `hostname` instead of `shared.GetInternalHostname` - [Verified](../pkg/servicestatus/consul.go#L288)
 - [x] Vault uses `hostname` instead of `shared.GetInternalHostname` - [Verified](../pkg/servicestatus/vault.go#L329)
-- [x] `--update-policies` flag added - [Verified](../cmd/update/vault.go#L79)
+- [x] `--policies` flag added - [Verified](../cmd/update/vault.go#L79)
 
 ### End-to-End Tests (User Action Required)
 
-- [ ] **Test 1:** Run `sudo eos update vault --update-policies`
+- [ ] **Test 1:** Run `sudo eos update vault --policies`
   - Expected: Policy update succeeds
   - Expected: `vault policy read eos-policy` shows `secret/data/services/*`
 
@@ -424,7 +424,7 @@ vault policy read eos-policy | grep services
 - Comprehensive error handling
 
 ✅ **Philosophy:**
-- **Human centric** - One command (`--update-policies`) fixes existing installations
+- **Human centric** - One command (`--policies`) fixes existing installations
 - **Evidence based** - Solves real production error (403 permission denied)
 - **Sustainable** - Changes are modular, reusable, well-documented
 - **Solve once** - Policy infrastructure now supports easy updates
@@ -444,7 +444,7 @@ The BionicGPT 403 fix required three coordinated changes:
 2. **Authorization** - Default policy now includes `secret/data/services/*`
 3. **Observability** - Services display actual hostname
 
-**User Impact:** One command (`sudo eos update vault --update-policies`) fixes all existing installations.
+**User Impact:** One command (`sudo eos update vault --policies`) fixes all existing installations.
 
 **Developer Impact:** Establishes pattern for future policy updates.
 
@@ -459,7 +459,7 @@ The BionicGPT 403 fix required three coordinated changes:
 cd /opt/eos && git pull && go build -o /usr/local/bin/eos ./cmd/
 
 # Step 2: Update Vault policies
-sudo eos update vault --update-policies
+sudo eos update vault --policies
 
 # Step 3: Test
 sudo eos create bionicgpt

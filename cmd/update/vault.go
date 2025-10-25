@@ -35,7 +35,7 @@ var VaultCmd = &cobra.Command{
 The command intelligently updates:
 1. Vault address stored in Consul KV (--address)
 2. Vault HCL configuration file ports (--ports)
-3. Vault policies to latest version (--update-policies)
+3. Vault policies to latest version (--policies)
 4. Configuration drift correction (--fix)
 5. Vault seal status (--unseal)
 6. Restarts Vault service to apply changes (ports only)
@@ -152,7 +152,7 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 				"  --fix             Fix configuration drift\n" +
 				"  --address         Update Vault address\n" +
 				"  --ports           Migrate ports\n" +
-				"  --update-policies Update policies\n\n" +
+				"  --policies Update policies\n\n" +
 				"Use --dry-run to preview changes for any operation.\n\n" +
 				"Examples:\n" +
 				"  eos update vault --unseal\n" +
@@ -199,15 +199,15 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 				"  eos update vault --address vhost5\n\n" +
 				"Use --ports to migrate Vault ports:\n" +
 				"  eos update vault --ports 8179 -> default\n\n" +
-				"Use --update-policies to update Vault policies:\n" +
-				"  eos update vault --update-policies\n\n" +
+				"Use --policies to update Vault policies:\n" +
+				"  eos update vault --policies\n\n" +
 				"Use --fix to correct configuration drift:\n" +
 				"  eos update vault --fix")
 	}
 
 	if vaultAddress == "" && vaultPorts == "" {
 		return eos_err.NewUserError(
-			"Must specify one of: --unseal, --address, --ports, --update-policies, or --fix.\n\n" +
+			"Must specify one of: --unseal, --address, --ports, --policies, or --fix.\n\n" +
 				"Unseal Vault (after reboot or seal):\n" +
 				"  eos update vault --unseal\n\n" +
 				"Fix configuration drift:\n" +
@@ -221,7 +221,7 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 				"  eos update vault --ports 8179 -> default\n" +
 				"  eos update vault --ports 8179 -> 8200 --dry-run\n\n" +
 				"Update policies to latest version:\n" +
-				"  eos update vault --update-policies")
+				"  eos update vault --policies")
 	}
 
 	// Route to appropriate handler

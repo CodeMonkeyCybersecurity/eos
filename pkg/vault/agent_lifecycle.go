@@ -433,7 +433,7 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 		log.Error(" ⚠️  SERVICE DEPLOYMENT BLOCKED: Cannot deploy services (bionicgpt, etc.)")
 		log.Error(" ⚠️  Missing capabilities: create, update on secret/data/services/*")
 		log.Error(" ⚠️  This indicates eos-default-policy was not written correctly")
-		log.Error(" ⚠️  Fix with: sudo eos update vault --update-policies && sudo systemctl restart vault-agent-eos")
+		log.Error(" ⚠️  Fix with: sudo eos update vault --policies && sudo systemctl restart vault-agent-eos")
 		return cerr.Newf("agent token missing required capabilities on %s: got %v, need [create, update]",
 			testPath, caps)
 	}

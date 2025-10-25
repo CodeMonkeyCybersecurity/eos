@@ -595,7 +595,7 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 			if !hasCreateOrUpdate {
 				result.Status = debug.StatusError
 				result.Message = "Token does NOT have create/update on services/* path"
-				result.Remediation = "Update policy: sudo eos update vault --update-policies && sudo systemctl restart vault-agent-eos"
+				result.Remediation = "Update policy: sudo eos update vault --policies && sudo systemctl restart vault-agent-eos"
 			}
 
 			// 4. Check eos-default-policy content
@@ -637,7 +637,7 @@ func VaultAgentTokenPermissionsDiagnostic() *debug.Diagnostic {
 
 					result.Status = debug.StatusError
 					result.Message = "Policy missing services/* path"
-					result.Remediation = "Update policy: sudo eos update vault --update-policies"
+					result.Remediation = "Update policy: sudo eos update vault --policies"
 				}
 			}
 

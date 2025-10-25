@@ -748,7 +748,7 @@ func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error 
 			return fmt.Errorf("failed to store secret in Vault at %s: %w\n\n"+
 				"HINT: The Vault policy may be missing service secrets access.\n"+
 				"Run this command to update Vault policies:\n"+
-				"  sudo eos update vault --update-policies\n\n"+
+				"  sudo eos update vault --policies\n\n"+
 				"Then restart Vault Agent to get a new token:\n"+
 				"  sudo systemctl restart vault-agent-eos", path, err)
 		}

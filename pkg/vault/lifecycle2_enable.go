@@ -363,7 +363,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Error(" [Phase 11.1] CRITICAL: eos-default-policy missing service secrets access")
 		log.Error(" ⚠️  SERVICE DEPLOYMENT BLOCKED: Cannot deploy services (bionicgpt, etc.)")
 		log.Error(" ⚠️  Missing path: secret/data/services/*")
-		log.Error(" ⚠️  Fix with: sudo eos update vault --update-policies")
+		log.Error(" ⚠️  Fix with: sudo eos update vault --policies")
 		return fmt.Errorf("eos-default-policy missing required service secrets path")
 	} else {
 		log.Info(" [Phase 11.1] ✓ Verified: eos-default-policy includes service secrets access")

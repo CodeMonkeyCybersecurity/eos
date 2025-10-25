@@ -303,7 +303,7 @@ failed to store secret in Vault at services/production/bionicgpt: permission den
 
 HINT: The Vault policy may be missing service secrets access.
 Run this command to update Vault policies:
-  sudo eos update vault --update-policies
+  sudo eos update vault --policies
 
 Then restart Vault Agent to get a new token:
   sudo systemctl restart vault-agent-eos
@@ -404,7 +404,7 @@ func TestSecretStorage(t *testing.T) {
 ### "failed to write metadata to secret/metadata/services/..."
 
 **Cause**: Vault token lacks metadata write permissions
-**Fix**: Run `sudo eos update vault --update-policies`
+**Fix**: Run `sudo eos update vault --policies`
 
 ### "Secret exists in memory but lost on restart"
 
