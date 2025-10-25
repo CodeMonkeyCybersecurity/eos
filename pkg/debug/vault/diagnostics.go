@@ -55,6 +55,8 @@ func AllDiagnostics() []*debug.Diagnostic {
 		VaultAgentTokenDiagnostic(),
 		VaultAgentTokenPermissionsDiagnostic(), // Comprehensive token permissions analysis
 		VaultAgentLogsDiagnostic(),
+		// Vault Identity diagnostics
+		IdentityDiagnostic(), // Entity and alias configuration
 	}
 }
 
@@ -106,6 +108,9 @@ func AuthDiagnostics() []*debug.Diagnostic {
 
 		// 6. Review logs for authentication errors
 		VaultAgentLogsDiagnostic(),
+
+		// 7. Check identity entity and aliases (needed for MFA)
+		IdentityDiagnostic(),
 	}
 }
 

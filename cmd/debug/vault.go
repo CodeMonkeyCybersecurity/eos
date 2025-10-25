@@ -18,12 +18,13 @@ import (
 )
 
 var (
-	vaultDebugFormat   string
-	vaultDebugOutput   string
-	vaultDebugSanitize bool
-	vaultDebugShowAll  bool
-	vaultDebugAgent    bool
-	vaultDebugAuth     bool
+	vaultDebugFormat     string
+	vaultDebugOutput     string
+	vaultDebugSanitize   bool
+	vaultDebugShowAll    bool
+	vaultDebugAgent      bool
+	vaultDebugAuth       bool
+	vaultDebugIdentities bool
 )
 
 var vaultDebugCmd = &cobra.Command{
@@ -45,8 +46,9 @@ This command performs extensive checks on:
 - Authentication and authorization (AppRole, tokens, policies)
 
 DIAGNOSTIC MODES:
-  --agent    Vault Agent service diagnostics (service, config, credentials, token, logs)
-  --auth     Authentication & authorization deep-dive (policies, permissions, AppRole, token capabilities)
+  --agent       Vault Agent service diagnostics (service, config, credentials, token, logs)
+  --auth        Authentication & authorization deep-dive (policies, permissions, AppRole, token capabilities)
+  --identities  Identity entity and alias diagnostics (entity ID, aliases, MFA methods)
 
 EXAMPLES:
   # Run full diagnostics with text output
@@ -57,6 +59,9 @@ EXAMPLES:
 
   # Deep-dive authentication troubleshooting (permission denied, policy issues)
   sudo eos debug vault --auth
+
+  # Identity entity diagnostics (troubleshoot MFA setup, entity aliases)
+  sudo eos debug vault --identities
 
   # Save to file
   sudo eos debug vault --output=/tmp/vault-debug.txt
@@ -89,6 +94,7 @@ func init() {
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugShowAll, "show-all", false, "Show all checks including skipped ones")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAgent, "agent", false, "Run Vault Agent diagnostics only (service, config, credentials, token, logs)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAuth, "auth", false, "Run authentication & authorization diagnostics (health, AppRole, token, policies, permissions)")
+	vaultDebugCmd.Flags().BoolVar(&vaultDebugIdentities, "identities", false, "Run identity entity and alias diagnostics (entity ID, aliases, MFA methods)")
 
 	debugCmd.AddCommand(vaultDebugCmd)
 }
@@ -97,8 +103,18 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Validate mutually exclusive flags
-	if vaultDebugAgent && vaultDebugAuth {
-		return fmt.Errorf("--agent and --auth flags are mutually exclusive; use only one at a time")
+	flagCount := 0
+	if vaultDebugAgent {
+		flagCount++
+	}
+	if vaultDebugAuth {
+		flagCount++
+	}
+	if vaultDebugIdentities {
+		flagCount++
+	}
+	if flagCount > 1 {
+		return fmt.Errorf("--agent, --auth, and --identities flags are mutually exclusive; use only one at a time")
 	}
 
 	logger.Info("Starting Vault diagnostics",
@@ -107,6 +123,7 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Bool("show_all", vaultDebugShowAll),
 		zap.Bool("agent_mode", vaultDebugAgent),
 		zap.Bool("auth_mode", vaultDebugAuth),
+		zap.Bool("identities_mode", vaultDebugIdentities),
 		zap.String("output_file", vaultDebugOutput))
 
 	// Create collector with appropriate formatter
@@ -146,6 +163,13 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			zap.Int("auth_diagnostics", len(allDiagnostics)))
 		totalDiagnostics = len(allDiagnostics)
 		logger.Info("Registered auth diagnostics", zap.Int("total", totalDiagnostics))
+	} else if vaultDebugIdentities {
+		componentName = "Vault Identity"
+		allDiagnostics = []*debug.Diagnostic{debugvault.IdentityDiagnostic()}
+		logger.Debug("Running in Identities-only mode",
+			zap.Int("identity_diagnostics", len(allDiagnostics)))
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered identity diagnostics", zap.Int("total", totalDiagnostics))
 	} else {
 		// Full mode: all diagnostics including TLS
 		allDiagnostics = debugvault.AllDiagnostics()
@@ -217,6 +241,8 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			summaryComponent = "vault-agent"
 		} else if vaultDebugAuth {
 			summaryComponent = "vault-auth"
+		} else if vaultDebugIdentities {
+			summaryComponent = "vault-identity"
 		}
 		output = debug.FormatQuickSummary(quickSummary, summaryComponent)
 		output += "\n\n"
