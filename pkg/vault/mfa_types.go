@@ -55,6 +55,16 @@ type MFABootstrapData struct {
 	// Used for staleness detection - if this data is very old, it might
 	// indicate the password has been rotated or the operation is stuck.
 	FetchedAt time.Time
+
+	// SecretVersion is the Vault KV v2 version number of the bootstrap password
+	// Used for optimistic locking - if this version changes, the password was rotated
+	// after we fetched it, and we should refuse to use the cached password.
+	//
+	// This provides stronger guarantees than time-based staleness detection because
+	// it detects actual Vault state changes rather than just elapsed time.
+	//
+	// Version 0 means version tracking is not available (older Vault or KV v1).
+	SecretVersion int
 }
 
 // IsStale returns true if the cached data is older than the threshold.

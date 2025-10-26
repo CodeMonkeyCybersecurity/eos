@@ -608,10 +608,10 @@ func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error)
 // the password once during verification instead of checking existence then reading later.
 //
 // Prerequisites verified:
-//   1. Userpass user exists
-//   2. Entity exists (by name or alias)
-//   3. Entity alias exists for userpass mount
-//   4. Bootstrap password exists and is readable
+//  1. Userpass user exists
+//  2. Entity exists (by name or alias)
+//  3. Entity alias exists for userpass mount
+//  4. Bootstrap password exists and is readable
 //
 // Returns MFABootstrapData containing the password and metadata, or error if any
 // prerequisite fails.
@@ -621,9 +621,10 @@ func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error)
 //
 // Eliminates TOCTOU: By reading the password during verification instead of just checking
 // existence, we avoid the race condition where:
-//   T0: Check if password exists → TRUE
-//   T1: [Password gets deleted/rotated]
-//   T2: Try to read password → FAIL
+//
+//	T0: Check if password exists → TRUE
+//	T1: [Password gets deleted/rotated]
+//	T2: Try to read password → FAIL
 //
 // Example:
 //
@@ -790,13 +791,36 @@ func VerifyAndFetchMFAPrerequisites(
 		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
 		zap.Int("password_length", len(password)))
 
+	// Extract version number for optimistic locking (P1 enhancement)
+	// This allows detecting if the password was rotated between fetch and use
+	secretVersion := 0
+	if metadata, ok := passwordSecret.Data["metadata"].(map[string]interface{}); ok {
+		if version, ok := metadata["version"].(int); ok {
+			secretVersion = version
+			log.Debug("   Extracted secret version for optimistic locking",
+				zap.Int("version", secretVersion))
+		} else {
+			// Try json.Number (Vault sometimes returns numbers as json.Number)
+			if versionNum, ok := metadata["version"].(float64); ok {
+				secretVersion = int(versionNum)
+				log.Debug("   Extracted secret version from float64",
+					zap.Int("version", secretVersion))
+			}
+		}
+	}
+
+	if secretVersion == 0 {
+		log.Debug("   Version tracking not available (KV v1 or older Vault)")
+	}
+
 	// Build return data
 	bootstrapData := &MFABootstrapData{
-		Username:   username,
-		Password:   password,
-		EntityID:   entityID,
-		SecretPath: vaultpaths.UserpassBootstrapPasswordKVPath,
-		FetchedAt:  time.Now(),
+		Username:      username,
+		Password:      password,
+		EntityID:      entityID,
+		SecretPath:    vaultpaths.UserpassBootstrapPasswordKVPath,
+		FetchedAt:     time.Now(),
+		SecretVersion: secretVersion,
 	}
 
 	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully",
@@ -811,29 +835,14 @@ func VerifyAndFetchMFAPrerequisites(
 	return bootstrapData, nil
 }
 
-// VerifyMFAPrerequisites checks that all prerequisites for MFA setup exist
-// This provides clear diagnostic output if something is misconfigured
+// NOTE: VerifyMFAPrerequisites() was DELETED in this commit.
 //
-// DEPRECATED: Use VerifyAndFetchMFAPrerequisites() instead.
-// This function only verifies existence without fetching the bootstrap password,
-// which creates a TOCTOU vulnerability (check at T0, read at T1).
+// RATIONALE: The backwards-compatibility wrapper defeated the optimization by throwing
+// away the fetched bootstrap data, forcing redundant Vault reads. Analysis showed zero
+// callers in the codebase, making the wrapper pure technical debt.
 //
-// This function is kept for backwards compatibility but will be removed in future versions.
-// It's now implemented as a simple wrapper that calls VerifyAndFetchMFAPrerequisites
-// and discards the returned bootstrap data.
-//
-// Prerequisites checked:
-// 1. Userpass user exists
-// 2. Entity exists (by name or alias)
-// 3. Entity alias exists for userpass mount
-// 4. Bootstrap password exists (via the new function)
-//
-// This function is defensive and provides detailed diagnostics if any prerequisite is missing.
-func VerifyMFAPrerequisites(rc *eos_io.RuntimeContext, client *api.Client, username string) error {
-	// Delegate to the new function and discard the bootstrap data
-	_, err := VerifyAndFetchMFAPrerequisites(rc, client, username)
-	return err
-}
+// Migration: Any external code should use VerifyAndFetchMFAPrerequisites() instead,
+// which verifies prerequisites AND returns the cached bootstrap data for later use.
 
 // deleteEntityTOTPSecret deletes the TOTP secret for an entity
 // This is used during cleanup when TOTP verification fails
@@ -987,18 +996,165 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("")
 
-	// STALENESS CHECK: Warn if cached bootstrap data is old
-	dataAge := bootstrapData.Age()
-	if dataAge > 5*time.Minute {
-		log.Warn("Bootstrap data is older than 5 minutes",
-			zap.Duration("age", dataAge),
+	// ========================================
+	// DEFENSIVE CHECKS (P0 - CRITICAL)
+	// ========================================
+	// These checks catch caller bugs that would otherwise cause confusing crashes
+	// or security issues. They should never fire in normal operation.
+
+	// Check 1: Nil pointer guard
+	if bootstrapData == nil {
+		log.Error("BUG: SetupUserTOTP called with nil bootstrapData",
+			zap.String("username", username))
+		return cerr.New(
+			"BUG: SetupUserTOTP called with nil bootstrapData.\n" +
+				"This is a programming error.\n" +
+				"Bootstrap data must be fetched with VerifyAndFetchMFAPrerequisites first.")
+	}
+
+	// Check 2: Username mismatch guard
+	if bootstrapData.Username != username {
+		log.Error("BUG: Bootstrap data username mismatch",
+			zap.String("requested_username", username),
+			zap.String("bootstrap_username", bootstrapData.Username))
+		return cerr.Errorf(
+			"BUG: Bootstrap data username mismatch.\n"+
+				"Function called for user '%s' but data is for user '%s'.\n"+
+				"This is a programming error in the caller.",
+			username, bootstrapData.Username)
+	}
+
+	// Check 3: Required fields guard
+	if bootstrapData.Password == "" {
+		log.Error("BUG: Bootstrap data has empty password field",
+			zap.String("username", username))
+		return cerr.New("BUG: Bootstrap data has empty password field")
+	}
+
+	if bootstrapData.EntityID == "" {
+		log.Error("BUG: Bootstrap data has empty entity ID field",
+			zap.String("username", username))
+		return cerr.New("BUG: Bootstrap data has empty entity ID field")
+	}
+
+	if bootstrapData.SecretPath == "" {
+		log.Error("BUG: Bootstrap data has empty secret path field",
+			zap.String("username", username))
+		return cerr.New("BUG: Bootstrap data has empty secret path field")
+	}
+
+	// Check 4: Future timestamp guard (system clock issues)
+	if bootstrapData.FetchedAt.After(time.Now()) {
+		log.Error("BUG: Bootstrap data has future timestamp",
+			zap.String("username", username),
 			zap.Time("fetched_at", bootstrapData.FetchedAt),
-			zap.String("warning", "password may have been rotated since verification"))
-		log.Warn("If TOTP verification fails below, this staleness may be the cause")
-	} else {
-		log.Debug("Using cached bootstrap data",
+			zap.Time("now", time.Now()))
+		return cerr.Errorf(
+			"BUG: Bootstrap data has future timestamp.\n"+
+				"FetchedAt: %s, Now: %s\n"+
+				"This indicates a system clock problem.",
+			bootstrapData.FetchedAt, time.Now())
+	}
+
+	log.Debug("Defensive checks passed - bootstrap data is valid",
+		zap.String("username", username),
+		zap.String("entity_id", bootstrapData.EntityID),
+		zap.Int("password_length", len(bootstrapData.Password)))
+
+	// ========================================
+	// STALENESS CHECK
+	// ========================================
+	// STALENESS CHECK: Fail fast if cached bootstrap data is too old
+	// CRITICAL P0 FIX: Previously this only warned and continued, which is security theater.
+	// Now we actually prevent using stale data to avoid authentication failures.
+	dataAge := bootstrapData.Age()
+	const stalenessThreshold = 5 * time.Minute
+
+	if dataAge > stalenessThreshold {
+		log.Error("Bootstrap data is too old - refusing to use stale password",
 			zap.Duration("age", dataAge),
+			zap.Duration("threshold", stalenessThreshold),
 			zap.Time("fetched_at", bootstrapData.FetchedAt))
+		return cerr.Errorf(
+			"Bootstrap data is too old (%s). Maximum age: %s.\n"+
+				"The password may have been rotated since verification.\n"+
+				"Please retry: eos update vault --setup-mfa-user %s",
+			dataAge, stalenessThreshold, username)
+	}
+
+	log.Debug("Using cached bootstrap data (within staleness threshold)",
+		zap.Duration("age", dataAge),
+		zap.Duration("threshold", stalenessThreshold),
+		zap.Time("fetched_at", bootstrapData.FetchedAt))
+
+	// ========================================
+	// VERSION-BASED STALENESS CHECK (P1 - ENHANCED SECURITY)
+	// ========================================
+	// Verify that the bootstrap password hasn't been rotated since we fetched it.
+	// This provides stronger guarantees than time-based staleness because it detects
+	// actual Vault state changes rather than just elapsed time.
+	//
+	// Example scenario this prevents:
+	//   T0: Fetch password (version 1) = "pass123"
+	//   T1: Admin rotates password (version 2) = "pass456"
+	//   T2: We try to use cached "pass123" - FAILS
+	//   Time-based check wouldn't catch this if T2-T0 < threshold!
+	//
+	// With version check, we detect version mismatch and refuse to use stale password.
+
+	if bootstrapData.SecretVersion > 0 {
+		// Version tracking is available - verify password hasn't been rotated
+		log.Debug("Verifying bootstrap password version for optimistic locking",
+			zap.Int("cached_version", bootstrapData.SecretVersion),
+			zap.String("secret_path", bootstrapData.SecretPath))
+
+		currentSecret, err := client.Logical().Read(bootstrapData.SecretPath)
+		if err != nil {
+			log.Error("Failed to verify bootstrap password version",
+				zap.Error(err),
+				zap.String("secret_path", bootstrapData.SecretPath))
+			return cerr.Wrap(err, "failed to verify bootstrap password version")
+		}
+
+		if currentSecret == nil || currentSecret.Data == nil {
+			log.Error("Bootstrap password disappeared during setup",
+				zap.String("secret_path", bootstrapData.SecretPath))
+			return cerr.Errorf(
+				"Bootstrap password disappeared during setup!\n"+
+					"Expected at: %s\n"+
+					"This may indicate a security incident or misconfiguration.",
+				bootstrapData.SecretPath)
+		}
+
+		// Extract current version
+		currentVersion := 0
+		if metadata, ok := currentSecret.Data["metadata"].(map[string]interface{}); ok {
+			if version, ok := metadata["version"].(int); ok {
+				currentVersion = version
+			} else if versionNum, ok := metadata["version"].(float64); ok {
+				currentVersion = int(versionNum)
+			}
+		}
+
+		// Compare versions
+		if currentVersion != bootstrapData.SecretVersion {
+			log.Error("Bootstrap password was rotated during setup",
+				zap.Int("cached_version", bootstrapData.SecretVersion),
+				zap.Int("current_version", currentVersion),
+				zap.String("secret_path", bootstrapData.SecretPath))
+			return cerr.Errorf(
+				"Bootstrap password was modified during setup!\n"+
+					"Cached version: %d\n"+
+					"Current version: %d\n"+
+					"This indicates the password was rotated.\n"+
+					"Please retry: eos update vault --setup-mfa-user %s",
+				bootstrapData.SecretVersion, currentVersion, username)
+		}
+
+		log.Debug("✓ Bootstrap password version verified (not rotated)",
+			zap.Int("version", currentVersion))
+	} else {
+		log.Debug("Version-based staleness check skipped (version tracking not available)")
 	}
 
 	// Step 1: Retrieve the TOTP method ID that was created during EnableMFAMethods

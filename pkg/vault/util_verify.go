@@ -37,8 +37,9 @@ import (
 //   - err: non-nil if error checking (not a 404)
 //
 // Path Resolution:
-//   Input semantic path: "eos/bootstrap"
-//   Constructed metadata path: "secret/metadata/eos/bootstrap"
+//
+//	Input semantic path: "eos/bootstrap"
+//	Constructed metadata path: "secret/metadata/eos/bootstrap"
 //
 // Error Handling:
 //   - 404 errors are expected (secret doesn't exist) → returns (false, nil)
@@ -109,6 +110,22 @@ func checkSecretExistsKVv2(
 
 	// Secret exists if we got a non-nil response with data
 	if secret != nil && secret.Data != nil {
+		// CRITICAL P1 FIX: Check if secret is destroyed (all versions permanently deleted)
+		// The metadata endpoint returns success even for destroyed secrets,
+		// so we must check the destroyed field explicitly.
+		//
+		// KV v2 has multiple deletion states:
+		// 1. Soft-deleted: deletion_time set, can be undeleted
+		// 2. Destroyed: destroyed=true, permanently deleted, CANNOT be recovered
+		//
+		// We check destroyed first because it's the most severe state.
+		if destroyed, ok := secret.Data["destroyed"].(bool); ok && destroyed {
+			log.Warn("Secret exists in metadata but is destroyed (all versions permanently deleted)",
+				zap.String("semantic_path", semanticPath),
+				zap.String("metadata_path", metadataPath))
+			return false, nil // Treat destroyed secrets as not existing
+		}
+
 		// CRITICAL: Check if the secret is soft-deleted in KV v2
 		// The metadata endpoint returns success even for deleted secrets,
 		// so we must check the deletion_time field explicitly.
@@ -116,7 +133,7 @@ func checkSecretExistsKVv2(
 		// From Vault docs: "The metadata endpoint returns metadata about a secret,
 		// including deletion and version information. A deleted secret still has metadata."
 		if deletionTime, ok := secret.Data["deletion_time"].(string); ok && deletionTime != "" {
-			log.Warn("Secret exists in metadata but is marked as deleted",
+			log.Warn("Secret exists in metadata but current version is soft-deleted",
 				zap.String("semantic_path", semanticPath),
 				zap.String("metadata_path", metadataPath),
 				zap.String("deletion_time", deletionTime))
