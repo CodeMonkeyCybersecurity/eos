@@ -139,7 +139,7 @@ func GenerateMissingConfigError(missingFlags []string) error {
 	msg.WriteString("  eos create bionicgpt --help          # Full documentation\n")
 	msg.WriteString("\n")
 
-	return eos_err.NewUserError(msg.String())
+	return eos_err.NewUserError("%s", msg.String())
 }
 
 // GenerateMissingConfigErrorShort creates a concise error message for missing configuration
@@ -168,7 +168,7 @@ func GenerateMissingConfigErrorShort(missingFlags []string) error {
 	msg.WriteString("For detailed explanations of each flag, run:\n")
 	msg.WriteString("  eos create bionicgpt --help\n")
 
-	return eos_err.NewUserError(msg.String())
+	return eos_err.NewUserError("%s", msg.String())
 }
 
 // ValidateRequiredFlags checks if required configuration flags are provided
