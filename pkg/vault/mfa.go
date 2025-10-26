@@ -1280,22 +1280,26 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("")
 
-	// Step 4: Prompt user to test TOTP code
-	log.Info("Now please test your TOTP code to verify it works.")
+	// Step 4: Clear sequential instructions to prevent user confusion
+	log.Info("NEXT STEPS:")
+	log.Info("")
+	log.Info("  Step 1: ADD the QR code or secret key to your authenticator app")
+	log.Info("          (Google Authenticator, Authy, 1Password, etc.)")
+	log.Info("")
+	log.Info("  Step 2: WAIT for the 6-digit code to appear in your app")
+	log.Info("          (it changes every 30 seconds)")
+	log.Info("")
+	log.Info("  Step 3: Press ENTER when you've added the secret and can see the code")
 	log.Info("")
 
-	// Wait for user to confirm they've saved the secret
-	if !interaction.PromptYesNo(rc.Ctx, "Have you saved the TOTP secret in your authenticator app?", true) {
-		log.Warn("User declined to save TOTP secret")
-		log.Warn("WARNING: User will NOT be able to authenticate with MFA until they configure TOTP")
-		return cerr.New("user did not save TOTP secret")
-	}
+	// Wait for user to press ENTER (avoids confusion with yes/no or TOTP code entry)
+	_ = interaction.PromptRequired("Press ENTER to continue...")
+
+	log.Info("")
+	log.Info("Great! Now let's test the TOTP code to verify it works.")
+	log.Info("")
 
 	// Verify TOTP setup by performing an actual login test
-	log.Info("")
-	log.Info("Testing TOTP code via actual authentication...")
-	log.Info("")
-
 	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
 	if err != nil {
 		log.Error(" Failed to get test code from user", zap.Error(err))
