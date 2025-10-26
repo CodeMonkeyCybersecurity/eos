@@ -160,6 +160,10 @@ func GenerateMissingConfigErrorShort(missingFlags []string) error {
 			msg.WriteString("Authentik URL (e.g., https://auth.example.com)\n")
 		}
 	}
+
+	// Interactive mode hint
+	msg.WriteString("\nTip: Run in an interactive terminal to be prompted for values\n")
+
 	msg.WriteString("\nExample:\n")
 	msg.WriteString("  eos create bionicgpt \\\n")
 	msg.WriteString("    --domain chat.example.com \\\n")

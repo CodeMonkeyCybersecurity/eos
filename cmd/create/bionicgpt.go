@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt_nomad"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -160,7 +161,10 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 
 // validateBionicGPTConfig validates required configuration before deployment
 // PreRunE: Fails fast with helpful error message if required flags are missing
+// IN INTERACTIVE MODE: Prompts for missing values
 func validateBionicGPTConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
 	// Build minimal config to check required fields
 	config := &bionicgpt_nomad.EnterpriseConfig{
 		Domain:    bionicgptDomain,
@@ -168,8 +172,41 @@ func validateBionicGPTConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		AuthURL:   bionicgptAuthURL,
 	}
 
-	// Validate required flags - returns user-friendly error with context
-	return bionicgpt_nomad.ValidateRequiredFlags(config)
+	// Check if required flags are missing
+	if err := bionicgpt_nomad.ValidateRequiredFlags(config); err != nil {
+		// If we're in a TTY (interactive terminal), offer to prompt
+		if interaction.IsTTY() {
+			logger.Info("Missing required flags, entering interactive mode")
+
+			// Prompt for missing values
+			updatedConfig, promptErr := bionicgpt_nomad.PromptForMissingConfig(rc, config)
+			if promptErr != nil {
+				// User cancelled, timeout, or error
+				logger.Info("Interactive mode cancelled or failed",
+					zap.Error(promptErr))
+
+				// Show original error with helpful hint
+				return fmt.Errorf("%w\n\nTip: Interactive mode failed. Use flags instead", err)
+			}
+
+			// Update global flag variables with prompted values
+			bionicgptDomain = updatedConfig.Domain
+			bionicgptCloudNode = updatedConfig.CloudNode
+			bionicgptAuthURL = updatedConfig.AuthURL
+
+			logger.Info("Interactive configuration completed successfully",
+				zap.String("domain", bionicgptDomain),
+				zap.String("cloud_node", bionicgptCloudNode))
+
+			return nil
+		}
+
+		// Not interactive - return original error
+		return err
+	}
+
+	// All flags provided - no prompting needed
+	return nil
 }
 
 func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

@@ -106,23 +106,23 @@ func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Add VM configuration if type is vm
 	if unifiedType == "vm" {
-		memoryMB, err := utils.ParseMemorySize(vmMemory)
+		memoryMB, err := utils.ParseMemorySize(unifiedMemory)
 		if err != nil {
 			return fmt.Errorf("invalid memory size: %w", err)
 		}
 
-		volumes, err := parseVolumeSpecs(vmVolumes)
+		volumes, err := parseVolumeSpecs(unifiedVolumes)
 		if err != nil {
 			return fmt.Errorf("invalid volume format: %w", err)
 		}
 
 		request.VMConfig = &unified.VMStorageConfig{
 			Memory:    memoryMB,
-			VCPUs:     uint(vmVCPUs),
-			Network:   vmNetwork,
-			OSVariant: vmOSVariant,
-			SSHKeys:   vmSSHKeys,
-			CloudInit: vmCloudInit,
+			VCPUs:     uint(unifiedVCPUs),
+			Network:   unifiedNetwork,
+			OSVariant: unifiedOSVariant,
+			SSHKeys:   unifiedSSHKeys,
+			CloudInit: unifiedCloudInit,
 			Volumes:   volumes,
 		}
 	}

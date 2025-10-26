@@ -40,9 +40,8 @@ For example:
 }
 
 func init() {
-	// Add storage and VM management commands
+	// Add storage commands
 	CreateCmd.AddCommand(storageUdisks2Cmd)
-	CreateCmd.AddCommand(vmLibvirtCmd)
 	CreateCmd.AddCommand(storageUnifiedCmd)
 
 }
