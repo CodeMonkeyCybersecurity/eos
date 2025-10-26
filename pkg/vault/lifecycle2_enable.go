@@ -474,7 +474,8 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 			log.Info("TOTP has been verified to work, now enforcing MFA for all logins...")
 			log.Info("")
 
-			if err := EnforceMFAPolicyOnly(rc, client, mfaConfig); err != nil {
+			// Pass entity ID from bootstrapData to enforcement (required for policy to target users)
+			if err := EnforceMFAPolicyOnly(rc, client, mfaConfig, bootstrapData.EntityID); err != nil {
 				log.Error(" [Phase 13] Failed to enforce MFA policy",
 					zap.Error(err),
 					zap.Duration("duration", time.Since(phaseStart)))

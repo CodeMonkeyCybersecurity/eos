@@ -121,11 +121,16 @@ func CreateMFAMethodsOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 // one user. This ensures users can actually authenticate with MFA before
 // enforcement is active.
 //
+// The entityID parameter specifies which entity the enforcement should target.
+// This is required because Vault's default behavior is to not enforce MFA on
+// anyone if entity IDs are not specified (safety measure to prevent lockouts).
+//
 // If this function is called before TOTP setup, users will be locked out
 // because they won't have TOTP secrets configured yet.
-func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
+func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig, entityID string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Applying MFA enforcement policy")
+	log.Info(" Applying MFA enforcement policy",
+		zap.String("entity_id", entityID))
 	log.Info("MFA Setup State Transition",
 		zap.String("from_state", "totp_verified"),
 		zap.String("to_state", "mfa_enforced"),
@@ -133,6 +138,11 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 
 	if config == nil {
 		config = DefaultMFAConfig()
+	}
+
+	if entityID == "" {
+		log.Error(" Entity ID is required for MFA enforcement")
+		return cerr.New("entity ID is required for MFA enforcement - cannot target specific users without it")
 	}
 
 	// Get privileged client
@@ -145,7 +155,7 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 	// Apply enforcement policies
 	if config.EnforceForAll {
 		log.Info(" Enforcing MFA for all authentication methods")
-		if err := enforceMFAForAllUsers(rc, privilegedClient, config); err != nil {
+		if err := enforceMFAForAllUsers(rc, privilegedClient, config, entityID); err != nil {
 			log.Error(" Failed to enforce MFA for all users", zap.Error(err))
 			return cerr.Wrap(err, "failed to enforce MFA for all users")
 		}
@@ -164,20 +174,17 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 // DEPRECATED: Use CreateMFAMethodsOnly() + SetupUserTOTP() + EnforceMFAPolicyOnly()
 // for better error recovery and idempotency.
 //
+// BROKEN: This function is deprecated and WILL NOT WORK because it doesn't have
+// access to the entity ID required for MFA enforcement. DO NOT USE.
+//
 // This function combines method creation and enforcement in one operation,
 // which can lead to lockout if TOTP setup fails.
 func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Warn(" DEPRECATED: Using legacy EnableMFAMethods (combines creation + enforcement)")
-	log.Warn(" Consider using CreateMFAMethodsOnly + EnforceMFAPolicyOnly for better safety")
+	log.Error(" DEPRECATED AND BROKEN: EnableMFAMethods cannot work without entity ID")
+	log.Error(" Use CreateMFAMethodsOnly + SetupUserTOTP + EnforceMFAPolicyOnly instead")
 
-	// Call new functions in sequence (legacy behavior)
-	if err := CreateMFAMethodsOnly(rc, client, config); err != nil {
-		return err
-	}
-
-	// Immediately enforce (this is the old behavior that can cause lockout)
-	return EnforceMFAPolicyOnly(rc, client, config)
+	return cerr.New("EnableMFAMethods is deprecated and broken - missing entity ID parameter required for enforcement")
 }
 
 // enableTOTPMFA enables Time-based One-Time Password MFA using Identity-based MFA
@@ -392,14 +399,15 @@ func enableOktaMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 }
 
 // enforceMFAForAllUsers creates policies to enforce MFA for all authentication methods
-func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
+func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig, entityID string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Configuring Identity-based MFA enforcement")
+	log.Info(" Configuring Identity-based MFA enforcement",
+		zap.String("entity_id", entityID))
 
 	// For now, we'll create a basic enforcement that can be expanded later
 	// Identity MFA enforcement requires method IDs which we stored earlier
 	if config.TOTPEnabled {
-		if err := enforceIdentityMFAForUserpass(rc, client); err != nil {
+		if err := enforceIdentityMFAForUserpass(rc, client, entityID); err != nil {
 			log.Warn("Failed to enforce TOTP MFA for userpass", zap.Error(err))
 		}
 	}
@@ -411,10 +419,14 @@ func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config
 }
 
 // enforceIdentityMFAForUserpass creates MFA login enforcement for userpass authentication
-// CRITICAL P0 FIX: This now creates an ACTUAL enforcement policy (was previously a stub)
-func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client) error {
+// CRITICAL P0 FIX: This now creates an ACTUAL enforcement policy targeting specific entity
+//
+// The entityID parameter specifies which entity (user) the MFA enforcement applies to.
+// Without this, the policy exists but doesn't apply to anyone (Vault safety default).
+func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, entityID string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Creating MFA login enforcement policy for userpass authentication")
+	log.Info(" Creating MFA login enforcement policy for userpass authentication",
+		zap.String("entity_id", entityID))
 
 	// Step 1: Retrieve TOTP method ID from Vault KV (stored during TOTP enablement)
 	log.Info(" [ASSESS] Retrieving TOTP method ID from Vault KV")
@@ -475,11 +487,14 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 	enforcementName := "eos-userpass-enforcement"
 	enforcementPath := fmt.Sprintf("identity/mfa/login-enforcement/%s", enforcementName)
 
+	// CRITICAL: Must specify identity_entity_ids to target specific users
+	// Without this field, the policy exists but doesn't apply to anyone (Vault safety default)
 	enforcementConfig := map[string]interface{}{
 		"name":                  enforcementName,
 		"mfa_method_ids":        []string{methodID},
 		"auth_method_accessors": []string{userpassAccessor},
 		"auth_method_types":     []string{"userpass"},
+		"identity_entity_ids":   []string{entityID}, // Target specific entity
 	}
 
 	log.Debug("MFA enforcement policy configuration",
@@ -494,7 +509,7 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 		return cerr.Wrap(err, "failed to create MFA enforcement policy")
 	}
 
-	// Step 4: Verify enforcement policy was created
+	// Step 4: Verify enforcement policy was created AND contains entity IDs
 	log.Info(" [EVALUATE] Verifying MFA enforcement policy creation")
 	verifyResp, err := client.Logical().Read(enforcementPath)
 	if err != nil {
@@ -503,9 +518,22 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 	} else if verifyResp == nil {
 		log.Warn("MFA enforcement policy verification returned nil (may still be active)")
 	} else {
-		log.Info(" MFA enforcement policy verified",
-			zap.String("policy_name", enforcementName),
-			zap.Int("response_keys", len(verifyResp.Data)))
+		// Verify the policy contains entity IDs (critical for enforcement to work)
+		if verifyResp.Data != nil {
+			if entityIDs, ok := verifyResp.Data["identity_entity_ids"].([]interface{}); ok && len(entityIDs) > 0 {
+				log.Info(" MFA enforcement policy verified with entity targeting",
+					zap.String("policy_name", enforcementName),
+					zap.Int("targeted_entities", len(entityIDs)),
+					zap.Any("entity_ids", entityIDs))
+			} else {
+				log.Warn("MFA enforcement policy created but has no entity IDs - may not apply to users",
+					zap.String("policy_name", enforcementName))
+			}
+		} else {
+			log.Info(" MFA enforcement policy verified",
+				zap.String("policy_name", enforcementName),
+				zap.Int("response_keys", len(verifyResp.Data)))
+		}
 	}
 
 	// Success!
