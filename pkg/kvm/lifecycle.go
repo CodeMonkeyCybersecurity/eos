@@ -252,7 +252,7 @@ func resolveIsoDir(rc *eos_io.RuntimeContext, nonInteractive bool, isoOverride s
 		otelzap.Ctx(rc.Ctx).Info("Using default ISO directory (non-interactive)", zap.String("iso_dir", "/srv/iso"))
 		return "/srv/iso"
 	}
-	val := interaction.PromptConfirmOrValue(rc.Ctx, "The hypervisor needs access to an ISO directory", "/srv/iso")
+	val := interaction.PromptInput(rc.Ctx, "The hypervisor needs access to an ISO directory", "/srv/iso")
 	otelzap.Ctx(rc.Ctx).Info("ISO directory selected", zap.String("iso_dir", val))
 	return val
 }

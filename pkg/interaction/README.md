@@ -1,6 +1,6 @@
 # pkg/interaction
 
-*Last Updated: 2025-10-21*
+*Last Updated: 2025-10-26*
 
 Human-centric interaction utilities for Eos following the principle: **Technology serves humans, not the other way around.**
 
@@ -15,10 +15,9 @@ This package provides utilities for interacting with users in a respectful, info
 Standard user input prompts with structured logging:
 
 - `PromptYesNo(ctx, prompt, defaultYes)` - Yes/No questions with configurable defaults
-- `PromptInput(ctx, prompt, defaultValue)` - Text input with optional defaults
+- `PromptInput(ctx, prompt, defaultValue)` - Text input with optional defaults (accepts default or custom value)
 - `PromptSecret(ctx, prompt)` - Hidden input for passwords/secrets
 - `PromptSelect(ctx, prompt, options)` - Multiple choice selection
-- `PromptConfirmOrValue(ctx, prompt, defaultValue)` - Accept default or enter custom value
 
 All prompts:
 - Log to structured logging (never `fmt.Print*`)
