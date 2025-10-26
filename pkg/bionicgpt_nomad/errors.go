@@ -142,6 +142,35 @@ func GenerateMissingConfigError(missingFlags []string) error {
 	return eos_err.NewUserError(msg.String())
 }
 
+// GenerateMissingConfigErrorShort creates a concise error message for missing configuration
+// Pattern: Brief explanation + example + pointer to --help for full details
+func GenerateMissingConfigErrorShort(missingFlags []string) error {
+	var msg strings.Builder
+
+	msg.WriteString("BionicGPT deployment requires configuration\n\n")
+	msg.WriteString("Missing required flags:\n")
+	for _, flag := range missingFlags {
+		msg.WriteString(fmt.Sprintf("  --%-12s  ", flag))
+		switch flag {
+		case "domain":
+			msg.WriteString("Public domain (e.g., chat.example.com)\n")
+		case "cloud-node":
+			msg.WriteString("Cloud node hostname (Tailscale name)\n")
+		case "auth-url":
+			msg.WriteString("Authentik URL (e.g., https://auth.example.com)\n")
+		}
+	}
+	msg.WriteString("\nExample:\n")
+	msg.WriteString("  eos create bionicgpt \\\n")
+	msg.WriteString("    --domain chat.example.com \\\n")
+	msg.WriteString("    --cloud-node cloud-hecate \\\n")
+	msg.WriteString("    --auth-url https://auth.example.com\n\n")
+	msg.WriteString("For detailed explanations of each flag, run:\n")
+	msg.WriteString("  eos create bionicgpt --help\n")
+
+	return eos_err.NewUserError(msg.String())
+}
+
 // ValidateRequiredFlags checks if required configuration flags are provided
 // Returns user-friendly error if any are missing
 func ValidateRequiredFlags(config *EnterpriseConfig) error {
@@ -158,7 +187,7 @@ func ValidateRequiredFlags(config *EnterpriseConfig) error {
 	}
 
 	if len(missingFlags) > 0 {
-		return GenerateMissingConfigError(missingFlags)
+		return GenerateMissingConfigErrorShort(missingFlags)
 	}
 
 	return nil

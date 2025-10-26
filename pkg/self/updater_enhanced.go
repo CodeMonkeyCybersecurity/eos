@@ -125,6 +125,52 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	eeu.logger.Info(" Enhanced self-update completed successfully",
 		zap.Duration("duration", time.Since(eeu.transaction.StartTime)))
 
+	// Display clear success summary to user
+	fmt.Println()
+	fmt.Println("════════════════════════════════════════════════════════════════")
+	if eeu.transaction.BinaryInstalled {
+		// Show before/after commit hashes (first 8 chars)
+		afterCommit := "unknown"
+		if currentCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir); err == nil {
+			afterCommit = currentCommit
+		}
+		if len(eeu.transaction.GitCommitBefore) >= 8 && len(afterCommit) >= 8 {
+			fmt.Printf("✅ Update complete: %s → %s\n",
+				eeu.transaction.GitCommitBefore[:8],
+				afterCommit[:8])
+		} else {
+			fmt.Println("✅ Update complete")
+		}
+	} else {
+		// Already on latest version
+		if len(eeu.transaction.GitCommitBefore) >= 8 {
+			fmt.Printf("✅ Already on latest version: %s\n",
+				eeu.transaction.GitCommitBefore[:8])
+		} else {
+			fmt.Println("✅ Already on latest version")
+		}
+	}
+
+	// Show what was updated
+	if eeu.enhancedConfig.UpdateSystemPackages {
+		fmt.Println("   System packages: ✅ Updated")
+	}
+	if eeu.enhancedConfig.UpdateGoVersion {
+		fmt.Println("   Go compiler: ✅ Updated")
+	}
+
+	fmt.Println("════════════════════════════════════════════════════════════════")
+
+	// Check for running processes - use existing pattern
+	if eeu.enhancedConfig.CheckRunningProcesses {
+		// Use WarnAboutRunningProcesses which already checks and logs
+		if err := process.WarnAboutRunningProcesses(eeu.rc, "eos"); err == nil {
+			fmt.Println("⚠️  Restart running eos processes to use new version")
+		}
+	}
+
+	fmt.Println()
+
 	return nil
 }
 

@@ -4,8 +4,6 @@ package eos_cli
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -24,10 +22,7 @@ import (
 func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) (err error) {
 		logger.InitFallback()
-		
-		// Debug logging
-		_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Wrap() called for command: %s\n", cmd.Name())
-		
+
 		ctx := eos_io.NewContext(context.Background(), cmd.Name())
 		defer ctx.End(&err)
 
@@ -82,10 +77,10 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		}
 
 		// CRITICAL FIX: Never prompt for bootstrap if we're already running a bootstrap command
-		isBootstrapCommand := strings.Contains(cmd.CommandPath(), "bootstrap") || 
+		isBootstrapCommand := strings.Contains(cmd.CommandPath(), "bootstrap") ||
 			cmd.Name() == "bootstrap" ||
 			(cmd.Parent() != nil && cmd.Parent().Name() == "bootstrap")
-		
+
 		// Debug logging to understand command detection
 		ctx.Log.Debug("Bootstrap command detection",
 			zap.String("cmd.Name()", cmd.Name()),
@@ -99,10 +94,20 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 				return "none"
 			}()),
 			zap.Bool("is_bootstrap_command", isBootstrapCommand))
-		
+
 		err = fn(ctx, cmd, args)
-		if err != nil && !eos_err.IsExpectedUserError(err) {
-			err = cerr.WithStack(err)
+		if err != nil {
+			if eos_err.IsExpectedUserError(err) {
+				// User errors are displayed nicely via cobra - don't log them
+				if ctx.Verbose {
+					ctx.Log.Debug("Command completed with expected user error",
+						zap.String("error_type", "user_config"))
+				}
+			} else {
+				// System errors need full logging for diagnostics
+				ctx.Log.Error("Command failed with system error", zap.Error(err))
+				err = cerr.WithStack(err)
+			}
 		}
 		return err
 	}
@@ -158,10 +163,10 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		}
 
 		// CRITICAL FIX: Never prompt for bootstrap if we're already running a bootstrap command
-		isBootstrapCommand := strings.Contains(cmd.CommandPath(), "bootstrap") || 
+		isBootstrapCommand := strings.Contains(cmd.CommandPath(), "bootstrap") ||
 			cmd.Name() == "bootstrap" ||
 			(cmd.Parent() != nil && cmd.Parent().Name() == "bootstrap")
-		
+
 		// Debug logging to understand command detection
 		ctx.Log.Debug("Bootstrap command detection",
 			zap.String("cmd.Name()", cmd.Name()),
@@ -175,10 +180,20 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 				return "none"
 			}()),
 			zap.Bool("is_bootstrap_command", isBootstrapCommand))
-		
+
 		err = fn(ctx, cmd, args)
-		if err != nil && !eos_err.IsExpectedUserError(err) {
-			err = cerr.WithStack(err)
+		if err != nil {
+			if eos_err.IsExpectedUserError(err) {
+				// User errors are displayed nicely via cobra - don't log them
+				if ctx.Verbose {
+					ctx.Log.Debug("Command completed with expected user error",
+						zap.String("error_type", "user_config"))
+				}
+			} else {
+				// System errors need full logging for diagnostics
+				ctx.Log.Error("Command failed with system error", zap.Error(err))
+				err = cerr.WithStack(err)
+			}
 		}
 		return err
 	}
@@ -188,9 +203,10 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 // This function remains for backward compatibility but will be removed in a future version.
 //
 // Migration guide:
-//   Old: RunE: eos_cli.WrapDebug("service", runDebugService)
-//   New: RunE: eos_cli.Wrap(runDebugService)
-//        Then in runDebugService, capture output and call saveDebugOutput()
+//
+//	Old: RunE: eos_cli.WrapDebug("service", runDebugService)
+//	New: RunE: eos_cli.Wrap(runDebugService)
+//	     Then in runDebugService, capture output and call saveDebugOutput()
 //
 // See cmd/debug/consul.go for the reference implementation.
 func WrapDebug(serviceName string, fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
@@ -277,14 +293,16 @@ func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitize
 
 // startResourceWatchdog initializes resource monitoring for resource-intensive commands
 func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
-	_, _ = fmt.Fprintf(os.Stderr, "DEBUG: startResourceWatchdog called for command: %s\n", commandName)
+	ctx.Log.Debug("startResourceWatchdog called", zap.String("command", commandName))
 
 	// Commands that should NEVER be monitored
 	// These commands have built-in recursion protection and legitimately spawn multiple processes
 	exemptCommands := []string{"bootstrap", "doctor", "self"}
 	for _, exempt := range exemptCommands {
 		if strings.Contains(commandName, exempt) {
-			_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Command %s exempt from watchdog (uses built-in recursion protection)\n", commandName)
+			ctx.Log.Debug("Command exempt from watchdog",
+				zap.String("command", commandName),
+				zap.String("reason", "uses built-in recursion protection"))
 			return
 		}
 	}
@@ -303,10 +321,11 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 	}
 
 	if !shouldMonitor {
-		_, _ = fmt.Fprintf(os.Stderr, "DEBUG: Command %s doesn't need monitoring, returning\n", commandName)
+		ctx.Log.Debug("Command doesn't need monitoring",
+			zap.String("command", commandName))
 		return
 	}
-	
+
 	// Configure watchdog with enhanced tracing
 	config := watchdog.DefaultResourceConfig()
 
@@ -320,11 +339,11 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 
 	// NOTE: Bootstrap-specific config removed - bootstrap is now exempt from watchdog monitoring
 	// Bootstrap has its own recursion protection via EOS_BOOTSTRAP_IN_PROGRESS env var
-	
+
 	// Create and start the watchdog
 	rw := watchdog.NewResourceWatchdog(ctx.Ctx, ctx.Log, config)
 	rw.Start()
-	
+
 	// Ensure we capture panic information if it happens
 	defer func() {
 		if r := recover(); r != nil {
@@ -333,7 +352,7 @@ func startResourceWatchdog(ctx *eos_io.RuntimeContext, commandName string) {
 			panic(r) // Re-panic after capture
 		}
 	}()
-	
+
 	ctx.Log.Info("Resource watchdog started with enhanced tracing",
 		zap.String("command", commandName),
 		zap.Float64("cpu_limit", config.CPUCriticalThreshold),
