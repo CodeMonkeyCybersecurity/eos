@@ -10,7 +10,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	vaultpaths "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -1299,169 +1298,275 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("Great! Now let's test the TOTP code to verify it works.")
 	log.Info("")
 
-	// Verify TOTP setup by performing an actual login test
+	// Verify TOTP setup by prompting user to confirm they can see the code
 	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
 	if err != nil {
 		log.Error(" Failed to get test code from user", zap.Error(err))
 		return cerr.Wrap(err, "failed to get test code")
 	}
 
+	// We got a code from the user, which confirms they can see it in their app
+	// Actual verification will happen after MFA enforcement is applied
+	_ = testCodes[0] // Acknowledge we got the code
+
+	log.Info("")
+	log.Info(" ✓ TOTP secret configured and displayed to user")
+	log.Info("")
+	log.Info(" Your authenticator app should now show:")
+	log.Info("   Account: Vault - Eos Infrastructure (eos)")
+	log.Info("   Code: 6 digits, changes every 30 seconds")
+	log.Info("")
+	log.Info(" Next steps:")
+	log.Info("   1. MFA enforcement will be applied")
+	log.Info("   2. Complete MFA login flow will be tested")
+	log.Info("   3. Your TOTP code will be verified")
+	log.Info("")
+
+	// Mark verification as succeeded to prevent cleanup defer from deleting the secret
+	verificationSucceeded = true
+
+	// State transition: TOTP secret generated and displayed
+	log.Info("MFA Setup State Transition",
+		zap.String("from_state", "totp_secret_generated"),
+		zap.String("to_state", "totp_displayed_awaiting_enforcement"),
+		zap.String("entity_id", entityID),
+		zap.String("method_id", methodID),
+		zap.String("note", "QR code shown, user has code - verification after enforcement"))
+
+	return nil
+}
+
+// VerifyMFAEnforcement verifies that MFA enforcement is active by performing
+// a complete login flow with TOTP validation.
+//
+// This function MUST be called AFTER EnforceMFAPolicyOnly() has been called,
+// as it verifies that the enforcement policy is actually active.
+//
+// The function performs the following steps:
+//  1. Prompts user for a fresh TOTP code
+//  2. Attempts userpass login (should trigger MFA challenge)
+//  3. Extracts mfa_request_id from the challenge
+//  4. Validates TOTP code via sys/mfa/validate
+//  5. Cleans up test token
+//  6. Deletes bootstrap password from Vault KV
+//
+// Retry Logic:
+// - Retries up to maxRetries times if MFA challenge is not received
+// - Uses exponential backoff (1s, 4s, 9s, 16s, 25s)
+// - Rationale: Vault policies may take 1-2 seconds to propagate
+//
+// Parameters:
+//   - rc: Runtime context with logging and telemetry
+//   - client: Privileged Vault client (must have permission to read bootstrap password)
+//   - username: Vault username (typically "eos")
+//   - password: Bootstrap password for initial login
+//   - methodID: TOTP method ID (from secret/data/eos/mfa-methods/totp)
+//   - maxRetries: Maximum number of retry attempts (recommended: 5)
+//
+// Returns:
+//   - nil on success (MFA enforcement verified, bootstrap password deleted)
+//   - error on failure (login failed, TOTP invalid, or enforcement not active)
+func VerifyMFAEnforcement(rc *eos_io.RuntimeContext, client *api.Client, username, password, methodID string, maxRetries int) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info("")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info(" Verifying MFA Enforcement")
+	log.Info("═══════════════════════════════════════════════════════════")
+	log.Info("")
+	log.Info(" This verification confirms that:")
+	log.Info("   1. MFA enforcement policy is active")
+	log.Info("   2. Login attempts trigger MFA challenges")
+	log.Info("   3. TOTP codes are validated correctly")
+	log.Info("   4. Complete authentication flow works end-to-end")
+	log.Info("")
+
+	// Step 1: Prompt for fresh TOTP code
+	log.Info(" Step 1: Get fresh TOTP code from your authenticator app")
+	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
+	if err != nil {
+		log.Error(" Failed to get TOTP code from user", zap.Error(err))
+		return cerr.Wrap(err, "failed to get TOTP code for verification")
+	}
 	totpCode := testCodes[0]
 
-	// Step 1: Use cached bootstrap password from MFABootstrapData
-	// This password was already read and verified in VerifyAndFetchMFAPrerequisites()
-	password := bootstrapData.Password
-	log.Info(" [CACHED] Using bootstrap password from cached data",
-		zap.String("source_path", bootstrapData.SecretPath),
-		zap.Int("password_length", len(password)),
-		zap.Duration("cache_age", bootstrapData.Age()))
+	// Step 2: Attempt login with retry logic (policy propagation may take time)
+	var loginResp *api.Secret
+	var mfaRequestID string
 
-	// Step 2: Perform userpass login to trigger MFA challenge
-	log.Info(" [VERIFICATION] Attempting userpass login (will trigger MFA challenge)")
-	loginPath := fmt.Sprintf("auth/userpass/login/%s", username)
-	loginData := map[string]interface{}{"password": password}
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 4s, 9s, 16s, 25s
+			delay := time.Duration(attempt*attempt) * time.Second
+			log.Info(" Waiting for policy propagation before retry",
+				zap.Int("attempt", attempt+1),
+				zap.Int("max_retries", maxRetries),
+				zap.Duration("delay", delay))
+			time.Sleep(delay)
+		}
 
-	loginResp, err := client.Logical().Write(loginPath, loginData)
-	if err != nil {
-		log.Error(" [VERIFICATION] Userpass login failed",
-			zap.String("username", username),
-			zap.Error(err))
-		return cerr.Wrap(err, "userpass login failed during TOTP verification")
+		log.Info(" Step 2: Attempting userpass login (should trigger MFA challenge)",
+			zap.Int("attempt", attempt+1),
+			zap.Int("max_retries", maxRetries))
+
+		loginPath := fmt.Sprintf("auth/userpass/login/%s", username)
+		loginData := map[string]interface{}{"password": password}
+
+		loginResp, err = client.Logical().Write(loginPath, loginData)
+		if err != nil {
+			log.Error(" Userpass login failed",
+				zap.String("username", username),
+				zap.Int("attempt", attempt+1),
+				zap.Error(err))
+			return cerr.Wrap(err, "userpass login failed during MFA verification")
+		}
+
+		if loginResp == nil {
+			log.Error(" Userpass login returned nil response")
+			return cerr.New("userpass login returned nil response")
+		}
+
+		// Check if we got an MFA challenge
+		if loginResp.Auth != nil {
+			// No MFA challenge - enforcement not active yet
+			if attempt < maxRetries-1 {
+				log.Warn(" No MFA challenge received - enforcement may not be active yet",
+					zap.String("username", username),
+					zap.Int("attempt", attempt+1),
+					zap.String("will_retry", "yes"))
+				continue
+			} else {
+				log.Error(" No MFA challenge received after all retries",
+					zap.String("username", username),
+					zap.Int("total_attempts", maxRetries))
+				return cerr.New("expected MFA challenge but got direct authentication - MFA enforcement not active after policy propagation")
+			}
+		}
+
+		// Extract MFA request ID
+		if loginResp.Data == nil {
+			log.Error(" Login response missing data field")
+			return cerr.New("login response missing data field")
+		}
+
+		requestID, ok := loginResp.Data["mfa_request_id"].(string)
+		if !ok || requestID == "" {
+			log.Error(" No MFA request ID in response",
+				zap.Any("response_data", loginResp.Data))
+			return cerr.New("no mfa_request_id in login response - MFA may not be configured correctly")
+		}
+
+		mfaRequestID = requestID
+		log.Info(" ✓ MFA challenge received",
+			zap.String("mfa_request_id", mfaRequestID),
+			zap.Int("attempt", attempt+1))
+		break
 	}
 
-	if loginResp == nil {
-		log.Error(" [VERIFICATION] Userpass login returned nil response")
-		return cerr.New("userpass login returned nil response")
+	// Verify we got the MFA request ID
+	if mfaRequestID == "" {
+		return cerr.New("failed to obtain MFA challenge after all retry attempts")
 	}
 
-	// Step 3: Extract MFA challenge
-	log.Info(" [VERIFICATION] MFA challenge received - validating TOTP code")
-	if loginResp.Auth != nil {
-		// No MFA challenge - this shouldn't happen if MFA is enabled
-		log.Warn(" [VERIFICATION] No MFA challenge received - MFA may not be enforced",
-			zap.String("username", username))
-		return cerr.New("expected MFA challenge but got direct authentication - MFA not enforced?")
-	}
-
-	// MFA challenge is in Data field
-	if loginResp.Data == nil {
-		log.Error(" [VERIFICATION] Login response missing data field")
-		return cerr.New("login response missing data field")
-	}
-
-	mfaRequestID, ok := loginResp.Data["mfa_request_id"].(string)
-	if !ok || mfaRequestID == "" {
-		log.Error(" [VERIFICATION] No MFA request ID in response",
-			zap.Any("response_data", loginResp.Data))
-		return cerr.New("no mfa_request_id in login response - MFA may not be configured correctly")
-	}
-
-	log.Info(" [VERIFICATION] MFA challenge ID received",
-		zap.String("mfa_request_id", mfaRequestID))
-
-	// Step 4: Validate TOTP code
-	log.Info(" [VERIFICATION] Submitting TOTP code for validation")
+	// Step 3: Validate TOTP code
+	log.Info(" Step 3: Validating TOTP code with Vault")
 	mfaPayload := map[string]interface{}{
 		"mfa_request_id": mfaRequestID,
 		"mfa_payload": map[string][]string{
-			"totp": {totpCode},
+			methodID: {totpCode},
 		},
 	}
 
 	mfaResp, err := client.Logical().Write("sys/mfa/validate", mfaPayload)
 	if err != nil {
-		log.Error(" [VERIFICATION] TOTP code validation failed",
+		log.Error(" TOTP code validation failed",
 			zap.Error(err),
 			zap.String("mfa_request_id", mfaRequestID))
 		log.Error("")
 		log.Error(" ✗ TOTP code verification FAILED")
 		log.Error("")
-		log.Error("Common causes:")
-		log.Error("  • Code expired (TOTP codes are valid for 30 seconds)")
-		log.Error("  • Incorrect manual entry of backup key")
-		log.Error("  • Device clock not synchronized with server")
-		log.Error("  • Authenticator app time drift")
+		log.Error(" Common causes:")
+		log.Error("   • Code expired (TOTP codes are valid for 30 seconds)")
+		log.Error("   • Incorrect code entry")
+		log.Error("   • Device clock not synchronized with server")
+		log.Error("   • Authenticator app time drift")
 		log.Error("")
-		log.Error("Please try again with a fresh TOTP code.")
-		return cerr.Wrap(err, "TOTP validation failed during test login")
+		log.Error(" Please run 'eos create vault' again to retry MFA setup.")
+		log.Error("")
+		return cerr.Wrap(err, "TOTP validation failed during MFA enforcement verification")
 	}
 
 	if mfaResp == nil || mfaResp.Auth == nil {
-		log.Error(" [VERIFICATION] MFA validation returned invalid response")
+		log.Error(" MFA validation returned invalid response")
 		return cerr.New("MFA validation returned nil auth")
 	}
 
-	// Step 5: Extract and clean up test token
+	// Step 4: Extract and clean up test token
 	testToken := mfaResp.Auth.ClientToken
-	log.Info(" ✓ [VERIFICATION] Test login successful!",
+	log.Info(" ✓ Test login successful!",
 		zap.String("test_token_accessor", mfaResp.Auth.Accessor))
 
 	// Clean up: Revoke the test token immediately (we don't need it)
 	defer func() {
 		if testToken != "" {
-			log.Debug(" [VERIFICATION] Revoking test token",
+			log.Debug(" Revoking test token",
 				zap.String("accessor", mfaResp.Auth.Accessor))
 			// Create a new client with the test token to revoke itself
 			testClient, cloneErr := client.Clone()
 			if cloneErr == nil {
 				testClient.SetToken(testToken)
 				if revokeErr := testClient.Auth().Token().RevokeSelf(""); revokeErr != nil {
-					log.Warn(" [VERIFICATION] Failed to revoke test token (non-fatal)",
+					log.Warn(" Failed to revoke test token (non-fatal)",
 						zap.Error(revokeErr))
 				} else {
-					log.Debug(" [VERIFICATION] Test token revoked successfully")
+					log.Debug(" ✓ Test token revoked successfully")
 				}
 			}
 		}
 	}()
 
-	log.Info("")
-	log.Info(" ✓ TOTP code verified successfully via test login!")
-	log.Info("")
-
-	// Mark verification as succeeded to prevent cleanup defer from deleting the secret
-	verificationSucceeded = true
-
-	// State transition: TOTP verification succeeded
-	log.Info("MFA Setup State Transition",
-		zap.String("from_state", "totp_secret_generated"),
-		zap.String("to_state", "totp_verified"),
-		zap.String("entity_id", entityID),
-		zap.String("note", "Ready for MFA enforcement"))
-
-	// CRITICAL: Delete bootstrap password now that TOTP verification succeeded
-	// This password was only needed for initial setup and should not persist
-	log.Info(" [CLEANUP] Deleting ephemeral bootstrap password from Vault KV")
-	_, deleteErr := client.Logical().Delete(vaultpaths.UserpassBootstrapPasswordKVPath)
+	// Step 5: Delete bootstrap password (no longer needed after successful MFA verification)
+	log.Info(" Step 4: Cleaning up bootstrap password")
+	bootstrapPasswordPath := "secret/data/eos/bootstrap"
+	_, deleteErr := client.Logical().Delete(bootstrapPasswordPath)
 	if deleteErr != nil {
 		log.Warn(" Failed to delete bootstrap password (non-fatal)",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
+			zap.String("path", bootstrapPasswordPath),
 			zap.Error(deleteErr))
 		log.Warn("")
-		log.Warn(fmt.Sprintf("The bootstrap password still exists at: %s", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Warn("This password is no longer needed and should be deleted manually:")
-		log.Warn(fmt.Sprintf("  vault kv delete %s", vaultpaths.UserpassBootstrapPasswordCLIPath))
+		log.Warn(" The bootstrap password still exists at: " + bootstrapPasswordPath)
+		log.Warn(" This password is no longer needed and should be deleted manually:")
+		log.Warn("   vault kv delete secret/eos/bootstrap")
 		log.Warn("")
 	} else {
-		log.Info(" ✓ [CLEANUP] Bootstrap password deleted successfully",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
+		log.Info(" ✓ Bootstrap password deleted successfully",
+			zap.String("path", bootstrapPasswordPath))
 	}
 
+	// Final success message
 	log.Info("")
 	log.Info("═══════════════════════════════════════════════════════════")
-	log.Info(" TOTP MFA setup complete for user: " + username)
+	log.Info(" MFA Enforcement Verification Complete")
 	log.Info("═══════════════════════════════════════════════════════════")
 	log.Info("")
-	log.Info("Verification summary:")
-	log.Info("  ✓ Userpass authentication successful")
-	log.Info("  ✓ MFA challenge triggered correctly")
-	log.Info("  ✓ TOTP code validated successfully")
-	log.Info("  ✓ Complete authentication flow verified")
-	log.Info("  ✓ Bootstrap password cleaned up")
+	log.Info(" Verification summary:")
+	log.Info("   ✓ Userpass authentication successful")
+	log.Info("   ✓ MFA challenge triggered correctly")
+	log.Info("   ✓ TOTP code validated successfully")
+	log.Info("   ✓ Complete authentication flow verified")
+	log.Info("   ✓ Bootstrap password cleaned up")
 	log.Info("")
-	log.Info("You will now be prompted for a TOTP code every time you")
-	log.Info("authenticate to Vault with your username and password.")
+	log.Info(" You will now be prompted for a TOTP code every time you")
+	log.Info(" authenticate to Vault with your username and password.")
 	log.Info("")
+
+	// State transition: MFA verification complete
+	log.Info("MFA Verification State Transition",
+		zap.String("from_state", "enforcement_applied"),
+		zap.String("to_state", "mfa_verified_and_active"),
+		zap.String("username", username),
+		zap.String("method_id", methodID),
+		zap.String("note", "MFA fully configured and verified"))
 
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -485,7 +486,57 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 				log.Error("")
 				return logger.LogErrAndWrap(rc, "enforce MFA policy", err)
 			}
-			log.Info(" [EVALUATE] MFA enforcement active")
+			log.Info(" [EVALUATE] MFA enforcement policy applied successfully")
+
+			// CRITICAL: NOW verify that enforcement is working by testing complete login flow
+			log.Info("")
+			log.Info(" [VERIFY] Testing MFA enforcement with real login flow...")
+
+			// Retrieve TOTP method ID from storage
+			methodIDSecret, err := client.Logical().Read("secret/data/eos/mfa-methods/totp")
+			if err != nil || methodIDSecret == nil {
+				log.Error(" Failed to retrieve TOTP method ID for verification", zap.Error(err))
+				return logger.LogErrAndWrap(rc, "retrieve TOTP method ID", err)
+			}
+
+			data, ok := methodIDSecret.Data["data"].(map[string]interface{})
+			if !ok {
+				return logger.LogErrAndWrap(rc, "invalid method ID data structure", cerr.New("invalid structure"))
+			}
+
+			methodID, ok := data["method_id"].(string)
+			if !ok || methodID == "" {
+				return logger.LogErrAndWrap(rc, "invalid method ID", cerr.New("method_id not found"))
+			}
+
+			log.Debug("Retrieved TOTP method ID from storage",
+				zap.String("method_id", methodID),
+				zap.String("path", "secret/data/eos/mfa-methods/totp"))
+
+			// Retrieve bootstrap password from MFABootstrapData
+			bootstrapData, fetchErr := VerifyAndFetchMFAPrerequisites(rc, client, "eos")
+			if fetchErr != nil {
+				log.Error(" Failed to retrieve bootstrap password for verification", zap.Error(fetchErr))
+				return logger.LogErrAndWrap(rc, "retrieve bootstrap password", fetchErr)
+			}
+
+			// Call verification function with retry logic
+			if err := VerifyMFAEnforcement(rc, client, "eos", bootstrapData.Password, methodID, 5); err != nil {
+				log.Error(" [Phase 13] MFA enforcement verification failed", zap.Error(err))
+				log.Error("")
+				log.Error("  MFA enforcement policy is applied, but verification failed.")
+				log.Error("")
+				log.Error("Possible causes:")
+				log.Error("  • TOTP code was incorrect or expired")
+				log.Error("  • Authenticator app not synchronized")
+				log.Error("  • Policy propagation delay (rare)")
+				log.Error("")
+				log.Error("To retry: Run 'eos create vault' again")
+				log.Error("")
+				return logger.LogErrAndWrap(rc, "verify MFA enforcement", err)
+			}
+
+			log.Info(" [EVALUATE] MFA verification succeeded - system fully secured!")
 
 		} else {
 			log.Warn("")

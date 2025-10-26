@@ -299,7 +299,7 @@ func containsAgentToken(configStr string) bool {
 	// Simple string check - proper implementation would use HCL parser
 	return configStr != "" &&
 		(containsPattern(configStr, `tokens\s*\{\s*agent\s*=`) ||
-		containsPattern(configStr, `tokens\.agent\s*=`))
+			containsPattern(configStr, `tokens\.agent\s*=`))
 }
 
 // containsPattern checks if a regex pattern exists in the string
