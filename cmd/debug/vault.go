@@ -25,6 +25,7 @@ var (
 	vaultDebugAgent      bool
 	vaultDebugAuth       bool
 	vaultDebugIdentities bool
+	vaultDebugMFA        bool
 )
 
 var vaultDebugCmd = &cobra.Command{
@@ -49,6 +50,7 @@ DIAGNOSTIC MODES:
   --agent       Vault Agent service diagnostics (service, config, credentials, token, logs)
   --auth        Authentication & authorization deep-dive (policies, permissions, AppRole, token capabilities)
   --identities  Identity entity and alias diagnostics (entity ID, aliases, MFA methods)
+  --mfa         MFA enforcement diagnostics (methods, policies, entity linkage)
 
 EXAMPLES:
   # Run full diagnostics with text output
@@ -62,6 +64,9 @@ EXAMPLES:
 
   # Identity entity diagnostics (troubleshoot MFA setup, entity aliases)
   sudo eos debug vault --identities
+
+  # MFA enforcement diagnostics (troubleshoot "expected MFA challenge" errors)
+  sudo eos debug vault --mfa
 
   # Save to file
   sudo eos debug vault --output=/tmp/vault-debug.txt
@@ -95,6 +100,7 @@ func init() {
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAgent, "agent", false, "Run Vault Agent diagnostics only (service, config, credentials, token, logs)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAuth, "auth", false, "Run authentication & authorization diagnostics (health, AppRole, token, policies, permissions)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugIdentities, "identities", false, "Run identity entity and alias diagnostics (entity ID, aliases, MFA methods)")
+	vaultDebugCmd.Flags().BoolVar(&vaultDebugMFA, "mfa", false, "Run MFA enforcement diagnostics (methods, policies, entity linkage)")
 
 	debugCmd.AddCommand(vaultDebugCmd)
 }
@@ -113,8 +119,11 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if vaultDebugIdentities {
 		flagCount++
 	}
+	if vaultDebugMFA {
+		flagCount++
+	}
 	if flagCount > 1 {
-		return fmt.Errorf("--agent, --auth, and --identities flags are mutually exclusive; use only one at a time")
+		return fmt.Errorf("--agent, --auth, --identities, and --mfa flags are mutually exclusive; use only one at a time")
 	}
 
 	logger.Info("Starting Vault diagnostics",
@@ -124,6 +133,7 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		zap.Bool("agent_mode", vaultDebugAgent),
 		zap.Bool("auth_mode", vaultDebugAuth),
 		zap.Bool("identities_mode", vaultDebugIdentities),
+		zap.Bool("mfa_mode", vaultDebugMFA),
 		zap.String("output_file", vaultDebugOutput))
 
 	// Create collector with appropriate formatter
@@ -170,6 +180,13 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			zap.Int("identity_diagnostics", len(allDiagnostics)))
 		totalDiagnostics = len(allDiagnostics)
 		logger.Info("Registered identity diagnostics", zap.Int("total", totalDiagnostics))
+	} else if vaultDebugMFA {
+		componentName = "Vault MFA Enforcement"
+		allDiagnostics = []*debug.Diagnostic{debugvault.MFAEnforcementDiagnostic()}
+		logger.Debug("Running in MFA-only mode",
+			zap.Int("mfa_diagnostics", len(allDiagnostics)))
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered MFA enforcement diagnostics", zap.Int("total", totalDiagnostics))
 	} else {
 		// Full mode: all diagnostics including TLS
 		allDiagnostics = debugvault.AllDiagnostics()
@@ -243,6 +260,8 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			summaryComponent = "vault-auth"
 		} else if vaultDebugIdentities {
 			summaryComponent = "vault-identity"
+		} else if vaultDebugMFA {
+			summaryComponent = "vault-mfa"
 		}
 		output = debug.FormatQuickSummary(quickSummary, summaryComponent)
 		output += "\n\n"
