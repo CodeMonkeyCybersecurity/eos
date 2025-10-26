@@ -31,6 +31,15 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		ctx := eos_io.NewContext(context.Background(), cmd.Name())
 		defer ctx.End(&err)
 
+		// Set verbosity flags from command-line flags
+		// Check if --verbose or --quiet flags were set
+		if cmd.Flag("verbose") != nil && cmd.Flag("verbose").Changed {
+			ctx.Verbose = true
+		}
+		if cmd.Flag("quiet") != nil && cmd.Flag("quiet").Changed {
+			ctx.Quiet = true
+		}
+
 		// Panic recovery
 		defer func() {
 			if r := recover(); r != nil {

@@ -45,6 +45,41 @@ type RuntimeContext struct {
 	Attributes map[string]string
 	Validate   *verify.WrapValidation
 	Operation  *OperationContext // Operation context for structured logging and tracking
+	Verbose    bool              // Enable verbose output (all DEBUG/INFO logs)
+	Quiet      bool              // Minimal output (only errors and final status)
+}
+
+// ShouldLog returns true if a log message at the given level should be displayed
+// Based on the verbosity flags (--verbose / --quiet)
+//
+// Rules:
+//   - Always show ERROR and WARN
+//   - In quiet mode (-q): Only ERROR and WARN
+//   - In verbose mode (-v): Show everything (DEBUG, INFO, WARN, ERROR)
+//   - Default mode: Show WARN and ERROR, hide DEBUG and INFO
+func (rc *RuntimeContext) ShouldLog(level string) bool {
+	// Always show errors and warnings regardless of verbosity
+	if level == "ERROR" || level == "WARN" {
+		return true
+	}
+
+	// In quiet mode, only show errors and warnings
+	if rc.Quiet {
+		return false
+	}
+
+	// In verbose mode, show everything
+	if rc.Verbose {
+		return true
+	}
+
+	// Default mode: hide DEBUG and INFO
+	if level == "DEBUG" || level == "INFO" {
+		return false
+	}
+
+	// Show everything else by default
+	return true
 }
 
 // NewContext sets up tracing, logging and validation hooks.

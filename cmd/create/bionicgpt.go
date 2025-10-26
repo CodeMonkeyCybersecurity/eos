@@ -100,7 +100,8 @@ Prerequisites:
   Run 'eos create bionicgpt --help' for more details.
 
 Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
-		RunE: eos.Wrap(runCreateBionicGPT),
+		PreRunE: eos.Wrap(validateBionicGPTConfig),
+		RunE:    eos.Wrap(runCreateBionicGPT),
 	}
 
 	// Required flags
@@ -155,6 +156,20 @@ Code Monkey Cybersecurity - "Cybersecurity. With humans."`,
 		"Skip health check after deployment")
 
 	CreateCmd.AddCommand(bionicgptCmd)
+}
+
+// validateBionicGPTConfig validates required configuration before deployment
+// PreRunE: Fails fast with helpful error message if required flags are missing
+func validateBionicGPTConfig(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Build minimal config to check required fields
+	config := &bionicgpt_nomad.EnterpriseConfig{
+		Domain:    bionicgptDomain,
+		CloudNode: bionicgptCloudNode,
+		AuthURL:   bionicgptAuthURL,
+	}
+
+	// Validate required flags - returns user-friendly error with context
+	return bionicgpt_nomad.ValidateRequiredFlags(config)
 }
 
 func runCreateBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

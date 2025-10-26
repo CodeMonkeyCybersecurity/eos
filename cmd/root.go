@@ -30,6 +30,31 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/upgrade"
 )
 
+var (
+	// Global flags for verbosity control
+	verboseOutput bool
+	quietOutput   bool
+)
+
+func init() {
+	// Add global flags for output verbosity
+	// These are persistent flags that apply to all subcommands
+	RootCmd.PersistentFlags().BoolVarP(&verboseOutput, "verbose", "v", false,
+		"Enable verbose output (show all DEBUG/INFO logs)")
+	RootCmd.PersistentFlags().BoolVarP(&quietOutput, "quiet", "q", false,
+		"Minimal output (show only errors and final status)")
+}
+
+// IsVerbose returns true if --verbose flag was set
+func IsVerbose() bool {
+	return verboseOutput
+}
+
+// IsQuiet returns true if --quiet flag was set
+func IsQuiet() bool {
+	return quietOutput
+}
+
 // RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
