@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	sharedvault "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -47,7 +47,8 @@ func DiscoverFromConsul(rc *eos_io.RuntimeContext) (sharedvault.Environment, err
 	}
 
 	// Connect to Consul (no token required for public KV reads in default policy)
-	consulClient, err := consul.ConfigureConsulClient(rc, "")
+	// Create a basic Consul client - we don't need authentication for reading public KV
+	consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
 	if err != nil {
 		return "", fmt.Errorf("Consul unavailable: %w\n\n"+
 			"Cannot determine environment without Consul (fail-closed security).\n\n"+
