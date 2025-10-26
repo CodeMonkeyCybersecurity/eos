@@ -21,7 +21,7 @@ import (
 func GetZoneIDForDomain(rc *eos_io.RuntimeContext, token, domain string) (string, error) {
 	domain = strings.TrimSuffix(domain, ".")
 
-	req, err := http.NewRequest("GET", hetznerAPIBase+"/zones", nil)
+	req, err := http.NewRequest("GET", HetznerDNSAPIBase+"/zones", nil)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to create request for fetching zones", zap.Error(err))
 		return "", err
@@ -77,7 +77,7 @@ func CreateRecord(rc *eos_io.RuntimeContext, token, zoneID, name, ip string) err
 		return err
 	}
 
-	req, err := http.NewRequest("POST", hetznerAPIBase+"/records", bytes.NewBuffer(bodyBytes))
+	req, err := http.NewRequest("POST", HetznerDNSAPIBase+"/records", bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to create request for creating record", zap.Error(err))
 		return err
@@ -118,36 +118,11 @@ func CreateRecord(rc *eos_io.RuntimeContext, token, zoneID, name, ip string) err
 	return nil
 }
 
-const hetznerAPIBase = "https://dns.hetzner.com/api/v1"
-
-// CreateRecordRequest is the request body for creating or updating a DNS record.
-type CreateRecordRequest struct {
-	ZoneID string `json:"zone_id"`
-	Type   string `json:"type"` // e.g. "A", "CNAME"
-	Name   string `json:"name"`
-	Value  string `json:"value"`
-	TTL    int    `json:"ttl"`
-}
-
-// RecordResponse holds data for the record creation response.
-type RecordResponse struct {
-	Record struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-		Type string `json:"type"`
-	} `json:"record"`
-}
-
-// ZonesResponse is used to decode the JSON containing a list of zones.
-type ZonesResponse struct {
-	Zones []struct {
-		ID   string `json:"id"`
-		Name string `json:"name"`
-	} `json:"zones"`
-}
+// NOTE: hetznerAPIBase moved to constants.go (HetznerDNSAPIBase) to fix P0 duplication violation
+// NOTE: CreateRecordRequest, RecordResponse, ZonesResponse moved to types.go for centralization
 
 func (c *DNSClient) GetAllPrimaryServers(rc *eos_io.RuntimeContext, zoneID string) ([]PrimaryServer, error) {
-	url := hetznerDNSBaseURL + "/primary_servers"
+	url := HetznerDNSAPIBase + "/primary_servers"
 	if zoneID != "" {
 		url += "?zone_id=" + zoneID
 	}
@@ -191,7 +166,7 @@ func (c *DNSClient) CreatePrimaryServer(rc *eos_io.RuntimeContext, zoneID, addre
 	}
 	body, _ := json.Marshal(payload)
 
-	req, err := http.NewRequestWithContext(rc.Ctx, "POST", hetznerDNSBaseURL+"/primary_servers", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", HetznerDNSAPIBase+"/primary_servers", bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating request to create primary server")
 	}
@@ -225,7 +200,7 @@ func (c *DNSClient) CreatePrimaryServer(rc *eos_io.RuntimeContext, zoneID, addre
 }
 
 func (c *DNSClient) GetPrimaryServer(rc *eos_io.RuntimeContext, id string) (*PrimaryServer, error) {
-	url := hetznerDNSBaseURL + "/primary_servers/" + id
+	url := HetznerDNSAPIBase + "/primary_servers/" + id
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
@@ -266,7 +241,7 @@ func (c *DNSClient) UpdatePrimaryServer(rc *eos_io.RuntimeContext, id, zoneID, a
 	}
 	body, _ := json.Marshal(payload)
 
-	req, err := http.NewRequestWithContext(rc.Ctx, "PUT", hetznerDNSBaseURL+"/primary_servers/"+id, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(rc.Ctx, "PUT", HetznerDNSAPIBase+"/primary_servers/"+id, bytes.NewReader(body))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating PUT request")
 	}
@@ -300,7 +275,7 @@ func (c *DNSClient) UpdatePrimaryServer(rc *eos_io.RuntimeContext, id, zoneID, a
 }
 
 func (c *DNSClient) DeletePrimaryServer(rc *eos_io.RuntimeContext, id string) error {
-	req, err := http.NewRequestWithContext(rc.Ctx, "DELETE", hetznerDNSBaseURL+"/primary_servers/"+id, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, "DELETE", HetznerDNSAPIBase+"/primary_servers/"+id, nil)
 	if err != nil {
 		return errors.Wrap(err, "creating DELETE request")
 	}

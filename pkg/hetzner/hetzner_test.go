@@ -93,9 +93,9 @@ func TestHetznerConstants(t *testing.T) {
 	t.Run("api_urls_security", func(t *testing.T) {
 		// Test that API URLs use HTTPS
 		urls := []string{
-			hetznerDNSBaseURL,
-			recordsBaseURL,
-			zonesBaseURL,
+			HetznerDNSAPIBase,
+			HetznerDNSRecordsURL,
+			HetznerDNSZonesURL,
 		}
 
 		for _, url := range urls {
@@ -107,18 +107,18 @@ func TestHetznerConstants(t *testing.T) {
 	})
 
 	t.Run("dns_base_url_validation", func(t *testing.T) {
-		assert.Equal(t, "https://dns.hetzner.com/api/v1", hetznerDNSBaseURL)
-		assert.True(t, strings.HasPrefix(hetznerDNSBaseURL, "https://"))
+		assert.Equal(t, "https://dns.hetzner.com/api/v1", HetznerDNSAPIBase)
+		assert.True(t, strings.HasPrefix(HetznerDNSAPIBase, "https://"))
 	})
 
 	t.Run("records_base_url_validation", func(t *testing.T) {
-		assert.Equal(t, "https://dns.hetzner.com/api/v1/records", recordsBaseURL)
-		assert.True(t, strings.HasPrefix(recordsBaseURL, "https://"))
+		assert.Equal(t, "https://dns.hetzner.com/api/v1/records", HetznerDNSRecordsURL)
+		assert.True(t, strings.HasPrefix(HetznerDNSRecordsURL, "https://"))
 	})
 
 	t.Run("zones_base_url_validation", func(t *testing.T) {
-		assert.Equal(t, "https://dns.hetzner.com/api/v1/zones", zonesBaseURL)
-		assert.True(t, strings.HasPrefix(zonesBaseURL, "https://"))
+		assert.Equal(t, "https://dns.hetzner.com/api/v1/zones", HetznerDNSZonesURL)
+		assert.True(t, strings.HasPrefix(HetznerDNSZonesURL, "https://"))
 	})
 }
 

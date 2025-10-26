@@ -57,7 +57,7 @@ func NewClient(token string, log *zap.Logger) *DNSClient {
 		// Fallback to default client if migration fails
 		client, _ = httpclient.NewClient(httpclient.DefaultConfig())
 	}
-	
+
 	return &DNSClient{
 		Token:      token,
 		Log:        log.Named("hetzner"),

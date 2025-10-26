@@ -724,103 +724,35 @@ func VerifyAndFetchMFAPrerequisites(
 			zap.String("mount_accessor", userpassMount.Accessor))
 	}
 
-	// Check 4: ATOMICALLY read bootstrap password (REPLACES existence check)
-	// This is the key change - we READ instead of just checking existence
+	// Check 4: ATOMICALLY read bootstrap password using unified abstraction
+	// This replaces 90 lines of inline validation with domain-specific function
 	log.Info("   Check 4: Reading bootstrap password (Phase 10a completion proof)")
-	log.Info("     Path being read:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
 
-	passwordSecret, err := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
+	// Get underlying *zap.Logger from otelzap.LoggerWithCtx for API compatibility
+	// otelzap.Logger embeds *zap.Logger, so Logger().Logger gets the embedded field
+	zapLogger := log.Logger().Logger
+	kv := NewEosKVv2Store(client, "secret", zapLogger)
+	bootstrapPass, err := GetBootstrapPassword(rc.Ctx, kv, zapLogger)
 	if err != nil {
-		// Check if it's a 404 (not found)
-		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
-			log.Error("   ✗ Bootstrap password not found (404)",
-				zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-			log.Error("")
-			log.Error("═══════════════════════════════════════════════════════════")
-			log.Error(" Phase 10a Incomplete: Bootstrap Password Not Found")
-			log.Error("═══════════════════════════════════════════════════════════")
-			log.Error("")
-			log.Error("Expected path:", zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-			log.Error("")
-			log.Error("Diagnostic Commands:")
-			log.Error("  1. Check if secret exists: vault kv get -mount=secret eos/bootstrap")
-			log.Error("  2. List all secrets: vault kv list secret/")
-			log.Error("  3. Check Vault logs: journalctl -u vault -n 100")
-			log.Error("")
-			log.Error("Recovery:")
-			log.Error("  Re-run: sudo eos update vault --enable-userpass")
-			log.Error("")
-			return nil, cerr.Errorf(
-				"Phase 10a incomplete: bootstrap password not found at %s",
-				vaultpaths.UserpassBootstrapPasswordKVPath)
-		}
-
-		// Other error (network, permissions, etc.)
-		log.Error("   ✗ Failed to read bootstrap password",
-			zap.Error(err),
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		return nil, cerr.Wrap(err, "failed to read bootstrap password")
+		// Error already includes decision tree from ErrPhasePrerequisiteMissing
+		return nil, err
 	}
 
-	// Validate response structure
-	if passwordSecret == nil || passwordSecret.Data == nil {
-		log.Error("   ✗ Bootstrap password returned nil or has no data",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		return nil, cerr.New("Phase 10a incomplete: bootstrap password has invalid structure")
-	}
+	password := bootstrapPass.Password
 
-	// Extract password from KV v2 structure
-	kvData, ok := passwordSecret.Data["data"].(map[string]interface{})
-	if !ok {
-		log.Error("   ✗ Invalid KV v2 structure",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.Any("structure", passwordSecret.Data))
-		return nil, cerr.New("bootstrap password has invalid KV v2 structure")
-	}
-
-	password, ok := kvData[vaultpaths.UserpassBootstrapPasswordKVField].(string)
-	if !ok || password == "" {
-		log.Error("   ✗ Password field missing or empty",
-			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
-			zap.Any("available_fields", getMapKeys(kvData)))
-		return nil, cerr.Newf("password field '%s' missing or invalid",
-			vaultpaths.UserpassBootstrapPasswordKVField)
-	}
-
-	log.Info("   ✓ Bootstrap password retrieved successfully",
-		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-		zap.Int("password_length", len(password)))
-
-	// Extract version number for optimistic locking (P1 enhancement)
-	// This allows detecting if the password was rotated between fetch and use
-	secretVersion := 0
-	if metadata, ok := passwordSecret.Data["metadata"].(map[string]interface{}); ok {
-		if version, ok := metadata["version"].(int); ok {
-			secretVersion = version
-			log.Debug("   Extracted secret version for optimistic locking",
-				zap.Int("version", secretVersion))
-		} else {
-			// Try json.Number (Vault sometimes returns numbers as json.Number)
-			if versionNum, ok := metadata["version"].(float64); ok {
-				secretVersion = int(versionNum)
-				log.Debug("   Extracted secret version from float64",
-					zap.Int("version", secretVersion))
-			}
-		}
-	}
-
-	if secretVersion == 0 {
-		log.Debug("   Version tracking not available (KV v1 or older Vault)")
-	}
+	log.Info("   ✓ Bootstrap password retrieved and validated successfully",
+		zap.String("path", "secret/eos/bootstrap"),
+		zap.Int("password_length", len(password)),
+		zap.Time("created_at", bootstrapPass.CreatedAt))
 
 	// Build return data
 	bootstrapData := &MFABootstrapData{
 		Username:      username,
 		Password:      password,
 		EntityID:      entityID,
-		SecretPath:    vaultpaths.UserpassBootstrapPasswordKVPath,
+		SecretPath:    "secret/eos/bootstrap",
 		FetchedAt:     time.Now(),
-		SecretVersion: secretVersion,
+		SecretVersion: 0, // Version tracking not available with new KVv2 SDK (not needed for bootstrap password)
 	}
 
 	log.Info(" [PRE-MFA VERIFICATION] All prerequisites verified successfully",

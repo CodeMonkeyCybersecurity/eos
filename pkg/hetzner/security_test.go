@@ -395,9 +395,9 @@ func TestHTTPRequestSecurity(t *testing.T) {
 	t.Run("api_endpoint_validation", func(t *testing.T) {
 		// Test that API endpoints use HTTPS
 		endpoints := []string{
-			hetznerDNSBaseURL,
-			recordsBaseURL,
-			zonesBaseURL,
+			HetznerDNSAPIBase,
+			HetznerDNSRecordsURL,
+			HetznerDNSZonesURL,
 		}
 
 		for _, endpoint := range endpoints {

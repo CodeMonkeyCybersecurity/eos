@@ -13,7 +13,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	vaultpaths "github.com/CodeMonkeyCybersecurity/eos/pkg/shared/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -222,15 +221,6 @@ func getSecretDataKeys(secret *api.Secret) []string {
 	return keys
 }
 
-// getMapKeys extracts keys from a map for logging
-func getMapKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 // WriteUserpassCredentialsFallback writes the Eos user's password to disk and Vault KV,
 // with telemetry, structured logging, and cockroachdb‐style error wrapping.
 func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string) error {
@@ -323,10 +313,10 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		log.Info(" Ownership set successfully on secrets directory")
 	}
 
-	// Write to Vault KV store
-	log.Info(" Writing fallback credentials to Vault KV store",
-		zap.String("path", "secret/eos/userpass-password"))
-
+	// Write bootstrap password to Vault KV using unified abstraction
+	// with built-in write-then-verify (replaces 120 lines of inline verification)
+	// NOTE: This is a temporary bootstrap password for initial setup only.
+	// It will be deleted after successful TOTP verification in Phase 13.
 	client, err := GetPrivilegedClient(rc)
 	if err != nil {
 		log.Error(" Failed to get privileged client for KV write",
@@ -334,113 +324,19 @@ func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string
 		return cerr.Wrap(err, "get-privileged-client")
 	}
 
-	// Write bootstrap password to Vault KV using standardized path and format
-	// NOTE: This is a temporary bootstrap password for initial setup only.
-	// It will be deleted after successful TOTP verification in Phase 13.
-	bootstrapData := map[string]interface{}{
-		vaultpaths.UserpassBootstrapPasswordKVField: password,
-		"created_at":  time.Now().UTC().Format(time.RFC3339),
-		"purpose":     "initial-setup-verification",
-		"lifecycle":   "ephemeral - deleted after first use",
-		"created_by":  "eos-phase-10a",
+	// Get underlying *zap.Logger from otelzap.LoggerWithCtx
+	zapLogger := log.Logger().Logger
+	kv := NewEosKVv2Store(client, "secret", zapLogger)
+	if err := WriteBootstrapPassword(rc.Ctx, kv, password, zapLogger); err != nil {
+		return cerr.Wrap(err, "write-bootstrap-password")
 	}
-
-	if err := WriteKVv2(rc, client, "secret", "eos/bootstrap", bootstrapData); err != nil {
-		log.Error(" Failed to write bootstrap credentials to Vault KV",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.Error(err))
-		return cerr.Wrap(err, "write-bootstrap-password-kv")
-	}
-
-	log.Info(" [EVALUATE] Bootstrap credentials written to Vault KV successfully",
-		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-		zap.String("purpose", "initial-setup-verification"),
-		zap.String("lifecycle", "ephemeral - will be deleted after MFA setup"))
-
-	// Verify KV write by reading it back
-	// CRITICAL P0: This verification MUST fail the function if secret wasn't persisted.
-	// Previously this only logged warnings and returned success, causing silent failures
-	// that weren't detected until Phase 13 MFA setup tried to read the secret.
-	log.Info(" Verifying KV write by reading back from Vault")
-	verifySecret, verifyErr := client.Logical().Read(vaultpaths.UserpassBootstrapPasswordKVPath)
-	if verifyErr != nil {
-		log.Error(" Bootstrap password write verification failed - read error",
-			zap.Error(verifyErr),
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Error("")
-		log.Error("  This indicates the secret was not successfully written to Vault storage.")
-		log.Error("  Possible causes:")
-		log.Error("    • Vault storage backend is unavailable or read-only")
-		log.Error("    • Network partition between Eos and Vault")
-		log.Error("    • Insufficient permissions on the secret path")
-		log.Error("")
-		return cerr.Wrap(verifyErr, "failed to verify bootstrap password write - read error")
-	}
-
-	if verifySecret == nil {
-		log.Error(" Bootstrap password write verification failed - secret not found",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		log.Error("")
-		log.Error("  The write operation reported success, but the secret does not exist.")
-		log.Error("  This indicates a Vault storage backend failure.")
-		log.Error("")
-		log.Error("  Diagnostic steps:")
-		log.Error("    1. Check Vault storage health: vault status")
-		log.Error("    2. Check Vault logs: journalctl -u vault -n 100")
-		log.Error("    3. Verify storage backend configuration in /etc/vault.d/vault.hcl")
-		log.Error("")
-		return cerr.New("bootstrap password secret not found after write - storage may have failed")
-	}
-
-	// Verify the data structure is correct (KV v2 format)
-	if verifySecret.Data == nil {
-		log.Error(" Bootstrap password write verification failed - response has no data",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath))
-		return cerr.New("bootstrap password verification failed - Vault response has no data")
-	}
-
-	dataMap, ok := verifySecret.Data["data"].(map[string]interface{})
-	if !ok {
-		log.Error(" Bootstrap password write verification failed - invalid KV v2 structure",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.Any("response_structure", verifySecret.Data))
-		log.Error("")
-		log.Error("  Expected KV v2 structure: { \"data\": { \"password\": \"...\" }, \"metadata\": {...} }")
-		log.Error("  Actual structure does not have a 'data' field as map[string]interface{}")
-		log.Error("")
-		log.Error("  Possible causes:")
-		log.Error("    • KV engine at 'secret' is not version 2 (check: vault secrets list)")
-		log.Error("    • Secret was written to wrong mount point")
-		log.Error("    • Vault API version mismatch")
-		log.Error("")
-		return cerr.New("bootstrap password verification failed - secret has invalid KV v2 structure")
-	}
-
-	// Verify the password field exists in the data
-	if _, hasPassword := dataMap[vaultpaths.UserpassBootstrapPasswordKVField]; !hasPassword {
-		log.Error(" Bootstrap password write verification failed - password field missing",
-			zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-			zap.String("expected_field", vaultpaths.UserpassBootstrapPasswordKVField),
-			zap.Any("actual_fields", getMapKeys(dataMap)))
-		log.Error("")
-		log.Error("  The secret exists but does not contain the required password field.")
-		log.Error("  This indicates a bug in the secret write logic.")
-		log.Error("")
-		return cerr.Newf("bootstrap password verification failed - field '%s' not in written secret",
-			vaultpaths.UserpassBootstrapPasswordKVField)
-	}
-
-	// SUCCESS: All verification checks passed
-	log.Info(" [EVALUATE] Bootstrap password write verification successful",
-		zap.String("path", vaultpaths.UserpassBootstrapPasswordKVPath),
-		zap.String("field_verified", vaultpaths.UserpassBootstrapPasswordKVField))
 
 	// State transition logging for forensic analysis
 	log.Info("Phase 10a State Transition",
 		zap.String("phase", "10a"),
 		zap.String("from_state", "userpass_user_created"),
 		zap.String("to_state", "bootstrap_password_persisted"),
-		zap.String("secret_path", vaultpaths.UserpassBootstrapPasswordKVPath),
+		zap.String("secret_path", "secret/eos/bootstrap"),
 		zap.String("completion_status", "success"),
 		zap.Time("completed_at", time.Now()))
 

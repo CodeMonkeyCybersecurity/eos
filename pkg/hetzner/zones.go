@@ -16,7 +16,7 @@ import (
 )
 
 func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
-	req, err := http.NewRequestWithContext(rc.Ctx, "GET", zonesBaseURL, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, "GET", HetznerDNSZonesURL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET /zones")
 	}
@@ -50,7 +50,7 @@ func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
 func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZone, error) {
 	payload, _ := json.Marshal(zone)
 
-	req, err := http.NewRequestWithContext(rc.Ctx, "POST", zonesBaseURL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", HetznerDNSZonesURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating POST /zones")
 	}
@@ -84,7 +84,7 @@ func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZon
 }
 
 func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone, error) {
-	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
+	url := fmt.Sprintf("%s/%s", HetznerDNSZonesURL, zoneID)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
@@ -118,7 +118,7 @@ func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone,
 }
 
 func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated DNSZone) (*DNSZone, error) {
-	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
+	url := fmt.Sprintf("%s/%s", HetznerDNSZonesURL, zoneID)
 	payload, _ := json.Marshal(updated)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "PUT", url, bytes.NewReader(payload))
@@ -155,7 +155,7 @@ func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated
 }
 
 func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
-	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
+	url := fmt.Sprintf("%s/%s", HetznerDNSZonesURL, zoneID)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "DELETE", url, nil)
 	if err != nil {
@@ -185,7 +185,7 @@ func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
 }
 
 func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string, zoneFile string) error {
-	url := fmt.Sprintf("%s/%s/import", zonesBaseURL, zoneID)
+	url := fmt.Sprintf("%s/%s/import", HetznerDNSZonesURL, zoneID)
 	body := strings.NewReader(zoneFile)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, body)
@@ -217,7 +217,7 @@ func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string
 }
 
 func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (string, error) {
-	url := fmt.Sprintf("%s/%s/export", zonesBaseURL, zoneID)
+	url := fmt.Sprintf("%s/%s/export", HetznerDNSZonesURL, zoneID)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
@@ -251,7 +251,7 @@ func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (st
 }
 
 func (c *DNSClient) ValidateZoneFile(rc *eos_io.RuntimeContext, zoneFile string) error {
-	url := zonesBaseURL + "/file/validate"
+	url := HetznerDNSZonesURL + "/file/validate"
 	body := strings.NewReader(zoneFile)
 
 	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, body)
