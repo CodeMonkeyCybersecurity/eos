@@ -2,13 +2,25 @@ package interaction
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// For testing: allow overriding stdin
+var testStdin io.Reader
+
+func getStdinReader() io.Reader {
+	if testStdin != nil {
+		return testStdin
+	}
+	return os.Stdin
+}
 
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
 func PromptWithDefault(label, defaultValue string) string {
@@ -18,7 +30,7 @@ func PromptWithDefault(label, defaultValue string) string {
 		zap.String("label", label),
 		zap.String("default", defaultValue))
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(getStdinReader())
 	text, _ := reader.ReadString('\n')
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -32,7 +44,7 @@ func PromptRequired(label string) string {
 	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
 	logger := otelzap.L()
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(getStdinReader())
 	for {
 		logger.Info("terminal prompt: required user input", zap.String("label", label))
 		text, _ := reader.ReadString('\n')
@@ -88,7 +100,7 @@ func PromptYesNo(args ...interface{}) bool {
 	logger := otelzap.L()
 	logger.Info("terminal prompt: yes/no question", zap.String("question", question))
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(getStdinReader())
 	response, _ := reader.ReadString('\n')
 	response = strings.TrimSpace(strings.ToLower(response))
 
@@ -128,7 +140,7 @@ func PromptSelect(args ...interface{}) string {
 	}
 
 	// Get selection
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(getStdinReader())
 	for {
 		logger.Info("terminal prompt: enter selection number")
 		text, _ := reader.ReadString('\n')
@@ -175,29 +187,106 @@ func PromptSecret(args ...interface{}) (string, error) {
 	return PromptRequired(label), nil
 }
 
-// PromptSecrets prompts for multiple secrets
-// Accepts either (...labels) or (ctx, count) signatures
+// PromptSecrets prompts for one or more secret values.
+//
+// Supported call patterns:
+//   - PromptSecrets(count int) - prompts "Secret 1", "Secret 2", etc.
+//   - PromptSecrets(ctx context.Context, count int) - context currently unused, prompts "Secret 1", "Secret 2", etc.
+//   - PromptSecrets(ctx context.Context, label string, count int) - prompts "label" (count=1) or "label 1", "label 2" (count>1)
+//
+// Returns error if:
+//   - Invalid number of arguments
+//   - Arguments have wrong types
+//   - Count is zero or negative
+//   - Failed to read secret input
+//
+// NOTE: Context is currently unused. Cancellation support is tracked as P2 issue.
 func PromptSecrets(args ...interface{}) ([]string, error) {
 	var count int
+	var label string
+	var hasLabel bool
 
-	// Check if first arg is context
-	if len(args) > 0 {
-		if _, isInt := args[0].(int); !isInt {
-			// First arg is context (ignored), second is count
-			if len(args) > 1 {
-				count = args[1].(int)
-			}
-		} else {
-			count = args[0].(int)
+	// Parse arguments based on count and types
+	switch len(args) {
+	case 1:
+		// Pattern: PromptSecrets(count)
+		var ok bool
+		count, ok = args[0].(int)
+		if !ok {
+			return nil, fmt.Errorf("PromptSecrets: argument must be int, got %T", args[0])
 		}
+
+	case 2:
+		// Pattern: PromptSecrets(ctx, count)
+		// NOTE: Context ignored (see function comment for P2 issue)
+		var ok bool
+		count, ok = args[1].(int)
+		if !ok {
+			return nil, fmt.Errorf("PromptSecrets: args[1] must be int (count), got %T", args[1])
+		}
+
+	case 3:
+		// Pattern: PromptSecrets(ctx, label, count)
+		// NOTE: Context ignored (see function comment for P2 issue)
+		var ok bool
+		label, ok = args[1].(string)
+		if !ok {
+			return nil, fmt.Errorf("PromptSecrets: args[1] must be string (label), got %T", args[1])
+		}
+		count, ok = args[2].(int)
+		if !ok {
+			return nil, fmt.Errorf("PromptSecrets: args[2] must be int (count), got %T", args[2])
+		}
+		hasLabel = true
+
+	default:
+		return nil, fmt.Errorf("PromptSecrets: invalid number of arguments (%d), expected 1, 2, or 3", len(args))
 	}
 
+	// Validate count is positive
+	if count <= 0 {
+		return nil, fmt.Errorf("PromptSecrets: count must be positive, got %d", count)
+	}
+
+	// Collect secrets
 	results := make([]string, count)
 	for i := 0; i < count; i++ {
-		secret, _ := PromptSecret(fmt.Sprintf("Secret %d", i+1))
+		var promptLabel string
+		if hasLabel {
+			// For single secret, use label as-is. For multiple, add index.
+			if count == 1 {
+				promptLabel = label
+			} else {
+				promptLabel = fmt.Sprintf("%s %d", label, i+1)
+			}
+		} else {
+			// No label provided, use generic numbered label
+			promptLabel = fmt.Sprintf("Secret %d", i+1)
+		}
+
+		// P1: Handle error instead of ignoring it
+		secret, err := PromptSecret(promptLabel)
+		if err != nil {
+			return nil, fmt.Errorf("failed to prompt for %s: %w", promptLabel, err)
+		}
 		results[i] = secret
 	}
 	return results, nil
+}
+
+// Type-safe wrapper functions for compile-time safety
+// These functions provide explicit signatures to prevent type errors at compile time.
+// Existing code can continue using the variadic version; new code should prefer these.
+
+// PromptSecretsSimple prompts for N secrets with default labels "Secret 1", "Secret 2", etc.
+func PromptSecretsSimple(count int) ([]string, error) {
+	return PromptSecrets(count)
+}
+
+// PromptSecretsLabeled prompts for N secrets with a custom label.
+// For count=1, prompts "label". For count>1, prompts "label 1", "label 2", etc.
+func PromptSecretsLabeled(ctx context.Context, label string, count int) ([]string, error) {
+	return PromptSecrets(ctx, label, count)
 }
 
 // PromptInputWithReader prompts for input using a specific reader
