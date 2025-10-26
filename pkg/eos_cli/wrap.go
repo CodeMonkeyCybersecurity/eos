@@ -278,7 +278,7 @@ func argsModified(original, sanitized []string) bool {
 }
 
 // sanitizeFlagValues sanitizes flag values by intercepting the flag parsing
-func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, sanitizer *security.InputSanitizer) error {
+func sanitizeFlagValues(ctx *eos_io.RuntimeContext, cmd *cobra.Command, _ *security.InputSanitizer) error {
 	// This is a simplified approach - in practice, we would need to walk through
 	// all flags and sanitize their values, but Cobra makes this challenging
 	// because flags are parsed before we get here.

@@ -260,7 +260,7 @@ func displayDryRunChanges(logger otelzap.LoggerWithCtx, portLabel string, fromPo
 
 // applyPortChanges backs up config, updates it, and restarts the service
 func applyPortChanges(rc *eos_io.RuntimeContext, configPath string, currentConfig []byte,
-	portType string, actualFromPort, actualToPort int, config *CurrentPortConfig) error {
+	portType string, _ int, actualToPort int, _ *CurrentPortConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// INTERVENE: Backup current configuration

@@ -469,12 +469,12 @@ func (m *EnhancedConsulManager) startMetricsCollection(rc *eos_io.RuntimeContext
 }
 
 // Placeholder methods for caching (implementation would use Redis/memory cache)
-func (m *EnhancedConsulManager) getCachedService(serviceName, tag string) []*api.CatalogService {
+func (m *EnhancedConsulManager) getCachedService(_ string, _ string) []*api.CatalogService {
 	// Implementation would retrieve from cache
 	return nil
 }
 
-func (m *EnhancedConsulManager) setCachedService(serviceName, tag string, services []*api.CatalogService) {
+func (m *EnhancedConsulManager) setCachedService(_ string, _ string, _ []*api.CatalogService) {
 	// Implementation would store in cache with TTL
 }
 

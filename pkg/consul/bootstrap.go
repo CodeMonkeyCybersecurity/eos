@@ -219,7 +219,7 @@ func waitForBootstrapNodes(rc *eos_io.RuntimeContext, config *ConsulConfig) erro
 }
 
 // initializeCluster initializes the Consul cluster
-func initializeCluster(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
+func initializeCluster(rc *eos_io.RuntimeContext, _ *ConsulConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Initializing Consul cluster")
@@ -257,7 +257,7 @@ func initializeCluster(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
 }
 
 // bootstrapACLSystem bootstraps the ACL system
-func bootstrapACLSystem(rc *eos_io.RuntimeContext, config *ConsulConfig) (string, error) {
+func bootstrapACLSystem(rc *eos_io.RuntimeContext, _ *ConsulConfig) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Bootstrapping ACL system")
@@ -377,7 +377,7 @@ func min(a, b int) int {
 }
 
 // configureInitialServices configures initial services and policies
-func configureInitialServices(rc *eos_io.RuntimeContext, config *ConsulConfig) error {
+func configureInitialServices(rc *eos_io.RuntimeContext, _ *ConsulConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Configuring initial services")

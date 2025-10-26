@@ -271,7 +271,7 @@ func getTokenFromConsulKV(rc *eos_io.RuntimeContext) (string, string, error) {
 }
 
 // getTokenFromFile retrieves token from filesystem
-func getTokenFromFile(rc *eos_io.RuntimeContext) (string, string, error) {
+func getTokenFromFile(_ *eos_io.RuntimeContext) (string, string, error) {
 	tokenPath := "/etc/consul.d/acl-token"
 
 	data, err := os.ReadFile(tokenPath)

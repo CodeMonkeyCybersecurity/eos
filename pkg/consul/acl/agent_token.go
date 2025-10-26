@@ -267,9 +267,9 @@ func PersistAgentTokenToConfig(rc *eos_io.RuntimeContext, tokenID string, config
 		// For now, warn user to manually update
 		logger.Warn("Automatic token update not yet implemented")
 		logger.Warn("Please manually update the agent token in the config file:")
-		logger.Warn(fmt.Sprintf("  Edit: %s", configPath))
+		logger.Warn("  Edit: " + configPath)
 		logger.Warn("  Set: acl.tokens.agent = \"<new-token>\"")
-		logger.Warn(fmt.Sprintf("  Then: systemctl restart consul"))
+		logger.Warn("  Then: systemctl restart consul")
 
 		return fmt.Errorf("agent token update not yet implemented - manual update required")
 	}
@@ -278,7 +278,7 @@ func PersistAgentTokenToConfig(rc *eos_io.RuntimeContext, tokenID string, config
 	// This is a simplified implementation - proper HCL parsing would be better
 	logger.Warn("Automatic token persistence not yet implemented")
 	logger.Warn("For persistent agent token across restarts:")
-	logger.Warn(fmt.Sprintf("  1. Edit: %s", configPath))
+	logger.Warn("  1. Edit: " + configPath)
 	logger.Warn("  2. Add to acl.tokens block:")
 	logger.Warn("       acl = {")
 	logger.Warn("         enabled = true")
@@ -297,7 +297,7 @@ func PersistAgentTokenToConfig(rc *eos_io.RuntimeContext, tokenID string, config
 // containsAgentToken checks if the config string already has an agent token
 func containsAgentToken(configStr string) bool {
 	// Simple string check - proper implementation would use HCL parser
-	return (configStr != "" && configStr != "") &&
+	return configStr != "" &&
 		(containsPattern(configStr, `tokens\s*\{\s*agent\s*=`) ||
 		containsPattern(configStr, `tokens\.agent\s*=`))
 }

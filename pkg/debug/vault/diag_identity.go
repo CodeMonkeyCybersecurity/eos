@@ -236,7 +236,7 @@ func checkMFAMethods(client *api.Client) string {
 	}
 
 	info.WriteString("\nMFA Methods:\n")
-	info.WriteString(fmt.Sprintf("  TOTP: Enabled\n"))
+	info.WriteString("  TOTP: Enabled\n")
 	info.WriteString(fmt.Sprintf("  Method ID: %s\n", methodID))
 
 	// Get additional TOTP method details if available
