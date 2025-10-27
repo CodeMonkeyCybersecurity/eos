@@ -112,16 +112,26 @@ func BuildAppRoleLoginPayload(roleID, secretID string) map[string]interface{} {
 	}
 }
 
-// DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
+// DefaultAppRoleOptions returns the default operational flags for AppRole provisioning.
+//
+// NOTE: This function returns AppRoleOptions which controls the PROVISIONING BEHAVIOR
+// (ForceRecreate, RefreshCreds), NOT the actual AppRole configuration sent to Vault.
+//
+// The actual AppRole configuration (token_ttl, token_period, policies) comes from
+// DefaultAppRoleData, which is written to Vault by EnsureAppRole().
+//
+// Historical Note: TokenTTL and TokenMaxTTL fields in AppRoleOptions are NOT used
+// during AppRole creation. They exist for backward compatibility but are ignored.
+// Real configuration: see DefaultAppRoleData variable.
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
-		RoleName:      AppRoleName, // fix: use AppRoleName ("eos-approle") instead of EosID ("eos")
-		Policies:      []string{EosDefaultPolicyName, EosAdminPolicyName}, // Admin role per HashiCorp best practices
-		TokenTTL:      "1h",
-		TokenMaxTTL:   "4h",
-		SecretIDTTL:   "24h",
-		ForceRecreate: false,
-		RefreshCreds:  false,
+		RoleName:      AppRoleName, // "eos-approle"
+		Policies:      []string{EosDefaultPolicyName, EosAdminPolicyName},
+		TokenTTL:      "4h",        // IGNORED: Actual value from DefaultAppRoleData
+		TokenMaxTTL:   "",          // REMOVED: Conflicts with token_period (see DefaultAppRoleData)
+		SecretIDTTL:   "24h",       // IGNORED: Actual value from DefaultAppRoleData
+		ForceRecreate: false,       // Operational flag: whether to force recreation
+		RefreshCreds:  false,       // Operational flag: whether to refresh credentials
 	}
 }
 
