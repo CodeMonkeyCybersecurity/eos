@@ -78,7 +78,7 @@ jobs:
           trufflehog filesystem . --json > trufflehog-report.json || true
 
       - name: Upload security artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: security-reports
