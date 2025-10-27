@@ -80,7 +80,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	}
 
 	// 3. Get or generate secrets automatically
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	secretManager, err := secrets.NewManager(rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("secret manager initialization failed: %w", err)
 	}
@@ -90,7 +90,7 @@ func runCreateGrafana(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		"secret_key":     secrets.SecretTypeToken,
 	}
 
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("grafana", requiredSecrets)
+	serviceSecrets, err := secretManager.EnsureServiceSecrets(rc.Ctx, "grafana", requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("secret generation failed: %w", err)
 	}

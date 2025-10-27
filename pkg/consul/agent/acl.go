@@ -44,7 +44,7 @@ func GenerateAgentToken(rc *eos_io.RuntimeContext, config AgentConfig, secretMan
 
 	// Check if token already exists
 	if secretManager != nil {
-		existingToken, err := secretManager.GetSecret("consul", tokenKey)
+		existingToken, err := secretManager.GetSecret(rc.Ctx, "consul", tokenKey)
 		if err == nil && existingToken != "" {
 			logger.Info("Using existing agent token from Vault",
 				zap.String("node_name", config.NodeName))

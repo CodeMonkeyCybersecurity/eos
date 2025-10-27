@@ -74,7 +74,7 @@ func GetAPIKeyFromSecretManager(rc *eos_io.RuntimeContext, sm *secrets.SecretMan
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Query SecretManager for hetzner DNS token
-	token, err := sm.GetSecret("hetzner", "dns_token")
+	token, err := sm.GetSecret(rc.Ctx, "hetzner", "dns_token")
 	if err != nil {
 		logger.Debug("Hetzner API key not found in SecretManager",
 			zap.Error(err))
@@ -161,7 +161,7 @@ func StoreAPIKey(rc *eos_io.RuntimeContext, sm *secrets.SecretManager, token *cr
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Store in SecretManager at secret/hetzner/dns_token
-	if err := sm.StoreSecret("hetzner", "dns_token", token.Value(), secrets.SecretTypeAPIKey); err != nil {
+	if err := sm.StoreSecret(rc.Ctx, "hetzner", "dns_token", token.Value(), secrets.SecretTypeAPIKey); err != nil {
 		logger.Warn("Failed to store API key in SecretManager",
 			zap.Error(err))
 		return fmt.Errorf("failed to store API key: %w", err)

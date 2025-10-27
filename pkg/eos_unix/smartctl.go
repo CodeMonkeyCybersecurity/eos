@@ -14,7 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"go.opentelemetry.io/otel/attribute"
 )
 

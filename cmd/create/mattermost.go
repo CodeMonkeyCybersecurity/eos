@@ -154,7 +154,7 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	}
 
 	// 3. Get or generate secrets automatically
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	secretManager, err := secrets.NewManager(rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("secret manager initialization failed: %w", err)
 	}
@@ -166,7 +166,7 @@ func runCreateMattermost(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		"invite_":           secrets.SecretTypeToken,
 	}
 
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("mattermost", requiredSecrets)
+	serviceSecrets, err := secretManager.EnsureServiceSecrets(rc.Ctx, "mattermost", requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("secret generation failed: %w", err)
 	}

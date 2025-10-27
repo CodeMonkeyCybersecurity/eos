@@ -65,7 +65,7 @@ func NewCephClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*CephClient
 	}
 
 	// Initialize secret manager
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	secretManager, err := secrets.NewManager(rc, envConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
@@ -222,7 +222,7 @@ func (c *CephClient) getKeyring() (string, error) {
 	}
 
 	// Try to retrieve existing secrets
-	serviceSecrets, err := c.secretManager.GetOrGenerateServiceSecrets("ceph", requiredSecrets)
+	serviceSecrets, err := c.secretManager.EnsureServiceSecrets(c.rc.Ctx, "ceph", requiredSecrets)
 	if err != nil {
 		// If no secrets exist, check for keyring file
 		if c.config.KeyringPath != "" {

@@ -3,10 +3,8 @@ package secrets
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,25 +12,22 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"github.com/hashicorp/vault/api"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// SecretManager handles automatic secret management
-type SecretManager struct {
+// Manager handles automatic secret management
+// NOTE: Renamed from SecretManager for consistency with SecretStore naming
+type Manager struct {
 	rc      *eos_io.RuntimeContext
-	backend SecretBackend
+	backend SecretStore // REFACTORED: Uses new SecretStore interface
 	env     *environment.EnvironmentConfig
 }
 
-// SecretBackend defines the interface for secret storage backends
-type SecretBackend interface {
-	Store(path string, secret map[string]interface{}) error
-	Retrieve(path string) (map[string]interface{}, error)
-	Generate(path string, secretType SecretType) (string, error)
-	Exists(path string) bool
-}
+// SecretManager is a deprecated alias for Manager
+// DEPRECATED: Use Manager instead. Will be removed in Eos v2.0.0 (approximately 6 months)
+type SecretManager = Manager
 
 // SecretType defines the type of secret to generate
 type SecretType string
@@ -130,16 +125,16 @@ func (ss *ServiceSecrets) Has(key string) bool {
 	return exists
 }
 
-// NewSecretManager creates a new secret manager with automatic backend detection
-func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.EnvironmentConfig) (*SecretManager, error) {
+// NewManager creates a new secret manager with automatic backend detection
+// REFACTORED: Now uses SecretStore interface and new VaultStore/ConsulStore implementations
+func NewManager(rc *eos_io.RuntimeContext, envConfig *environment.EnvironmentConfig) (*Manager, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	var backend SecretBackend
-	var err error
+	var backend SecretStore
 
 	// SECURITY: Choose backend based on environment configuration
 	// Vault is the secure default for production
-	// Only fall back to file backend in development/testing
+	// Consul KV fallback for Hecate when Vault unavailable (legacy compatibility)
 	backendType := os.Getenv("EOS_SECRET_BACKEND")
 	if backendType == "" {
 		backendType = "vault" // Secure default
@@ -147,64 +142,101 @@ func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.Environm
 
 	switch backendType {
 	case "vault":
-		backend, err = NewVaultBackend(rc, envConfig.VaultAddr)
+		// Create Vault client using centralized GetVaultClient()
+		vaultClient, err := vault.GetVaultClient(rc)
 		if err != nil {
-			logger.Error("Vault backend initialization failed", zap.Error(err))
+			logger.Error("Vault client initialization failed", zap.Error(err))
 			// SECURITY: Fail-closed in production, only allow fallback in dev/test
 			if os.Getenv("GO_ENV") == "development" || os.Getenv("GO_ENV") == "test" {
-				logger.Warn("Development mode: falling back to file backend (INSECURE)")
-				backend = NewFileBackend()
+				logger.Warn("Development mode: falling back to Consul KV backend (INSECURE - plaintext storage)")
+				// Try Consul fallback
+				consulConfig := consulapi.DefaultConfig()
+				consulClient, consulErr := consulapi.NewClient(consulConfig)
+				if consulErr != nil {
+					return nil, fmt.Errorf("vault backend failed and consul fallback unavailable: vault error: %w, consul error: %v", err, consulErr)
+				}
+				backend = NewConsulStore(consulClient)
 			} else {
 				return nil, fmt.Errorf("vault backend required in production but initialization failed: %w", err)
 			}
+		} else {
+			backend = NewVaultStore(vaultClient, "secret")
 		}
-	case "file":
-		// SECURITY: Only allow file backend in development/testing
+	case "consul":
+		// SECURITY: Only allow Consul KV backend in development/testing or for Hecate legacy compatibility
 		if os.Getenv("GO_ENV") != "development" && os.Getenv("GO_ENV") != "test" {
-			return nil, fmt.Errorf("file backend not allowed in production - use vault")
+			logger.Warn("Using Consul KV backend in production (PLAINTEXT storage - not recommended)")
 		}
-		logger.Warn("Using insecure file backend (development only)")
-		backend = NewFileBackend()
+		consulConfig := consulapi.DefaultConfig()
+		consulClient, err := consulapi.NewClient(consulConfig)
+		if err != nil {
+			return nil, fmt.Errorf("consul client initialization failed: %w", err)
+		}
+		logger.Warn("Using insecure Consul KV backend (plaintext storage)")
+		backend = NewConsulStore(consulClient)
 	default:
-		return nil, fmt.Errorf("unsupported secret backend: %s (supported: vault, file)", backendType)
+		return nil, fmt.Errorf("unsupported secret backend: %s (supported: vault, consul)", backendType)
 	}
 
 	logger.Info("Secret manager initialized",
-		zap.String("backend", fmt.Sprintf("%T", backend)))
+		zap.String("backend", backend.Name()),
+		zap.Bool("supports_versioning", backend.SupportsVersioning()),
+		zap.Bool("supports_metadata", backend.SupportsMetadata()))
 
-	return &SecretManager{
+	return &Manager{
 		rc:      rc,
 		backend: backend,
 		env:     envConfig,
 	}, nil
 }
 
-// GetOrGenerateServiceSecrets gets existing secrets or generates new ones for a service
-func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, requiredSecrets map[string]SecretType) (*ServiceSecrets, error) {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+// NewSecretManager is a deprecated alias for NewManager
+// DEPRECATED: Use NewManager instead. Will be removed in Eos v2.0.0 (approximately 6 months)
+func NewSecretManager(rc *eos_io.RuntimeContext, envConfig *environment.EnvironmentConfig) (*Manager, error) {
+	return NewManager(rc, envConfig)
+}
 
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+// EnsureServiceSecrets ensures that all required secrets exist for a service
+// If secrets exist in the backend, they are retrieved. If any are missing, new ones are generated and stored.
+// This is the recommended method for service secret management.
+//
+// REFACTORED: Renamed from GetOrGenerateServiceSecrets to clarify that this function:
+//  1. GETs existing secrets from backend
+//  2. GENERATEs missing secrets
+//  3. STOREs new/updated secrets to backend
+//
+// The name "Ensure" makes it clear that the function guarantees the final state (all secrets exist).
+func (m *Manager) EnsureServiceSecrets(ctx context.Context, serviceName string, requiredSecrets map[string]SecretType) (*ServiceSecrets, error) {
+	logger := otelzap.Ctx(ctx)
 
-	logger.Info("Getting or generating service secrets",
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
+
+	logger.Info("Ensuring service secrets exist",
 		zap.String("service", serviceName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath))
 
-	// Try to retrieve existing secrets
-	if sm.backend.Exists(secretPath) {
-		existing, err := sm.backend.Retrieve(secretPath)
+	// ASSESS: Try to retrieve existing secrets
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		logger.Warn("Failed to check if secrets exist, will generate new ones", zap.Error(err))
+		exists = false
+	}
+
+	if exists {
+		existing, err := m.backend.Get(ctx, secretPath)
 		if err != nil {
 			logger.Warn("Failed to retrieve existing secrets, generating new ones", zap.Error(err))
 		} else {
 			// Validate existing secrets have all required keys
 			secrets := &ServiceSecrets{
 				ServiceName: serviceName,
-				Environment: sm.env.Environment,
+				Environment: m.env.Environment,
 				Secrets:     existing,
-				Backend:     fmt.Sprintf("%T", sm.backend),
+				Backend:     m.backend.Name(),
 			}
 
-			if sm.validateSecrets(secrets, requiredSecrets) {
+			if m.validateSecrets(secrets, requiredSecrets) {
 				logger.Info("Using existing secrets", zap.String("service", serviceName))
 				return secrets, nil
 			}
@@ -213,21 +245,21 @@ func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, require
 		}
 	}
 
-	// Generate new secrets
+	// INTERVENE: Generate new secrets
 	logger.Info("Generating new secrets",
 		zap.String("service", serviceName),
 		zap.Int("secret_count", len(requiredSecrets)))
 
 	secrets := &ServiceSecrets{
 		ServiceName: serviceName,
-		Environment: sm.env.Environment,
+		Environment: m.env.Environment,
 		Secrets:     make(map[string]interface{}),
-		Backend:     fmt.Sprintf("%T", sm.backend),
+		Backend:     m.backend.Name(),
 	}
 
 	// Generate each required secret
 	for secretName, secretType := range requiredSecrets {
-		value, err := sm.generateSecret(secretType)
+		value, err := m.generateSecret(secretType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate %s: %w", secretName, err)
 		}
@@ -241,13 +273,22 @@ func (sm *SecretManager) GetOrGenerateServiceSecrets(serviceName string, require
 
 	// Store secrets in backend
 	// P0 FIX: MUST fail if storage fails - otherwise secrets are lost on restart
-	if err := sm.backend.Store(secretPath, secrets.Secrets); err != nil {
+	if err := m.backend.Put(ctx, secretPath, secrets.Secrets); err != nil {
 		logger.Error("Failed to store secrets in backend", zap.Error(err))
 		return nil, fmt.Errorf("failed to persist secrets to backend at %s: %w", secretPath, err)
 	}
 
+	// EVALUATE
 	logger.Info("Secrets stored successfully", zap.String("path", secretPath))
 	return secrets, nil
+}
+
+// GetOrGenerateServiceSecrets is a deprecated alias for EnsureServiceSecrets
+// DEPRECATED: Use EnsureServiceSecrets instead. Will be removed in Eos v2.0.0 (approximately 6 months)
+//
+// This function exists for backward compatibility. New code should use EnsureServiceSecrets(ctx, ...)
+func (m *Manager) GetOrGenerateServiceSecrets(serviceName string, requiredSecrets map[string]SecretType) (*ServiceSecrets, error) {
+	return m.EnsureServiceSecrets(m.rc.Ctx, serviceName, requiredSecrets)
 }
 
 // validateSecrets checks if existing secrets contain all required keys
@@ -296,25 +337,29 @@ func (sm *SecretManager) generateSecret(secretType SecretType) (string, error) {
 //
 // Example:
 //
-//	secretManager.StoreSecret("bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey)
-func (sm *SecretManager) StoreSecret(serviceName, secretName string, value interface{}, secretType SecretType) error {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+//	secretManager.StoreSecret(ctx, "bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey)
+func (m *Manager) StoreSecret(ctx context.Context, serviceName, secretName string, value interface{}, secretType SecretType) error {
+	logger := otelzap.Ctx(ctx)
 
 	// Unified path format
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	logger.Info("Storing secret",
 		zap.String("service", serviceName),
 		zap.String("secret", secretName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath),
 		zap.String("type", string(secretType)))
 
 	// ASSESS - Get existing secrets (if any)
 	existing := make(map[string]interface{})
-	if sm.backend.Exists(secretPath) {
-		var err error
-		existing, err = sm.backend.Retrieve(secretPath)
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		logger.Warn("Could not check if secrets exist, will create new",
+			zap.Error(err),
+			zap.String("path", secretPath))
+	} else if exists {
+		existing, err = m.backend.Get(ctx, secretPath)
 		if err != nil {
 			logger.Warn("Could not retrieve existing secrets, will overwrite",
 				zap.Error(err),
@@ -328,7 +373,7 @@ func (sm *SecretManager) StoreSecret(serviceName, secretName string, value inter
 	existing[secretName+"_type"] = string(secretType) // Store type metadata for validation
 
 	// Store back to backend
-	if err := sm.backend.Store(secretPath, existing); err != nil {
+	if err := m.backend.Put(ctx, secretPath, existing); err != nil {
 		logger.Error("Failed to store secret",
 			zap.Error(err),
 			zap.String("service", serviceName),
@@ -352,26 +397,30 @@ func (sm *SecretManager) StoreSecret(serviceName, secretName string, value inter
 //
 // Example:
 //
-//	apiKey, err := secretManager.GetSecret("bionicgpt", "azure_api_key")
-func (sm *SecretManager) GetSecret(serviceName, secretName string) (string, error) {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+//	apiKey, err := secretManager.GetSecret(ctx, "bionicgpt", "azure_api_key")
+func (m *Manager) GetSecret(ctx context.Context, serviceName, secretName string) (string, error) {
+	logger := otelzap.Ctx(ctx)
 
 	// Unified path format
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	logger.Debug("Retrieving secret",
 		zap.String("service", serviceName),
 		zap.String("secret", secretName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath))
 
 	// ASSESS - Check if service secrets exist
-	if !sm.backend.Exists(secretPath) {
-		return "", fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, sm.env.Environment)
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check if secrets exist for service '%s': %w", serviceName, err)
+	}
+	if !exists {
+		return "", fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, m.env.Environment)
 	}
 
 	// Retrieve all secrets for service
-	secrets, err := sm.backend.Retrieve(secretPath)
+	secrets, err := m.backend.Get(ctx, secretPath)
 	if err != nil {
 		logger.Error("Failed to retrieve secrets from backend",
 			zap.Error(err),
@@ -401,11 +450,11 @@ func (sm *SecretManager) GetSecret(serviceName, secretName string) (string, erro
 
 // UpdateSecret updates an existing secret (alias to StoreSecret for clarity)
 // Returns error if secret doesn't exist - use StoreSecret to create new secrets
-func (sm *SecretManager) UpdateSecret(serviceName, secretName string, newValue interface{}, secretType SecretType) error {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+func (m *Manager) UpdateSecret(ctx context.Context, serviceName, secretName string, newValue interface{}, secretType SecretType) error {
+	logger := otelzap.Ctx(ctx)
 
 	// Check if secret exists first
-	_, err := sm.GetSecret(serviceName, secretName)
+	_, err := m.GetSecret(ctx, serviceName, secretName)
 	if err != nil {
 		return fmt.Errorf("cannot update non-existent secret '%s' for service '%s': %w (use StoreSecret to create)", secretName, serviceName, err)
 	}
@@ -415,7 +464,7 @@ func (sm *SecretManager) UpdateSecret(serviceName, secretName string, newValue i
 		zap.String("secret", secretName))
 
 	// Use StoreSecret (idempotent)
-	return sm.StoreSecret(serviceName, secretName, newValue, secretType)
+	return m.StoreSecret(ctx, serviceName, secretName, newValue, secretType)
 }
 
 // StoreSecretWithMetadata stores a secret with custom metadata (TTL, owner, rotation policy, etc.)
@@ -438,31 +487,36 @@ func (sm *SecretManager) UpdateSecret(serviceName, secretName string, newValue i
 //			"model":    "gpt-4",
 //		},
 //	}
-//	err := secretManager.StoreSecretWithMetadata("bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey, metadata)
-func (sm *SecretManager) StoreSecretWithMetadata(
+//	err := secretManager.StoreSecretWithMetadata(ctx, "bionicgpt", "azure_api_key", apiKey, secrets.SecretTypeAPIKey, metadata)
+func (m *Manager) StoreSecretWithMetadata(
+	ctx context.Context,
 	serviceName, secretName string,
 	value interface{},
 	secretType SecretType,
 	metadata *SecretMetadata,
 ) error {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+	logger := otelzap.Ctx(ctx)
 
 	// Unified path format
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	logger.Info("Storing secret with metadata",
 		zap.String("service", serviceName),
 		zap.String("secret", secretName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath),
 		zap.String("type", string(secretType)),
 		zap.String("ttl", metadata.TTL))
 
 	// ASSESS - Get existing secrets (if any)
 	existing := make(map[string]interface{})
-	if sm.backend.Exists(secretPath) {
-		var err error
-		existing, err = sm.backend.Retrieve(secretPath)
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		logger.Warn("Could not check if secrets exist, will create new",
+			zap.Error(err),
+			zap.String("path", secretPath))
+	} else if exists {
+		existing, err = m.backend.Get(ctx, secretPath)
 		if err != nil {
 			logger.Warn("Could not retrieve existing secrets, will overwrite",
 				zap.Error(err),
@@ -476,7 +530,7 @@ func (sm *SecretManager) StoreSecretWithMetadata(
 	existing[secretName+"_type"] = string(secretType) // Store type metadata
 
 	// Store secret data first (KV v2 Put)
-	if err := sm.backend.Store(secretPath, existing); err != nil {
+	if err := m.backend.Put(ctx, secretPath, existing); err != nil {
 		logger.Error("Failed to store secret",
 			zap.Error(err),
 			zap.String("service", serviceName),
@@ -484,14 +538,29 @@ func (sm *SecretManager) StoreSecretWithMetadata(
 		return fmt.Errorf("failed to store secret '%s' for service '%s': %w", secretName, serviceName, err)
 	}
 
-	// INTERVENE - Store metadata (ONLY for Vault backend)
-	if vaultBackend, ok := sm.backend.(*VaultBackend); ok {
+	// INTERVENE - Store metadata (ONLY if backend supports it)
+	if m.backend.SupportsMetadata() {
 		// Add timestamp if not provided
 		if metadata.CreatedAt == "" {
 			metadata.CreatedAt = fmt.Sprintf("%d", time.Now().Unix())
 		}
 
-		if err := vaultBackend.StoreMetadata(secretPath, metadata); err != nil {
+		// Convert our SecretMetadata to store.Metadata format
+		storeMetadata := &Metadata{
+			TTL:         metadata.TTL,
+			CreatedBy:   metadata.CreatedBy,
+			CreatedAt:   metadata.CreatedAt,
+			Purpose:     metadata.Purpose,
+			Owner:       metadata.Owner,
+			RotateAfter: metadata.RotateAfter,
+			Custom:      make(map[string]string),
+		}
+		// Add custom fields
+		for k, v := range metadata.Custom {
+			storeMetadata.Custom["custom_"+k] = v
+		}
+
+		if err := m.backend.PutMetadata(ctx, secretPath, storeMetadata); err != nil {
 			logger.Warn("Failed to store secret metadata (non-critical - secret data is stored)",
 				zap.Error(err),
 				zap.String("secret", secretName),
@@ -503,8 +572,8 @@ func (sm *SecretManager) StoreSecretWithMetadata(
 				zap.String("secret", secretName))
 		}
 	} else {
-		logger.Debug("Skipping metadata storage (file backend doesn't support it)",
-			zap.String("backend", fmt.Sprintf("%T", sm.backend)))
+		logger.Debug("Skipping metadata storage (backend doesn't support it)",
+			zap.String("backend", m.backend.Name()))
 	}
 
 	// EVALUATE
@@ -521,33 +590,47 @@ func (sm *SecretManager) StoreSecretWithMetadata(
 //
 // Example:
 //
-//	value, metadata, err := secretManager.GetSecretWithMetadata("bionicgpt", "azure_api_key")
+//	value, metadata, err := secretManager.GetSecretWithMetadata(ctx, "bionicgpt", "azure_api_key")
 //	if err != nil {
 //		return err
 //	}
 //	fmt.Printf("API Key TTL: %s\n", metadata.TTL)
-func (sm *SecretManager) GetSecretWithMetadata(serviceName, secretName string) (string, *SecretMetadata, error) {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+func (m *Manager) GetSecretWithMetadata(ctx context.Context, serviceName, secretName string) (string, *SecretMetadata, error) {
+	logger := otelzap.Ctx(ctx)
 
 	// Get the secret value first
-	value, err := sm.GetSecret(serviceName, secretName)
+	value, err := m.GetSecret(ctx, serviceName, secretName)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// Try to get metadata (only works for Vault backend)
+	// Try to get metadata (only if backend supports it)
 	metadata := &SecretMetadata{}
-	if vaultBackend, ok := sm.backend.(*VaultBackend); ok {
-		secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
-		retrievedMetadata, err := vaultBackend.GetMetadata(secretPath)
+	if m.backend.SupportsMetadata() {
+		secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
+		storeMetadata, err := m.backend.GetMetadata(ctx, secretPath)
 		if err != nil {
 			logger.Debug("Could not retrieve secret metadata (non-critical)",
 				zap.Error(err),
 				zap.String("service", serviceName),
 				zap.String("secret", secretName))
 			// Return empty metadata, not an error
-		} else {
-			metadata = retrievedMetadata
+		} else if storeMetadata != nil {
+			// Convert store.Metadata to our SecretMetadata
+			metadata.TTL = storeMetadata.TTL
+			metadata.CreatedBy = storeMetadata.CreatedBy
+			metadata.CreatedAt = storeMetadata.CreatedAt
+			metadata.Purpose = storeMetadata.Purpose
+			metadata.Owner = storeMetadata.Owner
+			metadata.RotateAfter = storeMetadata.RotateAfter
+
+			// Extract custom fields
+			metadata.Custom = make(map[string]string)
+			for k, v := range storeMetadata.Custom {
+				if strings.HasPrefix(k, "custom_") {
+					metadata.Custom[strings.TrimPrefix(k, "custom_")] = v
+				}
+			}
 		}
 	}
 
@@ -559,25 +642,29 @@ func (sm *SecretManager) GetSecretWithMetadata(serviceName, secretName string) (
 //
 // Example:
 //
-//	err := secretManager.DeleteSecret("bionicgpt", "old_api_key")
-func (sm *SecretManager) DeleteSecret(serviceName, secretName string) error {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+//	err := secretManager.DeleteSecret(ctx, "bionicgpt", "old_api_key")
+func (m *Manager) DeleteSecret(ctx context.Context, serviceName, secretName string) error {
+	logger := otelzap.Ctx(ctx)
 
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	logger.Info("Deleting secret",
 		zap.String("service", serviceName),
 		zap.String("secret", secretName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath))
 
 	// ASSESS - Check if service secrets exist
-	if !sm.backend.Exists(secretPath) {
-		return fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, sm.env.Environment)
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if secrets exist for service '%s': %w", serviceName, err)
+	}
+	if !exists {
+		return fmt.Errorf("no secrets found for service '%s' in environment '%s'", serviceName, m.env.Environment)
 	}
 
 	// Retrieve all secrets
-	secrets, err := sm.backend.Retrieve(secretPath)
+	secrets, err := m.backend.Get(ctx, secretPath)
 	if err != nil {
 		logger.Error("Failed to retrieve secrets from backend",
 			zap.Error(err),
@@ -595,7 +682,7 @@ func (sm *SecretManager) DeleteSecret(serviceName, secretName string) error {
 	delete(secrets, secretName+"_type") // Remove type metadata too
 
 	// Store updated bundle back to backend
-	if err := sm.backend.Store(secretPath, secrets); err != nil {
+	if err := m.backend.Put(ctx, secretPath, secrets); err != nil {
 		logger.Error("Failed to update secrets after deletion",
 			zap.Error(err),
 			zap.String("service", serviceName),
@@ -617,28 +704,35 @@ func (sm *SecretManager) DeleteSecret(serviceName, secretName string) error {
 //
 // Example:
 //
-//	secretNames, err := secretManager.ListSecrets("bionicgpt")
+//	secretNames, err := secretManager.ListSecrets(ctx, "bionicgpt")
 //	// Returns: ["azure_api_key", "postgres_password", "jwt_secret"]
-func (sm *SecretManager) ListSecrets(serviceName string) ([]string, error) {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+func (m *Manager) ListSecrets(ctx context.Context, serviceName string) ([]string, error) {
+	logger := otelzap.Ctx(ctx)
 
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	logger.Debug("Listing secrets",
 		zap.String("service", serviceName),
-		zap.String("environment", sm.env.Environment),
+		zap.String("environment", m.env.Environment),
 		zap.String("path", secretPath))
 
 	// ASSESS - Check if service secrets exist
-	if !sm.backend.Exists(secretPath) {
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil {
+		logger.Warn("Failed to check if secrets exist",
+			zap.Error(err),
+			zap.String("service", serviceName))
+		return []string{}, nil // Return empty list on error (graceful degradation)
+	}
+	if !exists {
 		logger.Debug("No secrets found for service",
 			zap.String("service", serviceName),
-			zap.String("environment", sm.env.Environment))
+			zap.String("environment", m.env.Environment))
 		return []string{}, nil // No secrets = empty list (not an error)
 	}
 
 	// Retrieve all secrets
-	secrets, err := sm.backend.Retrieve(secretPath)
+	secrets, err := m.backend.Get(ctx, secretPath)
 	if err != nil {
 		logger.Error("Failed to retrieve secrets from backend",
 			zap.Error(err),
@@ -668,21 +762,22 @@ func (sm *SecretManager) ListSecrets(serviceName string) ([]string, error) {
 //
 // Example:
 //
-//	if secretManager.SecretExists("bionicgpt", "azure_api_key") {
+//	if secretManager.SecretExists(ctx, "bionicgpt", "azure_api_key") {
 //		// Secret exists, safe to update
 //	}
-func (sm *SecretManager) SecretExists(serviceName, secretName string) bool {
-	logger := otelzap.Ctx(sm.rc.Ctx)
+func (m *Manager) SecretExists(ctx context.Context, serviceName, secretName string) bool {
+	logger := otelzap.Ctx(ctx)
 
-	secretPath := fmt.Sprintf("services/%s/%s", sm.env.Environment, serviceName)
+	secretPath := fmt.Sprintf("services/%s/%s", m.env.Environment, serviceName)
 
 	// Check if service has any secrets
-	if !sm.backend.Exists(secretPath) {
+	exists, err := m.backend.Exists(ctx, secretPath)
+	if err != nil || !exists {
 		return false
 	}
 
 	// Retrieve all secrets to check for specific key
-	secrets, err := sm.backend.Retrieve(secretPath)
+	secrets, err := m.backend.Get(ctx, secretPath)
 	if err != nil {
 		logger.Debug("Failed to retrieve secrets while checking existence",
 			zap.Error(err),
@@ -691,440 +786,13 @@ func (sm *SecretManager) SecretExists(serviceName, secretName string) bool {
 		return false
 	}
 
-	_, exists := secrets[secretName]
+	_, exists = secrets[secretName]
 	return exists
 }
 
 // GetBackend returns the secret backend for direct access (for advanced use cases)
 // Most code should use StoreSecret/GetSecret instead
-func (sm *SecretManager) GetBackend() SecretBackend {
-	return sm.backend
-}
-
-// Vault Backend Implementation
-type VaultBackend struct {
-	address string
-	client  *api.Client
-	rc      *eos_io.RuntimeContext // For logging in diagnostic functions
-}
-
-// NewVaultBackend creates a Vault backend using the centralized GetVaultClient()
-// This ensures consistent TLS settings, VAULT_SKIP_VERIFY handling, and token management
-func NewVaultBackend(rc *eos_io.RuntimeContext, address string) (*VaultBackend, error) {
-	// CRITICAL FIX P0: Use centralized vault.GetVaultClient() instead of creating our own
-	// This respects VAULT_SKIP_VERIFY, TLS settings, and environment variables
-	// Fixes: "Client sent an HTTP request to an HTTPS server" error
-	client, err := vault.GetVaultClient(rc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Vault client: %w", err)
-	}
-
-	// Token should be set via VAULT_TOKEN environment variable
-	// or read from ~/.vault-token by the SDK (handled by GetVaultClient)
-
-	return &VaultBackend{
-		address: address,
-		client:  client,
-		rc:      rc,
-	}, nil
-}
-
-func (vb *VaultBackend) Store(path string, secret map[string]interface{}) error {
-	logger := otelzap.Ctx(vb.rc.Ctx)
-
-	// DIAGNOSTIC: Log token information before operation
-	if err := vb.logTokenDiagnostics(path); err != nil {
-		logger.Warn("Failed to retrieve token diagnostics (non-critical)",
-			zap.Error(err),
-			zap.String("target_path", path))
-	}
-
-	// Store secret in Vault KV v2
-	// Path format: secret/data/{path}
-	_, err := vb.client.KVv2("secret").Put(context.Background(), path, secret)
-	if err != nil {
-		// Check if this is a permission denied error on service secrets path
-		if strings.Contains(err.Error(), "permission denied") && strings.HasPrefix(path, "services/") {
-			return fmt.Errorf("failed to store secret in Vault at %s: %w\n\n"+
-				"HINT: The Vault policy may be missing service secrets access.\n"+
-				"Run this command to update Vault policies:\n"+
-				"  sudo eos update vault --policies\n\n"+
-				"Then restart Vault Agent to get a new token:\n"+
-				"  sudo systemctl restart vault-agent-eos", path, err)
-		}
-		return fmt.Errorf("failed to store secret in Vault at %s: %w", path, err)
-	}
-	return nil
-}
-
-// logTokenDiagnostics logs detailed information about the current Vault token
-// to help diagnose permission denied errors
-func (vb *VaultBackend) logTokenDiagnostics(targetPath string) error {
-	logger := otelzap.Ctx(vb.rc.Ctx)
-
-	// Lookup current token information
-	tokenInfo, err := vb.client.Auth().Token().LookupSelf()
-	if err != nil {
-		return fmt.Errorf("failed to lookup token: %w", err)
-	}
-
-	// Extract token details
-	accessor := "unknown"
-	if acc, ok := tokenInfo.Data["accessor"].(string); ok && len(acc) >= 8 {
-		accessor = acc[:8] + "..." // Show first 8 chars for identification
-	}
-
-	policies := []string{}
-	if pols, ok := tokenInfo.Data["policies"].([]interface{}); ok {
-		for _, p := range pols {
-			if pstr, ok := p.(string); ok {
-				policies = append(policies, pstr)
-			}
-		}
-	}
-
-	ttl := "unknown"
-	if ttlRaw, ok := tokenInfo.Data["ttl"].(json.Number); ok {
-		ttl = ttlRaw.String() + "s"
-	}
-
-	// Log token diagnostics
-	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	logger.Info("Vault Token Diagnostics (for permission troubleshooting)")
-	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	logger.Info("Token Information:",
-		zap.String("accessor", accessor),
-		zap.Strings("policies", policies),
-		zap.String("ttl_remaining", ttl),
-		zap.String("target_path", "secret/data/"+targetPath))
-
-	// Check token capabilities on the target path
-	fullPath := fmt.Sprintf("secret/data/%s", targetPath)
-	caps, err := vb.client.Sys().CapabilitiesSelf(fullPath)
-	if err != nil {
-		logger.Warn("Failed to check token capabilities", zap.Error(err))
-	} else {
-		logger.Info("Token Capabilities on Target Path:",
-			zap.String("path", fullPath),
-			zap.Strings("capabilities", caps))
-
-		// Analyze capabilities
-		hasCreate := false
-		hasUpdate := false
-		for _, cap := range caps {
-			if cap == "create" {
-				hasCreate = true
-			}
-			if cap == "update" {
-				hasUpdate = true
-			}
-		}
-
-		if !hasCreate && !hasUpdate {
-			logger.Error("❌ Token DOES NOT have 'create' or 'update' capability on target path",
-				zap.String("path", fullPath),
-				zap.Strings("actual_capabilities", caps))
-		} else {
-			logger.Info("✓ Token has required capabilities",
-				zap.Bool("has_create", hasCreate),
-				zap.Bool("has_update", hasUpdate))
-		}
-	}
-
-	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-	return nil
-}
-
-func (vb *VaultBackend) Retrieve(path string) (map[string]interface{}, error) {
-	logger := otelzap.Ctx(vb.rc.Ctx)
-
-	// DIAGNOSTIC: Log token information before operation
-	if err := vb.logTokenDiagnostics(path); err != nil {
-		logger.Warn("Failed to retrieve token diagnostics (non-critical)",
-			zap.Error(err),
-			zap.String("target_path", path))
-	}
-
-	// Retrieve secret from Vault KV v2
-	secretData, err := vb.client.KVv2("secret").Get(context.Background(), path)
-	if err != nil {
-		// Check if this is a permission denied error
-		if strings.Contains(err.Error(), "permission denied") {
-			return nil, fmt.Errorf("failed to retrieve secret from Vault at %s: %w\n\n"+
-				"HINT: The Vault token may not have read permissions on this path.\n"+
-				"Check the token's policies with:\n"+
-				"  vault token lookup", path, err)
-		}
-		return nil, fmt.Errorf("failed to retrieve secret from Vault at %s: %w", path, err)
-	}
-
-	if secretData == nil || secretData.Data == nil {
-		return nil, fmt.Errorf("secret not found at %s", path)
-	}
-
-	return secretData.Data, nil
-}
-
-func (vb *VaultBackend) Generate(path string, secretType SecretType) (string, error) {
-	// Generate secret using local crypto (Vault doesn't generate secrets for us)
-	// Then store it in Vault
-	secret, err := generateSecretValue(secretType)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate secret: %w", err)
-	}
-
-	// Store in Vault
-	secretMap := map[string]interface{}{
-		"value": secret,
-		"type":  string(secretType),
-	}
-
-	if err := vb.Store(path, secretMap); err != nil {
-		return "", fmt.Errorf("failed to store generated secret: %w", err)
-	}
-
-	return secret, nil
-}
-
-// generateSecretValue generates a secret value based on type
-// REFACTORED: Now delegates to pkg/crypto for all generation (single source of truth)
-// All secrets use alphanumeric-only [a-zA-Z0-9] for maximum compatibility
-func generateSecretValue(secretType SecretType) (string, error) {
-	switch secretType {
-	case SecretTypePassword:
-		return crypto.GenerateURLSafePassword(32)
-	case SecretTypeAPIKey:
-		return crypto.GenerateAPIKey(32)
-	case SecretTypeToken:
-		return crypto.GenerateToken(32)
-	case SecretTypeJWT:
-		return crypto.GenerateJWTSecret(32)
-	default:
-		return crypto.GenerateURLSafePassword(32)
-	}
-}
-
-func (vb *VaultBackend) Exists(path string) bool {
-	// Check if secret exists in Vault
-	secretData, err := vb.client.KVv2("secret").Get(context.Background(), path)
-	if err != nil || secretData == nil {
-		return false
-	}
-	return secretData.Data != nil
-}
-
-// StoreMetadata stores custom metadata for a secret path using Vault KV v2 metadata API
-// This leverages Vault's custom_metadata feature to attach TTL, owner, rotation policies, etc.
-//
-// SECURITY NOTE: Metadata is NOT encrypted, but it's audit-logged.
-// NEVER put sensitive data in metadata - use secret data storage instead.
-//
-// Path format: Metadata is stored at secret/metadata/{path}
-// Secret data is at secret/data/{path} (handled by Store method)
-func (vb *VaultBackend) StoreMetadata(path string, metadata *SecretMetadata) error {
-	logger := otelzap.Ctx(vb.rc.Ctx)
-
-	// Convert SecretMetadata struct to map[string]string for Vault
-	customMetadata := make(map[string]string)
-	if metadata.TTL != "" {
-		customMetadata["ttl"] = metadata.TTL
-	}
-	if metadata.CreatedBy != "" {
-		customMetadata["created_by"] = metadata.CreatedBy
-	}
-	if metadata.CreatedAt != "" {
-		customMetadata["created_at"] = metadata.CreatedAt
-	}
-	if metadata.Purpose != "" {
-		customMetadata["purpose"] = metadata.Purpose
-	}
-	if metadata.Owner != "" {
-		customMetadata["owner"] = metadata.Owner
-	}
-	if metadata.RotateAfter != "" {
-		customMetadata["rotate_after"] = metadata.RotateAfter
-	}
-
-	// Add any custom fields
-	for k, v := range metadata.Custom {
-		// Prefix custom fields to avoid collision with standard fields
-		customMetadata["custom_"+k] = v
-	}
-
-	// Vault KV v2 metadata path
-	metadataPath := fmt.Sprintf("secret/metadata/%s", path)
-
-	logger.Debug("Writing secret metadata to Vault",
-		zap.String("path", metadataPath),
-		zap.Int("metadata_fields", len(customMetadata)))
-
-	// Write to Vault using logical client (metadata endpoint)
-	_, err := vb.client.Logical().WriteWithContext(vb.rc.Ctx, metadataPath, map[string]interface{}{
-		"custom_metadata": customMetadata,
-	})
-
-	if err != nil {
-		logger.Error("Failed to store secret metadata",
-			zap.Error(err),
-			zap.String("path", metadataPath))
-		return fmt.Errorf("failed to write metadata to %s: %w", metadataPath, err)
-	}
-
-	logger.Debug("Secret metadata stored successfully",
-		zap.String("path", metadataPath),
-		zap.Int("fields", len(customMetadata)))
-
-	return nil
-}
-
-// GetMetadata retrieves custom metadata for a secret path from Vault KV v2
-// Returns an empty SecretMetadata struct if no metadata exists (not an error).
-//
-// Path format: Reads from secret/metadata/{path}
-func (vb *VaultBackend) GetMetadata(path string) (*SecretMetadata, error) {
-	logger := otelzap.Ctx(vb.rc.Ctx)
-
-	// Vault KV v2 metadata path
-	metadataPath := fmt.Sprintf("secret/metadata/%s", path)
-
-	logger.Debug("Reading secret metadata from Vault",
-		zap.String("path", metadataPath))
-
-	// Read from Vault using logical client
-	resp, err := vb.client.Logical().ReadWithContext(vb.rc.Ctx, metadataPath)
-	if err != nil {
-		logger.Debug("Failed to read metadata (may not exist)",
-			zap.Error(err),
-			zap.String("path", metadataPath))
-		return &SecretMetadata{}, nil // Return empty metadata, not error
-	}
-
-	// No metadata exists - return empty struct
-	if resp == nil || resp.Data == nil {
-		logger.Debug("No metadata found at path",
-			zap.String("path", metadataPath))
-		return &SecretMetadata{}, nil
-	}
-
-	// Extract custom_metadata field
-	customMetadataRaw, ok := resp.Data["custom_metadata"]
-	if !ok {
-		logger.Debug("No custom_metadata field in response",
-			zap.String("path", metadataPath))
-		return &SecretMetadata{}, nil
-	}
-
-	// Type assert to map[string]interface{} (Vault returns this type)
-	customMetadataMap, ok := customMetadataRaw.(map[string]interface{})
-	if !ok {
-		logger.Warn("custom_metadata is not a map",
-			zap.String("path", metadataPath),
-			zap.String("type", fmt.Sprintf("%T", customMetadataRaw)))
-		return &SecretMetadata{}, nil
-	}
-
-	// Convert map to SecretMetadata struct
-	metadata := &SecretMetadata{
-		Custom: make(map[string]string),
-	}
-
-	// Extract standard fields
-	if ttl, ok := customMetadataMap["ttl"].(string); ok {
-		metadata.TTL = ttl
-	}
-	if createdBy, ok := customMetadataMap["created_by"].(string); ok {
-		metadata.CreatedBy = createdBy
-	}
-	if createdAt, ok := customMetadataMap["created_at"].(string); ok {
-		metadata.CreatedAt = createdAt
-	}
-	if purpose, ok := customMetadataMap["purpose"].(string); ok {
-		metadata.Purpose = purpose
-	}
-	if owner, ok := customMetadataMap["owner"].(string); ok {
-		metadata.Owner = owner
-	}
-	if rotateAfter, ok := customMetadataMap["rotate_after"].(string); ok {
-		metadata.RotateAfter = rotateAfter
-	}
-
-	// Extract custom fields (prefixed with "custom_")
-	for k, v := range customMetadataMap {
-		if strings.HasPrefix(k, "custom_") {
-			if strVal, ok := v.(string); ok {
-				// Remove "custom_" prefix
-				metadata.Custom[strings.TrimPrefix(k, "custom_")] = strVal
-			}
-		}
-	}
-
-	logger.Debug("Secret metadata retrieved successfully",
-		zap.String("path", metadataPath),
-		zap.Int("fields", len(customMetadataMap)))
-
-	return metadata, nil
-}
-
-// File Backend Implementation (fallback)
-type FileBackend struct {
-	basePath string
-}
-
-func NewFileBackend() *FileBackend {
-	return &FileBackend{
-		basePath: "/opt/eos/secrets",
-	}
-}
-
-func (fb *FileBackend) Store(path string, secret map[string]interface{}) error {
-	fullPath := filepath.Join(fb.basePath, path+".json")
-
-	// Create directory
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0700); err != nil {
-		return fmt.Errorf("failed to create secret directory: %w", err)
-	}
-
-	// Store as JSON
-	data, err := json.MarshalIndent(secret, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal secret: %w", err)
-	}
-
-	if err := os.WriteFile(fullPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write secret file: %w", err)
-	}
-
-	return nil
-}
-
-func (fb *FileBackend) Retrieve(path string) (map[string]interface{}, error) {
-	fullPath := filepath.Join(fb.basePath, path+".json")
-
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("secret not found")
-	}
-
-	data, err := os.ReadFile(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read secret file: %w", err)
-	}
-
-	var secret map[string]interface{}
-	if err := json.Unmarshal(data, &secret); err != nil {
-		return nil, fmt.Errorf("failed to parse secret: %w", err)
-	}
-
-	return secret, nil
-}
-
-func (fb *FileBackend) Generate(path string, secretType SecretType) (string, error) {
-	// File backend doesn't have built-in generation, use manual generation
-	return "", fmt.Errorf("file backend generate not supported")
-}
-
-func (fb *FileBackend) Exists(path string) bool {
-	fullPath := filepath.Join(fb.basePath, path+".json")
-	_, err := os.Stat(fullPath)
-	return err == nil
+// DEPRECATED: Direct backend access will be removed in Eos v2.0.0
+func (m *Manager) GetBackend() SecretStore {
+	return m.backend
 }

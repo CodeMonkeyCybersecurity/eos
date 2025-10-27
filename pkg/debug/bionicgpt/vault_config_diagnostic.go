@@ -42,7 +42,9 @@ func VaultConfigDiagnostic() *debug.Diagnostic {
 			}
 
 			// Vault path for BionicGPT secrets
-			vaultPath := "secret/services/production/bionicgpt"
+			// NOTE: Path should NOT include "secret/" prefix - Vault KVv2 API prepends "secret/data/" automatically
+			// Using "secret/services/..." creates "secret/data/secret/services/..." (double prefix bug)
+			vaultPath := "services/production/bionicgpt"
 			result.Metadata["vault_path"] = vaultPath
 
 			output.WriteString(fmt.Sprintf("Vault Path: %s\n\n", vaultPath))

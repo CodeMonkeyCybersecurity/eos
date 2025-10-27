@@ -60,10 +60,10 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		logger.Warn("Environment discovery failed, using defaults", zap.Error(err))
 		// Continue with defaults rather than failing
 		envConfig = &environment.EnvironmentConfig{
-			Environment:   "production",
-			Datacenter:    "dc1",
-			Region:        "us-east-1",
-			VaultAddr:     fmt.Sprintf("http://localhost:%d", shared.PortVault),
+			Environment: "production",
+			Datacenter:  "dc1",
+			Region:      "us-east-1",
+			VaultAddr:   fmt.Sprintf("http://localhost:%d", shared.PortVault),
 		}
 	}
 
@@ -81,7 +81,7 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	}
 
 	// 3. Get or generate secrets automatically
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	secretManager, err := secrets.NewManager(rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("secret manager initialization failed: %w", err)
 	}
@@ -92,7 +92,7 @@ func runCreateJenkins(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		"jwt_secret":     secrets.SecretTypeJWT,
 	}
 
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("jenkins", requiredSecrets)
+	serviceSecrets, err := secretManager.EnsureServiceSecrets(rc.Ctx, "jenkins", requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("secret generation failed: %w", err)
 	}

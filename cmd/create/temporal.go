@@ -54,7 +54,7 @@ func runCreateTemporal(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	// Initialize secret manager and generate password
 	logger.Info("Initializing secret manager")
-	secretManager, err := secrets.NewSecretManager(rc, envConfig)
+	secretManager, err := secrets.NewManager(rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
@@ -62,7 +62,7 @@ func runCreateTemporal(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	requiredSecrets := map[string]secrets.SecretType{
 		"postgres_password": secrets.SecretTypePassword,
 	}
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("temporal", requiredSecrets)
+	serviceSecrets, err := secretManager.EnsureServiceSecrets(rc.Ctx, "temporal", requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("failed to generate secrets: %w", err)
 	}

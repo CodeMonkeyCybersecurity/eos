@@ -420,6 +420,7 @@ func (cm *ConfigManager) storeAPIKeyInVault() error {
 	// Use unified StoreSecret() method - handles path format automatically
 	// This replaces the old pattern of manually constructing paths
 	if err := cm.secretManager.StoreSecret(
+		cm.rc.Ctx,
 		cm.config.ServiceName,
 		"azure_api_key",
 		cm.config.APIKey,
@@ -448,7 +449,7 @@ func (cm *ConfigManager) retrieveAPIKeyFromVault() (string, error) {
 
 	// Use unified GetSecret() method - handles path format automatically
 	// This replaces the old pattern of manually constructing paths
-	apiKey, err := cm.secretManager.GetSecret(cm.config.ServiceName, "azure_api_key")
+	apiKey, err := cm.secretManager.GetSecret(cm.rc.Ctx, cm.config.ServiceName, "azure_api_key")
 	if err != nil {
 		logger.Warn("Failed to retrieve API key from Vault, will create fallback .env file",
 			zap.Error(err))

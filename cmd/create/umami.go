@@ -45,7 +45,7 @@ var CreateUmamiCmd = &cobra.Command{
 		}
 
 		// Initialize secret manager
-		secretManager, err := secrets.NewSecretManager(rc, envConfig)
+		secretManager, err := secrets.NewManager(rc, envConfig)
 		if err != nil {
 			return fmt.Errorf("failed to initialize secret manager: %w", err)
 		}
@@ -87,7 +87,7 @@ var CreateUmamiCmd = &cobra.Command{
 		requiredSecrets := map[string]secrets.SecretType{
 			"database_password": secrets.SecretTypePassword,
 		}
-		serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets("umami", requiredSecrets)
+		serviceSecrets, err := secretManager.EnsureServiceSecrets(rc.Ctx, "umami", requiredSecrets)
 		if err != nil {
 			logger.Warn("Failed to manage secrets", zap.Error(err))
 		} else {

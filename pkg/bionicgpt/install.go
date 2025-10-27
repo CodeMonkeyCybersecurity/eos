@@ -253,7 +253,7 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 
 	// Step 5: Initialize secret manager for service secrets
 	logger.Info("Initializing secret manager")
-	secretManager, err := secrets.NewSecretManager(bgi.rc, envConfig)
+	secretManager, err := secrets.NewManager(bgi.rc, envConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
@@ -271,7 +271,7 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		requiredSecrets["azure_api_key"] = secrets.SecretTypeAPIKey
 	}
 
-	serviceSecrets, err := secretManager.GetOrGenerateServiceSecrets(VaultServiceName, requiredSecrets)
+	serviceSecrets, err := secretManager.EnsureServiceSecrets(ctx, VaultServiceName, requiredSecrets)
 	if err != nil {
 		return fmt.Errorf("failed to manage secrets: %w", err)
 	}
