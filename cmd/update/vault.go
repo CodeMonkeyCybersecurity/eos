@@ -18,13 +18,15 @@ import (
 )
 
 var (
-	vaultPorts          string
-	vaultAddress        string
-	vaultDryRun         bool
-	vaultUpdatePolicies bool
-	vaultFix            bool
-	vaultFixMFA         bool
-	vaultUnseal         bool
+	vaultPorts           string
+	vaultAddress         string
+	vaultDryRun          bool
+	vaultUpdatePolicies  bool
+	vaultFix             bool
+	vaultFixMFA          bool
+	vaultUnseal          bool
+	vaultAgent           bool // NEW: Update Vault Agent
+	vaultEnableTemplates bool // NEW: Enable template rendering
 )
 
 // VaultCmd updates Vault configuration
@@ -48,6 +50,13 @@ Unseal Vault:
                Automatically unseals if Vault is sealed
                Idempotent: safe to run multiple times
 
+Vault Agent Update:
+  --agent      Update Vault Agent service (restart, renew token, fix permissions)
+               Assesses Agent health and automatically fixes issues
+               Restarts service if token expired or service not running
+               Waits for token renewal and verifies authentication
+               Use with --dry-run to preview actions
+
 Configuration Drift Correction:
   --fix        Detect and correct drift from canonical state
   --mfa        Fix MFA enforcement policies only (use with --fix)
@@ -69,6 +78,10 @@ Configuration Drift Correction:
 Examples:
   # Unseal Vault (recommended after seal or reboot)
   eos update vault --unseal
+
+  # Update Vault Agent (restart, renew token, fix permissions)
+  eos update vault --agent
+  eos update vault --agent --dry-run  # Preview actions
 
   # Detect and fix all configuration drift (including MFA)
   eos update vault --fix
@@ -123,7 +136,7 @@ func init() {
 	VaultCmd.Flags().StringVar(&vaultPorts, "ports", "",
 		"Port migration in format: FROM -> TO (e.g., '8179 -> default' or '8179 -> 8200')")
 	VaultCmd.Flags().BoolVar(&vaultDryRun, "dry-run", false,
-		"Preview changes without applying them (works with --fix, --ports, --address)")
+		"Preview changes without applying them (works with --fix, --ports, --address, --agent)")
 	VaultCmd.Flags().BoolVar(&vaultUpdatePolicies, "policies", false,
 		"Update Vault policies to latest version (requires root token)")
 	VaultCmd.Flags().BoolVar(&vaultFix, "fix", false,
@@ -132,6 +145,10 @@ func init() {
 		"Fix MFA enforcement policies only (requires --fix, use --dry-run to preview)")
 	VaultCmd.Flags().BoolVar(&vaultUnseal, "unseal", false,
 		"Unseal Vault using stored unseal keys from initialization")
+	VaultCmd.Flags().BoolVar(&vaultAgent, "agent", false,
+		"Update Vault Agent service (restart, renew token, fix permissions)")
+	VaultCmd.Flags().BoolVar(&vaultEnableTemplates, "enable-templates", false,
+		"Enable Vault Agent template rendering for automatic secret injection")
 }
 
 func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -156,20 +173,32 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if vaultUnseal {
 		operationCount++
 	}
+	if vaultAgent {
+		operationCount++
+	}
+	if vaultEnableTemplates {
+		operationCount++
+	}
 
 	// CRITICAL: Only allow ONE operation at a time
 	if operationCount > 1 {
 		return eos_err.NewUserError(
 			"Cannot specify multiple operations simultaneously.\n\n" +
 				"Choose ONE of:\n" +
-				"  --unseal          Unseal Vault\n" +
-				"  --fix             Fix configuration drift\n" +
-				"  --address         Update Vault address\n" +
-				"  --ports           Migrate ports\n" +
-				"  --policies Update policies\n\n" +
+				"  --unseal           Unseal Vault\n" +
+				"  --agent            Update Vault Agent\n" +
+				"  --enable-templates Enable template rendering\n" +
+				"  --fix              Fix configuration drift\n" +
+				"  --address          Update Vault address\n" +
+				"  --ports            Migrate ports\n" +
+				"  --policies         Update policies\n\n" +
 				"Use --dry-run to preview changes for any operation.\n\n" +
 				"Examples:\n" +
 				"  eos update vault --unseal\n" +
+				"  eos update vault --agent\n" +
+				"  eos update vault --agent --dry-run\n" +
+				"  eos update vault --enable-templates\n" +
+				"  eos update vault --enable-templates --dry-run\n" +
 				"  eos update vault --fix\n" +
 				"  eos update vault --fix --dry-run\n" +
 				"  eos update vault --address vhost5\n" +
@@ -179,6 +208,16 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	// Handle --unseal flag first (most common operation)
 	if vaultUnseal {
 		return runVaultUnseal(rc)
+	}
+
+	// Handle --agent flag (update Vault Agent)
+	if vaultAgent {
+		return runVaultAgentUpdate(rc, vaultDryRun)
+	}
+
+	// Handle --enable-templates flag (enable template rendering)
+	if vaultEnableTemplates {
+		return runVaultEnableTemplates(rc, vaultDryRun)
 	}
 
 	// Validate --mfa requires --fix
@@ -255,6 +294,34 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return runVaultAddressUpdate(rc)
 	}
 	return runVaultPortsUpdate(rc)
+}
+
+// runVaultEnableTemplates orchestrates enabling Vault Agent template rendering
+// Pure orchestration - delegates to pkg/vault/templates.go for business logic
+func runVaultEnableTemplates(rc *eos_io.RuntimeContext, dryRun bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("================================================================================")
+	logger.Info("Enable Vault Agent Template Rendering")
+	logger.Info("================================================================================")
+	logger.Info("")
+
+	// Create config
+	config := &vault.EnableTemplatesConfig{
+		Services: []string{}, // Empty = all services
+		DryRun:   dryRun,
+	}
+
+	// Delegate to business logic (ALL logic in pkg/vault/templates.go)
+	if err := vault.EnableTemplates(rc, config); err != nil {
+		return err
+	}
+
+	logger.Info("")
+	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
+	logger.Info("================================================================================")
+
+	return nil
 }
 
 // runVaultAddressUpdate orchestrates Vault address update
@@ -639,6 +706,50 @@ func runVaultUnseal(rc *eos_io.RuntimeContext) error {
 	logger.Info("")
 	logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
 	logger.Info("================================================================================")
+
+	return nil
+}
+
+// runVaultAgentUpdate orchestrates Vault Agent update and recovery
+// Pure orchestration - delegates to pkg/vault/agent_update.go for business logic
+func runVaultAgentUpdate(rc *eos_io.RuntimeContext, dryRun bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("================================================================================")
+	logger.Info("Vault Agent Update")
+	logger.Info("================================================================================")
+	logger.Info("")
+
+	// Create config
+	config := &vault.AgentUpdateConfig{
+		ForceRestart:   false, // Only restart if needed
+		FixPermissions: true,  // Always fix permissions if issues found
+		WaitForRenewal: true,  // Wait for token renewal after restart
+		MaxWaitSeconds: 30,    // 30 seconds max wait
+		DryRun:         dryRun,
+	}
+
+	// Delegate to business logic (ALL logic in pkg/vault/agent_update.go)
+	if err := vault.UpdateAgent(rc, config); err != nil {
+		return err
+	}
+
+	if !dryRun {
+		logger.Info("")
+		logger.Info("================================================================================")
+		logger.Info("✓ Vault Agent Updated Successfully")
+		logger.Info("================================================================================")
+		logger.Info("")
+		logger.Info("Vault Agent is healthy and authenticated.")
+		logger.Info("")
+		logger.Info("Verify status:")
+		logger.Info("  • Service status:       systemctl status vault-agent-eos")
+		logger.Info("  • Agent logs:           journalctl -u vault-agent-eos -n 20")
+		logger.Info("  • Detailed diagnostics: sudo eos debug vault --agent")
+		logger.Info("")
+		logger.Info("Code Monkey Cybersecurity - 'Cybersecurity. With humans.'")
+		logger.Info("================================================================================")
+	}
 
 	return nil
 }

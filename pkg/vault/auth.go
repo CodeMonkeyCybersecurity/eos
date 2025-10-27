@@ -384,9 +384,23 @@ func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string
 		renewable = renewableData
 	}
 
+	// NOTE: Root tokens are INTENTIONALLY not renewable (HashiCorp security design)
+	// - Root tokens: renewable=false (by design, must be re-generated)
+	// - AppRole tokens WITHOUT token_period: renewable=true but hit max_ttl (expire eventually)
+	// - AppRole tokens WITH token_period: renewable=true, infinitely renewable
+	//
+	// For long-running services (Vault Agent), we MUST use token_period to enable infinite renewal.
+	// See pkg/shared/vault_auth.go:DefaultAppRoleData for configuration.
 	if !renewable {
-		log.Warn("Token is not renewable - will need re-authentication at expiry",
-			zap.String("token_type", tokenType))
+		if tokenType == "root" {
+			log.Debug("Root token is not renewable (expected behavior)",
+				zap.String("token_type", tokenType),
+				zap.String("reason", "HashiCorp security design - root tokens cannot be renewed"))
+		} else {
+			log.Warn("Token is not renewable - will need re-authentication at expiry",
+				zap.String("token_type", tokenType),
+				zap.String("remediation", "For long-running services, use AppRole with token_period"))
+		}
 	}
 
 	// P0 FIX 4: Check num_uses (use_limit) - HashiCorp pattern

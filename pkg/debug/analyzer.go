@@ -139,10 +139,21 @@ func (a *Analyzer) determineHealth(analysis *Analysis, report *Report) HealthSta
 	}
 
 	// Check if we have successful service checks
+	// BUG FIX: Accept multiple category names for service health checks
+	// - "Systemd" for Vault server service
+	// - "Vault Agent" for Agent service diagnostics
+	// - "Vault" for general Vault checks
 	hasRunningService := false
+	serviceCategories := []string{"Systemd", "Vault Agent", "Vault", "Service"}
+
 	for _, result := range report.Results {
-		if result.Category == "Systemd" && result.Status == StatusOK {
-			hasRunningService = true
+		for _, category := range serviceCategories {
+			if result.Category == category && result.Status == StatusOK {
+				hasRunningService = true
+				break
+			}
+		}
+		if hasRunningService {
 			break
 		}
 	}
@@ -151,6 +162,8 @@ func (a *Analyzer) determineHealth(analysis *Analysis, report *Report) HealthSta
 		return HealthHealthy
 	}
 
+	// Only return DEGRADED if we have no healthy services at all
+	// This prevents false DEGRADED status when all checks pass
 	return HealthDegraded
 }
 

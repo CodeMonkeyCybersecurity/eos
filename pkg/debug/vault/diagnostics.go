@@ -94,22 +94,25 @@ func AuthDiagnostics() []*debug.Diagnostic {
 		// 1. Verify Vault is healthy and accessible (prerequisite for auth)
 		HealthCheckDiagnostic(),
 
-		// 2. Check AppRole credentials exist and are valid
+		// 2. AppRole configuration deep-dive (token_period, token_max_ttl, policies)
+		AppRoleDiagnostic(),
+
+		// 3. Check AppRole credentials exist and are valid
 		VaultAgentCredentialsDiagnostic(),
 
-		// 3. Check if Agent has successfully authenticated (token file)
+		// 4. Check if Agent has successfully authenticated (token file)
 		VaultAgentTokenDiagnostic(),
 
-		// 4. Deep dive into token permissions, policies, and capabilities
+		// 5. Deep dive into token permissions, policies, and capabilities
 		VaultAgentTokenPermissionsDiagnostic(),
 
-		// 5. Check Agent service is running (auth flow depends on it)
+		// 6. Check Agent service is running (auth flow depends on it)
 		VaultAgentServiceDiagnostic(),
 
-		// 6. Review logs for authentication errors
+		// 7. Review logs for authentication errors
 		VaultAgentLogsDiagnostic(),
 
-		// 7. Check identity entity and aliases (needed for MFA)
+		// 8. Check identity entity and aliases (needed for MFA)
 		IdentityDiagnostic(),
 	}
 }

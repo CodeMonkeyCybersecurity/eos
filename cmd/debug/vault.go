@@ -24,6 +24,7 @@ var (
 	vaultDebugShowAll    bool
 	vaultDebugAgent      bool
 	vaultDebugAuth       bool
+	vaultDebugAppRole    bool // NEW: AppRole diagnostics
 	vaultDebugIdentities bool
 	vaultDebugMFA        bool
 )
@@ -49,6 +50,7 @@ This command performs extensive checks on:
 DIAGNOSTIC MODES:
   --agent       Vault Agent service diagnostics (service, config, credentials, token, logs)
   --auth        Authentication & authorization deep-dive (policies, permissions, AppRole, token capabilities)
+  --approle     AppRole configuration deep-dive (token_period, token_max_ttl, policies, credentials)
   --identities  Identity entity and alias diagnostics (entity ID, aliases, MFA methods)
   --mfa         MFA enforcement diagnostics (methods, policies, entity linkage)
 
@@ -99,6 +101,7 @@ func init() {
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugShowAll, "show-all", false, "Show all checks including skipped ones")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAgent, "agent", false, "Run Vault Agent diagnostics only (service, config, credentials, token, logs)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugAuth, "auth", false, "Run authentication & authorization diagnostics (health, AppRole, token, policies, permissions)")
+	vaultDebugCmd.Flags().BoolVar(&vaultDebugAppRole, "approle", false, "Run AppRole configuration diagnostics (token_period, token_max_ttl, policies, credentials)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugIdentities, "identities", false, "Run identity entity and alias diagnostics (entity ID, aliases, MFA methods)")
 	vaultDebugCmd.Flags().BoolVar(&vaultDebugMFA, "mfa", false, "Run MFA enforcement diagnostics (methods, policies, entity linkage)")
 
@@ -116,6 +119,9 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	if vaultDebugAuth {
 		flagCount++
 	}
+	if vaultDebugAppRole {
+		flagCount++
+	}
 	if vaultDebugIdentities {
 		flagCount++
 	}
@@ -123,7 +129,7 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		flagCount++
 	}
 	if flagCount > 1 {
-		return fmt.Errorf("--agent, --auth, --identities, and --mfa flags are mutually exclusive; use only one at a time")
+		return fmt.Errorf("--agent, --auth, --approle, --identities, and --mfa flags are mutually exclusive; use only one at a time")
 	}
 
 	logger.Info("Starting Vault diagnostics",
@@ -173,6 +179,13 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			zap.Int("auth_diagnostics", len(allDiagnostics)))
 		totalDiagnostics = len(allDiagnostics)
 		logger.Info("Registered auth diagnostics", zap.Int("total", totalDiagnostics))
+	} else if vaultDebugAppRole {
+		componentName = "Vault AppRole"
+		allDiagnostics = []*debug.Diagnostic{debugvault.AppRoleDiagnostic()}
+		logger.Debug("Running in AppRole-only mode",
+			zap.Int("approle_diagnostics", len(allDiagnostics)))
+		totalDiagnostics = len(allDiagnostics)
+		logger.Info("Registered AppRole diagnostics", zap.Int("total", totalDiagnostics))
 	} else if vaultDebugIdentities {
 		componentName = "Vault Identity"
 		allDiagnostics = []*debug.Diagnostic{debugvault.IdentityDiagnostic()}

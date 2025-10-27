@@ -42,11 +42,42 @@ var AppRolePaths = AppRolePathsStruct{
 }
 
 // DefaultAppRoleData is the default Vault AppRole configuration.
+//
+// CRITICAL P0 FIX: Added token_period to enable automatic token renewal
+// CRITICAL P0 FIX: Removed token_max_ttl to prevent conflict with token_period
+//
+// HashiCorp Vault Token Types:
+// - Without token_period: tokens are renewable but have max_ttl limit (eventually expire)
+// - With token_period: tokens are infinitely renewable (perfect for long-running services)
+//
+// Why token_period is CRITICAL for Vault Agent:
+// 1. Vault Agent is a long-running daemon (systemd service)
+// 2. Without token_period, tokens hit max_ttl and expire (4h default)
+// 3. Agent can't re-authenticate automatically (needs human intervention)
+// 4. With token_period, Agent auto-renews token before expiry FOREVER
+//
+// Why token_max_ttl is REMOVED:
+// - HashiCorp docs: "When a period and an explicit max TTL were both set on a token,
+//   it behaves as a periodic token. However, once the explicit max TTL is reached,
+//   the token will be revoked."
+// - Setting token_max_ttl with token_period defeats the purpose of periodic tokens
+// - For periodic tokens, TTL is reset on each renewal (no max limit needed)
+//
+// Security Trade-off:
+// - Risk: Compromised token could be renewed indefinitely
+// - Mitigation: Token bound to specific AppRole policies, SecretID has TTL (24h)
+// - Additional Mitigation: Token must be renewed every 4h (detectable activity)
+// - Benefit: Zero-touch operation, no deployment failures from expired tokens
+//
+// References:
+// - https://developer.hashicorp.com/vault/docs/concepts/tokens#token-time-to-live-periodic-tokens-and-explicit-max-ttls
+// - https://developer.hashicorp.com/vault/docs/auth/approle#configuration
 var DefaultAppRoleData = map[string]interface{}{
-	"policies":      []string{EosDefaultPolicyName},
-	"token_ttl":     VaultDefaultTokenTTL,
-	"token_max_ttl": VaultDefaultTokenMaxTTL,
-	"secret_id_ttl": VaultDefaultSecretIDTTL,
+	"policies":     []string{EosDefaultPolicyName},
+	"token_ttl":    VaultDefaultTokenTTL,    // 4h - Initial TTL after authentication
+	"token_period": VaultDefaultTokenTTL,    // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
+	// token_max_ttl REMOVED - conflicts with token_period (would limit periodic tokens to max_ttl)
+	"secret_id_ttl": VaultDefaultSecretIDTTL, // 24h - SecretID expires (requires new authentication)
 }
 
 //
