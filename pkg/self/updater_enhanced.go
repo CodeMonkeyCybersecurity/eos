@@ -160,7 +160,8 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	}
 
 	fmt.Println("════════════════════════════════════════════════════════════════")
-
+	fmt.Println()
+	
 	// Check for running processes - use existing pattern
 	if eeu.enhancedConfig.CheckRunningProcesses {
 		// Use WarnAboutRunningProcesses which already checks and logs
