@@ -164,13 +164,21 @@ func (rc *RuntimeContext) ValidateAll() error {
 }
 
 // End logs outcome, emits a telemetry span with key attributes, and flushes.
+// P1 FIX: Use INFO level for expected user errors (not ERROR)
 func (rc *RuntimeContext) End(errPtr *error) {
 	duration := time.Since(rc.Timestamp)
 	success := (*errPtr == nil)
 	if success {
 		rc.Log.Info("Command completed", zap.Duration("duration", duration))
 	} else {
-		rc.Log.Error("Command failed", zap.Duration("duration", duration), zap.Error(*errPtr))
+		// P1 FIX: User input errors should be INFO, not ERROR
+		if eos_err.IsExpectedUserError(*errPtr) {
+			rc.Log.Info("Command completed with expected error",
+				zap.Duration("duration", duration),
+				zap.Error(*errPtr))
+		} else {
+			rc.Log.Error("Command failed", zap.Duration("duration", duration), zap.Error(*errPtr))
+		}
 	}
 
 	vaultAddr := rc.Attributes["vault_addr"]

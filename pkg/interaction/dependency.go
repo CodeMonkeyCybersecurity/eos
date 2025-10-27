@@ -260,14 +260,14 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 		zap.Duration("timeout", installTimeout))
 
 	// Execute installation command
-	// Note: This uses shell execution because install commands often use pipes, etc.
-	// Output is captured to buffer (not shown in real-time) but logged on error for debugging
-	// Capture: false means don't return the output string, but it's still captured internally
+	// StreamOutput: true shows progress to user in real-time (essential for large downloads)
+	// This prevents the "hanging" appearance when Ollama downloads 100s of MB
 	_, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "/bin/bash",
-		Args:    []string{"-c", config.InstallCmd},
-		Capture: false,
-		Timeout: installTimeout,
+		Command:      "/bin/bash",
+		Args:         []string{"-c", config.InstallCmd},
+		Capture:      false,
+		StreamOutput: true, // Show download progress to user
+		Timeout:      installTimeout,
 	})
 
 	if err != nil {
@@ -285,10 +285,11 @@ func installDependency(rc *eos_io.RuntimeContext, config DependencyConfig) error
 			zap.Duration("timeout", startTimeout))
 
 		_, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "/bin/bash",
-			Args:    []string{"-c", config.StartCmd},
-			Capture: false,
-			Timeout: startTimeout,
+			Command:      "/bin/bash",
+			Args:         []string{"-c", config.StartCmd},
+			Capture:      false,
+			StreamOutput: true, // Show startup messages to user
+			Timeout:      startTimeout,
 		})
 
 		if err != nil {

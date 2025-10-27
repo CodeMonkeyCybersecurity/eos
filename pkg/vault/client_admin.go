@@ -100,6 +100,7 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	}
 
 	// Define admin authentication methods in priority order
+	// P0 FIX: Root token added BEFORE userpass to prevent MFA bypass vulnerability
 	adminAuthMethods := []AdminAuthMethod{
 		{
 			Name:        "vault-agent-with-admin-policy",
@@ -127,6 +128,14 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 			Required: []string{"identity/mfa/*", "sys/policy/*", "sys/mounts/*"},
 		},
 		{
+			Name:        "root-token-interactive",
+			Description: "Root token (emergency use, requires sudo)",
+			TryFunc: func(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
+				return tryRootTokenInteractive(rc, client, AuthContextRuntime)
+			},
+			Required: []string{"root"},
+		},
+		{
 			Name:        "interactive-userpass-with-admin-check",
 			Description: "Interactive userpass (manual, prompts user)",
 			TryFunc: func(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
@@ -146,6 +155,7 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	}
 
 	// Try each admin authentication method
+	// P1 FIX: Enhanced diagnostic logging with method-specific remediation
 	var lastErr error
 	for _, method := range adminAuthMethods {
 		logger.Info(" Attempting admin authentication method",
@@ -155,9 +165,44 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		token, err := method.TryFunc(rc, client)
 		if err != nil {
 			lastErr = err
-			logger.Debug(" Admin authentication method failed",
+
+			// P1 FIX: WARN level with diagnostic context (was DEBUG)
+			logger.Warn(" Admin authentication method failed",
 				zap.String("method", method.Name),
-				zap.Error(err))
+				zap.Error(err),
+				zap.String("next_action", "trying next method"))
+
+			// P1 FIX: Method-specific remediation guidance
+			switch method.Name {
+			case "vault-agent-with-admin-policy":
+				logger.Warn("   Possible causes:")
+				logger.Warn("     • Vault Agent service not running")
+				logger.Warn("     • Token file stale (agent crashed)")
+				logger.Warn("     • Token lacks eos-admin-policy")
+				logger.Warn("   Check with: sudo systemctl status vault-agent-eos")
+
+			case "admin-approle":
+				logger.Warn("   Possible causes:")
+				logger.Warn("     • Credentials missing: /var/lib/eos/secret/admin_role_id")
+				logger.Warn("     • Wrong permissions (need 0600, owned by root)")
+				logger.Warn("     • AppRole not configured in Vault")
+				logger.Warn("   Check with: sudo ls -la /var/lib/eos/secret/admin_*")
+
+			case "root-token-interactive":
+				logger.Warn("   Possible causes:")
+				logger.Warn("     • Root token file missing")
+				logger.Warn("     • User declined to use root token")
+				logger.Warn("     • Not running with sudo")
+				logger.Warn("   Check with: sudo ls -la /run/eos/vault_init_output.json")
+
+			case "interactive-userpass-with-admin-check":
+				logger.Warn("   Possible causes:")
+				logger.Warn("     • User declined interactive auth")
+				logger.Warn("     • Wrong username/password")
+				logger.Warn("     • User lacks eos-admin-policy")
+				logger.Warn("     • MFA verification failed")
+			}
+
 			continue
 		}
 

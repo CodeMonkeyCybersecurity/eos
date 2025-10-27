@@ -7,6 +7,7 @@ package progress
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -89,12 +90,62 @@ func (op *Operation) Done() {
 		zap.String("operation", op.Name))
 }
 
+// PercentageTracker tracks percentage progress and only logs when it changes
+// This prevents log spam when progress callbacks fire multiple times at same percentage
+type PercentageTracker struct {
+	mu            sync.Mutex
+	lastLogged    int64
+	logInterval   int64 // Log every N percent (default: 10)
+	operation     string
+	ctx           context.Context
+}
+
+// NewPercentageTracker creates a progress tracker that deduplicates logs
+func NewPercentageTracker(ctx context.Context, operation string) *PercentageTracker {
+	return &PercentageTracker{
+		lastLogged:  -1, // Never logged yet
+		logInterval: 10, // Log every 10%
+		operation:   operation,
+		ctx:         ctx,
+	}
+}
+
+// WithInterval sets custom log interval (e.g., 5 for every 5%)
+func (pt *PercentageTracker) WithInterval(interval int64) *PercentageTracker {
+	pt.logInterval = interval
+	return pt
+}
+
+// Update logs progress only when percentage crosses a log interval boundary
+// Example: With interval=10, logs at 0%, 10%, 20%... but NOT multiple times at 10%
+func (pt *PercentageTracker) Update(percent int64, status string) {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+
+	logger := otelzap.Ctx(pt.ctx)
+
+	// Calculate which interval bucket this percentage falls into
+	// Example: percent=23 with interval=10 -> bucket=20
+	bucket := (percent / pt.logInterval) * pt.logInterval
+
+	// Only log if we've crossed into a new bucket
+	if bucket != pt.lastLogged {
+		logger.Info("Download progress",
+			zap.Int64("percent", percent),
+			zap.String("status", status),
+			zap.String("operation", pt.operation))
+		pt.lastLogged = bucket
+	}
+}
+
 // ShowPercentage is a helper for operations with known progress (like downloads)
-// Call this from your progress callback
+// DEPRECATED: Use NewPercentageTracker().Update() instead to avoid log spam
+// This function has no state and will spam logs when called repeatedly at same percentage
 func ShowPercentage(ctx context.Context, operation string, percent int64, status string) {
 	logger := otelzap.Ctx(ctx)
 
 	// Only log at 10% intervals to avoid spam
+	// WARNING: This still logs on EVERY call when percent is multiple of 10
 	if percent%10 == 0 {
 		logger.Info("Download progress",
 			zap.Int64("percent", percent),

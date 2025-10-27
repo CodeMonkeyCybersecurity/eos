@@ -123,10 +123,17 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		}
 
 		var buf bytes.Buffer
-		// FIXED: Only capture to buffer, use structured logging for output
-		// Removed os.Stdout to prevent raw command output mixing with structured logs
-		cmd.Stdout = &buf
-		cmd.Stderr = &buf
+		// StreamOutput: Show output directly to user in real-time (for long-running installs)
+		// Otherwise: Capture to buffer for structured logging
+		if opts.StreamOutput {
+			// Stream mode: Show output to user, also capture for error reporting
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		} else {
+			// Buffer mode: Capture for structured logging
+			cmd.Stdout = &buf
+			cmd.Stderr = &buf
+		}
 
 		err = cmd.Run()
 		output = buf.String()

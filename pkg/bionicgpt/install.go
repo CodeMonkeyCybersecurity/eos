@@ -20,6 +20,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ollama"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/preflight"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/progress"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
@@ -629,14 +630,13 @@ func (bgi *BionicGPTInstaller) setupLocalEmbeddings(ctx context.Context) error {
 		logger.Info("Pulling embeddings model (this may take a few minutes)...",
 			zap.String("model", bgi.config.LocalEmbeddingsModel))
 
+		// Create progress tracker to deduplicate logs (prevents spam at same percentage)
+		progressTracker := progress.NewPercentageTracker(ctx, "Ollama model pull")
+
 		err = ollamaClient.PullModel(ctx, bgi.config.LocalEmbeddingsModel, func(progress ollama.PullProgress) {
 			if progress.Total > 0 {
 				percent := (progress.Completed * 100) / progress.Total
-				if percent%10 == 0 { // Log every 10%
-					logger.Info("Download progress",
-						zap.Int64("percent", percent),
-						zap.String("status", progress.Status))
-				}
+				progressTracker.Update(percent, progress.Status)
 			}
 		})
 

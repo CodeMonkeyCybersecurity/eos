@@ -38,6 +38,7 @@ type Options struct {
 	Shell              bool             // Shell mode (bash -c)
 	Retries            int              // Optional retry count
 	Capture            bool             // Return captured output
+	StreamOutput       bool             // Stream output to user in real-time (useful for long-running installations)
 	LogFields          []zap.Field      // Extra fields
 	Delay              time.Duration    // Initial delay between retries (will use exponential backoff)
 	Timeout            time.Duration    // Timeout for individual command execution

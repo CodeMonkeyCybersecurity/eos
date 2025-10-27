@@ -162,6 +162,11 @@ func coreAgentTokenAuth(rc *eos_io.RuntimeContext, client *api.Client, tokenPath
 	// P0 FIX 1: Check token file freshness (HashiCorp recommended pattern)
 	// Vault Agent renews tokens every ~15-30 seconds
 	// If token file is >5 minutes old, Vault Agent likely crashed/stopped
+	var originalModTime time.Time
+	if info, statErr := os.Stat(tokenPath); statErr == nil {
+		originalModTime = info.ModTime()
+	}
+
 	if err := checkTokenFileFreshness(rc, tokenPath); err != nil {
 		log.Warn("Token file freshness check failed",
 			zap.String("path", tokenPath),
@@ -173,11 +178,36 @@ func coreAgentTokenAuth(rc *eos_io.RuntimeContext, client *api.Client, tokenPath
 			return "", fmt.Errorf("token file stale and Vault Agent unhealthy: %w", healthErr)
 		}
 
-		// Agent is healthy but token is old - may be renewing now, proceed with retry
-		log.Info("Token file is old but Vault Agent is healthy - will retry to get fresh token")
+		// P0 FIX 3: Agent is healthy - wait for file to be UPDATED (not just read stale content)
+		log.Info("Vault Agent is healthy - waiting for token renewal")
+
+		const maxWait = 30 * time.Second
+		const checkInterval = 2 * time.Second
+		deadline := time.Now().Add(maxWait)
+
+		for time.Now().Before(deadline) {
+			time.Sleep(checkInterval)
+
+			// Check if file was modified
+			if info, statErr := os.Stat(tokenPath); statErr == nil {
+				currentModTime := info.ModTime()
+				if currentModTime.After(originalModTime) {
+					log.Info("Vault Agent renewed token - file was updated",
+						zap.Duration("waited", time.Since(originalModTime)),
+						zap.Time("old_mtime", originalModTime),
+						zap.Time("new_mtime", currentModTime))
+					break
+				}
+			}
+		}
+
+		// Check freshness again after waiting
+		if err := checkTokenFileFreshness(rc, tokenPath); err != nil {
+			return "", fmt.Errorf("token still stale after waiting for Vault Agent renewal: %w", err)
+		}
 	}
 
-	// Use existing retry logic for agent tokens (handles race condition)
+	// Read token (either was fresh or just renewed)
 	token, err := readAgentTokenWithRetry(rc, tokenPath)
 	if err != nil {
 		log.Debug("Failed to read agent token",
