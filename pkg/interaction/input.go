@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -76,6 +77,7 @@ func PromptInput(args ...interface{}) string {
 }
 
 // PromptYesNo prompts for yes/no and returns true for yes
+// P0 FIX: Added error handling, input validation, and retry logic
 // For new code, use pkg/prompt.YesNo which has RuntimeContext support
 func PromptYesNo(args ...interface{}) bool {
 	var question string
@@ -92,6 +94,7 @@ func PromptYesNo(args ...interface{}) bool {
 	} else {
 		return false
 	}
+
 	prompt := question
 	if defaultYes {
 		prompt += " [Y/n]: "
@@ -102,15 +105,71 @@ func PromptYesNo(args ...interface{}) bool {
 	logger := otelzap.L()
 	logger.Info("terminal prompt: yes/no question", zap.String("question", question))
 
-	reader := bufio.NewReader(getStdinReader())
-	response, _ := reader.ReadString('\n')
-	response = strings.TrimSpace(strings.ToLower(response))
+	const maxAttempts = 3
+	var lastErr error
 
-	if response == "" {
-		return defaultYes
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		reader := bufio.NewReader(getStdinReader())
+		response, err := reader.ReadString('\n')
+
+		// P0 FIX: Handle errors (was: response, _ := reader.ReadString('\n'))
+		if err != nil {
+			lastErr = err
+			if err == io.EOF {
+				logger.Warn("Reached end of input (EOF), using default",
+					zap.Bool("default", defaultYes),
+					zap.String("question", question))
+				return defaultYes
+			}
+			logger.Warn("Failed to read input, retrying",
+				zap.Error(err),
+				zap.Int("attempt", attempt),
+				zap.Int("max_attempts", maxAttempts))
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		response = strings.TrimSpace(strings.ToLower(response))
+
+		// Handle empty input (use default)
+		if response == "" {
+			logger.Debug("Empty input, using default",
+				zap.Bool("default", defaultYes))
+			return defaultYes
+		}
+
+		// P0 FIX: Validate input and accept common variations
+		switch response {
+		case "y", "yes", "yeah", "yep", "sure", "ok", "true", "1":
+			logger.Debug("User answered yes", zap.String("response", response))
+			return true
+		case "n", "no", "nope", "nah", "false", "0":
+			logger.Debug("User answered no", zap.String("response", response))
+			return false
+		default:
+			// P0 FIX: Invalid input - retry with guidance (was: silent wrong answer)
+			logger.Warn("Invalid input. Please enter 'y' for yes or 'n' for no.",
+				zap.String("input", response),
+				zap.Int("attempt", attempt),
+				zap.Int("remaining", maxAttempts-attempt))
+
+			if attempt == maxAttempts {
+				logger.Warn("Maximum attempts reached, using default",
+					zap.Bool("default", defaultYes),
+					zap.String("question", question))
+				return defaultYes
+			}
+
+			// Prompt again
+			logger.Info("terminal prompt: " + prompt)
+		}
 	}
 
-	return response == "y" || response == "yes"
+	// Should never reach here, but handle gracefully
+	logger.Error("Unexpected prompt state, using default",
+		zap.Error(lastErr),
+		zap.Bool("default", defaultYes))
+	return defaultYes
 }
 
 // PromptSelect prompts the user to select from options

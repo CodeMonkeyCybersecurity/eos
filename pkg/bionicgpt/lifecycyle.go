@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -21,42 +22,116 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting BionicGPT deletion process")
 
-	// ASSESS Phase 1: Check Docker availability (using SDK)
+	// ASSESS Phase 1: Check Docker availability with informed consent
+	// P0: Use human-centric dependency pattern (not hard error)
 	logger.Info("Checking Docker availability")
-	if err := container.CheckIfDockerInstalled(rc); err != nil {
-		logger.Error("Docker is not available",
-			zap.Error(err),
-			zap.String("remediation", "Install Docker or use 'eos create docker'"))
 
-		fmt.Println()
-		fmt.Println("✗ Docker is not installed or not available")
-		fmt.Println()
-		fmt.Println("BionicGPT uses Docker containers. To delete it, Docker must be available.")
-		fmt.Println()
-		fmt.Println("Options:")
-		fmt.Println("  1. Install Docker:    sudo eos create docker")
-		fmt.Println("  2. Manual cleanup:    sudo rm -rf /opt/bionicgpt")
-		fmt.Println()
+	// First check if Docker is installed
+	dockerErr := container.CheckIfDockerInstalled(rc)
+	if dockerErr != nil {
+		logger.Warn("Docker is not available",
+			zap.Error(dockerErr),
+			zap.String("note", "Docker is needed for safe container removal and volume backup"))
 
-		return fmt.Errorf("Docker not available - cannot proceed with deletion")
+		logger.Info("")
+		logger.Info("════════════════════════════════════════════════════════════════")
+		logger.Info("Docker Not Available")
+		logger.Info("════════════════════════════════════════════════════════════════")
+		logger.Info("")
+		logger.Info("BionicGPT uses Docker containers. For safe deletion, Docker is needed to:")
+		logger.Info("  • Stop running containers gracefully")
+		logger.Info("  • Create backups of Docker volumes")
+		logger.Info("  • Remove containers and images cleanly")
+		logger.Info("")
+		logger.Info("Options:")
+		logger.Info("  1. Install Docker and proceed with safe deletion")
+		logger.Info("  2. Manual cleanup (no backup, may leave orphaned resources)")
+		logger.Info("")
+
+		// Offer to install Docker (informed consent)
+		installDocker := interaction.PromptYesNo(rc.Ctx, "Install Docker to proceed with safe deletion", false)
+
+		if installDocker {
+			logger.Info("User chose to install Docker")
+			if err := container.EnsureDockerInstalled(rc); err != nil {
+				logger.Error("Docker installation failed", zap.Error(err))
+				// Offer manual cleanup fallback
+				logger.Info("")
+				logger.Warn("Docker installation failed. You can still do manual cleanup.")
+				manualCleanup := interaction.PromptYesNo(rc.Ctx, "Proceed with manual cleanup (no backup)", false)
+				if !manualCleanup {
+					return fmt.Errorf("deletion cancelled - Docker required for safe deletion")
+				}
+				return performManualCleanup(rc, DefaultInstallDir)
+			}
+		} else {
+			logger.Info("User declined Docker installation")
+			logger.Info("")
+			logger.Info("Manual cleanup option:")
+			logger.Info("  • Removes installation directory: /opt/bionicgpt")
+			logger.Info("  • NO BACKUP will be created")
+			logger.Info("  • Docker volumes/containers will NOT be removed")
+			logger.Info("  • You can clean up Docker resources later if Docker is installed")
+			logger.Info("")
+
+			manualCleanup := interaction.PromptYesNo(rc.Ctx, "Proceed with manual cleanup (no backup)", false)
+			if !manualCleanup {
+				logger.Info("Deletion cancelled")
+				return nil
+			}
+
+			return performManualCleanup(rc, DefaultInstallDir)
+		}
 	}
 
-	// Also check if Docker daemon is running
+	// Docker is installed, check if it's running
 	if err := container.CheckRunning(rc); err != nil {
-		logger.Error("Docker daemon is not running",
-			zap.Error(err),
-			zap.String("remediation", "Start Docker daemon"))
+		logger.Warn("Docker is installed but not running",
+			zap.Error(err))
 
-		fmt.Println()
-		fmt.Println("✗ Docker is installed but not running")
-		fmt.Println()
-		fmt.Println("Remediation:")
-		fmt.Println("  • Start Docker: sudo systemctl start docker")
-		fmt.Println("  • Check status:  sudo systemctl status docker")
-		fmt.Println()
+		logger.Info("")
+		logger.Info("Docker daemon is not running. To proceed with safe deletion:")
+		logger.Info("  • Start Docker: sudo systemctl start docker")
+		logger.Info("  • Check status:  sudo systemctl status docker")
+		logger.Info("")
 
-		return fmt.Errorf("Docker daemon not running - cannot proceed with deletion")
+		// Offer to start Docker
+		startDocker := interaction.PromptYesNo(rc.Ctx, "Attempt to start Docker daemon", true)
+		if startDocker {
+			logger.Info("Attempting to start Docker daemon...")
+			_, startErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "systemctl",
+				Args:    []string{"start", "docker"},
+			})
+
+			if startErr != nil {
+				logger.Error("Failed to start Docker daemon", zap.Error(startErr))
+				logger.Info("")
+				logger.Info("Manual cleanup option available (no backup)")
+				manualCleanup := interaction.PromptYesNo(rc.Ctx, "Proceed with manual cleanup", false)
+				if !manualCleanup {
+					return fmt.Errorf("deletion cancelled - Docker daemon not running")
+				}
+				return performManualCleanup(rc, DefaultInstallDir)
+			}
+
+			// Verify Docker started
+			if err := container.CheckRunning(rc); err != nil {
+				logger.Error("Docker daemon failed to start", zap.Error(err))
+				return fmt.Errorf("Docker daemon not running - cannot proceed with safe deletion")
+			}
+
+			logger.Info("✓ Docker daemon started successfully")
+		} else {
+			logger.Info("User declined to start Docker")
+			manualCleanup := interaction.PromptYesNo(rc.Ctx, "Proceed with manual cleanup (no backup)", false)
+			if !manualCleanup {
+				return fmt.Errorf("deletion cancelled - Docker daemon required")
+			}
+			return performManualCleanup(rc, DefaultInstallDir)
+		}
 	}
+
 	logger.Info("Docker is available and running")
 
 	installDir := DefaultInstallDir
@@ -257,18 +332,73 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 				}
 				logger.Warn("Continuing deletion despite backup failure (--force)")
 			} else {
+				// P1 FIX: Validate backup integrity before proceeding
+				logger.Info("Validating backup integrity...", zap.String("volume", volumeName))
+
 				info, err := os.Stat(backupPath)
 				if err != nil {
-					logger.Warn("Backup file not found after creation",
-						zap.String("path", backupPath))
-				} else {
-					logger.Info("Backup created successfully",
+					logger.Error("Backup file not found after creation",
 						zap.String("path", backupPath),
-						zap.Int64("size_bytes", info.Size()))
-					fmt.Printf("✓ Backup created: %s (%.2f MB)\n",
-						backupPath, float64(info.Size())/(1024*1024))
-					backupPaths = append(backupPaths, backupPath)
+						zap.Error(err))
+					if !BionicgptDeleteForce {
+						return fmt.Errorf("backup validation failed: file not found at %s", backupPath)
+					}
+					logger.Warn("Continuing despite missing backup file (--force)")
+					continue
 				}
+
+				// Check 1: Non-zero size
+				if info.Size() == 0 {
+					logger.Error("Backup file is empty (0 bytes)",
+						zap.String("path", backupPath))
+					if !BionicgptDeleteForce {
+						return fmt.Errorf("backup validation failed: empty file at %s", backupPath)
+					}
+					logger.Warn("Continuing despite empty backup file (--force)")
+					continue
+				}
+
+				// Check 2: Can read tar header
+				logger.Debug("Verifying tar archive integrity")
+				validateOutput, validateErr := execute.Run(rc.Ctx, execute.Options{
+					Command: "tar",
+					Args:    []string{"-tzf", backupPath},
+					Capture: true,
+					Timeout: 30 * 1000, // 30 seconds
+				})
+
+				if validateErr != nil {
+					logger.Error("Backup validation failed: cannot read tar archive",
+						zap.String("path", backupPath),
+						zap.Error(validateErr),
+						zap.String("output", validateOutput))
+					if !BionicgptDeleteForce {
+						return fmt.Errorf("backup validation failed: corrupt tar file at %s: %w", backupPath, validateErr)
+					}
+					logger.Warn("Continuing despite corrupt backup (--force)")
+					continue
+				}
+
+				// Check 3: Contains files
+				fileCount := strings.Count(validateOutput, "\n")
+				if fileCount == 0 {
+					logger.Warn("Backup appears empty (no files listed)",
+						zap.String("path", backupPath))
+					if !BionicgptDeleteForce {
+						return fmt.Errorf("backup validation failed: no files in archive at %s", backupPath)
+					}
+					logger.Warn("Continuing despite empty archive (--force)")
+					continue
+				}
+
+				sizeMB := float64(info.Size()) / (1024 * 1024)
+				logger.Info("✓ Backup validated successfully",
+					zap.String("path", backupPath),
+					zap.Int64("size_bytes", info.Size()),
+					zap.Float64("size_mb", sizeMB),
+					zap.Int("file_count", fileCount))
+
+				backupPaths = append(backupPaths, backupPath)
 			}
 		}
 	} else {
@@ -359,10 +489,63 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	}
 
 	// Step 7: Purge secrets and configs if --purge flag is set
+	// P1 FIX: Add confirmation for destructive --purge operation
 	if BionicgptDeletePurge {
-		logger.Info("Purging BionicGPT secrets and configs (--purge flag enabled)")
+		logger.Info("")
+		logger.Info("════════════════════════════════════════════════════════════════")
+		logger.Warn("⚠️  DESTRUCTIVE OPERATION: Secret Purge")
+		logger.Info("════════════════════════════════════════════════════════════════")
+		logger.Info("")
+		logger.Info("The --purge flag will PERMANENTLY delete:")
+		logger.Info("  • Vault secrets: secret/bionicgpt/*")
+		logger.Info("    - postgres_password")
+		logger.Info("    - jwt_secret")
+		logger.Info("    - litellm_master_key")
+		logger.Info("    - azure_api_key (if configured)")
+		logger.Info("  • Consul configs: service/bionicgpt/config/*")
+		logger.Info("")
+		logger.Warn("⚠️  This is IRREVERSIBLE - secrets cannot be recovered!")
+		logger.Info("")
+
+		if len(backupPaths) > 0 {
+			logger.Info("Backup location:", zap.String("backup_dir", backupDir))
+			logger.Warn("Note: Backups do NOT include Vault secrets or Consul configs")
+		} else {
+			logger.Warn("No backup was created (--skip-backup or backup failed)")
+		}
+
+		logger.Info("")
+
+		// Require explicit confirmation unless --force is set
+		if !BionicgptDeleteForce {
+			confirmed := interaction.PromptYesNo(rc.Ctx,
+				"Type 'yes' to confirm PERMANENT deletion of secrets", false)
+
+			if !confirmed {
+				logger.Info("Secret purge cancelled by user")
+				logger.Info("")
+				logger.Info("Secrets remain in Vault and Consul:")
+				logger.Info("  • Vault: vault kv list secret/bionicgpt")
+				logger.Info("  • Consul: consul kv get -recurse service/bionicgpt/config/")
+				logger.Info("")
+				logger.Info("To purge secrets later:")
+				logger.Info("  eos delete bionicgpt --purge (BionicGPT must already be removed)")
+				logger.Info("  OR manually: vault kv metadata delete -mount=secret bionicgpt/")
+				logger.Info("")
+				// Don't return error - deletion succeeded, just skip purge
+				return nil
+			}
+
+			logger.Info("User confirmed secret purge - proceeding")
+		} else {
+			logger.Warn("--force flag set, skipping purge confirmation")
+		}
+
+		logger.Info("")
+		logger.Info("Purging BionicGPT secrets and configs...")
+
 		if err := purgeServiceData(rc); err != nil {
-			logger.Warn("Failed to purge service data", zap.Error(err))
+			logger.Error("Failed to purge service data", zap.Error(err))
 			if !BionicgptDeleteForce {
 				return fmt.Errorf("failed to purge service data: %w", err)
 			}
@@ -370,27 +553,30 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		}
 	}
 
-	// Summary
+	// Summary - P0 FIX: Use structured logging instead of fmt.Println
 	logger.Info("BionicGPT deletion completed successfully")
-	fmt.Println()
-	fmt.Println("✓ BionicGPT has been completely removed")
+	logger.Info("")
+	logger.Info("✓ BionicGPT has been completely removed")
 
 	if len(backupPaths) > 0 {
-		fmt.Println()
-		fmt.Println("✓ Backups created successfully:")
+		logger.Info("")
+		logger.Info("✓ Backups created successfully:")
 		for _, path := range backupPaths {
 			info, err := os.Stat(path)
 			if err == nil {
-				fmt.Printf("  • %s (%.2f MB)\n", path, float64(info.Size())/(1024*1024))
+				sizeMB := float64(info.Size()) / (1024 * 1024)
+				logger.Info("  • Backup file",
+					zap.String("path", path),
+					zap.Float64("size_mb", sizeMB))
 			} else {
-				fmt.Printf("  • %s\n", path)
+				logger.Info("  • Backup file", zap.String("path", path))
 			}
 		}
-		fmt.Println()
-		fmt.Printf("Backup location: %s\n", backupDir)
-		fmt.Println("These backups are safe and will NOT be deleted.")
+		logger.Info("")
+		logger.Info("Backup location:", zap.String("dir", backupDir))
+		logger.Info("These backups are safe and will NOT be deleted.")
 	}
-	fmt.Println()
+	logger.Info("")
 
 	return nil
 }
@@ -400,6 +586,54 @@ var (
 	BionicgptDeleteForce      bool
 	BionicgptDeletePurge      bool
 )
+
+// performManualCleanup removes BionicGPT installation directory without Docker
+// This is a fallback when Docker is not available
+func performManualCleanup(rc *eos_io.RuntimeContext, installDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Performing manual cleanup (Docker not available)")
+	logger.Info("")
+	logger.Warn("⚠️  Manual cleanup limitations:")
+	logger.Info("  • NO backup will be created")
+	logger.Info("  • Docker containers will NOT be removed (if they exist)")
+	logger.Info("  • Docker volumes will NOT be removed (if they exist)")
+	logger.Info("  • Docker images will NOT be removed (if they exist)")
+	logger.Info("")
+	logger.Info("Removing installation directory:", zap.String("dir", installDir))
+
+	// Check if directory exists
+	if _, err := os.Stat(installDir); os.IsNotExist(err) {
+		logger.Info("Installation directory does not exist - nothing to clean up")
+		logger.Info("")
+		logger.Info("✓ No files to remove")
+		logger.Info("")
+		logger.Info("Note: If you install Docker later, you can clean up Docker resources with:")
+		logger.Info("  docker ps -a --filter name=bionicgpt")
+		logger.Info("  docker volume ls --filter name=bionicgpt")
+		return nil
+	}
+
+	// Remove directory
+	if err := os.RemoveAll(installDir); err != nil {
+		logger.Error("Failed to remove installation directory",
+			zap.String("dir", installDir),
+			zap.Error(err))
+		return fmt.Errorf("failed to remove installation directory: %w", err)
+	}
+
+	logger.Info("✓ Installation directory removed")
+	logger.Info("")
+	logger.Info("Manual cleanup completed")
+	logger.Info("")
+	logger.Info("Note: Docker resources may still exist. If you install Docker later, clean up with:")
+	logger.Info("  docker rm -f bionicgpt-app bionicgpt-postgres bionicgpt-embeddings")
+	logger.Info("  docker volume rm bionicgpt-postgres-data bionicgpt-documents")
+	logger.Info("  docker rmi ghcr.io/bionic-gpt/bionicgpt:* ankane/pgvector:*")
+	logger.Info("")
+
+	return nil
+}
 
 // purgeServiceData removes BionicGPT secrets from Vault and configs from Consul KV
 func purgeServiceData(rc *eos_io.RuntimeContext) error {
@@ -414,7 +648,7 @@ func purgeServiceData(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Info("Service data purged successfully")
-	fmt.Println("✓ BionicGPT secrets and configs purged from Vault and Consul")
+	logger.Info("✓ BionicGPT secrets and configs purged from Vault and Consul")
 
 	return nil
 }
