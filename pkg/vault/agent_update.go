@@ -380,6 +380,7 @@ func isHealthy(status *AgentHealthStatus) bool {
 		status.TokenValid &&
 		!status.TokenExpired &&
 		!status.TokenExpiresSoon &&
+		!status.ConfigMismatch && // NEW: Token must match AppRole config
 		status.CredentialsExist &&
 		status.CredentialsReadable
 }
@@ -390,8 +391,12 @@ func displayPlannedActions(rc *eos_io.RuntimeContext, status *AgentHealthStatus,
 
 	actions := []string{}
 
-	if !status.ServiceRunning || config.ForceRestart {
-		actions = append(actions, "Restart Vault Agent service")
+	if !status.ServiceRunning || config.ForceRestart || status.ConfigMismatch {
+		if status.ConfigMismatch {
+			actions = append(actions, "Restart Vault Agent service (AppRole config changed - need new token)")
+		} else {
+			actions = append(actions, "Restart Vault Agent service")
+		}
 	}
 
 	if config.FixPermissions && !status.PermissionsCorrect {
@@ -444,7 +449,11 @@ func performInterventions(rc *eos_io.RuntimeContext, status *AgentHealthStatus, 
 	}
 
 	// Intervention 3: Restart service if not running or forced
-	if !status.ServiceRunning || config.ForceRestart || status.TokenExpired || status.TokenExpiresSoon {
+	// NEW: Also restart if AppRole config has changed (token needs to match new config)
+	if !status.ServiceRunning || config.ForceRestart || status.TokenExpired || status.TokenExpiresSoon || status.ConfigMismatch {
+		if status.ConfigMismatch {
+			logger.Info("⚠️  AppRole configuration has changed - restarting Agent to get new token with updated config")
+		}
 		logger.Info("Restarting Vault Agent service...")
 		cmd := exec.CommandContext(rc.Ctx, "systemctl", "restart", shared.VaultAgentService)
 		if err := cmd.Run(); err != nil {
