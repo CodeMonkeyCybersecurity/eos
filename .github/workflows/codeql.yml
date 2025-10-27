@@ -70,7 +70,7 @@ jobs:
           upload: true
           
       - name: Upload CodeQL results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: codeql-results-${{ matrix.language }}
