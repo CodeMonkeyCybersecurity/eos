@@ -220,6 +220,12 @@ func (bgi *BionicGPTInstaller) assessInstallation(ctx context.Context) (*Install
 func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
 
+	// Step 0: Validate Vault prerequisite (P0 - CRITICAL)
+	logger.Info("Validating Vault prerequisite")
+	if err := ValidateVaultAvailable(bgi.rc); err != nil {
+		return err // User-friendly error from ValidateVaultAvailable
+	}
+
 	// Step 1: Check prerequisites (Docker, ports) with human-centric informed consent
 	logger.Info("Checking prerequisites")
 	if err := bgi.checkPrerequisites(ctx); err != nil {

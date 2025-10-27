@@ -23,6 +23,7 @@ type Config struct {
 	FixPermissions  bool
 	RepairConfig    bool
 	FixAddresses    bool
+	RepairMFA       bool
 	All             bool
 }
 
@@ -42,10 +43,11 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 	startTime := rc.Operation.StartTime
 
 	// Default: run all repairs if no specific flag is set
-	runBinaries := config.CleanupBinaries || config.All || (!config.CleanupBinaries && !config.FixPermissions && !config.RepairConfig && !config.FixAddresses)
+	runBinaries := config.CleanupBinaries || config.All || (!config.CleanupBinaries && !config.FixPermissions && !config.RepairConfig && !config.FixAddresses && !config.RepairMFA)
 	runPermissions := config.FixPermissions || config.All
 	runConfig := config.RepairConfig || config.All
 	runAddresses := config.FixAddresses || config.All
+	runMFA := config.RepairMFA || config.All
 
 	logger.Info("Vault repair operation initialized",
 		zap.String("operation_id", rc.Operation.OperationID),
@@ -53,7 +55,8 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 		zap.Bool("cleanup_binaries", runBinaries),
 		zap.Bool("fix_permissions", runPermissions),
 		zap.Bool("repair_config", runConfig),
-		zap.Bool("fix_addresses", runAddresses))
+		zap.Bool("fix_addresses", runAddresses),
+		zap.Bool("repair_mfa", runMFA))
 
 	if config.DryRun {
 		logger.Info("DRY-RUN MODE: No changes will be made",
@@ -117,6 +120,26 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 		if err != nil {
 			logger.Warn("Address repair encountered errors", zap.Error(err))
 			result.Errors = append(result.Errors, err)
+		}
+	}
+
+	// ASSESS & INTERVENE: Repair MFA enforcement policies
+	if runMFA {
+		logger.Info("[ASSESS] Checking MFA enforcement policies")
+		// Get privileged Vault client for MFA operations
+		client, err := vault.GetPrivilegedClient(rc)
+		if err != nil {
+			logger.Warn("Cannot get Vault client for MFA repair - skipping MFA checks",
+				zap.Error(err))
+			logger.Info("  To fix manually: Check Vault is running and unsealed")
+		} else {
+			found, fixed, err := RepairMFAEnforcement(rc, client, config.DryRun)
+			result.IssuesFound += found
+			result.IssuesFixed += fixed
+			if err != nil {
+				logger.Warn("MFA enforcement repair encountered errors", zap.Error(err))
+				result.Errors = append(result.Errors, err)
+			}
 		}
 	}
 

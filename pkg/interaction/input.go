@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // For testing: allow overriding stdin
@@ -183,8 +185,43 @@ func PromptSecret(args ...interface{}) (string, error) {
 
 	logger := otelzap.L()
 	logger.Info("terminal prompt: secret input (not echoed)", zap.String("label", label))
-	// For now, use regular prompt - proper implementation would use syscall/terminal
-	return PromptRequired(label), nil
+
+	// SECURITY: Use term.ReadPassword to hide input from terminal
+	// Check if stdin is a terminal
+	if !term.IsTerminal(int(syscall.Stdin)) {
+		// Fallback for non-terminal (e.g., testing)
+		logger.Warn("stdin is not a terminal, secret will be visible")
+
+		// NOTE: Don't call PromptRequired here - it logs again causing duplicate output
+		// Instead, inline the prompt logic without duplicate logging
+		reader := bufio.NewReader(getStdinReader())
+		for {
+			text, _ := reader.ReadString('\n')
+			text = strings.TrimSpace(text)
+			if text != "" {
+				return text, nil
+			}
+			logger.Warn("Input cannot be empty, retrying")
+		}
+	}
+
+	// Print prompt without newline
+	fmt.Printf("%s: ", label)
+
+	// Read password without echoing
+	secretBytes, err := term.ReadPassword(int(syscall.Stdin))
+	fmt.Println() // Add newline after hidden input
+
+	if err != nil {
+		return "", fmt.Errorf("failed to read secret: %w", err)
+	}
+
+	secret := strings.TrimSpace(string(secretBytes))
+	if secret == "" {
+		return "", fmt.Errorf("secret cannot be empty")
+	}
+
+	return secret, nil
 }
 
 // PromptSecrets prompts for one or more secret values.

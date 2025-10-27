@@ -23,6 +23,7 @@ var (
 	vaultDryRun         bool
 	vaultUpdatePolicies bool
 	vaultFix            bool
+	vaultFixMFA         bool
 	vaultUnseal         bool
 )
 
@@ -49,6 +50,7 @@ Unseal Vault:
 
 Configuration Drift Correction:
   --fix        Detect and correct drift from canonical state
+  --mfa        Fix MFA enforcement policies only (use with --fix)
   --dry-run    Preview changes without applying (works with --fix, --ports, --address)
 
   The --fix flag compares current Vault installation against the canonical
@@ -57,6 +59,10 @@ Configuration Drift Correction:
   - Duplicate binaries
   - Configuration file syntax
   - API/cluster addresses (localhost → hostname)
+  - MFA enforcement policies (missing entity IDs)
+
+  The --mfa flag restricts fixes to MFA enforcement policies only.
+  Use this to repair policies that are missing identity_entity_ids.
 
   Like combing through the configuration to correct any settings that drifted.
 
@@ -64,11 +70,17 @@ Examples:
   # Unseal Vault (recommended after seal or reboot)
   eos update vault --unseal
 
-  # Detect and fix all configuration drift
+  # Detect and fix all configuration drift (including MFA)
   eos update vault --fix
+
+  # Fix MFA enforcement policies only
+  eos update vault --fix --mfa
 
   # Show what would be fixed (dry-run)
   eos update vault --fix --dry-run
+
+  # Show what MFA issues would be fixed
+  eos update vault --fix --mfa --dry-run
 
   # Update Vault address (stored in Consul KV for discovery)
   eos update vault --address vhost5
@@ -116,6 +128,8 @@ func init() {
 		"Update Vault policies to latest version (requires root token)")
 	VaultCmd.Flags().BoolVar(&vaultFix, "fix", false,
 		"Fix configuration drift from canonical state (use --dry-run to preview)")
+	VaultCmd.Flags().BoolVar(&vaultFixMFA, "mfa", false,
+		"Fix MFA enforcement policies only (requires --fix, use --dry-run to preview)")
 	VaultCmd.Flags().BoolVar(&vaultUnseal, "unseal", false,
 		"Unseal Vault using stored unseal keys from initialization")
 }
@@ -167,15 +181,27 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		return runVaultUnseal(rc)
 	}
 
+	// Validate --mfa requires --fix
+	if vaultFixMFA && !vaultFix {
+		return eos_err.NewUserError(
+			"The --mfa flag requires --fix to be specified.\n\n" +
+				"Use --fix --mfa together:\n" +
+				"  eos update vault --fix --mfa           (fix MFA policies only)\n" +
+				"  eos update vault --fix --mfa --dry-run (preview MFA fixes)\n" +
+				"  eos update vault --fix                 (fix everything including MFA)")
+	}
+
 	// Handle --fix flag (configuration drift correction)
 	if vaultFix {
 		logger.Info("Running configuration drift correction",
-			zap.Bool("dry_run", vaultDryRun))
+			zap.Bool("dry_run", vaultDryRun),
+			zap.Bool("mfa_only", vaultFixMFA))
 
 		// Delegate to pkg/vault/fix - same logic as 'eos fix vault'
 		config := &vaultfix.Config{
-			DryRun: vaultDryRun,
-			All:    true, // Check all drift types
+			DryRun:    vaultDryRun,
+			RepairMFA: vaultFixMFA, // If --mfa specified, only fix MFA
+			All:       !vaultFixMFA, // If --mfa NOT specified, fix everything
 		}
 
 		result, err := vaultfix.RunFixes(rc, config)

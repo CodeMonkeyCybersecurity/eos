@@ -3,7 +3,9 @@
 package vault
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -127,6 +129,10 @@ func CreateMFAMethodsOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 //
 // If this function is called before TOTP setup, users will be locked out
 // because they won't have TOTP secrets configured yet.
+//
+// FAIL-CLOSED BEHAVIOR: If enforcement fails after TOTP setup, this function
+// will attempt to clean up the TOTP method and user enrollment to prevent
+// leaving Vault in an inconsistent state (TOTP configured but not enforced).
 func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig, entityID string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Applying MFA enforcement policy",
@@ -152,14 +158,92 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 		return cerr.Wrap(err, "get privileged client for MFA")
 	}
 
+	// FAIL-CLOSED: Track enforcement success for cleanup
+	var enforcementSucceeded bool
+	defer func() {
+		if !enforcementSucceeded {
+			log.Warn("")
+			log.Warn("═══════════════════════════════════════════════════════════")
+			log.Warn(" MFA enforcement failed - cleaning up partial state")
+			log.Warn("═══════════════════════════════════════════════════════════")
+			log.Warn("")
+			log.Warn("MFA enforcement policy creation failed after TOTP was configured.")
+			log.Warn("To prevent inconsistent state (TOTP configured but not enforced),")
+			log.Warn("we will clean up the TOTP method and user enrollment.")
+			log.Warn("")
+
+			// Retrieve TOTP method ID for cleanup
+			methodIDSecret, readErr := privilegedClient.Logical().Read("secret/data/eos/mfa-methods/totp")
+			if readErr != nil {
+				log.Error(" Cannot read TOTP method ID for cleanup",
+					zap.Error(readErr))
+				return
+			}
+
+			if methodIDSecret == nil || methodIDSecret.Data == nil {
+				log.Error(" TOTP method ID not found - cannot clean up")
+				return
+			}
+
+			data, ok := methodIDSecret.Data["data"].(map[string]interface{})
+			if !ok {
+				log.Error(" Invalid TOTP method data structure - cannot clean up")
+				return
+			}
+
+			methodID, ok := data["method_id"].(string)
+			if !ok || methodID == "" {
+				log.Error(" TOTP method_id is invalid - cannot clean up")
+				return
+			}
+
+			// Delete user's TOTP enrollment
+			if cleanupErr := deleteEntityTOTPSecret(rc, privilegedClient, entityID, methodID); cleanupErr != nil {
+				log.Error(" Failed to delete TOTP enrollment during cleanup",
+					zap.Error(cleanupErr))
+			} else {
+				log.Info(" ✓ TOTP enrollment deleted")
+			}
+
+			// Delete TOTP method
+			methodPath := fmt.Sprintf("identity/mfa/method/totp/%s", methodID)
+			if _, deleteErr := privilegedClient.Logical().Delete(methodPath); deleteErr != nil {
+				log.Error(" Failed to delete TOTP method during cleanup",
+					zap.Error(deleteErr),
+					zap.String("method_path", methodPath))
+				log.Error("Manual cleanup command:")
+				log.Error(fmt.Sprintf("  vault delete %s", methodPath))
+			} else {
+				log.Info(" ✓ TOTP method deleted")
+			}
+
+			// Delete method ID from KV store
+			if _, kvDeleteErr := privilegedClient.Logical().Delete("secret/data/eos/mfa-methods/totp"); kvDeleteErr != nil {
+				log.Warn(" Failed to delete TOTP method ID from KV (non-fatal)",
+					zap.Error(kvDeleteErr))
+			} else {
+				log.Info(" ✓ TOTP method ID removed from KV")
+			}
+
+			log.Warn("")
+			log.Warn("Cleanup complete. Vault is in consistent 'no MFA' state.")
+			log.Warn("You can retry MFA setup with: eos create vault")
+			log.Warn("")
+		}
+	}()
+
 	// Apply enforcement policies
 	if config.EnforceForAll {
 		log.Info(" Enforcing MFA for all authentication methods")
 		if err := enforceMFAForAllUsers(rc, privilegedClient, config, entityID); err != nil {
 			log.Error(" Failed to enforce MFA for all users", zap.Error(err))
+			// enforcementSucceeded remains false - cleanup will trigger
 			return cerr.Wrap(err, "failed to enforce MFA for all users")
 		}
 	}
+
+	// Mark enforcement as successful - cleanup will be skipped
+	enforcementSucceeded = true
 
 	log.Info(" MFA enforcement active")
 	log.Info("MFA Setup State Transition",
@@ -171,18 +255,42 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 
 // EnableMFAMethods enables and configures MFA methods in Vault
 //
-// DEPRECATED: Use CreateMFAMethodsOnly() + SetupUserTOTP() + EnforceMFAPolicyOnly()
-// for better error recovery and idempotency.
+// Deprecated: Use CreateMFAMethodsOnly() + SetupUserTOTP() + EnforceMFAPolicyOnly()
+// for better error recovery and idempotency. This function is broken because it
+// doesn't have access to the entity ID required for MFA enforcement.
 //
-// BROKEN: This function is deprecated and WILL NOT WORK because it doesn't have
-// access to the entity ID required for MFA enforcement. DO NOT USE.
+// BROKEN: This function combines method creation and enforcement in one operation,
+// which can lead to lockout if TOTP setup fails. The entity ID parameter is missing,
+// making enforcement impossible.
 //
-// This function combines method creation and enforcement in one operation,
-// which can lead to lockout if TOTP setup fails.
+// Migration guide:
+//
+//	// OLD (broken):
+//	err := EnableMFAMethods(rc, client, config)
+//
+//	// NEW (correct):
+//	// Step 1: Create TOTP method
+//	err := CreateMFAMethodsOnly(rc, client, config)
+//	if err != nil { return err }
+//
+//	// Step 2: Verify prerequisites and get bootstrap data
+//	bootstrapData, err := VerifyAndFetchMFAPrerequisites(rc, client, "eos")
+//	if err != nil { return err }
+//
+//	// Step 3: User enrolls TOTP (scan QR code)
+//	err = SetupUserTOTP(rc, client, "eos", bootstrapData)
+//	if err != nil { return err }
+//
+//	// Step 4: Apply enforcement
+//	err = EnforceMFAPolicyOnly(rc, client, config, bootstrapData.EntityID)
+//	if err != nil { return err }
+//
+// This function will be removed in Eos v2.0.0.
 func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFAConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Error(" DEPRECATED AND BROKEN: EnableMFAMethods cannot work without entity ID")
 	log.Error(" Use CreateMFAMethodsOnly + SetupUserTOTP + EnforceMFAPolicyOnly instead")
+	log.Error(" See function documentation for migration guide")
 
 	return cerr.New("EnableMFAMethods is deprecated and broken - missing entity ID parameter required for enforcement")
 }
@@ -1037,7 +1145,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		return cerr.Errorf(
 			"Bootstrap data is too old (%s). Maximum age: %s.\n"+
 				"The password may have been rotated since verification.\n"+
-				"Please retry: eos update vault --setup-mfa-user %s",
+				"Please retry: Run 'eos create vault' again to set up MFA for user %s",
 			dataAge, stalenessThreshold, username)
 	}
 
@@ -1106,7 +1214,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 					"Cached version: %d\n"+
 					"Current version: %d\n"+
 					"This indicates the password was rotated.\n"+
-					"Please retry: eos update vault --setup-mfa-user %s",
+					"Please retry: Run 'eos create vault' again to set up MFA for user %s",
 				bootstrapData.SecretVersion, currentVersion, username)
 		}
 
@@ -1183,7 +1291,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		log.Info("  1. Delete the existing TOTP secret:")
 		log.Info(fmt.Sprintf("     vault write identity/mfa/method/totp/admin-destroy entity_id=%s method_id=%s", entityID, methodID))
 		log.Info("  2. Re-run TOTP setup:")
-		log.Info(fmt.Sprintf("     eos update vault --setup-mfa-user %s", username))
+		log.Info(fmt.Sprintf("     Run 'eos create vault' again and answer 'Yes' to MFA prompt"))
 		log.Info("")
 		log.Info("IMPORTANT: Deleting the TOTP secret will lock the user out until")
 		log.Info("they complete TOTP setup again with a new QR code.")
@@ -1319,8 +1427,10 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	log.Info("  Step 3: Press ENTER when you've added the secret and can see the code")
 	log.Info("")
 
-	// Wait for user to press ENTER (avoids confusion with yes/no or TOTP code entry)
-	_ = interaction.PromptRequired("Press ENTER to continue...")
+	// Wait for user to press ENTER (using prompt that accepts empty input)
+	log.Info("terminal prompt: Press ENTER to continue...")
+	fmt.Fprintf(os.Stderr, "Press ENTER to continue...")
+	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 
 	log.Info("")
 	log.Info("Great! Now let's test the TOTP code to verify it works.")

@@ -236,14 +236,42 @@ func (bgi *BionicGPTInstaller) verifyPhaseHealth(ctx context.Context, phase Depl
 				// Don't fail - service might become healthy later
 			}
 		default:
-			logger.Warn(fmt.Sprintf("  ⚠ %s: unhealthy (status: %s), but continuing", service, healthStatus))
-			// Show last few log lines for debugging
-			logs, _ := execute.Run(ctx, execute.Options{
-				Command: "docker",
-				Args:    []string{"logs", "--tail", "20", containerName},
-				Capture: true,
-			})
-			logger.Debug(fmt.Sprintf("Recent logs from %s:\n%s", service, logs))
+			// P1 FIX: Intelligent error classification for LiteLLM
+			if service == "litellm-proxy" {
+				logger.Warn(fmt.Sprintf("  ⚠ %s: unhealthy (status: %s), performing diagnostic analysis", service, healthStatus))
+
+				// Diagnose LiteLLM health with error classification
+				liteLLMError, diagErr := DiagnoseLiteLLMHealth(ctx, containerName)
+				if diagErr != nil {
+					logger.Error("Failed to diagnose LiteLLM health",
+						zap.Error(diagErr))
+				} else {
+					// Log classified error with remediation
+					logger.Error("LiteLLM Error Diagnosis",
+						zap.String("type", string(liteLLMError.Type)),
+						zap.String("message", liteLLMError.Message),
+						zap.String("remediation", liteLLMError.Remediation),
+						zap.Bool("should_retry", liteLLMError.ShouldRetry))
+
+					// If it's a config error, fail fast (don't retry)
+					if !liteLLMError.ShouldRetry {
+						return fmt.Errorf("LiteLLM %s error (will not retry): %s\n\n%s",
+							liteLLMError.Type, liteLLMError.Message, liteLLMError.Remediation)
+					}
+
+					logger.Warn(fmt.Sprintf("  ⚠ Transient error - will continue (may recover): %s", liteLLMError.Message))
+				}
+			} else {
+				// Generic unhealthy handling for other services
+				logger.Warn(fmt.Sprintf("  ⚠ %s: unhealthy (status: %s), but continuing", service, healthStatus))
+				// Show last few log lines for debugging
+				logs, _ := execute.Run(ctx, execute.Options{
+					Command: "docker",
+					Args:    []string{"logs", "--tail", "20", containerName},
+					Capture: true,
+				})
+				logger.Debug(fmt.Sprintf("Recent logs from %s:\n%s", service, logs))
+			}
 		}
 	}
 
