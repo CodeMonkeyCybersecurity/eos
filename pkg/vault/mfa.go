@@ -597,8 +597,8 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 
 	// CRITICAL: Must specify identity_entity_ids to target specific users
 	// Without this field, the policy exists but doesn't apply to anyone (Vault safety default)
+	// NOTE: "name" goes in URL path, NOT in request body (per Vault API docs)
 	enforcementConfig := map[string]interface{}{
-		"name":                  enforcementName,
 		"mfa_method_ids":        []string{methodID},
 		"auth_method_accessors": []string{userpassAccessor},
 		"auth_method_types":     []string{"userpass"},
@@ -1433,21 +1433,6 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	_, _ = bufio.NewReader(os.Stdin).ReadBytes('\n')
 
 	log.Info("")
-	log.Info("Great! Now let's test the TOTP code to verify it works.")
-	log.Info("")
-
-	// Verify TOTP setup by prompting user to confirm they can see the code
-	testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter the 6-digit TOTP code from your authenticator app", 1)
-	if err != nil {
-		log.Error(" Failed to get test code from user", zap.Error(err))
-		return cerr.Wrap(err, "failed to get test code")
-	}
-
-	// We got a code from the user, which confirms they can see it in their app
-	// Actual verification will happen after MFA enforcement is applied
-	_ = testCodes[0] // Acknowledge we got the code
-
-	log.Info("")
 	log.Info(" ✓ TOTP secret configured and displayed to user")
 	log.Info("")
 	log.Info(" Your authenticator app should now show:")
@@ -1565,34 +1550,35 @@ func VerifyMFAEnforcement(rc *eos_io.RuntimeContext, client *api.Client, usernam
 		}
 
 		// Check if we got an MFA challenge
-		if loginResp.Auth != nil {
+		// Per Vault API docs: When MFA is enforced, loginResp.Auth contains MFARequirement
+		// with the mfa_request_id. If Auth.MFARequirement is nil, MFA is not enforced.
+		if loginResp.Auth == nil || loginResp.Auth.MFARequirement == nil {
 			// No MFA challenge - enforcement not active yet
 			if attempt < maxRetries-1 {
 				log.Warn(" No MFA challenge received - enforcement may not be active yet",
 					zap.String("username", username),
 					zap.Int("attempt", attempt+1),
-					zap.String("will_retry", "yes"))
+					zap.String("will_retry", "yes"),
+					zap.Bool("auth_present", loginResp.Auth != nil),
+					zap.Bool("mfa_requirement_present", loginResp.Auth != nil && loginResp.Auth.MFARequirement != nil))
 				continue
 			} else {
 				log.Error(" No MFA challenge received after all retries",
 					zap.String("username", username),
-					zap.Int("total_attempts", maxRetries))
+					zap.Int("total_attempts", maxRetries),
+					zap.Bool("auth_present", loginResp.Auth != nil))
 				return cerr.New("expected MFA challenge but got direct authentication - MFA enforcement not active after policy propagation")
 			}
 		}
 
-		// Extract MFA request ID
-		if loginResp.Data == nil {
-			log.Error(" Login response missing data field")
-			return cerr.New("login response missing data field")
+		// Extract MFA request ID from Auth.MFARequirement
+		if loginResp.Auth.MFARequirement.MFARequestID == "" {
+			log.Error(" MFA requirement exists but mfa_request_id is empty",
+				zap.Any("mfa_requirement", loginResp.Auth.MFARequirement))
+			return cerr.New("MFA requirement exists but mfa_request_id is empty")
 		}
 
-		requestID, ok := loginResp.Data["mfa_request_id"].(string)
-		if !ok || requestID == "" {
-			log.Error(" No MFA request ID in response",
-				zap.Any("response_data", loginResp.Data))
-			return cerr.New("no mfa_request_id in login response - MFA may not be configured correctly")
-		}
+		requestID := loginResp.Auth.MFARequirement.MFARequestID
 
 		mfaRequestID = requestID
 		log.Info(" ✓ MFA challenge received",
