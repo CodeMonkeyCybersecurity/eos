@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ func OrchestrateVaultAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 // readAgentTokenWithRetry handles the race condition where the agent token file exists but is empty
 // because the agent hasn't finished authentication yet. We retry with backoff up to 30 seconds.
+// P0 FIX 7: Detect when Vault Agent has renewed token during retry (HashiCorp pattern)
 func readAgentTokenWithRetry(rc *eos_io.RuntimeContext, path string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -53,6 +55,16 @@ func readAgentTokenWithRetry(rc *eos_io.RuntimeContext, path string) (string, er
 		zap.Int("max_attempts", maxAttempts),
 		zap.Duration("retry_delay", retryDelay),
 		zap.Duration("max_wait_time", time.Duration(maxAttempts)*retryDelay))
+
+	// P0 FIX 7: Record initial file mtime to detect token renewals
+	// If token file is old, we want to know if Vault Agent updated it during retry
+	initialMtime := time.Time{}
+	if info, err := os.Stat(path); err == nil {
+		initialMtime = info.ModTime()
+		log.Debug("Initial token file modification time recorded",
+			zap.Time("initial_mtime", initialMtime),
+			zap.String("path", path))
+	}
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug("Attempting to read agent token file",
@@ -104,6 +116,21 @@ func readAgentTokenWithRetry(rc *eos_io.RuntimeContext, path string) (string, er
 				}
 			}
 			continue
+		}
+
+		// P0 FIX 7: Check if file was updated by Vault Agent during retry
+		// This helps diagnose if we successfully waited for a token renewal
+		if attempt > 1 && !initialMtime.IsZero() {
+			if info, err := os.Stat(path); err == nil {
+				currentMtime := info.ModTime()
+				if currentMtime.After(initialMtime) {
+					log.Info("Vault Agent renewed token during retry (file was updated)",
+						zap.Int("attempt", attempt),
+						zap.Time("initial_mtime", initialMtime),
+						zap.Time("current_mtime", currentMtime),
+						zap.Duration("renewal_detected_after", currentMtime.Sub(initialMtime)))
+				}
+			}
 		}
 
 		// Success! Token is present and non-empty
@@ -351,13 +378,71 @@ func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string
 		tokenType = typeVal.(string)
 	}
 
+	// P0 FIX 3: Check if token is renewable (HashiCorp recommended pattern)
+	renewable := secret.Renewable
+	if renewableData, ok := secret.Data["renewable"].(bool); ok {
+		renewable = renewableData
+	}
+
+	if !renewable {
+		log.Warn("Token is not renewable - will need re-authentication at expiry",
+			zap.String("token_type", tokenType))
+	}
+
+	// P0 FIX 4: Check num_uses (use_limit) - HashiCorp pattern
+	// If token has limited uses, it may be consumed after this operation
+	numUses := int64(0)
+	if numUsesData, ok := secret.Data["num_uses"]; ok && numUsesData != nil {
+		switch v := numUsesData.(type) {
+		case float64:
+			numUses = int64(v)
+		case int:
+			numUses = int64(v)
+		case int64:
+			numUses = v
+		}
+
+		if numUses > 0 {
+			log.Warn("Token has use_limit - may be consumed after use",
+				zap.Int64("remaining_uses", numUses),
+				zap.String("token_type", tokenType))
+		}
+	}
+
+	// P0 FIX 5: Check TTL sufficiency (HashiCorp recommendation)
+	// Ensure token has enough TTL remaining for the operation
+	ttl := int64(0)
+	if ttlData, ok := secret.Data["ttl"]; ok && ttlData != nil {
+		switch v := ttlData.(type) {
+		case float64:
+			ttl = int64(v)
+		case int:
+			ttl = int64(v)
+		case int64:
+			ttl = v
+		}
+	}
+
+	const minRequiredTTL = 60 // 1 minute minimum (HashiCorp pattern)
+
+	if ttl > 0 && ttl < minRequiredTTL {
+		log.Error("Token TTL too low - insufficient time for operation",
+			zap.Int64("ttl_seconds", ttl),
+			zap.Int64("min_required_ttl", minRequiredTTL),
+			zap.String("remediation", "Wait for Vault Agent to renew token or re-authenticate"))
+
+		return fmt.Errorf("token TTL too low (%ds remaining, need at least %ds) - wait for renewal or re-authenticate",
+			ttl, minRequiredTTL)
+	}
+
 	log.Info(" Token validated successfully",
 		zap.String("token_type", tokenType),
 		zap.Any("policies", secret.Data["policies"]),
 		zap.Any("path", secret.Data["path"]),
 		zap.Any("accessor", secret.Data["accessor"]),
-		zap.Bool("renewable", secret.Renewable),
-		zap.Any("ttl", secret.Data["ttl"]))
+		zap.Bool("renewable", renewable),
+		zap.Int64("ttl_seconds", ttl),
+		zap.Int64("num_uses", numUses))
 	return nil
 }
 

@@ -22,6 +22,10 @@ package vault
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -144,11 +148,34 @@ func coreAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) (string, err
 // coreAgentTokenAuth reads and validates a Vault Agent token from disk
 // Returns: token string on success, error on failure
 // Path is typically /run/eos/vault_agent_eos.token
+//
+// HASHICORP BEST PRACTICES (P0):
+// 1. Check token file modification time (detect stale tokens from dead Vault Agent)
+// 2. Verify Vault Agent service is running before trusting token file
+// 3. Read token with retry logic (handles agent startup race condition)
 func coreAgentTokenAuth(rc *eos_io.RuntimeContext, client *api.Client, tokenPath string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
 	log.Debug("Reading Vault Agent token from disk",
 		zap.String("path", tokenPath))
+
+	// P0 FIX 1: Check token file freshness (HashiCorp recommended pattern)
+	// Vault Agent renews tokens every ~15-30 seconds
+	// If token file is >5 minutes old, Vault Agent likely crashed/stopped
+	if err := checkTokenFileFreshness(rc, tokenPath); err != nil {
+		log.Warn("Token file freshness check failed",
+			zap.String("path", tokenPath),
+			zap.Error(err))
+
+		// P0 FIX 2: Verify Vault Agent service health
+		if healthErr := checkVaultAgentHealth(rc); healthErr != nil {
+			// Both checks failed - token is stale AND agent is down
+			return "", fmt.Errorf("token file stale and Vault Agent unhealthy: %w", healthErr)
+		}
+
+		// Agent is healthy but token is old - may be renewing now, proceed with retry
+		log.Info("Token file is old but Vault Agent is healthy - will retry to get fresh token")
+	}
 
 	// Use existing retry logic for agent tokens (handles race condition)
 	token, err := readAgentTokenWithRetry(rc, tokenPath)
@@ -267,4 +294,69 @@ func handleMFAChallenge(rc *eos_io.RuntimeContext, client *api.Client, mfaReques
 		zap.String("token_accessor", secret.Auth.Accessor))
 
 	return secret.Auth.ClientToken, nil
+}
+
+// checkTokenFileFreshness verifies that the token file was recently modified by Vault Agent
+// Returns error if token file is stale (older than 5 minutes)
+// HashiCorp Pattern: Detect when Vault Agent has crashed/stopped renewing tokens
+func checkTokenFileFreshness(rc *eos_io.RuntimeContext, tokenPath string) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	fileInfo, err := os.Stat(tokenPath)
+	if err != nil {
+		return cerr.Wrap(err, "failed to stat token file")
+	}
+
+	tokenAge := time.Since(fileInfo.ModTime())
+
+	// Vault Agent renews tokens every ~15-30 seconds
+	// If file hasn't been modified in 5 minutes, agent likely not running
+	const maxTokenFileAge = 5 * time.Minute
+
+	if tokenAge > maxTokenFileAge {
+		log.Warn("Token file is stale - Vault Agent may have stopped",
+			zap.Duration("age", tokenAge),
+			zap.Duration("max_age", maxTokenFileAge),
+			zap.String("path", tokenPath),
+			zap.Time("last_modified", fileInfo.ModTime()))
+
+		return fmt.Errorf("token file is %v old (max %v) - Vault Agent may have crashed",
+			tokenAge.Round(time.Second), maxTokenFileAge)
+	}
+
+	log.Debug("Token file freshness check passed",
+		zap.Duration("age", tokenAge),
+		zap.Time("last_modified", fileInfo.ModTime()))
+
+	return nil
+}
+
+// checkVaultAgentHealth verifies that the Vault Agent systemd service is running
+// Returns error if service is not active
+// HashiCorp Pattern: Verify agent is healthy before trusting token file
+func checkVaultAgentHealth(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+
+	// Check if systemd service is active
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "vault-agent-eos")
+	output, err := cmd.CombinedOutput()
+
+	serviceStatus := strings.TrimSpace(string(output))
+
+	if err != nil || serviceStatus != "active" {
+		log.Warn("Vault Agent service is not running",
+			zap.Error(err),
+			zap.String("service_status", serviceStatus),
+			zap.String("service_name", "vault-agent-eos"))
+
+		return fmt.Errorf("Vault Agent service (vault-agent-eos) is not running (status: %s)\n"+
+			"Start it with: sudo systemctl start vault-agent-eos\n"+
+			"Check status: sudo systemctl status vault-agent-eos\n"+
+			"View logs: sudo journalctl -u vault-agent-eos -n 50", serviceStatus)
+	}
+
+	log.Debug("Vault Agent service is healthy",
+		zap.String("service_status", serviceStatus))
+
+	return nil
 }

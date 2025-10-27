@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -104,7 +105,10 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 	return nil
 }
 
-// SecureReadTokenFile reads a token file with permission validation
+// SecureReadTokenFile reads a token file with permission validation and file locking
+// P0 FIX 6: Add file locking for concurrent token reads (HashiCorp pattern)
+// Multiple eos commands may read the token file simultaneously
+// Advisory locking prevents reading while Vault Agent is writing
 func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -117,7 +121,37 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 		return "", fmt.Errorf("token file security validation failed: %w", err)
 	}
 
-	// Read the file
+	// P0 FIX 6: Open file with concurrent-safe read pattern
+	// Use OpenFile instead of ReadFile to enable file locking
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		return "", fmt.Errorf("failed to open token file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	// P0 FIX 6: Acquire shared lock (multiple readers allowed, blocks writers)
+	// LOCK_SH = shared lock (read-only, multiple concurrent readers OK)
+	// Prevents reading token file while Vault Agent is writing to it
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_SH); err != nil {
+		log.Warn("Failed to acquire shared lock on token file (non-fatal, continuing)",
+			zap.String("file", filePath),
+			zap.Error(err))
+		// Non-fatal - continue reading even if flock fails
+		// Some filesystems (e.g., NFS) may not support advisory locking
+	} else {
+		// Release lock when done
+		defer func() {
+			if unlockErr := syscall.Flock(int(file.Fd()), syscall.LOCK_UN); unlockErr != nil {
+				log.Debug("Failed to release lock on token file",
+					zap.String("file", filePath),
+					zap.Error(unlockErr))
+			}
+		}()
+		log.Debug("Acquired shared lock on token file",
+			zap.String("file", filePath))
+	}
+
+	// Read file contents
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read token file %s: %w", filePath, err)
