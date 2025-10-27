@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/purge"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -250,6 +251,18 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		logger.Debug("Installation directory already removed")
 	}
 
+	// Step 7: Purge secrets and configs if --purge flag is set
+	if BionicgptDeletePurge {
+		logger.Info("Purging BionicGPT secrets and configs (--purge flag enabled)")
+		if err := purgeServiceData(rc); err != nil {
+			logger.Warn("Failed to purge service data", zap.Error(err))
+			if !BionicgptDeleteForce {
+				return fmt.Errorf("failed to purge service data: %w", err)
+			}
+			logger.Warn("Continuing despite purge failure (--force)")
+		}
+	}
+
 	// Summary
 	logger.Info("BionicGPT deletion completed successfully")
 	fmt.Println()
@@ -273,4 +286,23 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 var (
 	BionicgptDeleteSkipBackup bool
 	BionicgptDeleteForce      bool
+	BionicgptDeletePurge      bool
 )
+
+// purgeServiceData removes BionicGPT secrets from Vault and configs from Consul KV
+func purgeServiceData(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Purging BionicGPT service data from Vault and Consul")
+
+	// Use purge package to clean up secrets and configs
+	if err := purge.PurgeService(rc, "bionicgpt"); err != nil {
+		logger.Error("Failed to purge service data", zap.Error(err))
+		return fmt.Errorf("failed to purge bionicgpt service data: %w", err)
+	}
+
+	logger.Info("Service data purged successfully")
+	fmt.Println("✓ BionicGPT secrets and configs purged from Vault and Consul")
+
+	return nil
+}

@@ -70,6 +70,8 @@ func init() {
 		"Skip backup before deletion (not recommended)")
 	deleteBionicGPTCmd.Flags().BoolVar(&bionicgpt.BionicgptDeleteForce, "force", false,
 		"Force deletion even if components already removed")
+	deleteBionicGPTCmd.Flags().BoolVar(&bionicgpt.BionicgptDeletePurge, "purge", false,
+		"Also remove secrets from Vault and configs from Consul KV (complete wipe)")
 
 	DeleteCmd.AddCommand(deleteBionicGPTCmd)
 }
