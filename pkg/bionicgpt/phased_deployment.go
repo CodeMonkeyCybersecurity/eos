@@ -112,9 +112,9 @@ func (bgi *BionicGPTInstaller) phasedDeployment(ctx context.Context) error {
 			return fmt.Errorf("phase %d failed: %w", i+1, err)
 		}
 
-		// Wait for services to stabilize
+		// P0 FIX: Show progress during stabilization wait instead of silent sleep
 		logger.Info(fmt.Sprintf("Waiting %v for services to stabilize...", phase.WaitTime))
-		time.Sleep(phase.WaitTime)
+		bgi.waitWithProgress(ctx, phase.WaitTime)
 
 		// Verify health checks
 		if len(phase.HealthChecks) > 0 {
@@ -141,34 +141,102 @@ func (bgi *BionicGPTInstaller) phasedDeployment(ctx context.Context) error {
 }
 
 // startPhaseServices starts the services for a deployment phase
+// P0 FIX: Add real-time progress updates to prevent "appears to be hanging" confusion
 func (bgi *BionicGPTInstaller) startPhaseServices(ctx context.Context, phase DeploymentPhase) error {
 	logger := otelzap.Ctx(ctx)
 
 	logger.Info(fmt.Sprintf("Starting services: %s", strings.Join(phase.Services, ", ")))
 
+	// P0 FIX: Warn user if this might take a while (app container can be multi-GB)
+	for _, service := range phase.Services {
+		if service == "app" {
+			logger.Info("⏳ Starting main application container")
+			logger.Info("This may take 1-3 minutes on first install (large image download)")
+			logger.Info("Progress updates will be shown every 15 seconds...")
+		}
+	}
+
 	args := []string{"compose", "-f", bgi.config.ComposeFile, "up", "-d"}
 	args = append(args, phase.Services...)
 
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "docker",
-		Args:    args,
-		Dir:     bgi.config.InstallDir,
-		Capture: true,
-		Timeout: 5 * time.Minute,
-	})
+	logger.Debug("Docker compose command starting",
+		zap.String("command", "docker"),
+		zap.Strings("args", args),
+		zap.String("working_dir", bgi.config.InstallDir),
+		zap.Duration("timeout", 5*time.Minute))
 
-	if err != nil {
-		logger.Error("Failed to start services",
-			zap.Error(err),
-			zap.String("output", output))
-		return fmt.Errorf("docker compose up failed: %s", output)
+	// P0 FIX: Run docker compose in background with progress updates
+	startTime := time.Now()
+	done := make(chan struct {
+		output string
+		err    error
+	}, 1)
+
+	go func() {
+		output, err := execute.Run(ctx, execute.Options{
+			Command: "docker",
+			Args:    args,
+			Dir:     bgi.config.InstallDir,
+			Capture: true,
+			Timeout: 5 * time.Minute,
+		})
+		done <- struct {
+			output string
+			err    error
+		}{output, err}
+	}()
+
+	// P0 FIX: Show progress every 15 seconds while waiting
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case result := <-done:
+			elapsed := time.Since(startTime).Round(time.Second)
+			if result.err != nil {
+				logger.Error("Failed to start services",
+					zap.Error(result.err),
+					zap.String("output", result.output),
+					zap.Duration("elapsed", elapsed))
+
+				// P1 FIX: Better error context for timeouts
+				if strings.Contains(result.err.Error(), "timeout") || strings.Contains(result.err.Error(), "deadline exceeded") {
+					return fmt.Errorf("docker compose up timed out after %v\n"+
+						"This usually means:\n"+
+						"  1. Large container image is being downloaded (check network speed)\n"+
+						"  2. Container is failing health checks repeatedly\n"+
+						"  3. Dependency service is not healthy\n\n"+
+						"Check container status: docker ps -a | grep bionicgpt\n"+
+						"Check logs: docker compose -f %s logs --tail=50\n\n"+
+						"Raw output: %s",
+						elapsed, bgi.config.ComposeFile, result.output)
+				}
+
+				return fmt.Errorf("docker compose up failed: %s", result.output)
+			}
+
+			logger.Info(fmt.Sprintf("✓ Services started successfully (elapsed: %v)", elapsed))
+			logger.Debug("Docker compose output",
+				zap.String("services", strings.Join(phase.Services, ", ")),
+				zap.String("output", result.output),
+				zap.Duration("elapsed", elapsed))
+
+			return nil
+
+		case <-ticker.C:
+			elapsed := time.Since(startTime).Round(time.Second)
+			logger.Info(fmt.Sprintf("  ⏳ Still starting %s... (%v elapsed)",
+				strings.Join(phase.Services, ", "), elapsed))
+			logger.Info("  Docker is working in the background (pulling images, creating containers, setting up networks)")
+
+			// P2: Additional diagnostic info for long waits
+			if elapsed > 90*time.Second {
+				logger.Info("  💡 TIP: Open another terminal and run: docker ps -a | grep bionicgpt")
+				logger.Info("  This will show you real-time container status")
+			}
+		}
 	}
-
-	logger.Debug("Services started",
-		zap.String("services", strings.Join(phase.Services, ", ")),
-		zap.String("output", output))
-
-	return nil
 }
 
 // verifyPhaseHealth checks that services in this phase are healthy
@@ -276,6 +344,41 @@ func (bgi *BionicGPTInstaller) verifyPhaseHealth(ctx context.Context, phase Depl
 	}
 
 	return nil
+}
+
+// waitWithProgress waits for the specified duration, showing progress updates
+// P0 FIX: Replace silent time.Sleep() with visible progress updates
+func (bgi *BionicGPTInstaller) waitWithProgress(ctx context.Context, duration time.Duration) {
+	logger := otelzap.Ctx(ctx)
+
+	// Don't show progress for short waits (<30s)
+	if duration < 30*time.Second {
+		time.Sleep(duration)
+		return
+	}
+
+	// Show progress every 10 seconds for longer waits
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	deadline := time.Now().Add(duration)
+	remaining := duration
+
+	for remaining > 0 {
+		select {
+		case <-ctx.Done():
+			logger.Warn("Context cancelled during wait")
+			return
+		case <-ticker.C:
+			remaining = time.Until(deadline)
+			if remaining <= 0 {
+				return
+			}
+			logger.Info(fmt.Sprintf("  ⏳ %v remaining...", remaining.Round(time.Second)))
+		case <-time.After(remaining):
+			return
+		}
+	}
 }
 
 // getContainerName returns the Docker container name for a service

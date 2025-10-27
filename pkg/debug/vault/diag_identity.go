@@ -94,18 +94,48 @@ func IdentityDiagnostic() *debug.Diagnostic {
 			}
 
 			// Policies
+			// P1 ENHANCEMENT: Explicit policy validation
+			var policyWarnings []string
+			hasAdminPolicy := false
+			hasDefaultPolicy := false
+
 			if policies, ok := entityResp.Data["policies"].([]interface{}); ok && len(policies) > 0 {
 				entityInfo.WriteString("\nPolicies:\n")
 				for _, policy := range policies {
-					entityInfo.WriteString(fmt.Sprintf("  - %v\n", policy))
+					policyStr := fmt.Sprintf("%v", policy)
+					entityInfo.WriteString(fmt.Sprintf("  - %s", policyStr))
+
+					// Track which policies are present
+					if policyStr == shared.EosAdminPolicyName {
+						hasAdminPolicy = true
+						entityInfo.WriteString(" ✓ (admin access)\n")
+					} else if policyStr == shared.EosDefaultPolicyName {
+						hasDefaultPolicy = true
+						entityInfo.WriteString(" ✓ (default access)\n")
+					} else {
+						entityInfo.WriteString("\n")
+					}
 				}
 			} else {
 				entityInfo.WriteString("\nPolicies: (none)\n")
 			}
 
+			// Validate required policies
+			if !hasAdminPolicy {
+				policyWarnings = append(policyWarnings,
+					fmt.Sprintf("Entity lacks %s - administrative operations will fail", shared.EosAdminPolicyName))
+			}
+			if !hasDefaultPolicy {
+				policyWarnings = append(policyWarnings,
+					fmt.Sprintf("Entity lacks %s - basic operations may fail", shared.EosDefaultPolicyName))
+			}
+
 			// Check aliases
 			aliasesInfo, aliasWarnings := checkEntityAliases(client, entityResp.Data)
 			entityInfo.WriteString(aliasesInfo)
+
+			// Combine policy and alias warnings
+			allWarnings := append(policyWarnings, aliasWarnings...)
 
 			// Check MFA methods
 			mfaInfo := checkMFAMethods(client)
@@ -114,11 +144,33 @@ func IdentityDiagnostic() *debug.Diagnostic {
 			}
 
 			// Set result status based on findings
-			if len(aliasWarnings) > 0 {
+			// P1 ENHANCEMENT: Check both policy and alias warnings
+			if len(allWarnings) > 0 {
 				result.Status = debug.StatusWarning
-				result.Message = "Entity exists but has alias issues"
+				result.Message = "Entity exists but has configuration issues"
 				result.Output = entityInfo.String()
-				result.Remediation = strings.Join(aliasWarnings, "\n")
+
+				// Build remediation with specific fixes
+				var remediation strings.Builder
+				remediation.WriteString("Issues found:\n")
+				for i, warning := range allWarnings {
+					remediation.WriteString(fmt.Sprintf("%d. %s\n", i+1, warning))
+				}
+
+				// Add policy fix instructions if needed
+				if !hasAdminPolicy || !hasDefaultPolicy {
+					remediation.WriteString("\nFix entity policies with:\n")
+					remediation.WriteString(fmt.Sprintf("  vault write identity/entity/id/%s policies=%s,%s\n",
+						entityID, shared.EosDefaultPolicyName, shared.EosAdminPolicyName))
+				}
+
+				// Add alias fix instructions if needed
+				if len(aliasWarnings) > 0 {
+					remediation.WriteString("\nTo recreate missing aliases:\n")
+					remediation.WriteString("  sudo eos create vault  # Detects existing entity and creates missing aliases\n")
+				}
+
+				result.Remediation = remediation.String()
 			} else {
 				result.Status = debug.StatusOK
 				result.Message = "EOS entity configured correctly"
@@ -167,11 +219,31 @@ func checkEntityAliases(client *api.Client, entityData map[string]interface{}) (
 		aliasID := getStringValue(alias, "id")
 		aliasName := getStringValue(alias, "name")
 		mountAccessor := getStringValue(alias, "mount_accessor")
+		canonicalID := getStringValue(alias, "canonical_id")
 
 		info.WriteString(fmt.Sprintf("\nAlias %d:\n", i+1))
 		info.WriteString(fmt.Sprintf("  ID: %s\n", aliasID))
 		info.WriteString(fmt.Sprintf("  Name: %s\n", aliasName))
 		info.WriteString(fmt.Sprintf("  Mount Accessor: %s\n", mountAccessor))
+
+		// P1 ENHANCEMENT: Check for orphaned aliases
+		// Verify canonical_id matches the entity we're inspecting
+		if canonicalID != "" {
+			entityIDFromData := getStringValue(entityData, "id")
+			if canonicalID != entityIDFromData {
+				info.WriteString(fmt.Sprintf("  ⚠️  Canonical ID: %s (MISMATCH - orphaned alias!)\n", canonicalID))
+				warnings = append(warnings, fmt.Sprintf("Alias %d is orphaned - canonical_id doesn't match entity ID", i+1))
+			}
+		}
+
+		// P1 ENHANCEMENT: Display alias metadata (HashiCorp recommendation)
+		// "Leverage custom metadata on the entity alias instead"
+		if metadata, ok := alias["metadata"].(map[string]interface{}); ok && len(metadata) > 0 {
+			info.WriteString("  Metadata:\n")
+			for key, value := range metadata {
+				info.WriteString(fmt.Sprintf("    %s: %v\n", key, value))
+			}
+		}
 
 		// Find which auth backend this alias belongs to
 		var mountPath string

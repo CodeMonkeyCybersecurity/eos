@@ -56,12 +56,17 @@ func AllDiagnostics() []*debug.Diagnostic {
 		OllamaConnectivityDiagnostic(),
 		AppContainerMissingDiagnostic(),
 		LiteLLMHealthCheckDiagnostic(),
+		LiteLLMComprehensiveDiagnostic(), // NEW: Comprehensive Docker SDK + LiteLLM API health check
+		LiteLLMModelConnectivityDiagnostic(), // NEW: Test actual API calls to Azure models
 		LiteLLMErrorLogsDiagnostic(),
 		DatabaseConnectionTestDiagnostic(),
 		NetworkConnectivityDiagnostic(),
 		PortListenerDiagnostic(),
 		ZombieProcessesDiagnostic(),
 		AuthenticationIssueDiagnostic(),
+		DockerImagePullStatusDiagnostic(),    // NEW: Check if images are being pulled
+		ContainerStartupTimelineDiagnostic(), // NEW: Track startup timing
+		DockerComposeEventsDiagnostic(),      // NEW: Recent docker compose events
 	}
 }
 
@@ -267,6 +272,7 @@ func MigrationsDiagnostic() *debug.Diagnostic {
 }
 
 // LiteLLMProxyDiagnostic checks the LiteLLM proxy container
+// NOTE: This is basic container status check. Use LiteLLMComprehensiveDiagnostic for detailed health analysis.
 func LiteLLMProxyDiagnostic() *debug.Diagnostic {
 	return containerDiagnostic("LiteLLM Proxy", bionicgpt.ContainerLiteLLM, "LiteLLM proxy for LLM API calls")
 }
@@ -1049,6 +1055,537 @@ func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
 	}
 }
 
+// DockerImagePullStatusDiagnostic checks if Docker images are currently being pulled
+// CRITICAL for diagnosing "Phase 6 hanging" - often it's just pulling large images
+func DockerImagePullStatusDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Docker Image Pull Status",
+		Category:    "Deployment",
+		Description: "Check if Docker images are currently being downloaded",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Check docker events for recent pull operations
+			cmd := exec.CommandContext(ctx, "docker", "events",
+				"--since", "10m",
+				"--until", "0s",
+				"--filter", "type=image",
+				"--filter", "event=pull",
+				"--format", "{{.Time}}\t{{.Action}}\t{{.Actor.Attributes.name}}")
+
+			output, err := cmd.Output()
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "Could not check image pull status"
+				result.Output = fmt.Sprintf("Error: %v", err)
+				return result, nil
+			}
+
+			pullEvents := strings.TrimSpace(string(output))
+			if pullEvents == "" {
+				result.Status = debug.StatusOK
+				result.Message = "No recent image pulls detected"
+				result.Output = "No image pull activity in last 10 minutes"
+			} else {
+				lines := strings.Split(pullEvents, "\n")
+				result.Status = debug.StatusInfo
+				result.Message = fmt.Sprintf("Recent image pull activity detected (%d events)", len(lines))
+				result.Output = pullEvents
+				result.Metadata["pull_event_count"] = len(lines)
+
+				// Add informational note
+				result.Remediation = "If deployment appears stuck, images may be downloading in background. " +
+					"Check progress: docker ps -a | grep -E 'bionicgpt|litellm|postgres'"
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// ContainerStartupTimelineDiagnostic shows when each container was created/started
+// Helps diagnose which container is taking too long to start
+func ContainerStartupTimelineDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Container Startup Timeline",
+		Category:    "Deployment",
+		Description: "Show creation and startup times for all BionicGPT containers",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Get container startup times
+			cmd := exec.CommandContext(ctx, "docker", "ps", "-a",
+				"--filter", "name=bionicgpt",
+				"--format", "{{.Names}}\t{{.CreatedAt}}\t{{.Status}}\t{{.State}}")
+
+			output, err := cmd.Output()
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to get container timeline"
+				result.Output = fmt.Sprintf("Error: %v", err)
+				return result, nil
+			}
+
+			containerInfo := strings.TrimSpace(string(output))
+			if containerInfo == "" {
+				result.Status = debug.StatusWarning
+				result.Message = "No BionicGPT containers found"
+				result.Output = "No containers with 'bionicgpt' in name"
+				result.Remediation = "Check if installation completed: ls -la /opt/bionicgpt/"
+			} else {
+				lines := strings.Split(containerInfo, "\n")
+				result.Status = debug.StatusInfo
+				result.Message = fmt.Sprintf("Found %d BionicGPT containers", len(lines))
+
+				// Format as table
+				var timeline strings.Builder
+				timeline.WriteString("CONTAINER STARTUP TIMELINE:\n")
+				timeline.WriteString(strings.Repeat("=", 100) + "\n")
+				timeline.WriteString(fmt.Sprintf("%-25s %-30s %-25s %-10s\n",
+					"Container", "Created At", "Status", "State"))
+				timeline.WriteString(strings.Repeat("-", 100) + "\n")
+
+				for _, line := range lines {
+					parts := strings.Split(line, "\t")
+					if len(parts) >= 4 {
+						timeline.WriteString(fmt.Sprintf("%-25s %-30s %-25s %-10s\n",
+							parts[0], parts[1], parts[2], parts[3]))
+					}
+				}
+
+				result.Output = timeline.String()
+				result.Metadata["container_count"] = len(lines)
+
+				// Check for containers in "Created" state (not yet started)
+				if strings.Contains(containerInfo, "\tCreated\t") {
+					result.Remediation = "Some containers in 'Created' state (not started). " +
+						"This may indicate docker compose is still processing dependencies."
+				}
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// DockerComposeEventsDiagnostic shows recent docker compose events
+// Critical for understanding what docker compose is doing during "hang"
+func DockerComposeEventsDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Docker Compose Events",
+		Category:    "Deployment",
+		Description: "Show recent Docker Compose activity for BionicGPT stack",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Get all docker events for bionicgpt containers in last 15 minutes
+			cmd := exec.CommandContext(ctx, "docker", "events",
+				"--since", "15m",
+				"--until", "0s",
+				"--filter", "type=container",
+				"--filter", "label=com.docker.compose.project=bionicgpt",
+				"--format", "{{.Time}}\t{{.Action}}\t{{.Actor.Attributes.name}}")
+
+			output, err := cmd.Output()
+			if err != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "Could not retrieve Docker Compose events"
+				result.Output = fmt.Sprintf("Error: %v", err)
+				return result, nil
+			}
+
+			events := strings.TrimSpace(string(output))
+			if events == "" {
+				result.Status = debug.StatusInfo
+				result.Message = "No recent Docker Compose events"
+				result.Output = "No container events for bionicgpt project in last 15 minutes"
+			} else {
+				lines := strings.Split(events, "\n")
+				result.Status = debug.StatusInfo
+				result.Message = fmt.Sprintf("Found %d Docker Compose events in last 15 minutes", len(lines))
+
+				// Format events chronologically
+				var eventLog strings.Builder
+				eventLog.WriteString("RECENT DOCKER COMPOSE EVENTS (last 15 minutes):\n")
+				eventLog.WriteString(strings.Repeat("=", 100) + "\n")
+				eventLog.WriteString(fmt.Sprintf("%-20s %-30s %-30s\n", "Timestamp", "Action", "Container"))
+				eventLog.WriteString(strings.Repeat("-", 100) + "\n")
+
+				for _, line := range lines {
+					parts := strings.Split(line, "\t")
+					if len(parts) >= 3 {
+						// Parse Unix timestamp to human-readable
+						timestamp := parts[0]
+						if len(timestamp) > 10 {
+							timestamp = timestamp[:10] // Truncate to seconds
+						}
+						eventLog.WriteString(fmt.Sprintf("%-20s %-30s %-30s\n",
+							timestamp, parts[1], parts[2]))
+					}
+				}
+
+				result.Output = eventLog.String()
+				result.Metadata["event_count"] = len(lines)
+
+				// Check for specific problematic patterns
+				if strings.Contains(events, "kill") || strings.Contains(events, "die") {
+					result.Remediation = "Containers are being killed or dying. Check logs: " +
+						"docker compose -f /opt/bionicgpt/docker-compose.yml logs --tail=50"
+				} else if strings.Contains(events, "create") && !strings.Contains(events, "start") {
+					result.Remediation = "Containers created but not started. Docker may be pulling images or waiting for dependencies."
+				}
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// LiteLLMComprehensiveDiagnostic performs comprehensive LiteLLM health check
+// Uses Docker SDK for container inspection and LiteLLM HTTP API for health status
+func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "LiteLLM Comprehensive Health",
+		Category:    "LiteLLM",
+		Description: "Comprehensive LiteLLM proxy health check using Docker SDK and LiteLLM API",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var outputParts []string
+
+			// Create RuntimeContext for Docker manager
+			rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+			// Initialize Docker manager
+			mgr, err := container.NewManager(rc)
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to initialize Docker SDK client"
+				result.Error = err
+				result.Remediation = "Ensure Docker daemon is running: sudo systemctl start docker"
+				logger.Error("Failed to create Docker manager", zap.Error(err))
+				return result, nil
+			}
+			defer func() { _ = mgr.Close() }()
+
+			// 1. Check container status via Docker SDK
+			containerInfo, err := mgr.InspectRaw(ctx, bionicgpt.ContainerLiteLLM)
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "LiteLLM container not found"
+				result.Error = err
+				result.Remediation = "Start BionicGPT: cd /opt/bionicgpt && sudo docker compose up -d"
+				logger.Error("Failed to inspect litellm container", zap.Error(err))
+				return result, nil
+			}
+
+			// Extract container details
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "CONTAINER STATUS (Docker SDK)")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, fmt.Sprintf("Container ID: %s", containerInfo.ID[:12]))
+			outputParts = append(outputParts, fmt.Sprintf("Status: %s", containerInfo.State.Status))
+			outputParts = append(outputParts, fmt.Sprintf("Running: %v", containerInfo.State.Running))
+			outputParts = append(outputParts, fmt.Sprintf("Started At: %s", containerInfo.State.StartedAt))
+
+			healthStatus := "<no health check>"
+			if containerInfo.State.Health != nil {
+				healthStatus = containerInfo.State.Health.Status
+				outputParts = append(outputParts, fmt.Sprintf("Health Status: %s", healthStatus))
+				outputParts = append(outputParts, fmt.Sprintf("Health Checks Run: %d", len(containerInfo.State.Health.Log)))
+			}
+			outputParts = append(outputParts, "")
+
+			result.Metadata["container_id"] = containerInfo.ID[:12]
+			result.Metadata["running"] = containerInfo.State.Running
+			result.Metadata["health_status"] = healthStatus
+
+			// 2. Check LiteLLM /health endpoint via HTTP (exec curl inside container)
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "LITELLM /health ENDPOINT")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			healthCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+				"curl", "-f", "-s", "-m", "5", "http://localhost:4000/health")
+			healthOutput, healthErr := healthCmd.CombinedOutput()
+
+			if healthErr != nil {
+				outputParts = append(outputParts, "✗ /health endpoint failed")
+				outputParts = append(outputParts, fmt.Sprintf("Error: %v", healthErr))
+				result.Metadata["health_endpoint"] = "failed"
+			} else {
+				outputParts = append(outputParts, "✓ /health endpoint responding")
+				outputParts = append(outputParts, "Response:")
+				outputParts = append(outputParts, string(healthOutput))
+				result.Metadata["health_endpoint"] = "ok"
+			}
+			outputParts = append(outputParts, "")
+
+			// 3. Check LiteLLM /health/liveliness endpoint (should be faster, no Azure calls)
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "LITELLM /health/liveliness ENDPOINT")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			livelinessCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+				"curl", "-f", "-s", "-m", "5", "http://localhost:4000/health/liveliness")
+			livelinessOutput, livelinessErr := livelinessCmd.CombinedOutput()
+
+			if livelinessErr != nil {
+				outputParts = append(outputParts, "✗ /health/liveliness endpoint failed (or not supported)")
+				outputParts = append(outputParts, fmt.Sprintf("Error: %v", livelinessErr))
+				result.Metadata["liveliness_endpoint"] = "failed"
+			} else {
+				outputParts = append(outputParts, "✓ /health/liveliness endpoint responding")
+				outputParts = append(outputParts, "Response:")
+				outputParts = append(outputParts, string(livelinessOutput))
+				result.Metadata["liveliness_endpoint"] = "ok"
+			}
+			outputParts = append(outputParts, "")
+
+			// 4. Get recent logs for error classification
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "ERROR CLASSIFICATION (last 100 log lines)")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			logReader, err := mgr.Logs(ctx, bionicgpt.ContainerLiteLLM, container.LogOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+				Tail:       "100",
+				Timestamps: false,
+			})
+			if err != nil {
+				outputParts = append(outputParts, fmt.Sprintf("✗ Failed to retrieve logs: %v", err))
+			} else {
+				defer func() { _ = logReader.Close() }()
+
+				// Read all logs into string
+				var logsBuilder strings.Builder
+				scanner := bufio.NewScanner(logReader)
+				for scanner.Scan() {
+					line := scanner.Text()
+					if len(line) > 8 {
+						line = line[8:] // Strip Docker log header
+					}
+					logsBuilder.WriteString(line)
+					logsBuilder.WriteString("\n")
+				}
+				logs := logsBuilder.String()
+
+				// Classify error using existing bionicgpt error classification
+				liteLLMError := bionicgpt.ClassifyLiteLLMError(ctx, logs)
+
+				outputParts = append(outputParts, fmt.Sprintf("Error Type: %s", liteLLMError.Type))
+				outputParts = append(outputParts, fmt.Sprintf("Message: %s", liteLLMError.Message))
+				outputParts = append(outputParts, fmt.Sprintf("Should Retry: %v", liteLLMError.ShouldRetry))
+				outputParts = append(outputParts, "")
+				outputParts = append(outputParts, "Remediation:")
+				outputParts = append(outputParts, liteLLMError.Remediation)
+
+				result.Metadata["error_type"] = string(liteLLMError.Type)
+				result.Metadata["should_retry"] = liteLLMError.ShouldRetry
+			}
+			outputParts = append(outputParts, "")
+
+			// 5. Check litellm_config.yaml exists and is valid
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "CONFIGURATION FILES")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			configCheckCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+				"sh", "-c", "test -f /app/config.yaml && echo 'exists' || echo 'missing'")
+			configCheckOutput, _ := configCheckCmd.Output()
+			configExists := strings.TrimSpace(string(configCheckOutput)) == "exists"
+
+			if configExists {
+				outputParts = append(outputParts, "✓ /app/config.yaml exists")
+				result.Metadata["config_file"] = "exists"
+
+				// Get first 20 lines of config for inspection
+				configContentCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+					"head", "-20", "/app/config.yaml")
+				configContent, _ := configContentCmd.Output()
+				outputParts = append(outputParts, "")
+				outputParts = append(outputParts, "Config preview (first 20 lines):")
+				outputParts = append(outputParts, string(configContent))
+			} else {
+				outputParts = append(outputParts, "✗ /app/config.yaml MISSING")
+				result.Metadata["config_file"] = "missing"
+			}
+			outputParts = append(outputParts, "")
+
+			// 6. Check network connectivity (can container reach external Azure?)
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "NETWORK CONNECTIVITY")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			dnsCheckCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+				"sh", "-c", "command -v nslookup >/dev/null 2>&1 && nslookup openai.azure.com || echo 'nslookup not available'")
+			dnsOutput, _ := dnsCheckCmd.Output()
+			dnsResult := strings.TrimSpace(string(dnsOutput))
+
+			if strings.Contains(dnsResult, "nslookup not available") {
+				outputParts = append(outputParts, "⚠ DNS tools not available in container")
+			} else if strings.Contains(dnsResult, "can't resolve") || strings.Contains(dnsResult, "not found") {
+				outputParts = append(outputParts, "✗ Cannot resolve openai.azure.com")
+				outputParts = append(outputParts, dnsResult)
+			} else {
+				outputParts = append(outputParts, "✓ DNS resolution working")
+				outputParts = append(outputParts, dnsResult)
+			}
+			outputParts = append(outputParts, "")
+
+			// 7. Determine overall status
+			result.Output = strings.Join(outputParts, "\n")
+
+			if !containerInfo.State.Running {
+				result.Status = debug.StatusError
+				result.Message = "LiteLLM container is not running"
+				result.Remediation = "Start container: docker compose -f /opt/bionicgpt/docker-compose.yml up -d litellm-proxy"
+			} else if containerInfo.State.Health != nil && containerInfo.State.Health.Status != "healthy" {
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("LiteLLM container health: %s", containerInfo.State.Health.Status)
+				result.Remediation = "Check logs and Azure OpenAI connectivity. See error classification above."
+			} else if healthErr != nil {
+				result.Status = debug.StatusWarning
+				result.Message = "LiteLLM /health endpoint not responding"
+				result.Remediation = "LiteLLM web server may not be ready. Check logs: docker logs bionicgpt-litellm"
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = "✓ LiteLLM proxy is healthy and responding"
+			}
+
+			return result, nil
+		},
+	}
+}
+
+// LiteLLMModelConnectivityDiagnostic tests connectivity to each configured model
+// This diagnostic makes actual API calls to verify Azure OpenAI models are reachable
+func LiteLLMModelConnectivityDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "LiteLLM Model Connectivity",
+		Category:    "LiteLLM",
+		Description: "Test connectivity to each configured Azure OpenAI model",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			var outputParts []string
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "MODEL CONNECTIVITY TEST")
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, "Testing actual API calls to configured models...")
+			outputParts = append(outputParts, "")
+
+			// Read litellm_config.yaml to find configured models
+			configReadCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+				"cat", "/app/config.yaml")
+			configContent, err := configReadCmd.Output()
+
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to read litellm_config.yaml"
+				result.Error = err
+				result.Output = strings.Join(outputParts, "\n")
+				return result, nil
+			}
+
+			// Parse config for model names (simple text search)
+			configStr := string(configContent)
+			lines := strings.Split(configStr, "\n")
+			var modelNames []string
+			for _, line := range lines {
+				// Look for "model_name:" entries
+				if strings.Contains(line, "model_name:") {
+					parts := strings.Split(line, ":")
+					if len(parts) >= 2 {
+						modelName := strings.TrimSpace(parts[1])
+						modelNames = append(modelNames, modelName)
+					}
+				}
+			}
+
+			result.Metadata["configured_models"] = modelNames
+			outputParts = append(outputParts, fmt.Sprintf("Found %d configured models:", len(modelNames)))
+			for _, model := range modelNames {
+				outputParts = append(outputParts, fmt.Sprintf("  - %s", model))
+			}
+			outputParts = append(outputParts, "")
+
+			// Test each model via LiteLLM /chat/completions endpoint
+			healthyModels := 0
+			unhealthyModels := 0
+
+			for _, model := range modelNames {
+				outputParts = append(outputParts, fmt.Sprintf("Testing model: %s", model))
+
+				// Make a simple chat completion request
+				testPayload := fmt.Sprintf(`{"model": "%s", "messages": [{"role": "user", "content": "test"}], "max_tokens": 1}`, model)
+				testCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
+					"curl", "-f", "-s", "-m", "10",
+					"-X", "POST",
+					"-H", "Content-Type: application/json",
+					"-d", testPayload,
+					"http://localhost:4000/chat/completions")
+
+				testOutput, testErr := testCmd.CombinedOutput()
+
+				if testErr != nil {
+					outputParts = append(outputParts, fmt.Sprintf("  ✗ FAILED: %v", testErr))
+					outputParts = append(outputParts, fmt.Sprintf("  Response: %s", string(testOutput)))
+					unhealthyModels++
+				} else {
+					outputParts = append(outputParts, "  ✓ SUCCESS: Model is reachable")
+					healthyModels++
+				}
+				outputParts = append(outputParts, "")
+			}
+
+			// Summary
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+			outputParts = append(outputParts, fmt.Sprintf("Model Connectivity Summary: %d/%d models healthy",
+				healthyModels, len(modelNames)))
+			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
+
+			result.Output = strings.Join(outputParts, "\n")
+			result.Metadata["healthy_models"] = healthyModels
+			result.Metadata["unhealthy_models"] = unhealthyModels
+
+			if unhealthyModels > 0 {
+				result.Status = debug.StatusWarning
+				result.Message = fmt.Sprintf("%d of %d models are unhealthy", unhealthyModels, len(modelNames))
+				result.Remediation = "Check Azure OpenAI API key, endpoint URLs, and model deployment names. " +
+					"Verify in Azure Portal that deployments exist and are active."
+			} else if healthyModels == 0 {
+				result.Status = debug.StatusError
+				result.Message = "No models are responding"
+				result.Remediation = "Check LiteLLM configuration and Azure OpenAI connectivity. " +
+					"Verify API key and network connectivity to Azure."
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = fmt.Sprintf("✓ All %d configured models are healthy", healthyModels)
+			}
+
+			logger.Info("Model connectivity test completed",
+				zap.Int("healthy", healthyModels),
+				zap.Int("unhealthy", unhealthyModels))
+
+			return result, nil
+		},
+	}
+}
+
 // Helper Functions for Docker SDK operations
 
 // filterLogsForErrors reads container logs and filters for error patterns
@@ -1083,4 +1620,3 @@ func filterLogsForErrors(logReader io.ReadCloser, maxLines int) []string {
 	}
 	return errorLines
 }
-

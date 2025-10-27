@@ -36,35 +36,37 @@ type PullProgress struct {
 
 // LayerProgress tracks progress of a single layer
 type LayerProgress struct {
-	ID          string
-	Status      string
-	Current     int64
-	Total       int64
-	Complete    bool
-	Downloading bool // Actively downloading
-	Extracting  bool // Actively extracting
+	ID              string
+	Status          string
+	DownloadCurrent int64  // Bytes downloaded (stable, doesn't reset during extraction)
+	DownloadTotal   int64  // Total download size (stable once discovered)
+	Complete        bool
+	Phase           string // "waiting", "downloading", "extracting", "complete"
 }
 
 // PullTracker tracks overall pull progress across multiple layers
 type PullTracker struct {
-	layers     map[string]*LayerProgress
-	visual     *progress.VisualOperation
-	logger     otelzap.LoggerWithCtx
-	maxPercent float64   // Track maximum seen percentage (monotonic)
-	lastUpdate time.Time // Rate limiting for updates
-	totalSize  int64     // Total download size in bytes
-	startTime  time.Time // For download rate calculation
+	layers          map[string]*LayerProgress
+	visual          *progress.VisualOperation
+	logger          otelzap.LoggerWithCtx
+	lastUpdate      time.Time // Rate limiting for updates
+	totalSize       int64     // Total download size in bytes (locked once all layers discovered)
+	totalSizeLocked bool      // True when all layers have known sizes
+	startTime       time.Time // For download rate calculation
+	lastBytes       int64     // Bytes at last update (for current rate calculation)
 }
 
 // NewPullTracker creates a pull progress tracker
 func NewPullTracker(ctx context.Context, imageName string) *PullTracker {
 	return &PullTracker{
-		layers:     make(map[string]*LayerProgress),
-		visual:     progress.NewVisual(ctx, fmt.Sprintf("Pulling %s", imageName), "varies by size"),
-		logger:     otelzap.Ctx(ctx),
-		maxPercent: 0.0,
-		lastUpdate: time.Now(),
-		startTime:  time.Now(),
+		layers:          make(map[string]*LayerProgress),
+		visual:          progress.NewVisual(ctx, fmt.Sprintf("Pulling %s", imageName), "varies by size"),
+		logger:          otelzap.Ctx(ctx),
+		lastUpdate:      time.Now(),
+		totalSize:       0,
+		totalSizeLocked: false,
+		startTime:       time.Now(),
+		lastBytes:       0,
 	}
 }
 
@@ -94,30 +96,50 @@ func (pt *PullTracker) Update(event *PullProgress) {
 	layer, exists := pt.layers[event.ID]
 	if !exists {
 		layer = &LayerProgress{
-			ID: event.ID,
+			ID:    event.ID,
+			Phase: "waiting",
 		}
 		pt.layers[event.ID] = layer
 	}
 
 	layer.Status = event.Status
-	layer.Current = event.ProgressDetail.Current
-	layer.Total = event.ProgressDetail.Total
-
-	// Track phase of operation for better UX
 	status := strings.ToLower(event.Status)
-	layer.Downloading = strings.Contains(status, "downloading")
-	layer.Extracting = strings.Contains(status, "extracting")
 
-	// Mark as complete for certain statuses
-	if strings.Contains(event.Status, "Pull complete") ||
+	// Determine current phase
+	oldPhase := layer.Phase
+	if strings.Contains(status, "downloading") {
+		layer.Phase = "downloading"
+	} else if strings.Contains(status, "extracting") {
+		layer.Phase = "extracting"
+	} else if strings.Contains(event.Status, "Pull complete") ||
 		strings.Contains(event.Status, "Download complete") ||
 		strings.Contains(event.Status, "Already exists") {
+		layer.Phase = "complete"
 		layer.Complete = true
-		layer.Downloading = false
-		layer.Extracting = false
-		// When complete, set current = total for accurate percentage
-		if layer.Total > 0 {
-			layer.Current = layer.Total
+	} else if strings.Contains(status, "waiting") {
+		layer.Phase = "waiting"
+	}
+
+	// Update download metrics ONLY during download phase
+	// Once we enter extraction, preserve the download bytes
+	if layer.Phase == "downloading" {
+		layer.DownloadCurrent = event.ProgressDetail.Current
+		layer.DownloadTotal = event.ProgressDetail.Total
+	} else if layer.Phase == "extracting" && oldPhase == "downloading" {
+		// Just transitioned from downloading to extracting
+		// Ensure download bytes are finalized (set current = total)
+		if layer.DownloadTotal > 0 {
+			layer.DownloadCurrent = layer.DownloadTotal
+		}
+	} else if layer.Phase == "complete" {
+		// Mark as fully downloaded
+		if layer.DownloadTotal > 0 {
+			layer.DownloadCurrent = layer.DownloadTotal
+		}
+	} else if layer.Phase == "waiting" {
+		// Waiting phase: Docker may provide total size ahead of time
+		if event.ProgressDetail.Total > 0 {
+			layer.DownloadTotal = event.ProgressDetail.Total
 		}
 	}
 
@@ -138,52 +160,73 @@ func (pt *PullTracker) getSummary() string {
 	completeLayers := 0
 	downloadingLayers := 0
 	extractingLayers := 0
+	waitingLayers := 0
 	var totalBytes int64
 	var downloadedBytes int64
 
 	for _, layer := range pt.layers {
-		if layer.Complete {
+		// Count layers by phase
+		switch layer.Phase {
+		case "complete":
 			completeLayers++
-		}
-		if layer.Downloading {
+		case "downloading":
 			downloadingLayers++
-		}
-		if layer.Extracting {
+		case "extracting":
 			extractingLayers++
+		case "waiting":
+			waitingLayers++
 		}
-		totalBytes += layer.Total
-		downloadedBytes += layer.Current
+
+		// Sum up download metrics (stable, doesn't reset during extraction)
+		totalBytes += layer.DownloadTotal
+		downloadedBytes += layer.DownloadCurrent
 	}
 
-	// Store total size when we first discover it
-	if totalBytes > pt.totalSize {
-		pt.totalSize = totalBytes
+	// Lock total size once all layers have known sizes
+	// This prevents percentage from jumping when new layers are discovered
+	if !pt.totalSizeLocked {
+		allLayersHaveSize := true
+		for _, layer := range pt.layers {
+			if layer.DownloadTotal == 0 && layer.Phase != "complete" {
+				allLayersHaveSize = false
+				break
+			}
+		}
+
+		if allLayersHaveSize && totalBytes > 0 {
+			pt.totalSize = totalBytes
+			pt.totalSizeLocked = true
+			pt.logger.Debug("Total download size locked",
+				zap.Int64("total_bytes", pt.totalSize),
+				zap.Int("total_layers", totalLayers))
+		} else if totalBytes > pt.totalSize {
+			// Not locked yet, keep updating
+			pt.totalSize = totalBytes
+		}
 	}
 
 	if totalLayers == 0 {
 		return "starting pull"
 	}
 
-	// Calculate overall progress percentage
+	// Calculate overall progress percentage from LOCKED total
 	var percent float64
 	if pt.totalSize > 0 {
 		percent = float64(downloadedBytes) / float64(pt.totalSize) * 100
 	}
 
-	// MONOTONIC: Never let percentage decrease
-	if percent > pt.maxPercent {
-		pt.maxPercent = percent
-	} else {
-		percent = pt.maxPercent
+	// Calculate CURRENT download rate (bytes/sec since last update)
+	// This shows real-time speed, not average since start
+	bytesSinceLastUpdate := downloadedBytes - pt.lastBytes
+	timeSinceLastUpdate := time.Since(pt.lastUpdate).Seconds()
+	var rateStr string
+	if timeSinceLastUpdate > 0 && bytesSinceLastUpdate > 0 {
+		currentRate := float64(bytesSinceLastUpdate) / timeSinceLastUpdate
+		rateStr = fmt.Sprintf(" | %s/s", formatBytes(int64(currentRate)))
 	}
 
-	// Calculate download rate (bytes per second)
-	elapsed := time.Since(pt.startTime).Seconds()
-	var rateStr string
-	if elapsed > 0 && downloadedBytes > 0 {
-		rate := float64(downloadedBytes) / elapsed
-		rateStr = fmt.Sprintf(" | %s/s", formatBytes(int64(rate)))
-	}
+	// Update lastBytes for next iteration
+	pt.lastBytes = downloadedBytes
 
 	// Format total size
 	sizeStr := ""
@@ -206,7 +249,7 @@ func (pt *PullTracker) getSummary() string {
 		}
 	}
 
-	return fmt.Sprintf("%d/%d layers (%.1f%% complete)%s%s%s",
+	return fmt.Sprintf("%d/%d layers (%.1f%% downloaded)%s%s%s",
 		completeLayers, totalLayers, percent, sizeStr, rateStr, phaseStr)
 }
 
