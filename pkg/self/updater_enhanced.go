@@ -135,7 +135,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 			afterCommit = currentCommit
 		}
 		if len(eeu.transaction.GitCommitBefore) >= 8 && len(afterCommit) >= 8 {
-			fmt.Printf("✅ Update complete: %s → %s\n",
+			fmt.Printf("Update complete: %s → %s\n",
 				eeu.transaction.GitCommitBefore[:8],
 				afterCommit[:8])
 		} else {
@@ -153,10 +153,10 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 
 	// Show what was updated
 	if eeu.enhancedConfig.UpdateSystemPackages {
-		fmt.Println("   System packages: ✅ Updated")
+		fmt.Println("   System packages: Updated")
 	}
 	if eeu.enhancedConfig.UpdateGoVersion {
-		fmt.Println("   Go compiler: ✅ Updated")
+		fmt.Println("   Go compiler: Updated")
 	}
 
 	fmt.Println("════════════════════════════════════════════════════════════════")
@@ -165,7 +165,8 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	if eeu.enhancedConfig.CheckRunningProcesses {
 		// Use WarnAboutRunningProcesses which already checks and logs
 		if err := process.WarnAboutRunningProcesses(eeu.rc, "eos"); err == nil {
-			fmt.Println("⚠️  Restart running eos processes to use new version")
+			fmt.Println("")
+			fmt.Println("Restart running eos processes to use new version")
 		}
 	}
 
