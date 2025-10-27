@@ -41,6 +41,15 @@ var AppRolePaths = AppRolePathsStruct{
 	SecretID: filepath.Join(SecretsDir, "secret_id"),
 }
 
+// AdminAppRolePaths holds admin-level AppRole credential file paths.
+// Admin AppRole has elevated privileges (eos-admin-policy) for operational commands
+// like policy updates, MFA repair, and drift correction.
+// This follows HashiCorp best practice of using AppRole instead of root token.
+var AdminAppRolePaths = AppRolePathsStruct{
+	RoleID:   filepath.Join(SecretsDir, "admin_role_id"),
+	SecretID: filepath.Join(SecretsDir, "admin_secret_id"),
+}
+
 // DefaultAppRoleData is the default Vault AppRole configuration.
 //
 // CRITICAL P0 FIX: Added token_period to enable automatic token renewal
@@ -72,10 +81,15 @@ var AppRolePaths = AppRolePathsStruct{
 // References:
 // - https://developer.hashicorp.com/vault/docs/concepts/tokens#token-time-to-live-periodic-tokens-and-explicit-max-ttls
 // - https://developer.hashicorp.com/vault/docs/auth/approle#configuration
+//
+// HASHICORP BEST PRACTICE (P0): Vault Agent AppRole should have ADMIN policy
+// This allows operational commands (eos update vault --fix, policy updates, MFA repair)
+// to work WITHOUT root token, following HashiCorp's recommendation to minimize root token usage.
+// Admin policy is still bounded (not unlimited like root) and all operations are audited.
 var DefaultAppRoleData = map[string]interface{}{
-	"policies":     []string{EosDefaultPolicyName},
-	"token_ttl":    VaultDefaultTokenTTL,    // 4h - Initial TTL after authentication
-	"token_period": VaultDefaultTokenTTL,    // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
+	"policies":      []string{EosDefaultPolicyName, EosAdminPolicyName}, // Default + Admin for operational commands
+	"token_ttl":     VaultDefaultTokenTTL,                                // 4h - Initial TTL after authentication
+	"token_period":  VaultDefaultTokenTTL,                                // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
 	// token_max_ttl REMOVED - conflicts with token_period (would limit periodic tokens to max_ttl)
 	"secret_id_ttl": VaultDefaultSecretIDTTL, // 24h - SecretID expires (requires new authentication)
 }

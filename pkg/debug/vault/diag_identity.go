@@ -40,11 +40,12 @@ func IdentityDiagnostic() *debug.Diagnostic {
 			// The context passed to diagnostics contains the parent runtime context's Ctx
 			rc := &eos_io.RuntimeContext{Ctx: ctx}
 
-			client, err := vault.GetPrivilegedClient(rc)
+			// Use admin client for debug operations (HashiCorp best practice)
+			client, err := vault.GetAdminClient(rc)
 			if err != nil {
 				result.Status = debug.StatusError
-				result.Message = "Failed to get privileged Vault client"
-				result.Output = fmt.Sprintf("Error: %v\n\nEnsure Vault is initialized and root token is available", err)
+				result.Message = "Failed to get admin Vault client"
+				result.Output = fmt.Sprintf("Error: %v\n\nEnsure Vault is running and you have admin access", err)
 				result.Remediation = "Run 'eos debug vault --auth' to diagnose authentication issues"
 				return result, nil
 			}

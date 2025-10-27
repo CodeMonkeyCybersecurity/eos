@@ -327,6 +327,38 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	log.Info(" [Phase 10b] AppRole configuration complete",
 		zap.Duration("duration", time.Since(phaseStart)))
 
+	// Step 10b2: Configure Admin AppRole (HashiCorp best practice)
+	// Admin AppRole has elevated privileges (eos-admin-policy) for operational commands.
+	// This allows policy updates, MFA repair, and drift correction WITHOUT root token.
+	log.Info("───────────────────────────────────────────────────────────────")
+	log.Info(" [Phase 10b2] Configuring Admin AppRole (elevated privileges for operations)")
+	phaseStart = time.Now()
+
+	log.Info(" [ASSESS] Checking if Admin AppRole is already configured")
+	log.Info("Admin AppRole enables operational commands without root token (HashiCorp best practice)")
+
+	// Admin AppRole is NOT interactive - it's always created for operational commands
+	// Unlike regular AppRole (which is optional), admin AppRole is required for:
+	// - eos update vault --fix
+	// - eos update vault --policies
+	// - MFA enforcement repairs
+	// - Configuration drift correction
+	log.Info(" [INTERVENE] Creating admin AppRole (non-interactive, always enabled)")
+	if err := PhaseEnableAdminAppRole(rc, client, log); err != nil {
+		log.Error(" [Phase 10b2] Failed to enable admin AppRole",
+			zap.Error(err),
+			zap.Duration("duration", time.Since(phaseStart)))
+		// Admin AppRole failure is NON-FATAL during initial setup
+		// Root token is still available for this run
+		log.Warn("Admin AppRole creation failed - operational commands will use root token fallback")
+		log.Info("terminal prompt: ⚠ Admin AppRole not created - you can retry with: sudo eos create vault")
+	} else {
+		log.Info(" [EVALUATE] Admin AppRole created successfully")
+		log.Info("terminal prompt: ✓ Admin AppRole configured - operational commands will use admin policy")
+		log.Info(" [Phase 10b2] Admin AppRole configuration complete",
+			zap.Duration("duration", time.Since(phaseStart)))
+	}
+
 	// Step 10c: Create Eos entity and aliases
 	log.Info("───────────────────────────────────────────────────────────────")
 	log.Info(" [Phase 10c] Creating Eos entity and aliases")

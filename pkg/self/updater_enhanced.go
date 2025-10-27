@@ -139,15 +139,15 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 				eeu.transaction.GitCommitBefore[:8],
 				afterCommit[:8])
 		} else {
-			fmt.Println("✅ Update complete")
+			fmt.Println("Update complete")
 		}
 	} else {
 		// Already on latest version
 		if len(eeu.transaction.GitCommitBefore) >= 8 {
-			fmt.Printf("✅ Already on latest version: %s\n",
+			fmt.Printf("Already on latest version: %s\n",
 				eeu.transaction.GitCommitBefore[:8])
 		} else {
-			fmt.Println("✅ Already on latest version")
+			fmt.Println("Already on latest version")
 		}
 	}
 

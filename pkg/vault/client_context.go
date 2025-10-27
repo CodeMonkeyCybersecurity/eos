@@ -135,6 +135,27 @@ func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
 
 // GetPrivilegedClient retrieves the cached privileged (root token) vault client from context.
 //
+// ⚠️  HASHICORP BEST PRACTICE NOTICE (2025-10-27):
+// This function uses ROOT TOKEN which has unlimited Vault access.
+// For operational commands (NOT initial setup), use GetAdminClient() instead.
+//
+// When to use GetPrivilegedClient():
+//   ✅ CORRECT: During 'eos create vault' (initial setup, Phases 6-15)
+//   ✅ CORRECT: When explicitly handling root token operations
+//   ❌ AVOID: For maintenance commands (policy updates, MFA repair, drift correction)
+//
+// When to use GetAdminClient():
+//   ✅ CORRECT: eos update vault --fix
+//   ✅ CORRECT: eos update vault --policies
+//   ✅ CORRECT: eos debug vault
+//   ✅ CORRECT: Any operational command after initial setup
+//
+// Why this matters (HashiCorp security model):
+//   - Root token should be deleted after initial setup
+//   - Operational commands should use policy-bound auth (admin AppRole)
+//   - Admin AppRole is still audited (root bypasses all policies)
+//   - GetAdminClient() tries: Vault Agent → Admin AppRole → Userpass → Root (last resort)
+//
 // IMPORTANT: This function expects the client to be cached by Phase 6 (EnableVault → UnsealVault).
 // Phase 6 creates a root-authenticated client from vault_init.json and caches it via
 // SetPrivilegedClient(). All subsequent phases (6c, 7-15) use this cached client.
@@ -142,10 +163,11 @@ func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
 // Authentication timeline:
 //   - Phase 6: UnsealVault() → Root token from vault_init.json → SetPrivilegedClient()
 //   - Phase 10b: AppRole configured (for future runs)
+//   - Phase 10b2: Admin AppRole configured (for operational commands)
 //   - Phase 14: Vault Agent configured (for future runs)
-//   - Subsequent runs: Agent token → AppRole → Root token (fallback)
+//   - Subsequent runs: Use GetAdminClient() for operational commands
 //
-// Why cached client is necessary:
+// Why cached client is necessary during setup:
 //   - During initial setup, Vault Agent (Phase 14) and AppRole (Phase 10b) don't exist yet
 //   - Attempting to authenticate before Phase 6 would fail (no credentials available)
 //   - Phase 6 provides the ONLY working auth method during fresh installation
@@ -162,6 +184,9 @@ func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
 // This should only happen on subsequent runs where Agent/AppRole are already configured.
 //
 // Usage: Call this during Vault setup phases (after Phase 6) instead of GetRootClient().
+//
+// TODO (Post-Migration): Once all operational commands use GetAdminClient(),
+// this function should ONLY be called during 'eos create vault' setup.
 func GetPrivilegedClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 

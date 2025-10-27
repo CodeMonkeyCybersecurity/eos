@@ -38,8 +38,9 @@ func InitializeServiceFacade(rc *eos_io.RuntimeContext) error {
 
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Create vault client using existing simplified functions
-	client, err := GetPrivilegedClient(rc)
+	// Create vault client using admin authentication (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	client, err := GetAdminClient(rc)
 	if err != nil {
 		logger.Warn("Failed to create vault client, operations will be limited", zap.Error(err))
 	}
@@ -67,8 +68,10 @@ func GetServiceFacade() *ServiceFacade {
 // NewServiceFacade creates a new service facade instance
 func NewServiceFacade(rc *eos_io.RuntimeContext) (*ServiceFacade, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
-	client, err := GetPrivilegedClient(rc)
+
+	// Use admin client (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	client, err := GetAdminClient(rc)
 	if err != nil {
 		logger.Warn("Failed to create vault client", zap.Error(err))
 		return nil, fmt.Errorf("failed to create vault client: %w", err)

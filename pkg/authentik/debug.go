@@ -780,7 +780,7 @@ func displayResults(results []AuthentikCheckResult) {
 		return
 	}
 
-	fmt.Println("\n📊 Diagnostic Results:")
+	fmt.Println("\nDiagnostic Results:")
 	fmt.Println(strings.Repeat("=", 60))
 
 	currentCategory := ""
@@ -822,7 +822,7 @@ func displayResults(results []AuthentikCheckResult) {
 	failed := countFailed(results)
 	warnings := countWarnings(results)
 
-	fmt.Printf("\n📈 Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
+	fmt.Printf("\n Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
 }
 
 // displayPreUpgradeSummary displays upgrade summary and recommendations
@@ -848,7 +848,7 @@ func displayPreUpgradeSummary(results []AuthentikCheckResult) {
 		fmt.Printf("  Found %d warning(s) to review\n", warnings)
 	}
 	if criticalIssues == 0 && warnings == 0 {
-		fmt.Println("✅ All checks passed! System is ready for upgrade.")
+		fmt.Println("All checks passed! System is ready for upgrade.")
 	}
 
 	fmt.Println()

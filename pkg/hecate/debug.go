@@ -442,7 +442,7 @@ func displayHecateResults(results []HecateCheckResult) {
 		return
 	}
 
-	fmt.Println("\n📊 Diagnostic Results:")
+	fmt.Println("\n Diagnostic Results:")
 	fmt.Println(strings.Repeat("=", 60))
 
 	currentComponent := HecateComponentType("")
@@ -494,7 +494,7 @@ func displayHecateResults(results []HecateCheckResult) {
 		}
 	}
 
-	fmt.Printf("\n📈 Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
+	fmt.Printf("\n Summary: %d passed, %d failed, %d warnings\n\n", passed, failed, warnings)
 }
 
 // displayHecateConfigFiles displays the content of key Hecate configuration files

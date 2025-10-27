@@ -173,9 +173,18 @@ func readJSONFile(rc *eos_io.RuntimeContext, path string, out any) error {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		logger.Error("Failed to read JSON file",
-			zap.String("path", path),
-			zap.Error(err))
+		// HASHICORP PATTERN FIX (P2): Don't log ERROR for "file not found"
+		// When trying fallback paths (e.g., /run/eos/vault_init_output.json → /var/lib/eos/secret/vault_init.json),
+		// missing file is EXPECTED behavior, not an error. Only log ERROR for real failures (permission denied, etc.)
+		if os.IsNotExist(err) {
+			logger.Debug("JSON file not found (will try fallback locations)",
+				zap.String("path", path))
+		} else {
+			// Real error (permission denied, I/O error, etc.)
+			logger.Error("Failed to read JSON file",
+				zap.String("path", path),
+				zap.Error(err))
+		}
 		return fmt.Errorf("failed to read %s: %w", path, err)
 	}
 

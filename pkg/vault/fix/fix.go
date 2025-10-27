@@ -126,8 +126,8 @@ func RunFixes(rc *eos_io.RuntimeContext, config *Config) (*RepairResult, error) 
 	// ASSESS & INTERVENE: Repair MFA enforcement policies
 	if runMFA {
 		logger.Info("[ASSESS] Checking MFA enforcement policies")
-		// Get privileged Vault client for MFA operations
-		client, err := vault.GetPrivilegedClient(rc)
+		// Get admin Vault client for MFA operations (HashiCorp best practice)
+		client, err := vault.GetAdminClient(rc)
 		if err != nil {
 			logger.Warn("Cannot get Vault client for MFA repair - skipping MFA checks",
 				zap.Error(err))

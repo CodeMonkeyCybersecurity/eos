@@ -58,17 +58,18 @@ func CreateMFAMethodsOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 		config = DefaultMFAConfig()
 	}
 
-	// Get privileged client with root token for MFA configuration
-	log.Info(" Getting privileged client for MFA setup")
-	privilegedClient, err := GetPrivilegedClient(rc)
+	// Get admin client for MFA configuration (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	log.Info(" Getting admin client for MFA setup")
+	privilegedClient, err := GetAdminClient(rc)
 	if err != nil {
-		log.Error(" Failed to get privileged Vault client for MFA setup", zap.Error(err))
-		return cerr.Wrap(err, "get privileged client for MFA")
+		log.Error(" Failed to get admin Vault client for MFA setup", zap.Error(err))
+		return cerr.Wrap(err, "get admin client for MFA")
 	}
 
-	// Log what token the privileged client is using
+	// Log what token the admin client is using
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info(" Using privileged client for MFA operations")
+		log.Info(" Using admin client for MFA operations")
 	}
 
 	// Enable TOTP MFA if requested (method creation only, no enforcement)
@@ -151,11 +152,12 @@ func EnforceMFAPolicyOnly(rc *eos_io.RuntimeContext, client *api.Client, config 
 		return cerr.New("entity ID is required for MFA enforcement - cannot target specific users without it")
 	}
 
-	// Get privileged client
-	privilegedClient, err := GetPrivilegedClient(rc)
+	// Get admin client (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	privilegedClient, err := GetAdminClient(rc)
 	if err != nil {
-		log.Error(" Failed to get privileged Vault client for MFA enforcement", zap.Error(err))
-		return cerr.Wrap(err, "get privileged client for MFA")
+		log.Error(" Failed to get admin Vault client for MFA enforcement", zap.Error(err))
+		return cerr.Wrap(err, "get admin client for MFA")
 	}
 
 	// FAIL-CLOSED: Track enforcement success for cleanup
@@ -360,9 +362,9 @@ func storeMFAMethodID(rc *eos_io.RuntimeContext, methodType, methodID string) er
 		},
 	}
 
-	client, err := GetPrivilegedClient(rc)
+	client, err := GetAdminClient(rc)
 	if err != nil {
-		return cerr.Wrap(err, "failed to get root client")
+		return cerr.Wrap(err, "failed to get admin client")
 	}
 
 	_, err = client.Logical().Write(secretPath, data)

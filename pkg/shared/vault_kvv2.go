@@ -60,6 +60,14 @@ const (
 	AppRolePath      = "auth/approle/role/" + AppRoleName
 	AppRoleLoginPath = "auth/approle/login"
 
+	// Admin AppRole constants and paths
+	// Admin AppRole has elevated privileges (eos-admin-policy) for operational commands.
+	// This follows HashiCorp best practice of using AppRole instead of root token.
+	AdminAppRoleName      = "eos-admin-approle"
+	AdminAppRolePath      = "auth/approle/role/" + AdminAppRoleName
+	AdminAppRoleRoleIDPath   = AdminAppRolePath + "/role-id"
+	AdminAppRoleSecretIDPath = AdminAppRolePath + "/secret-id"
+
 	// Auth backends
 	AuthBackendUserpass = "userpass/"
 	AuthBackendApprole  = "approle/"

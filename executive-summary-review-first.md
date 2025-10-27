@@ -365,7 +365,7 @@ Provide:
 
 ---
 
-## 📊 Complexity Assessment
+##  Complexity Assessment
 
 **Estimated Implementation Time:**
 - Phase 1-2 (Setup + Commands): 2-3 hours

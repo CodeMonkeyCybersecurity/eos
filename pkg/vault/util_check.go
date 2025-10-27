@@ -202,10 +202,12 @@ func ListVault(rc *eos_io.RuntimeContext, path string) ([]string, error) {
 	_, span := tracer.Start(context.Background(), "vault.ListVault")
 	defer span.End()
 
-	client, err := GetPrivilegedClient(rc)
+	// Use admin client (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	client, err := GetAdminClient(rc)
 	if err != nil {
 		span.RecordError(err)
-		return nil, cerr.Wrap(err, "get root client")
+		return nil, cerr.Wrap(err, "get admin client")
 	}
 
 	fullPath := shared.VaultSecretMountPath + path

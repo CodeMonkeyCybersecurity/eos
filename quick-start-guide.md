@@ -389,7 +389,7 @@ vault kv get secret/bionicgpt/db
 
 ---
 
-## 📊 Success Criteria
+##  Success Criteria
 
 Deployment is successful when:
 
