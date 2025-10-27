@@ -85,7 +85,7 @@ func BuildAppRoleLoginPayload(roleID, secretID string) map[string]interface{} {
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      AppRoleName, // fix: use AppRoleName ("eos-approle") instead of EosID ("eos")
-		Policies:      []string{EosDefaultPolicyName},
+		Policies:      []string{EosDefaultPolicyName, EosAdminPolicyName}, // Admin role per HashiCorp best practices
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",
 		SecretIDTTL:   "24h",
@@ -105,7 +105,9 @@ var (
 func UserDataTemplate(password string) map[string]interface{} {
 	return map[string]interface{}{
 		"password": password,
-		"policies": []string{EosDefaultPolicyName},
+		// Assign both default (self-management) and admin (infrastructure management) policies
+		// This makes eos user an administrator (non-root) per HashiCorp best practices
+		"policies": []string{EosDefaultPolicyName, EosAdminPolicyName},
 	}
 }
 

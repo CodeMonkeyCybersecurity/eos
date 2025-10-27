@@ -108,7 +108,8 @@ func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log 
 		entityData := map[string]interface{}{
 			"name":     entityName,
 			"metadata": map[string]interface{}{"purpose": "Eos CLI unified identity"},
-			"policies": []string{shared.EosDefaultPolicyName},
+			// Assign both default and admin policies to make eos an administrator
+			"policies": []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName},
 		}
 		resp, err := client.Logical().Write(shared.EosEntityPath, entityData)
 		if err != nil {
@@ -125,7 +126,8 @@ func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log 
 
 	// Assign policies to the entity
 	_, err = client.Logical().Write(fmt.Sprintf("%s/id/%s", shared.EosEntityPath, entityID), map[string]interface{}{
-		"policies": []string{shared.EosDefaultPolicyName},
+		// Assign both default and admin policies
+		"policies": []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to assign policy to entity: %w", err)

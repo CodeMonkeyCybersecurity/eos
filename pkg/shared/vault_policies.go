@@ -101,6 +101,7 @@ path "sys/policy/*" { capabilities = ["deny"] }
 const EosAdminPolicyTemplate = `
 # Administrative policy for Eos infrastructure management
 # This policy provides elevated privileges for infrastructure administration
+# Based on HashiCorp's official admin policy best practices (2025)
 
 # Full token management
 path "auth/token/*" { capabilities = ["create", "read", "update", "delete", "list"] }
@@ -110,16 +111,17 @@ path "sys/capabilities-self" { capabilities = ["update"] }
 # Identity management
 path "identity/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 
-# System administration (restricted)
-path "sys/auth/*" { 
-  capabilities = ["create", "read", "update", "delete", "list"]
+# System administration (with sudo per HashiCorp recommendations)
+path "sys/auth/*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
   denied_parameters = {
     "root" = []
   }
 }
-path "sys/mounts/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "sys/policy/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "sys/policies/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/mounts/*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
+path "sys/policy/*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
+path "sys/policies/*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
+path "sys/policies/acl/*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
 
 # Audit and monitoring
 path "sys/audit" { capabilities = ["read", "list"] }

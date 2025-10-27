@@ -21,9 +21,116 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting BionicGPT deletion process")
 
+	// ASSESS Phase 1: Check Docker availability (using SDK)
+	logger.Info("Checking Docker availability")
+	if err := container.CheckIfDockerInstalled(rc); err != nil {
+		logger.Error("Docker is not available",
+			zap.Error(err),
+			zap.String("remediation", "Install Docker or use 'eos create docker'"))
+
+		fmt.Println()
+		fmt.Println("✗ Docker is not installed or not available")
+		fmt.Println()
+		fmt.Println("BionicGPT uses Docker containers. To delete it, Docker must be available.")
+		fmt.Println()
+		fmt.Println("Options:")
+		fmt.Println("  1. Install Docker:    sudo eos create docker")
+		fmt.Println("  2. Manual cleanup:    sudo rm -rf /opt/bionicgpt")
+		fmt.Println()
+
+		return fmt.Errorf("Docker not available - cannot proceed with deletion")
+	}
+
+	// Also check if Docker daemon is running
+	if err := container.CheckRunning(rc); err != nil {
+		logger.Error("Docker daemon is not running",
+			zap.Error(err),
+			zap.String("remediation", "Start Docker daemon"))
+
+		fmt.Println()
+		fmt.Println("✗ Docker is installed but not running")
+		fmt.Println()
+		fmt.Println("Remediation:")
+		fmt.Println("  • Start Docker: sudo systemctl start docker")
+		fmt.Println("  • Check status:  sudo systemctl status docker")
+		fmt.Println()
+
+		return fmt.Errorf("Docker daemon not running - cannot proceed with deletion")
+	}
+	logger.Info("Docker is available and running")
+
 	installDir := DefaultInstallDir
 	composeFile := filepath.Join(installDir, "docker-compose.yml")
-	backupDir := filepath.Join(installDir, "backups")
+
+	// ASSESS Phase 2: Check if BionicGPT is actually installed
+	logger.Info("Checking if BionicGPT is installed")
+	installationExists := false
+	var installedComponents []string
+	var missingComponents []string
+
+	// Check for installation directory
+	if _, err := os.Stat(installDir); err == nil {
+		installationExists = true
+		installedComponents = append(installedComponents, fmt.Sprintf("Installation directory (%s)", installDir))
+	} else {
+		missingComponents = append(missingComponents, "Installation directory")
+	}
+
+	// Check for docker-compose.yml
+	if _, err := os.Stat(composeFile); err == nil {
+		installationExists = true
+		installedComponents = append(installedComponents, "Docker Compose file")
+	} else {
+		missingComponents = append(missingComponents, "Docker Compose file")
+	}
+
+	// Check for running or stopped containers using Docker SDK
+	foundContainers, foundVolumes, sdkInstallExists, err := AssessInstallation(rc)
+	if err != nil {
+		logger.Warn("Failed to assess installation via Docker SDK", zap.Error(err))
+		// Non-fatal - containers/volumes lists will be empty
+	} else if sdkInstallExists {
+		installationExists = true
+	}
+
+	if len(foundContainers) > 0 {
+		installedComponents = append(installedComponents, fmt.Sprintf("%d Docker containers", len(foundContainers)))
+	}
+	if len(foundVolumes) > 0 {
+		installedComponents = append(installedComponents, fmt.Sprintf("%d Docker volumes", len(foundVolumes)))
+	}
+
+	// If nothing is installed, inform user
+	if !installationExists {
+		logger.Info("BionicGPT is not installed")
+		fmt.Println()
+		fmt.Println("✓ BionicGPT is not installed on this system")
+		fmt.Println()
+		fmt.Println("Nothing to delete. The following components were not found:")
+		for _, component := range missingComponents {
+			fmt.Printf("  ⊘ %s\n", component)
+		}
+		fmt.Println()
+		return nil
+	}
+
+	// Show what was found
+	logger.Info("Found BionicGPT installation",
+		zap.Strings("components", installedComponents),
+		zap.Strings("containers", foundContainers),
+		zap.Strings("volumes", foundVolumes))
+
+	// CRITICAL FIX P0: Store backups OUTSIDE installation directory
+	// Old: /opt/bionicgpt/backups/ (gets deleted with installation dir!)
+	// New: ~/.eos/backups/bionicgpt-{timestamp}/ (persists after deletion)
+	timestamp := fmt.Sprintf("%d", os.Getpid())
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to /tmp if home directory unavailable
+		logger.Warn("Could not determine home directory, using /tmp for backups", zap.Error(err))
+		homeDir = "/tmp"
+	}
+	backupDir := filepath.Join(homeDir, ".eos", "backups", fmt.Sprintf("bionicgpt-%s", timestamp))
 
 	// Confirmation prompt unless force is specified
 	if !BionicgptDeleteForce {
@@ -270,13 +377,18 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	if len(backupPaths) > 0 {
 		fmt.Println()
-		fmt.Println("Backups created:")
+		fmt.Println("✓ Backups created successfully:")
 		for _, path := range backupPaths {
-			fmt.Printf("  • %s\n", path)
+			info, err := os.Stat(path)
+			if err == nil {
+				fmt.Printf("  • %s (%.2f MB)\n", path, float64(info.Size())/(1024*1024))
+			} else {
+				fmt.Printf("  • %s\n", path)
+			}
 		}
 		fmt.Println()
-		fmt.Println("Note: Backups are stored in the installation directory which was removed.")
-		fmt.Println("They should be moved to a safe location before reinstalling.")
+		fmt.Printf("Backup location: %s\n", backupDir)
+		fmt.Println("These backups are safe and will NOT be deleted.")
 	}
 	fmt.Println()
 

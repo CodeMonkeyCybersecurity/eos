@@ -112,12 +112,27 @@ func RemoveContainer(rc *eos_io.RuntimeContext, containerName string) error {
 
 	if err != nil {
 		// Check if error is because container doesn't exist (idempotent behavior)
-		if containsNoSuchContainer(output) {
-			// Container already gone - success
+		if containsNoSuchContainer(output) || containsNoSuchContainer(err.Error()) {
+			// Container already gone - success (idempotent)
 			return nil
 		}
-		// Real error - return it
-		return fmt.Errorf("failed to remove container %s: %s", containerName, output)
+
+		// Real error - provide detailed context
+		errorMsg := output
+		if errorMsg == "" {
+			errorMsg = err.Error()
+		}
+
+		return fmt.Errorf("failed to remove Docker container '%s': %s\n\n"+
+			"Possible causes:\n"+
+			"  • Docker daemon not running (check: systemctl status docker)\n"+
+			"  • Permission denied (run with sudo)\n"+
+			"  • Container locked by another process\n\n"+
+			"Remediation:\n"+
+			"  • Start Docker: sudo systemctl start docker\n"+
+			"  • Use --force to skip errors: sudo eos delete bionicgpt --force\n"+
+			"  • Check Docker status: docker ps -a | grep %s",
+			containerName, errorMsg, containerName)
 	}
 
 	return nil

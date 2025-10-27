@@ -57,13 +57,14 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 		// Entity doesn't exist - create it
 		log.Info(" [INTERVENE] Creating new entity",
 			zap.String("entity_name", entityName),
-			zap.String("policy", shared.EosDefaultPolicyName),
+			zap.Strings("policies", []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName}),
 			zap.String("purpose", shared.EosEntityPurpose))
 
 		entityData := map[string]interface{}{
 			"name":     entityName,
 			"metadata": map[string]interface{}{"purpose": shared.EosEntityPurpose},
-			"policies": []string{shared.EosDefaultPolicyName},
+			// Assign both default and admin policies to make eos an administrator
+			"policies": []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName},
 		}
 
 		log.Debug("Entity creation data", zap.Any("data", entityData))

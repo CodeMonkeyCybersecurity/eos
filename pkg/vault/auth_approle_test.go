@@ -218,7 +218,7 @@ func TestDefaultAppRoleOptions(t *testing.T) {
 	opts := shared.DefaultAppRoleOptions()
 
 	assert.Equal(t, shared.AppRoleName, opts.RoleName)
-	assert.Equal(t, []string{shared.EosDefaultPolicyName}, opts.Policies)
+	assert.Equal(t, []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName}, opts.Policies)
 	assert.Equal(t, "1h", opts.TokenTTL)
 	assert.Equal(t, "4h", opts.TokenMaxTTL)
 	assert.Equal(t, "24h", opts.SecretIDTTL)
@@ -279,7 +279,7 @@ func TestUserDataTemplate(t *testing.T) {
 	data := shared.UserDataTemplate(password)
 
 	assert.Equal(t, password, data["password"])
-	assert.Equal(t, []string{shared.EosDefaultPolicyName}, data["policies"])
+	assert.Equal(t, []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName}, data["policies"])
 	assert.Len(t, data, 2)
 }
 
