@@ -56,7 +56,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		OllamaConnectivityDiagnostic(),
 		AppContainerMissingDiagnostic(),
 		LiteLLMHealthCheckDiagnostic(),
-		LiteLLMComprehensiveDiagnostic(), // NEW: Comprehensive Docker SDK + LiteLLM API health check
+		LiteLLMComprehensiveDiagnostic(),     // NEW: Comprehensive Docker SDK + LiteLLM API health check
 		LiteLLMModelConnectivityDiagnostic(), // NEW: Test actual API calls to Azure models
 		LiteLLMErrorLogsDiagnostic(),
 		DatabaseConnectionTestDiagnostic(),

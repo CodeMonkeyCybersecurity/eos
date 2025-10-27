@@ -903,15 +903,17 @@ services:
       - bionicgpt-network
     restart: unless-stopped
     healthcheck:
-      # SHIFT-LEFT FIX: More tolerant health check configuration
-      # - Increased start_period: 90s (was 30s) - allows Azure OpenAI connection time
-      # - Increased retries: 5 (was 3) - more tolerant of transient failures
-      # - Increased interval: 60s (was 30s) - reduce check frequency
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 60s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
+      # P0 FIX: Use /health/liveliness for Docker health check (passive, fast)
+      # RATIONALE: /health endpoint makes actual Azure API calls (slow, expensive, rate-limited)
+      #            /health/liveliness just checks if web server is responding (fast, local)
+      # SHIFT-LEFT: Separate concerns - Docker checks container health, Eos checks Azure connectivity
+      # SECURITY: Prevents Azure rate limiting from false-negative health checks
+      # REFERENCE: Adversarial Analysis ADVERSARIAL_ANALYSIS_BIONICGPT_PHASE6_FAILURE.md P0 Fix #1
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
+      interval: 15s       # More frequent checks (was 60s) - faster failure detection
+      timeout: 5s         # Shorter timeout (was 10s) - local check is fast
+      retries: 3          # Fewer retries (was 5) - fail fast on real issues
+      start_period: 30s   # Shorter grace (was 90s) - server starts quickly
     logging:
       driver: "json-file"
       options:
