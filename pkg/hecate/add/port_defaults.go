@@ -4,6 +4,7 @@ package add
 
 import (
 	"fmt"
+	"net"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -21,23 +22,39 @@ var serviceDefaultPorts = map[string]int{
 
 // EnsureBackendHasPort appends the default port for known services if port is missing
 // This improves UX by allowing users to specify just IP/hostname for known services
+// Correctly handles IPv4, IPv6, and hostnames
 //
 // Examples:
 //
 //	EnsureBackendHasPort("bionicgpt", "100.71.196.79")      → "100.71.196.79:8513"
 //	EnsureBackendHasPort("bionicgpt", "100.71.196.79:7703") → "100.71.196.79:7703" (user override)
+//	EnsureBackendHasPort("bionicgpt", "::1")                → "[::1]:8513" (IPv6)
+//	EnsureBackendHasPort("bionicgpt", "[::1]:7703")         → "[::1]:7703" (IPv6 with port)
+//	EnsureBackendHasPort("bionicgpt", "2001:db8::1")        → "[2001:db8::1]:8513" (IPv6)
 //	EnsureBackendHasPort("custom", "192.168.1.1")           → "192.168.1.1" (unknown service, no change)
 func EnsureBackendHasPort(service, backend string) string {
-	// Check if backend already has port (contains colon)
+	// Try to split host:port using net.SplitHostPort
+	// This correctly handles IPv6 brackets: [::1]:8080
+	_, _, err := net.SplitHostPort(backend)
+	if err == nil {
+		// Already has port - user explicitly specified it
+		return backend
+	}
+
+	// No port present - check if we should add default
+	defaultPort, hasDefault := serviceDefaultPorts[service]
+	if !hasDefault {
+		// Unknown service - return as-is (validation will catch missing port)
+		return backend
+	}
+
+	// Check if backend is IPv6 address (contains colons but no port)
+	// IPv6 format: 2001:db8::1 or ::1
 	if strings.Contains(backend, ":") {
-		return backend // User explicitly specified port - respect it
+		// This is IPv6 without port - add brackets and port
+		return fmt.Sprintf("[%s]:%d", backend, defaultPort)
 	}
 
-	// Check if service has a known default port
-	if defaultPort, exists := serviceDefaultPorts[service]; exists {
-		return fmt.Sprintf("%s:%d", backend, defaultPort)
-	}
-
-	// Unknown service - return as-is (validation will require explicit port)
-	return backend
+	// IPv4 or hostname without port - add port directly
+	return fmt.Sprintf("%s:%d", backend, defaultPort)
 }

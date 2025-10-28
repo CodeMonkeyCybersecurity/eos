@@ -19,6 +19,9 @@ type ServiceOptions struct {
 	SkipDNSCheck        bool     // Skip DNS resolution validation
 	SkipBackendCheck    bool     // Skip backend connectivity check
 	BackupRetentionDays int      // Days to keep old backups (0 = keep forever)
+
+	// Telemetry fields
+	InvocationMethod string // How command was invoked: "flag" or "subcommand" (for UX metrics)
 }
 
 // RouteConfig represents a Caddy route configuration

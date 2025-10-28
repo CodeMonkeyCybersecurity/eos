@@ -666,10 +666,11 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 
 	// Add cryptographically random suffix to guarantee uniqueness even if nanoseconds collide
 	// This handles edge case: two goroutines running on different CPU cores might see same clock value
-	randomSuffix, err := crypto.GenerateHex(4) // 4 bytes = 8 hex chars = 32 bits entropy
+	randomSuffix, err := crypto.GenerateHex(8) // 8 bytes = 16 hex chars = 64 bits entropy (min required by crypto.GenerateHex)
 	if err != nil {
-		// Fallback: use PID if crypto random fails (should never happen)
-		randomSuffix = fmt.Sprintf("%d", os.Getpid())
+		// Fallback: use PID + goroutine-local counter if crypto random fails (should never happen)
+		eeu.logger.Warn("Crypto random failed, using PID fallback for backup uniqueness", zap.Error(err))
+		randomSuffix = fmt.Sprintf("%d-%d", os.Getpid(), now.Unix())
 	}
 
 	backupFilename := fmt.Sprintf("eos.backup.%s.%d.%s", timestamp, nanos, randomSuffix)

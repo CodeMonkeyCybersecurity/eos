@@ -11,12 +11,12 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/add"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // updateHecateCmd represents the "update hecate" command.
 var updateHecateCmd = &cobra.Command{
 	Use:   "hecate",
+	Args:  cobra.NoArgs, // Parent command takes no positional args
 	Short: "Update Hecate deployment (regenerate files from Consul KV or add service)",
 	Long: `Regenerate Hecate docker-compose.yml and .env files from configuration stored in Consul KV,
 or add a new reverse proxy route to an existing Hecate installation.
@@ -48,26 +48,31 @@ Examples:
 
   # Add new service (basic)
   eos update hecate --add bionicgpt \
-    --route chat.codemonkey.ai \
+    --dns chat.codemonkey.ai \
     --upstream 100.64.0.50:8080
 
   # Add new service with SSO
   eos update hecate --add nextcloud \
-    --route cloud.codemonkey.ai \
+    --dns cloud.codemonkey.ai \
     --upstream 100.64.0.51:80 \
     --sso
 
   # Dry run to see changes
   eos update hecate --add wazuh \
-    --route wazuh.codemonkey.ai \
+    --dns wazuh.codemonkey.ai \
     --upstream 100.64.0.52:443 \
     --dry-run`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		// Check if --add flag is set
+		// Check if --add flag is explicitly set
 		addService, _ := cmd.Flags().GetString("add")
-		if addService != "" {
+		addWasSet := cmd.Flags().Changed("add")
+
+		if addWasSet {
+			if addService == "" {
+				return fmt.Errorf("--add requires a service name\nExample: eos update hecate --add bionicgpt --dns chat.example.com --upstream 100.64.0.1:8080")
+			}
 			// Delegate to add service flow
 			return runAddServiceFromFlag(rc, cmd, addService)
 		}
@@ -91,8 +96,8 @@ func init() {
 
 	// Add service management flags
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
-	updateHecateCmd.Flags().String("route", "", "Domain/subdomain for the service (aliases: --dns, --domain, --host)")
-	updateHecateCmd.Flags().String("upstream", "", "Backend address (ip:port or hostname:port) (aliases: --backend, --target)")
+	updateHecateCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for the service (required with --add)")
+	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
 
 	// Optional flags for --add
 	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route")
@@ -108,10 +113,8 @@ func init() {
 
 // runAddServiceFromFlag handles adding a new service when --add flag is used
 func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, service string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Parse flags (using "route" instead of "dns" as per new flag name)
-	route, _ := cmd.Flags().GetString("route")
+	// Parse flags
+	dns, _ := cmd.Flags().GetString("dns")
 	upstream, _ := cmd.Flags().GetString("upstream")
 	sso, _ := cmd.Flags().GetBool("sso")
 	ssoProvider, _ := cmd.Flags().GetString("sso-provider")
@@ -121,25 +124,23 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 	skipBackendCheck, _ := cmd.Flags().GetBool("skip-backend-check")
 	backupRetentionDays, _ := cmd.Flags().GetInt("backup-retention-days")
 
-	// Validate required flags
-	if route == "" {
-		return fmt.Errorf("--route flag is required when using --add\nExample: eos update hecate --add %s --route chat.example.com --upstream 100.64.0.1:8080", service)
+	// Validate required flags early (fail fast)
+	if dns == "" {
+		return fmt.Errorf("--dns flag is required when using --add\nExample: eos update hecate --add %s --dns chat.example.com --upstream 100.64.0.1:8080", service)
 	}
 	if upstream == "" {
-		return fmt.Errorf("--upstream flag is required when using --add\nExample: eos update hecate --add %s --route chat.example.com --upstream 100.64.0.1:8080", service)
+		return fmt.Errorf("--upstream flag is required when using --add\nExample: eos update hecate --add %s --dns chat.example.com --upstream 100.64.0.1:8080", service)
 	}
 
-	logger.Info("Adding new service to Hecate",
-		zap.String("service", service),
-		zap.String("route", route),
-		zap.String("upstream", upstream),
-		zap.Bool("sso", sso))
+	// Auto-append default port for known services if port is missing
+	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
+	backendWithPort := add.EnsureBackendHasPort(service, upstream)
 
-	// Build options
+	// Build options (with telemetry for UX measurement)
 	opts := &add.ServiceOptions{
 		Service:             service,
-		DNS:                 route, // Map route to DNS field
-		Backend:             upstream,
+		DNS:                 dns,
+		Backend:             backendWithPort,
 		SSO:                 sso,
 		SSOProvider:         ssoProvider,
 		CustomDirectives:    customDirectives,
@@ -147,6 +148,7 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 		SkipDNSCheck:        skipDNSCheck,
 		SkipBackendCheck:    skipBackendCheck,
 		BackupRetentionDays: backupRetentionDays,
+		InvocationMethod:    "flag", // Track --add flag vs subcommand usage
 	}
 
 	// Execute the add operation

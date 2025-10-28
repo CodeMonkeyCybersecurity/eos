@@ -6,6 +6,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/add"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 )
 
@@ -70,6 +71,11 @@ func init() {
 }
 
 func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// CRITICAL: Detect flag-like args (--force, -f, etc.) to prevent '--' separator bypass
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	// Get service from positional argument
 	service := args[0]
 
@@ -88,7 +94,7 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
 	backendWithPort := add.EnsureBackendHasPort(service, upstream)
 
-	// Build options
+	// Build options (with telemetry for UX measurement)
 	opts := &add.ServiceOptions{
 		Service:             service,
 		DNS:                 dns,
@@ -100,6 +106,7 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		SkipDNSCheck:        skipDNSCheck,
 		SkipBackendCheck:    skipBackendCheck,
 		BackupRetentionDays: backupRetentionDays,
+		InvocationMethod:    "subcommand", // Track --add flag vs subcommand usage
 	}
 
 	// Execute the add operation

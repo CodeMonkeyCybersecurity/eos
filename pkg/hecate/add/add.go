@@ -28,12 +28,13 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 				"  sudo eos update hecate add [service] --dns [domain] --upstream [backend]")
 	}
 
-	// Display header
+	// Display header with telemetry
 	logger.Info("Adding new service to Hecate",
 		zap.String("service", opts.Service),
 		zap.String("dns", opts.DNS),
 		zap.String("backend", opts.Backend),
-		zap.Bool("sso", opts.SSO))
+		zap.Bool("sso", opts.SSO),
+		zap.String("invocation_method", opts.InvocationMethod)) // Track UX preference
 
 	// If dry-run, show what would be done and exit
 	if opts.DryRun {
