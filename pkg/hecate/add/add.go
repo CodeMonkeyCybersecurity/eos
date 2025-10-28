@@ -456,7 +456,7 @@ func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions) {
 		logger.Info("Admin Credentials:")
 		logger.Info("  Username: bionicgpt-admin")
 		logger.Info("  Password: Retrieve with:")
-		logger.Info("    vault kv get -field=value secret/bionicgpt/admin_password")
+		logger.Info("    sudo cat /opt/bionicgpt/.env.admin | grep BIONICGPT_ADMIN_PASSWORD")
 		logger.Info("")
 		logger.Info("Authentik Groups Created:")
 		logger.Info("  - bionicgpt-superadmin (admin users)")

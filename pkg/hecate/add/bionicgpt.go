@@ -3,10 +3,12 @@
 package add
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	vaultapi "github.com/hashicorp/vault/api"
+	// vaultapi "github.com/hashicorp/vault/api" // Commented out: Vault logic commented for .env migration
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -98,12 +100,15 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 		return nil
 	}
 
-	// Step 1: Get Authentik credentials from Vault (with permission check)
-	logger.Info("    Getting Authentik credentials from Vault")
+	// Step 1: Get Authentik credentials from .env file
+	logger.Info("    Getting Authentik credentials from /opt/bionicgpt/.env")
 	authentikToken, authentikBaseURL, err := b.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
-		logger.Warn("Authentik credentials not found in Vault, skipping proxy provider setup", zap.Error(err))
-		logger.Warn("To enable authentication: vault kv put secret/bionicgpt/authentik api_key=... base_url=...")
+		logger.Warn("Authentik credentials not found, skipping proxy provider setup", zap.Error(err))
+		logger.Warn("To enable authentication, add to /opt/bionicgpt/.env:")
+		logger.Warn("  AUTHENTIK_TOKEN=your_authentik_api_token")
+		logger.Warn("  AUTHENTIK_BASE_URL=http://localhost:9000")
+		logger.Warn("Get API token from: https://hera.your-domain/if/admin/#/core/tokens")
 		return nil // Non-fatal: generic route still works
 	}
 
@@ -236,8 +241,44 @@ func (b *BionicGPTIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// getAuthentikCredentials retrieves Authentik API credentials from Vault with permission check
+// getAuthentikCredentials retrieves Authentik API credentials from .env files
+// TODO: Migrate to Vault once BionicGPT and Authentik are fully migrated to Vault-based secrets
 func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (string, string, error) {
+	// TEMPORARY: Read from .env files until Vault migration is complete
+	// BionicGPT stores Authentik token in /opt/bionicgpt/.env
+	// Authentik base URL can be inferred from Hecate or use default
+
+	bionicgptEnv, err := readEnvFile("/opt/bionicgpt/.env")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read /opt/bionicgpt/.env: %w\n"+
+			"Ensure BionicGPT is installed with: eos create bionicgpt", err)
+	}
+
+	// Check for AUTHENTIK_TOKEN in BionicGPT .env
+	apiKey := bionicgptEnv["AUTHENTIK_TOKEN"]
+	if apiKey == "" {
+		// Fallback: Try AUTHENTIK_API_KEY
+		apiKey = bionicgptEnv["AUTHENTIK_API_KEY"]
+	}
+
+	if apiKey == "" {
+		return "", "", fmt.Errorf("AUTHENTIK_TOKEN not found in /opt/bionicgpt/.env\n" +
+			"Add to .env file:\n" +
+			"  AUTHENTIK_TOKEN=your_authentik_api_token\n" +
+			"Get token from: https://hera.your-domain/if/admin/#/core/tokens")
+	}
+
+	// Get base URL from env or use default
+	baseURL := bionicgptEnv["AUTHENTIK_BASE_URL"]
+	if baseURL == "" {
+		// Default to localhost:9000 (Authentik default in Hecate stack)
+		baseURL = "http://localhost:9000"
+	}
+
+	return apiKey, baseURL, nil
+
+	/* COMMENTED OUT: Vault-based credential retrieval (for future migration)
+
 	// Create Vault client
 	vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
 	if err != nil {
@@ -288,6 +329,7 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 	}
 
 	return apiKey, baseURL, nil
+	*/
 }
 
 // getDefaultAuthFlowUUID retrieves the default authentication flow UUID
@@ -478,6 +520,30 @@ func (b *BionicGPTIntegrator) createBionicGPTAdmin(ctx context.Context, client *
 		return fmt.Errorf("failed to add user to group: %w", err)
 	}
 
+	logger := otelzap.Ctx(ctx)
+
+	// Store admin credentials in /opt/bionicgpt/.env.admin for retrieval
+	// This file is only created once and should be backed up
+	adminEnvPath := "/opt/bionicgpt/.env.admin"
+	adminEnvContent := fmt.Sprintf(`# BionicGPT Admin Credentials
+# Created: %s
+# IMPORTANT: Back up this file and keep it secure
+
+BIONICGPT_ADMIN_USERNAME=%s
+BIONICGPT_ADMIN_PASSWORD=%s
+BIONICGPT_ADMIN_EMAIL=%s
+
+# To retrieve password: cat %s | grep BIONICGPT_ADMIN_PASSWORD
+`, time.Now().Format(time.RFC3339), adminUsername, password, adminEmail, adminEnvPath)
+
+	if err := os.WriteFile(adminEnvPath, []byte(adminEnvContent), 0600); err != nil {
+		logger.Warn("Failed to write admin credentials to .env.admin", zap.Error(err))
+	} else {
+		logger.Info("Admin credentials stored", zap.String("path", adminEnvPath))
+	}
+
+	/* COMMENTED OUT: Vault storage (for future migration)
+
 	// Store password in Vault for user retrieval
 	vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
 	if err == nil {
@@ -494,6 +560,49 @@ func (b *BionicGPTIntegrator) createBionicGPTAdmin(ctx context.Context, client *
 			logger.Warn("Failed to store admin password in Vault", zap.Error(err))
 		}
 	}
+	*/
 
 	return nil
+}
+
+// readEnvFile reads a .env file and returns key-value pairs
+// Simple parser that handles KEY=VALUE format (no quotes, no multiline, no exports)
+func readEnvFile(filepath string) (map[string]string, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	env := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue // Skip malformed lines
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Remove surrounding quotes if present
+		value = strings.Trim(value, `"'`)
+
+		env[key] = value
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file: %w", err)
+	}
+
+	return env, nil
 }
