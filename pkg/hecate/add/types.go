@@ -24,6 +24,9 @@ type ServiceOptions struct {
 
 	// Telemetry fields
 	InvocationMethod string // How command was invoked: "flag" or "subcommand" (for UX metrics)
+
+	// Internal state tracking
+	UsedAdminAPI bool // Track if Admin API was used (for conditional reload logic)
 }
 
 // RouteConfig represents a Caddy route configuration

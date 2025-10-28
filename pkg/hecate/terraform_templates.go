@@ -82,6 +82,15 @@ resource "hcloud_firewall" "hecate" {
     source_ips = ["0.0.0.0/0", "::/0"]
   }
 
+  # QUIC/HTTP3 (UDP/443)
+  # CRITICAL: Required for HTTP/3 support (enabled by Caddy sysctl UDP buffer tuning)
+  rule {
+    direction = "in"
+    port      = "443"
+    protocol  = "udp"
+    source_ips = ["0.0.0.0/0", "::/0"]
+  }
+
   # Mail ports
   rule {
     direction = "in"

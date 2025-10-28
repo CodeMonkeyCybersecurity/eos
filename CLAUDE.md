@@ -6,6 +6,10 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 
 **IMPORTANT**: For roadmap, technical debt tracking, and future work planning, see [ROADMAP.md](ROADMAP.md). This file focuses on immediate development standards and patterns.
 
+**RECENT ADDITIONS** (2025-10-28):
+- ✅ Caddy Admin API infrastructure completed - see [ROADMAP.md](ROADMAP.md#-technical-debt---caddy-configuration-management-future-direction)
+- ✅ QUIC/HTTP3 firewall support (UDP/443) - see [ROADMAP.md](ROADMAP.md#-quichttp3-support---firewall-configuration-2025-10-28)
+
 ## Mission & Values
 
 ### Philosphy

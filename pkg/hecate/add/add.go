@@ -128,7 +128,7 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	}
 
 	// Phase 6: Validate and reload Caddy
-	if err := runCaddyReloadPhase(rc, backupPath); err != nil {
+	if err := runCaddyReloadPhase(rc, opts, backupPath); err != nil {
 		return err
 	}
 
@@ -149,6 +149,22 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	printSuccessMessage(logger, opts, verificationErr)
 
 	return nil
+}
+
+// isAdminAPIAvailable checks if the Caddy Admin API is available
+// Returns true if API is reachable, false otherwise
+func isAdminAPIAvailable(rc *eos_io.RuntimeContext) bool {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	client := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
+	if err := client.Health(rc.Ctx); err != nil {
+		logger.Debug("Caddy Admin API not available, will use file-based approach",
+			zap.Error(err))
+		return false
+	}
+
+	logger.Debug("Caddy Admin API is available")
+	return true
 }
 
 // runDryRun shows what would be changed without actually changing anything
@@ -437,6 +453,28 @@ func runAppendRoutePhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error 
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Phase 4/6: Updating Caddyfile...")
 
+	// ARCHITECTURE: Try Admin API first (zero-downtime), fallback to file editing
+	// This enables gradual migration while maintaining backward compatibility
+	useAdminAPI := isAdminAPIAvailable(rc)
+
+	if useAdminAPI {
+		logger.Info("Using Caddy Admin API for route management (zero-downtime)")
+		if err := runAppendRoutePhaseViaAPI(rc, opts); err != nil {
+			logger.Warn("Admin API failed, falling back to file-based approach",
+				zap.Error(err))
+			useAdminAPI = false // Disable API, will use file-based fallback below
+		} else {
+			// Success via API - set flag for reload phase to skip validation/reload
+			opts.UsedAdminAPI = true
+			return nil
+		}
+	}
+
+	// Fallback to file-based approach (or primary if API unavailable)
+	if !useAdminAPI {
+		logger.Info("Using file-based Caddyfile editing (traditional approach)")
+	}
+
 	// SAFETY CHECK: Re-verify no duplicate before appending
 	// This prevents race conditions and guards against logic bugs
 	duplicateResult, err := CheckDuplicateService(rc, CaddyfilePath, opts.Service, opts.DNS)
@@ -468,9 +506,15 @@ func runAppendRoutePhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error 
 }
 
 // runCaddyReloadPhase validates and reloads Caddy
-func runCaddyReloadPhase(rc *eos_io.RuntimeContext, backupPath string) error {
+func runCaddyReloadPhase(rc *eos_io.RuntimeContext, opts *ServiceOptions, backupPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Phase 5/6: Validating and reloading Caddy...")
+
+	// If Admin API was used, skip validation/reload (API already reloaded automatically)
+	if opts.UsedAdminAPI {
+		logger.Info("✓ Caddy Admin API was used - configuration already validated and reloaded atomically")
+		return nil
+	}
 
 	// Validate configuration
 	if err := ValidateCaddyConfig(rc, CaddyfilePath); err != nil {
