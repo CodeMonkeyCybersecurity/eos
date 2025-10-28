@@ -468,3 +468,28 @@ func (c *SAMLClient) DeleteSAMLProvider(ctx context.Context, pk string) error {
 
 	return nil
 }
+
+// DeletePropertyMapping deletes a SAML property mapping by PK
+func (c *SAMLClient) DeletePropertyMapping(ctx context.Context, pk string) error {
+	url := fmt.Sprintf("%s/api/v3/propertymappings/saml/%s/", c.BaseURL, pk)
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete property mapping: %d - %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

@@ -28,6 +28,7 @@ These violations cause immediate failure:
    - `fmt.Println` is unstructured - breaks telemetry, forensics, and debugging
    - This is a dev tool - verbose structured output is fine and helps debugging
    - **NO EXCEPTIONS**: Always use logger, even for user-facing output
+   - **Debug Commands Pattern** (`cmd/debug/*.go`): ALL diagnostic checks MUST use structured logging. Final report formatting MAY use `fmt.Print()` ONLY after diagnostics complete. Example: `logger.Info("Checking Vault config")` during check, then `fmt.Print(report.Render())` at end. Rationale: Preserves telemetry for diagnostics while allowing terminal-optimized report rendering.
 2. **Architecture**: Business logic in `pkg/`, orchestration ONLY in `cmd/` (see Architecture Enforcement below). Use official and well supported SDKs and APIs where possible.
 3. **Pattern**: ALWAYS follow Assess → Intervene → Evaluate in helpers
 4. **Context**: Always use `*eos_io.RuntimeContext` for all operations
@@ -273,6 +274,14 @@ Dependency Not Found (P0 - CRITICAL - Human-Centric)?
    ├─ Provides: Clear explanation, install commands, consent prompt
    ├─ Handles: Auto-install (if safe) or graceful exit with instructions
    └─ Example: Ollama, Docker, system packages
+
+Debug Command Output (cmd/debug/*.go)?
+├─ Diagnostic checks (health, config validation) → logger.Info/Warn/Error (structured)
+├─ Progress indicators → logger.Debug (or logger.Info if user-visible)
+├─ Issue detection → logger.Warn/Error with structured fields
+├─ Interim results → logger.Info with zap fields
+└─ Final report rendering → fmt.Print(report.String()) ONLY
+   └─ Rationale: Terminal-focused formatting AFTER all telemetry captured
 ```
 
 ## Secret and Configuration Management (P0 - CRITICAL)

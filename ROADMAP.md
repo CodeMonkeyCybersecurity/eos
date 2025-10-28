@@ -403,6 +403,608 @@ sudo eos update hecate --add bionicgpt --dns chat.codemonkey.net.au --upstream 1
 
 ---
 
+## Phase 4.6: Wazuh SSO Integration Security Improvements (P1) 📅 PLANNED
+
+### Target Completion: Week of 2025-11-10
+### Status: Planned (P0 fixes complete, P1 improvements pending)
+### Priority: P1 (CRITICAL - Must fix before production)
+### Effort: 10-12 hours
+
+**Context**: Comprehensive adversarial analysis (2025-10-28) of Wazuh SSO integration implementation identified 6 P1 (CRITICAL) security and reliability issues requiring resolution before production deployment.
+
+**Background**:
+- Completed P0 (BREAKING) fixes on 2025-10-28 (5 issues, ~125 lines changed)
+- P0 fixes address CLAUDE.md Rule #12 violations (hardcoded values → constants)
+- P1 fixes address security vulnerabilities and race conditions
+- Full adversarial analysis available in conversation history (2025-10-28)
+
+**P0 Fixes Completed** ✅:
+1. Hardcoded paths in sso_sync.go → Constants (5 paths)
+2. Hardcoded permissions in sso_sync.go → Security-documented constants (3 occurrences)
+3. Magic number timeouts → Documented constants (3 sleeps)
+4. Incomplete rollback tracking → Track ALL resources (property mappings + Consul KV keys)
+5. Magic string "Roles" → SAMLRolesAttributeName constant
+
+---
+
+### P1 #5: Research Crypto Key Length Requirements (1 hour)
+
+**File**: `pkg/wazuh/sso_sync.go:21`
+**Priority**: P1 - Security Critical
+**Effort**: 1 hour (research + implementation)
+
+**Current Code** (potentially insufficient):
+```go
+func GenerateExchangeKey() (string, error) {
+    key := make([]byte, 32)  // 256-bit
+    // ...
+}
+```
+
+**Issue**:
+- 32-byte (256-bit) key may be insufficient for SAML exchange key
+- NIST recommends 256-bit minimum, but many security frameworks require 384-bit or 512-bit
+- No documentation of threat model or security rationale
+- No reference to Wazuh/OpenSearch Security requirements
+
+**Why This Matters**:
+- SAML exchange keys are used for encrypting assertions
+- Weak keys → assertion decryption → authentication bypass
+- Compliance requirements (SOC2, PCI-DSS, HIPAA) may mandate specific key lengths
+
+**Research Required**:
+1. Check Wazuh OpenSearch Security documentation for exchange key requirements
+2. Review SAML 2.0 specifications (OASIS standard)
+3. Verify industry best practices for assertion encryption
+4. Confirm NIST SP 800-57 recommendations apply
+
+**Potential Fix** (pending research):
+```go
+const (
+    // RATIONALE: SAML exchange key length for assertion encryption
+    // SECURITY: 512-bit (64 bytes) exceeds NIST recommendations (256-bit minimum)
+    // COMPLIANCE: Meets requirements for SOC2, PCI-DSS, HIPAA
+    // REFERENCE: [Wazuh OpenSearch Security docs link] + NIST SP 800-57
+    SAMLExchangeKeyLengthBytes = 64  // 512-bit
+)
+
+func GenerateExchangeKey() (string, error) {
+    key := make([]byte, SAMLExchangeKeyLengthBytes)
+    // ...
+}
+```
+
+**Testing Checklist**:
+- [ ] Research complete (document findings in code comments)
+- [ ] Constant added with full security rationale
+- [ ] Test key generation with new length
+- [ ] Verify Wazuh accepts longer keys
+- [ ] Test SSO login flow with new key length
+- [ ] Document threat model and compliance requirements
+
+---
+
+### P1 #6: Atomic File Writes (Credential Leak Prevention) (2 hours)
+
+**Files**:
+- `pkg/wazuh/sso/configure.go:89, 95`
+- `pkg/wazuh/sso_sync.go:61, 106, 171`
+
+**Priority**: P1 - Security Critical (Credential Leak Risk)
+**Effort**: 2 hours
+
+**Current Code** (race condition vulnerability):
+```go
+// VULNERABLE: Non-atomic write
+if err := os.WriteFile(wazuh.OpenSearchSAMLExchangeKey, []byte(exchangeKey), wazuh.SAMLExchangeKeyPerm); err != nil {
+    return fmt.Errorf("failed to write exchange key file: %w", err)
+}
+```
+
+**Issue**:
+- `os.WriteFile` is NOT atomic:
+  1. Creates file with default permissions (0666 & umask) ← File created
+  2. Writes data ← **ATTACK WINDOW: File is readable!**
+  3. Calls `chmod` to set correct permissions (0600) ← Too late
+- Between steps 2 and 3, another process can read the exchange key
+
+**Why This Matters**:
+- Exchange key is SECRET (0600 permission = owner-only read)
+- Attack window allows unauthorized read of private key material
+- Enables SAML assertion decryption → authentication bypass
+- Violates principle of least privilege
+
+**Fix** (atomic write pattern):
+```go
+// pkg/shared/atomic_write.go (new file):
+func AtomicWriteFile(path string, data []byte, perm os.FileMode) error {
+    dir := filepath.Dir(path)
+
+    // Create temp file with secure permissions FIRST
+    tmpFile, err := os.CreateTemp(dir, ".tmp-*.writing")
+    if err != nil {
+        return fmt.Errorf("failed to create temp file: %w", err)
+    }
+    tmpPath := tmpFile.Name()
+    defer os.Remove(tmpPath) // Clean up temp file on error
+
+    // Set secure permissions BEFORE writing data
+    if err := tmpFile.Chmod(perm); err != nil {
+        tmpFile.Close()
+        return fmt.Errorf("failed to set temp file permissions: %w", err)
+    }
+
+    // Write data to temp file (already has secure permissions)
+    if _, err := tmpFile.Write(data); err != nil {
+        tmpFile.Close()
+        return fmt.Errorf("failed to write data: %w", err)
+    }
+
+    if err := tmpFile.Close(); err != nil {
+        return fmt.Errorf("failed to close temp file: %w", err)
+    }
+
+    // Atomic rename (no race condition possible)
+    if err := os.Rename(tmpPath, path); err != nil {
+        return fmt.Errorf("failed to rename temp file: %w", err)
+    }
+
+    return nil
+}
+```
+
+**Usage** (replace all os.WriteFile calls):
+```go
+// In configure.go and sso_sync.go:
+if err := shared.AtomicWriteFile(wazuh.OpenSearchSAMLExchangeKey, []byte(exchangeKey), wazuh.SAMLExchangeKeyPerm); err != nil {
+    return fmt.Errorf("failed to write exchange key file: %w", err)
+}
+```
+
+**Testing Checklist**:
+- [ ] Create `pkg/shared/atomic_write.go` with AtomicWriteFile()
+- [ ] Add unit tests (verify permissions set before write)
+- [ ] Replace 5 os.WriteFile calls (configure.go lines 89, 95 + sso_sync.go lines 61, 106, 171)
+- [ ] Test race condition scenario (monitor file permissions during write)
+- [ ] Verify atomic rename works across filesystems
+- [ ] Test error handling (disk full, permissions denied)
+
+**Files to Update**:
+1. `pkg/shared/atomic_write.go` (NEW - 50 lines)
+2. `pkg/wazuh/sso/configure.go` (2 calls)
+3. `pkg/wazuh/sso_sync.go` (3 calls)
+
+---
+
+### P1 #7: Race Condition - Distributed Locking (3 hours)
+
+**File**: `pkg/hecate/add/wazuh.go` (ConfigureAuthentication method)
+**Priority**: P1 - Reliability Critical
+**Effort**: 3 hours
+
+**Current Behavior**: No concurrency protection
+**Problem**: If two `eos update hecate add wazuh` commands run concurrently:
+1. Both get fresh `WazuhIntegrator` instances (constructor pattern works)
+2. But both write to SAME Authentik resources (no locking)
+3. If one fails and rolls back, it deletes resources the other created
+4. Result: Both operations appear to succeed, but resources are deleted
+
+**Attack Scenario**:
+```
+Time  | Process A                      | Process B
+------|--------------------------------|--------------------------------
+T0    | Create SAML provider (pk=123)  |
+T1    |                                | Create SAML provider (pk=123) [idempotent]
+T2    | Create application (pk=456)    |
+T3    |                                | Fails at some point
+T4    |                                | Rollback: Delete pk=123, pk=456
+T5    | Success! (but resources gone)  | Rolled back
+```
+
+**Why This Matters**:
+- Lost configuration (users can't log in)
+- Silent failure (Process A thinks it succeeded)
+- Data corruption (Consul KV has stale metadata)
+
+**Fix** (distributed locking via Consul KV):
+```go
+func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
+    logger := otelzap.Ctx(rc.Ctx)
+
+    // Acquire distributed lock
+    consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
+    if err != nil {
+        return fmt.Errorf("failed to create Consul client: %w", err)
+    }
+
+    lockKey := "eos/locks/wazuh-sso-integration"
+    lockOpts := &consulapi.LockOptions{
+        Key:          lockKey,
+        Value:        []byte(fmt.Sprintf("locked by %s at %s", os.Getenv("USER"), time.Now())),
+        SessionTTL:   "30s",  // Lock auto-releases if process dies
+    }
+
+    lock, err := consulClient.LockOpts(lockOpts)
+    if err != nil {
+        return fmt.Errorf("failed to create lock: %w", err)
+    }
+
+    lockCh, err := lock.Lock(nil)
+    if err != nil {
+        return fmt.Errorf("failed to acquire lock (another integration in progress?): %w", err)
+    }
+    defer lock.Unlock()
+
+    // Check if already configured
+    kv, _, err := consulClient.KV().Get("service/wazuh/sso/configured", nil)
+    if err == nil && kv != nil && string(kv.Value) == "true" {
+        logger.Warn("Wazuh SSO already configured by another process")
+
+        if !opts.Force {
+            return eos_err.NewUserError("Wazuh SSO integration already exists.\n\n"+
+                "Options:\n"+
+                "  1. Use --force to reconfigure\n"+
+                "  2. Use 'eos update wazuh --delete authentik' to remove existing integration")
+        }
+
+        logger.Warn("Reconfiguring Wazuh SSO (--force flag used)")
+    }
+
+    // ... rest of configuration ...
+
+    // Mark as configured
+    _, err = consulClient.KV().Put(&consulapi.KVPair{
+        Key:   "service/wazuh/sso/configured",
+        Value: []byte("true"),
+    }, nil)
+    if err != nil {
+        logger.Warn("Failed to mark integration as configured", zap.Error(err))
+    }
+
+    return nil
+}
+```
+
+**Testing Checklist**:
+- [ ] Test sequential operations work (lock acquired and released)
+- [ ] Test concurrent operations (second waits for first to complete)
+- [ ] Test lock timeout (process dies → lock auto-releases after 30s)
+- [ ] Test --force flag overrides "already configured" check
+- [ ] Verify lock doesn't leak (released on success AND on error)
+- [ ] Test lock contention logging (second process sees clear message)
+
+---
+
+### P1 #8: Strengthen URL Validation (1 hour)
+
+**File**: `cmd/update/wazuh_add_authentik.go:140-147`
+**Priority**: P1 - Input Validation
+**Effort**: 1 hour
+
+**Current Code** (weak validation):
+```go
+Validator: func(value string) error {
+    if value == "" {
+        return fmt.Errorf("Wazuh URL cannot be empty")
+    }
+    // TODO: Add more URL validation if needed
+    return nil
+},
+```
+
+**Issue**: Allows invalid URLs to reach business logic, causing cryptic errors
+- `file:///etc/passwd` (wrong protocol)
+- `wazuh.com` (missing protocol)
+- `https://wazuh .com` (spaces in hostname)
+- `https://wazuh.com:999999` (invalid port)
+- `https://127.0.0.1` (localhost not allowed for public URL)
+
+**Why This Matters**:
+- Poor user experience (cryptic errors deep in business logic)
+- Potential security issue (URL injection if not sanitized)
+- CLAUDE.md requires using `shared.SanitizeURL()` before validation
+
+**Fix** (use existing validation infrastructure):
+```go
+Validator: func(value string) error {
+    if value == "" {
+        return fmt.Errorf("Wazuh URL cannot be empty")
+    }
+
+    // Use existing validation infrastructure (CLAUDE.md pattern)
+    sanitized := shared.SanitizeURL(value)
+    if err := shared.ValidateURL(sanitized); err != nil {
+        return fmt.Errorf("invalid Wazuh URL: %w\n\n"+
+            "URL must be a valid HTTPS URL (e.g., https://wazuh.example.com)\n"+
+            "Got: %s", err, value)
+    }
+
+    // Protocol must be HTTPS (Wazuh requires TLS)
+    if !strings.HasPrefix(sanitized, "https://") {
+        return fmt.Errorf("Wazuh URL must use HTTPS protocol\n\n"+
+            "Got: %s\n"+
+            "Expected: https://%s", value, strings.TrimPrefix(value, "http://"))
+    }
+
+    // Reject localhost/127.0.0.1 (must be public URL for SSO)
+    parsedURL, _ := url.Parse(sanitized)
+    if parsedURL.Hostname() == "localhost" || parsedURL.Hostname() == "127.0.0.1" {
+        return fmt.Errorf("Wazuh URL must be a public hostname (not localhost)\n\n"+
+            "SSO requires a publicly accessible URL for redirect URIs.\n"+
+            "Use your server's public hostname or IP address.")
+    }
+
+    return nil
+},
+```
+
+**Testing Checklist**:
+- [ ] Test valid HTTPS URLs pass (https://wazuh.example.com)
+- [ ] Test HTTP URLs rejected with helpful message
+- [ ] Test localhost rejected with explanation
+- [ ] Test malformed URLs rejected (spaces, invalid chars)
+- [ ] Test URLs with invalid ports rejected
+- [ ] Test URLs without protocol get clear error
+- [ ] Verify error messages are actionable
+
+---
+
+### P1 #9: Fix Broken Health Check (1 hour)
+
+**File**: `pkg/hecate/add/wazuh.go:478-486`
+**Priority**: P1 - Reliability
+**Effort**: 1 hour
+
+**Current Code** (CREATES instead of CHECKS):
+```go
+func (w *WazuhIntegrator) HealthCheck(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
+    // ...
+
+    providerPK, err := samlClient.CreateSAMLProvider(rc.Ctx, authentik.SAMLProviderConfig{
+        Name: "wazuh-saml-provider",
+        // ...
+    })
+    if err != nil {
+        logger.Warn("Failed to verify SAML provider", zap.Error(err))
+        return nil // Non-fatal
+    }
+
+    // BUG: This CREATED a provider, not checked if it exists!
+}
+```
+
+**Issue**:
+- `CreateSAMLProvider` is NOT idempotent
+- If provider already exists, this will likely fail with "already exists" error
+- Error is swallowed, so user thinks health check passed
+- Actual health status is unknown
+
+**Why This Matters**:
+- False positives (health check says "OK" when it's not)
+- Creates duplicate resources on error
+- Doesn't actually verify SSO is working
+
+**Fix** (check instead of create):
+```go
+func (w *WazuhIntegrator) HealthCheck(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
+    logger := otelzap.Ctx(rc.Ctx)
+    logger.Info("  [3/3] Verifying Authentik SAML configuration")
+
+    token, baseURL, err := w.getAuthentikCredentials(rc.Ctx)
+    if err != nil {
+        logger.Warn("Skipping health check (Authentik credentials not available)")
+        return nil // Non-fatal - credentials issue, not health issue
+    }
+
+    samlClient := authentik.NewSAMLClient(baseURL, token)
+
+    // CHECK if provider exists (NOT create)
+    provider, err := samlClient.GetSAMLProviderByName(rc.Ctx, "wazuh-saml-provider")
+    if err != nil {
+        logger.Warn("SAML provider not found - integration may not be complete", zap.Error(err))
+        return nil // Non-fatal
+    }
+
+    logger.Info("    ✓ Authentik SAML provider configured", zap.String("provider_pk", provider.PK))
+
+    // Verify application exists
+    app, err := samlClient.GetApplicationBySlug(rc.Ctx, "wazuh-siem")
+    if err != nil {
+        logger.Warn("Wazuh application not found", zap.Error(err))
+        return nil // Non-fatal
+    }
+
+    logger.Info("    ✓ Wazuh application configured", zap.String("slug", app.Slug))
+
+    // Verify metadata in Consul KV
+    consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
+    if err == nil {
+        kv, _, err := consulClient.KV().Get("service/wazuh/sso/metadata_xml", nil)
+        if err == nil && kv != nil && len(kv.Value) > 0 {
+            logger.Info("    ✓ SAML metadata stored in Consul KV")
+        } else {
+            logger.Warn("SAML metadata not found in Consul KV")
+            logger.Warn("Wazuh server will need to fetch metadata directly from Authentik")
+        }
+    }
+
+    return nil
+}
+```
+
+**Note**: Requires adding `GetSAMLProviderByName()` and `GetApplicationBySlug()` methods to `pkg/authentik/saml.go`.
+
+**Testing Checklist**:
+- [ ] Add GetSAMLProviderByName() method to authentik package
+- [ ] Add GetApplicationBySlug() method to authentik package
+- [ ] Test health check with configured SSO (should pass)
+- [ ] Test health check with missing provider (should warn, not fail)
+- [ ] Test health check with missing application (should warn)
+- [ ] Test health check with missing Consul metadata (should warn)
+- [ ] Verify NO resources are created during health check
+
+---
+
+### P1 #10: Better TLS Validation (Custom CA Support) (2 hours)
+
+**File**: `pkg/hecate/add/wazuh.go:66-83`
+**Priority**: P1 - Security Improvement
+**Effort**: 2 hours
+
+**Current Code** (disables ALL validation):
+```go
+if opts.AllowInsecureTLS {
+    logger.Warn("⚠️  TLS CERTIFICATE VERIFICATION DISABLED")
+    // ... warnings ...
+    tlsConfig.InsecureSkipVerify = true  // Disables EVERYTHING
+}
+```
+
+**Issue**:
+- `InsecureSkipVerify = true` disables:
+  - Certificate expiry checks (allows expired certs)
+  - Hostname validation (allows wrong hostname)
+  - CA validation (allows self-signed certs from ANYONE)
+  - Revocation checks
+- Too permissive for security-conscious users
+
+**Why This Matters**:
+- Users with self-signed certs want to trust THEIR CA, not ALL CAs
+- Complete bypass is security anti-pattern
+- Better approach: Allow custom CA cert
+
+**Fix** (custom CA cert support):
+```go
+// In ServiceOptions struct (pkg/hecate/add/types.go):
+type ServiceOptions struct {
+    // ... existing fields ...
+    AllowInsecureTLS    bool   // DEPRECATED: Use CustomCACert instead
+    CustomCACert        string // Path to custom CA certificate (for self-signed certs)
+    // ...
+}
+
+// In wazuh.go validation (line ~66):
+if opts.CustomCACert != "" {
+    // Load and trust custom CA cert
+    caCert, err := os.ReadFile(opts.CustomCACert)
+    if err != nil {
+        return fmt.Errorf("failed to read CA cert from %s: %w", opts.CustomCACert, err)
+    }
+
+    caCertPool := x509.NewCertPool()
+    if !caCertPool.AppendCertsFromPEM(caCert) {
+        return fmt.Errorf("failed to parse CA cert from %s\n\n"+
+            "Ensure the file contains a valid PEM-encoded certificate", opts.CustomCACert)
+    }
+
+    tlsConfig.RootCAs = caCertPool // Use custom CA, keep all other validation
+    logger.Info("Using custom CA certificate", zap.String("path", opts.CustomCACert))
+
+} else if opts.AllowInsecureTLS {
+    // Only if no custom CA provided
+    logger.Warn("⚠️  TLS CERTIFICATE VERIFICATION DISABLED")
+    logger.Warn("This is INSECURE. Consider using --ca-cert instead.")
+    tlsConfig.InsecureSkipVerify = true
+}
+```
+
+**Command Usage**:
+```bash
+# NEW: Trust specific CA (RECOMMENDED)
+eos update hecate --add wazuh \
+  --dns wazuh.example.com \
+  --upstream 192.168.1.10 \
+  --ca-cert /etc/ssl/certs/my-ca.pem
+
+# OLD: Disable all validation (still works, but discouraged)
+eos update hecate --add wazuh \
+  --dns wazuh.example.com \
+  --upstream 192.168.1.10 \
+  --allow-insecure-tls
+```
+
+**Testing Checklist**:
+- [ ] Add CustomCACert field to ServiceOptions
+- [ ] Add --ca-cert flag to cmd/update/hecate_add.go
+- [ ] Test with valid custom CA cert (should work)
+- [ ] Test with invalid CA cert file (should error with clear message)
+- [ ] Test with malformed PEM file (should error)
+- [ ] Test with expired CA cert (should still validate server cert against it)
+- [ ] Verify hostname validation still works with custom CA
+- [ ] Deprecate --allow-insecure-tls in favor of --ca-cert
+
+---
+
+### Success Criteria ✅
+
+- [ ] P1 #5: Crypto key length research complete, constant documented
+- [ ] P1 #6: Atomic file writes implemented, 5 calls updated
+- [ ] P1 #7: Distributed locking implemented, race conditions prevented
+- [ ] P1 #8: URL validation strengthened, all invalid inputs rejected
+- [ ] P1 #9: Health check fixed, no resource creation during checks
+- [ ] P1 #10: Custom CA cert support added, --allow-insecure-tls deprecated
+- [ ] Build succeeds: `go build -o /tmp/eos-build ./cmd/`
+- [ ] go vet passes: `go vet ./pkg/wazuh/... ./pkg/hecate/... ./pkg/shared/...`
+- [ ] All tests pass (unit + integration)
+- [ ] Security review complete (no new P0/P1 issues)
+- [ ] Documentation updated (CLAUDE.md, command help text)
+
+---
+
+### Files to Modify
+
+| File | Changes | Lines | Effort |
+|------|---------|-------|--------|
+| `pkg/wazuh/types.go` | Add SAMLExchangeKeyLengthBytes constant | +10 | 15min |
+| `pkg/wazuh/sso_sync.go` | Use new constant in GenerateExchangeKey() | ~5 | 15min |
+| `pkg/shared/atomic_write.go` | NEW - Atomic file write helper | +50 | 1h |
+| `pkg/wazuh/sso/configure.go` | Use AtomicWriteFile (2 calls) | ~10 | 15min |
+| `pkg/wazuh/sso_sync.go` | Use AtomicWriteFile (3 calls) | ~15 | 15min |
+| `pkg/hecate/add/wazuh.go` | Add distributed locking + fix health check | +80 | 3h |
+| `pkg/hecate/add/types.go` | Add CustomCACert field | +2 | 5min |
+| `cmd/update/wazuh_add_authentik.go` | Strengthen URL validation | ~20 | 30min |
+| `cmd/update/hecate_add.go` | Add --ca-cert flag | +3 | 15min |
+| `pkg/authentik/saml.go` | Add GetSAMLProviderByName(), GetApplicationBySlug() | +60 | 1h |
+| **Total** | **10 files** | **~255 lines** | **10-12h** |
+
+---
+
+### Deployment Plan
+
+**Phase 1: Non-Breaking Changes** (6 hours)
+- P1 #5: Crypto key length (breaking only if keys incompatible)
+- P1 #6: Atomic file writes (internal improvement, no API change)
+- P1 #8: URL validation (stricter, may reject previously accepted invalid URLs)
+
+**Phase 2: Breaking Changes** (6 hours)
+- P1 #7: Distributed locking (may reject concurrent operations)
+- P1 #9: Health check fix (changes behavior)
+- P1 #10: Custom CA cert (deprecates --allow-insecure-tls)
+
+**Rollback Plan**:
+- Keep P0 fixes (already in production)
+- Revert P1 changes if critical issues found
+- Each P1 fix is independent (can revert individually)
+
+---
+
+### Reference
+
+**Full Analysis**: See conversation history (2025-10-28) for complete adversarial analysis with 25 issues across P0-P3.
+
+**Related Work**:
+- P0 fixes: Completed 2025-10-28 (5 issues, 4 files, ~125 lines)
+- P2 fixes: Documented as technical debt (7 issues, 6-8 hours estimated)
+- P3 fixes: Nice-to-have (6 issues, 12-16 hours estimated)
+
+**Next Steps After P1**:
+- Deploy to staging environment
+- Manual testing (full SSO flow)
+- Security audit (penetration testing)
+- Production deployment
+
+---
+
 ## Phase 5: Upgrade & Test 📅 PLANNED
 
 ### Target Completion: Week of 2025-11-10
@@ -1322,6 +1924,200 @@ Code: 403. Errors:
 **Complexity**: Low (policy update only)
 **Target Date**: TBD (when Vault-backed secret delivery required for compliance/rotation)
 **Reference**: See diagnostic output showing 403 errors for all 4 secrets (postgres_password, jwt_secret, litellm_master_key, azure_api_key)
+
+---
+
+### Debug Command Technical Debt (BionicGPT Integration Diagnostics)
+
+**Status**: 📋 TRACKED - Issues from adversarial analysis
+**Priority**: Mixed (P0-P3)
+**Total Effort**: ~14 hours
+**Added**: 2025-10-28
+**Reference**: `pkg/hecate/debug_bionicgpt.go` (946 lines)
+
+**Context**: Debug command `eos debug hecate --bionicgpt` implemented for Authentik-Caddy-BionicGPT triangle diagnostics. Adversarial analysis identified 22 issues ranging from P0 (breaking) to P3 (nice-to-have).
+
+---
+
+#### P0 - BREAKING (Must Fix)
+
+**Issue 2.3: Hardcoded Container Names** - 30 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:105, 128, 151`
+- **Problem**: Container name filters assume exact matches (e.g., `name=caddy`) - fails if user customized naming or Docker Compose v1/v2 differences
+- **Impact**: Debug command reports false negatives (claims containers not running when they are)
+- **Fix**: Use label-based filtering: `--filter label=com.docker.compose.project=hecate` instead of name-based
+- **Testing**: Verify on Docker Compose v1 (`hecate_caddy_1`) and v2 (`hecate-caddy-1`) naming conventions
+
+**Issue 4.1: Emoji Usage in Output** - 15 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:948-965` (display functions)
+- **Problem**: Emojis in output (✅ ❌ ⚠️) violate CLAUDE.md "Memory Notes" (no emojis unless requested)
+- **Impact**: Accessibility issues, inconsistent with Eos standards
+- **Options**:
+  1. Remove all emojis → use `[PASS]`, `[FAIL]`, `[WARN]` (cleanest, aligns with standards)
+  2. Add `--no-emoji` flag → keep emojis by default for human-friendliness
+- **Decision Required**: User preference on UX vs standards trade-off
+
+---
+
+#### P1 - CRITICAL (Before Production)
+
+**Issue 1.2: Missing Unit Tests** - 2 hours
+- **Files**: None - tests do not exist
+- **Problem**: Zero test coverage for 946 lines of complex diagnostic logic
+- **Priority**: P1 (critical business logic untested, high regression risk)
+- **Implementation**:
+  - Create `pkg/hecate/debug_bionicgpt_test.go`
+  - Test `extractBionicGPTDomain()` (string parsing edge cases)
+  - Test `readEnvFile()` (custom .env parser with quotes, comments, malformed lines)
+  - Mock Docker API responses for container checks
+  - Mock HTTP responses for Authentik API checks
+  - Mock file system for Caddyfile reading
+- **Coverage Target**: >80% of diagnostic functions
+
+**Issue 2.2: InsecureSkipVerify Always Enabled** - 30 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:765-770`
+- **Problem**: TLS verification disabled for all HTTP checks (security risk)
+- **Attack Scenario**: Man-in-the-middle attack during debug execution
+- **Impact**: Secrets could be intercepted if Authentik connection compromised
+- **Fix**: Only skip verification for localhost connections, require valid certs for remote
+- **Testing**: Verify HTTPS endpoints with valid/invalid/self-signed certificates
+
+**Issue 2.4: Potential Secrets Exposure in Error Messages** - 30 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:384, 430`
+- **Problem**: HTTP client errors might include auth tokens in URL parameters or headers
+- **Impact**: Authentik API token visible in telemetry/logs if API call fails
+- **Fix**: Sanitize error messages before logging - redact tokens, credentials
+- **Pattern**:
+  ```go
+  if err != nil {
+      sanitizedErr := sanitizeError(err, []string{authentikToken})
+      logger.Error("API call failed", zap.Error(sanitizedErr))
+  }
+  ```
+
+**Issue 3.2: Context Timeout Not Propagated** - 30 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:103, 127, 151` (all exec.Command calls)
+- **Problem**: Creates multiple child contexts with independent timeouts - parent context cancellation not respected
+- **Impact**: User presses Ctrl+C, but Docker/HTTP calls continue for up to 5 seconds each (30+ seconds total)
+- **Fix**: Use single context timeout at function level, pass `rc.Ctx` to all child operations
+- **Testing**: Run debug command, press Ctrl+C during checks, verify immediate cancellation
+
+**Issue 4.3: Hardcoded Paths Violate Constants Rule** - 15 minutes
+- **Files**: `pkg/hecate/debug_bionicgpt.go:595, 252`
+- **Problem**: `/opt/bionicgpt/.env`, `/opt/hecate/Caddyfile` hardcoded (violates CLAUDE.md P0 #12)
+- **Impact**: Breaks if user customized installation paths
+- **Fix**: Extract to constants:
+  ```go
+  // pkg/bionicgpt/constants.go
+  const (
+      BionicGPTInstallDir = "/opt/bionicgpt"
+      BionicGPTEnvFile = BionicGPTInstallDir + "/.env"
+  )
+
+  // pkg/hecate/constants.go
+  const (
+      HecateInstallDir = "/opt/hecate"
+      HecateCaddyfile = HecateInstallDir + "/Caddyfile"
+  )
+  ```
+
+---
+
+#### P2 - IMPORTANT (Quality Improvements)
+
+**Issue 2.1: Dynamic Container Detection** - 45 minutes
+- **Enhancement**: Auto-detect Docker Compose naming convention (v1 vs v2)
+- **Implementation**: Use Docker API labels instead of name matching
+- **Benefit**: Works universally without hardcoding container names
+
+**Issue 3.1: Add Panic Recovery** - 30 minutes
+- **Enhancement**: Wrap each phase check in `defer recover()` to prevent cascading failures
+- **Benefit**: One failing check doesn't crash entire diagnostic run
+
+**Issue 5.1: Handle Multiple Caddyfiles (Import Directive)** - 30 minutes
+- **Problem**: Assumes single Caddyfile, ignores `import` statements
+- **Enhancement**: Parse `import` directives, search imported files for BionicGPT config
+
+**Issue 5.2: Detect Multiple BionicGPT Deployments** - 30 minutes
+- **Problem**: Only detects first BionicGPT domain, ignores additional instances
+- **Enhancement**: Return `[]string` (all domains), check each instance
+
+**Issue 5.5: Proper Caddyfile Parsing** - 1 hour
+- **Problem**: Uses string search (`strings.Contains`) instead of proper parsing
+- **Enhancement**: Use `github.com/caddyserver/caddy/v2/caddyconfig/caddyfile` for accurate parsing
+- **Benefit**: Avoids false positives from commented-out config or wrong blocks
+
+**Issue 5.6: Check for Conflicting Routes** - 30 minutes
+- **Enhancement**: Detect if multiple services proxy to same backend (routing conflicts)
+
+**Issue 7.1: Implement Verbose Mode** - 30 minutes
+- **Problem**: `--verbose` flag defined but never used (line 25)
+- **Fix**: Add verbose logging when flag enabled
+
+**Issue 8.1: Refactor Long Functions** - 45 minutes
+- **Problem**: `checkAuthentikIntegration()` is 180 lines (violates readability)
+- **Fix**: Extract subfunctions for each check type
+
+**Issue 8.3: Extract Container Checking Helper** - 30 minutes
+- **Problem**: Near-identical code blocks for Caddy/Authentik/BionicGPT checks (lines 94-175)
+- **Fix**: Extract `checkContainerRunning(name, category) BionicGPTIntegrationCheck`
+
+---
+
+#### P3 - MINOR (Nice-to-Have)
+
+**Issue 3.3: Add Dry-Run Mode** - 30 minutes
+- **Enhancement**: `--dry-run` flag to preview checks without executing
+
+**Issue 4.2: Extract Hardcoded Timeouts** - 15 minutes
+- **Problem**: `5 * time.Second` repeated throughout code
+- **Fix**: Extract to constants (`DockerCommandTimeout`, `HTTPCheckTimeout`)
+
+**Issue 7.2: Add OpenTelemetry Spans** - 30 minutes
+- **Enhancement**: Wrap each phase in `tracer.Start()` for distributed tracing
+
+**Issue 7.3: Progress Indicators** - 30 minutes
+- **Enhancement**: Show "Checking X... [1/6]" during long-running operations
+
+**Issue 9.2: Export Format Options** - 30 minutes
+- **Enhancement**: Support `--format json|markdown|csv` for machine-parseable output
+
+**Issue 10.1: Add Godoc Comments** - 30 minutes
+- **Problem**: Public functions lack documentation
+- **Fix**: Add godoc comments to all exported functions
+
+---
+
+### Timeline & Priorities
+
+| Priority | Issues | Effort | Target |
+|----------|--------|--------|--------|
+| **P0** | 2 | 45 min | Week of 2025-11-03 |
+| **P1** | 5 | 3.5 hrs | Week of 2025-11-10 |
+| **P2** | 9 | 5.5 hrs | Week of 2025-11-17 |
+| **P3** | 6 | 4.5 hrs | TBD (low priority) |
+
+---
+
+### Success Criteria
+
+- [ ] P0 issues fixed (container detection, emoji policy decision)
+- [ ] P1 issues fixed (unit tests, security, constants)
+- [ ] Build succeeds: `go build -o /tmp/eos-build ./cmd/`
+- [ ] Test coverage >80% for diagnostic logic
+- [ ] Works on Docker Compose v1 and v2
+- [ ] Context cancellation works (Ctrl+C terminates immediately)
+- [ ] No secrets in logs/telemetry
+- [ ] Godoc comments on all exported functions
+
+---
+
+### Out of Scope
+
+**Not addressing in this cleanup** (tracked separately):
+- BionicGPT Vault Agent integration (see "BionicGPT Vault Integration" section above)
+- Automatic debug output capture (already implemented in `pkg/debug/capture.go`)
+- Evidence collection for remote debug (already implemented in `pkg/remotedebug/evidence.go`)
 
 ---
 

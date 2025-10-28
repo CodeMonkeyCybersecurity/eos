@@ -5,8 +5,10 @@
 package hecate
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -19,7 +21,7 @@ import (
 //
 // ASSESS → INTERVENE → EVALUATE pattern:
 // - ASSESS: Check container is running
-// - INTERVENE: Execute caddy validate inside container
+// - INTERVENE: Execute caddy validate inside container (with timeout)
 // - EVALUATE: Check exit code and parse output
 func ValidateCaddyfileLive(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -31,6 +33,29 @@ func ValidateCaddyfileLive(rc *eos_io.RuntimeContext, caddyfilePath string) erro
 	// ASSESS: Check container is running
 	// Note: Container name verification happens in container.ExecCommandInContainer
 
+	// CRITICAL P0.6: Create timeout context for docker exec
+	// RATIONALE: Caddy validate should complete in <10 seconds for normal configs
+	//            Timeout prevents indefinite hangs if Caddy is deadlocked or unresponsive
+	// THREAT MODEL: Container is running but Caddy process is hung/deadlocked
+	const dockerExecTimeout = 30 * time.Second
+	ctx, cancel := context.WithTimeout(rc.Ctx, dockerExecTimeout)
+	defer cancel()
+
+	// Create new RuntimeContext with timeout context
+	// Preserve all fields except Ctx which we replace with timeout context
+	timeoutRC := &eos_io.RuntimeContext{
+		Ctx:        ctx,
+		Log:        rc.Log,
+		Timestamp:  rc.Timestamp,
+		Command:    rc.Command,
+		Component:  rc.Component,
+		Attributes: rc.Attributes,
+		Validate:   rc.Validate,
+		Operation:  rc.Operation,
+		Verbose:    rc.Verbose,
+		Quiet:      rc.Quiet,
+	}
+
 	// INTERVENE: Execute caddy validate inside container
 	cfg := container.ExecConfig{
 		ContainerName: CaddyContainerName,
@@ -38,7 +63,20 @@ func ValidateCaddyfileLive(rc *eos_io.RuntimeContext, caddyfilePath string) erro
 		Tty:           false,
 	}
 
-	output, err := container.ExecCommandInContainer(rc, cfg)
+	output, err := container.ExecCommandInContainer(timeoutRC, cfg)
+
+	// Check for timeout
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("Caddy validation timed out after %v\n\n"+
+			"This may indicate:\n"+
+			"  - Caddy process is hung or deadlocked\n"+
+			"  - Container is unresponsive\n"+
+			"  - Config file is extremely large\n\n"+
+			"Check Caddy status:\n"+
+			"  docker exec %s ps aux | grep caddy\n"+
+			"  docker logs %s",
+			dockerExecTimeout, CaddyContainerName, CaddyContainerName)
+	}
 
 	// EVALUATE: Check results
 	if err != nil {
@@ -72,8 +110,32 @@ func ReloadCaddyViaExec(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 		zap.String("caddyfile", caddyfilePath))
 
 	// ASSESS: Validate first to ensure config is valid
+	// Note: ValidateCaddyfileLive has its own timeout
 	if err := ValidateCaddyfileLive(rc, caddyfilePath); err != nil {
 		return fmt.Errorf("validation failed, not reloading: %w", err)
+	}
+
+	// CRITICAL P0.6: Create timeout context for docker exec
+	// RATIONALE: Caddy reload should complete in <30 seconds for normal configs
+	//            Timeout prevents indefinite hangs if Caddy is deadlocked
+	// THREAT MODEL: Container is running but Caddy process is hung during reload
+	const dockerExecTimeout = 30 * time.Second
+	ctx, cancel := context.WithTimeout(rc.Ctx, dockerExecTimeout)
+	defer cancel()
+
+	// Create new RuntimeContext with timeout context
+	// Preserve all fields except Ctx which we replace with timeout context
+	timeoutRC := &eos_io.RuntimeContext{
+		Ctx:        ctx,
+		Log:        rc.Log,
+		Timestamp:  rc.Timestamp,
+		Command:    rc.Command,
+		Component:  rc.Component,
+		Attributes: rc.Attributes,
+		Validate:   rc.Validate,
+		Operation:  rc.Operation,
+		Verbose:    rc.Verbose,
+		Quiet:      rc.Quiet,
 	}
 
 	// INTERVENE: Execute caddy reload inside container
@@ -83,7 +145,22 @@ func ReloadCaddyViaExec(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 		Tty:           false,
 	}
 
-	output, err := container.ExecCommandInContainer(rc, cfg)
+	output, err := container.ExecCommandInContainer(timeoutRC, cfg)
+
+	// Check for timeout
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("Caddy reload timed out after %v\n\n"+
+			"This may indicate:\n"+
+			"  - Caddy process is hung or deadlocked during reload\n"+
+			"  - Container is unresponsive\n"+
+			"  - Config reload is taking longer than expected\n\n"+
+			"Check Caddy status:\n"+
+			"  docker exec %s ps aux | grep caddy\n"+
+			"  docker logs %s\n\n"+
+			"You may need to restart Caddy:\n"+
+			"  docker restart %s",
+			dockerExecTimeout, CaddyContainerName, CaddyContainerName, CaddyContainerName)
+	}
 
 	// EVALUATE: Check results
 	if err != nil {

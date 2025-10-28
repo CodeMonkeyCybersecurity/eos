@@ -190,24 +190,131 @@ func BackupCaddyfile(rc *eos_io.RuntimeContext) (string, error) {
 	return backupPath, nil
 }
 
-// RestoreBackup restores a backup Caddyfile
+// RestoreBackup restores a backup Caddyfile with integrity verification
+// This function performs comprehensive validation before restore to prevent
+// cascading failures from corrupted backup files.
 func RestoreBackup(rc *eos_io.RuntimeContext, backupPath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Read backup
+	// ASSESS: Verify backup file exists and is not empty
+	info, err := os.Stat(backupPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("backup file does not exist: %s", backupPath)
+		}
+		return fmt.Errorf("failed to stat backup file: %w", err)
+	}
+
+	if info.Size() == 0 {
+		return fmt.Errorf("backup file is empty (0 bytes): %s\n\n"+
+			"This backup cannot be restored.\n"+
+			"Check for other backups: ls -lh %s/", backupPath, BackupDir)
+	}
+
+	if info.Size() < 50 {
+		logger.Warn("Backup file is suspiciously small",
+			zap.String("backup_path", backupPath),
+			zap.Int64("size_bytes", info.Size()))
+	}
+
+	// ASSESS: Read backup content
 	content, err := os.ReadFile(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
 
-	// Restore to original location
-	if err := os.WriteFile(CaddyfilePath, content, 0644); err != nil {
-		return fmt.Errorf("failed to restore Caddyfile: %w", err)
+	// ASSESS: Validate Caddyfile syntax
+	if err := validateCaddyfileSyntax(string(content)); err != nil {
+		return fmt.Errorf("backup file has invalid Caddyfile syntax: %w\n\n"+
+			"Backup location: %s\n"+
+			"This backup cannot be restored safely.\n"+
+			"Check for other backups: ls -lh %s/", err, backupPath, BackupDir)
+	}
+
+	// INTERVENE: Write to temp file first (atomic operation pattern)
+	tempPath := CaddyfilePath + ".restore.tmp"
+	if err := os.WriteFile(tempPath, content, hecate.TempFilePerm); err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	// Ensure temp file is cleaned up on failure
+	defer func() {
+		if _, err := os.Stat(tempPath); err == nil {
+			_ = os.Remove(tempPath)
+		}
+	}()
+
+	// INTERVENE: Atomic rename (replaces target file in single syscall)
+	if err := os.Rename(tempPath, CaddyfilePath); err != nil {
+		return fmt.Errorf("failed to restore Caddyfile (atomic rename failed): %w", err)
+	}
+
+	// INTERVENE: Set correct permissions on restored file
+	if err := os.Chmod(CaddyfilePath, hecate.CaddyfilePerm); err != nil {
+		logger.Warn("Failed to set Caddyfile permissions after restore",
+			zap.Error(err))
+	}
+
+	// EVALUATE: Verify restore succeeded
+	restoredContent, err := os.ReadFile(CaddyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to verify restored file: %w", err)
+	}
+
+	if len(restoredContent) != len(content) {
+		return fmt.Errorf("restore verification failed: size mismatch\n"+
+			"Expected: %d bytes\n"+
+			"Actual: %d bytes\n\n"+
+			"The Caddyfile may be corrupted.",
+			len(content), len(restoredContent))
 	}
 
 	logger.Info("Restored Caddyfile from backup",
-		zap.String("backup_path", backupPath))
+		zap.String("backup_path", backupPath),
+		zap.Int64("backup_size_bytes", info.Size()),
+		zap.Int("restored_size_bytes", len(restoredContent)))
 
+	return nil
+}
+
+// validateCaddyfileSyntax performs basic syntax validation on Caddyfile content
+// This is NOT a complete parser, but catches common corruption issues:
+// - Unbalanced braces
+// - Missing required snippets (common block)
+// - Empty file
+func validateCaddyfileSyntax(content string) error {
+	if len(content) == 0 {
+		return fmt.Errorf("Caddyfile is empty")
+	}
+
+	// Check for balanced braces
+	openBraces := 0
+	for i, char := range content {
+		if char == '{' {
+			openBraces++
+		} else if char == '}' {
+			openBraces--
+			if openBraces < 0 {
+				return fmt.Errorf("unbalanced braces: extra '}' at position %d", i)
+			}
+		}
+	}
+
+	if openBraces > 0 {
+		return fmt.Errorf("unbalanced braces: %d unclosed '{'", openBraces)
+	}
+
+	// Check for required common snippet (all Hecate Caddyfiles should have this)
+	if !strings.Contains(content, "(common)") {
+		return fmt.Errorf("missing required (common) snippet\n\n" +
+			"This may not be a valid Hecate Caddyfile.\n" +
+			"Expected snippet:\n" +
+			"  (common) {\n" +
+			"    ...\n" +
+			"  }")
+	}
+
+	// Validation passed
 	return nil
 }
 
@@ -240,6 +347,13 @@ func AppendRoute(rc *eos_io.RuntimeContext, routeConfig string) error {
 }
 
 // CleanupOldBackups removes backups older than retentionDays
+// CRITICAL P0.7: This function protects against race conditions where operation A's backup
+// is deleted by operation B's cleanup before operation A completes.
+//
+// Protection mechanism:
+// 1. Only delete backups older than BackupMinimumAgeBeforeCleanup (1 hour)
+// 2. AND older than retention period
+// 3. This ensures concurrent operations have time to use their backups
 func CleanupOldBackups(rc *eos_io.RuntimeContext, retentionDays int) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -256,7 +370,13 @@ func CleanupOldBackups(rc *eos_io.RuntimeContext, retentionDays int) error {
 	}
 
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+	// CRITICAL P0.7: Minimum age before cleanup prevents race condition
+	// RATIONALE: Concurrent operation may have just created backup and is still using it
+	// THREAT MODEL: Operation A creates backup at T+0, Operation B's cleanup runs at T+1
+	//               and deletes backup before Operation A can restore it (if needed)
+	minimumAge := time.Now().Add(-hecate.BackupMinimumAgeBeforeCleanup)
 	removedCount := 0
+	skippedTooNew := 0
 
 	for _, file := range files {
 		info, err := os.Stat(file)
@@ -265,8 +385,23 @@ func CleanupOldBackups(rc *eos_io.RuntimeContext, retentionDays int) error {
 			continue
 		}
 
-		// Check if file is older than retention period
+		// CRITICAL P0.7: Check BOTH conditions:
+		// 1. File is older than retention period (user's policy)
+		// 2. File is older than minimum age (race condition protection)
 		if info.ModTime().Before(cutoffTime) {
+			// File is old enough for retention policy
+			if info.ModTime().After(minimumAge) {
+				// But NOT old enough for safe deletion (might be in use)
+				skippedTooNew++
+				logger.Debug("Skipping backup deletion: too new, may be in use",
+					zap.String("file", file),
+					zap.Time("mod_time", info.ModTime()),
+					zap.Duration("age", time.Since(info.ModTime())),
+					zap.Duration("minimum_age", hecate.BackupMinimumAgeBeforeCleanup))
+				continue
+			}
+
+			// Safe to delete: old enough AND past minimum age
 			if err := os.Remove(file); err != nil {
 				logger.Warn("Failed to remove old backup",
 					zap.String("file", file),
@@ -276,14 +411,17 @@ func CleanupOldBackups(rc *eos_io.RuntimeContext, retentionDays int) error {
 			removedCount++
 			logger.Debug("Removed old backup",
 				zap.String("file", file),
-				zap.Time("mod_time", info.ModTime()))
+				zap.Time("mod_time", info.ModTime()),
+				zap.Duration("age", time.Since(info.ModTime())))
 		}
 	}
 
-	if removedCount > 0 {
+	if removedCount > 0 || skippedTooNew > 0 {
 		logger.Info("Cleaned up old backups",
 			zap.Int("removed_count", removedCount),
-			zap.Int("retention_days", retentionDays))
+			zap.Int("skipped_too_new", skippedTooNew),
+			zap.Int("retention_days", retentionDays),
+			zap.Duration("minimum_age_protection", hecate.BackupMinimumAgeBeforeCleanup))
 	}
 
 	return nil

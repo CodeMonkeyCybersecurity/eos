@@ -27,10 +27,12 @@ type WazuhIntegrator struct {
 
 // WazuhIntegrationResources tracks resources created during Wazuh integration
 type WazuhIntegrationResources struct {
-	SAMLProviderPK  string // Authentik SAML provider PK (for cleanup)
-	ApplicationPK   string // Authentik application PK (for cleanup)
-	ApplicationSlug string // Authentik application slug (for cleanup)
-	MetadataStored  bool   // Whether metadata was stored in Consul KV
+	SAMLProviderPK       string   // Authentik SAML provider PK (for cleanup)
+	PropertyMappingPKs   []string // SAML property mappings created (for cleanup)
+	ApplicationPK        string   // Authentik application PK (for cleanup)
+	ApplicationSlug      string   // Authentik application slug (for cleanup)
+	MetadataStored       bool     // Whether metadata was stored in Consul KV
+	ConsulKVKeysCreated  []string // All Consul KV keys created (for cleanup)
 }
 
 func init() {
@@ -330,6 +332,7 @@ func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opt
 	if err != nil {
 		return fmt.Errorf("failed to create property mappings: %w", err)
 	}
+	w.resources.PropertyMappingPKs = propertyMappingPKs // Track for rollback
 	logger.Info("    ✓ Property mappings created", zap.Int("count", len(propertyMappingPKs)))
 
 	// Step 5: Get authorization flow
@@ -409,8 +412,9 @@ func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opt
 		logger.Warn("Failed to create Consul client, skipping metadata storage", zap.Error(err))
 		logger.Warn("Wazuh server will need to fetch metadata directly from Authentik API")
 	} else {
+		metadataKey := "service/wazuh/sso/metadata_xml"
 		kvPair := &consulapi.KVPair{
-			Key:   "service/wazuh/sso/metadata_xml",
+			Key:   metadataKey,
 			Value: metadata,
 		}
 		_, err = consulClient.KV().Put(kvPair, nil)
@@ -418,8 +422,9 @@ func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opt
 			logger.Warn("Failed to store metadata in Consul KV", zap.Error(err))
 			logger.Warn("Wazuh server will need to fetch metadata directly from Authentik API")
 		} else {
-			logger.Info("    ✓ Metadata stored in Consul KV", zap.String("key", "service/wazuh/sso/metadata_xml"))
+			logger.Info("    ✓ Metadata stored in Consul KV", zap.String("key", metadataKey))
 			w.resources.MetadataStored = true
+			w.resources.ConsulKVKeysCreated = append(w.resources.ConsulKVKeysCreated, metadataKey)
 		}
 	}
 
@@ -440,6 +445,8 @@ func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opt
 			}
 			if _, err := consulClient.KV().Put(kvPair, nil); err != nil {
 				logger.Warn("Failed to store config in Consul KV", zap.String("key", key), zap.Error(err))
+			} else {
+				w.resources.ConsulKVKeysCreated = append(w.resources.ConsulKVKeysCreated, key)
 			}
 		}
 		logger.Info("    ✓ Configuration stored in Consul KV")
@@ -525,6 +532,8 @@ func (w *WazuhIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
 		logger.Info("Deleting Authentik application", zap.String("slug", w.resources.ApplicationSlug))
 		if err := apiClient.DeleteApplication(rc.Ctx, w.resources.ApplicationSlug); err != nil {
 			logger.Warn("Failed to delete application", zap.Error(err))
+		} else {
+			logger.Info("    ✓ Deleted application", zap.String("slug", w.resources.ApplicationSlug))
 		}
 	}
 
@@ -533,16 +542,32 @@ func (w *WazuhIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
 		logger.Info("Deleting SAML provider", zap.String("pk", w.resources.SAMLProviderPK))
 		if err := samlClient.DeleteSAMLProvider(rc.Ctx, w.resources.SAMLProviderPK); err != nil {
 			logger.Warn("Failed to delete SAML provider", zap.Error(err))
+		} else {
+			logger.Info("    ✓ Deleted SAML provider", zap.String("pk", w.resources.SAMLProviderPK))
 		}
 	}
 
-	// Remove metadata from Consul KV
-	if w.resources.MetadataStored {
+	// Delete property mappings
+	for _, pk := range w.resources.PropertyMappingPKs {
+		logger.Info("Deleting property mapping", zap.String("pk", pk))
+		if err := samlClient.DeletePropertyMapping(rc.Ctx, pk); err != nil {
+			logger.Warn("Failed to delete property mapping", zap.String("pk", pk), zap.Error(err))
+		} else {
+			logger.Info("    ✓ Deleted property mapping", zap.String("pk", pk))
+		}
+	}
+
+	// Remove ALL Consul KV keys
+	if len(w.resources.ConsulKVKeysCreated) > 0 {
 		consulClient, err := consulapi.NewClient(consulapi.DefaultConfig())
 		if err == nil {
-			logger.Info("Removing metadata from Consul KV")
-			if _, err := consulClient.KV().Delete("service/wazuh/sso/metadata_xml", nil); err != nil {
-				logger.Warn("Failed to delete metadata from Consul KV", zap.Error(err))
+			logger.Info("Removing Consul KV keys", zap.Int("count", len(w.resources.ConsulKVKeysCreated)))
+			for _, key := range w.resources.ConsulKVKeysCreated {
+				if _, err := consulClient.KV().Delete(key, nil); err != nil {
+					logger.Warn("Failed to delete Consul KV key", zap.String("key", key), zap.Error(err))
+				} else {
+					logger.Info("    ✓ Deleted Consul KV key", zap.String("key", key))
+				}
 			}
 		}
 	}

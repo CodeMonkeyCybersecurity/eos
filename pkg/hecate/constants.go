@@ -30,17 +30,49 @@ const (
 // ============================================================================
 
 const (
-	// CaddyAdminAPIHost is the hostname where Caddy Admin API is accessible
-	// RATIONALE: Caddy Admin API runs on localhost for security (not exposed to network)
-	// SECURITY: Localhost-only prevents remote API access without authentication
+	// CaddyAdminAPIHost is the hostname where Caddy Admin API is accessible FROM THE HOST
+	// RATIONALE: Caddy Admin API is accessed via localhost from the host machine
+	// VALUE: "localhost" refers to host's localhost (not container's localhost)
 	CaddyAdminAPIHost = "localhost"
 
 	// CaddyAdminAPIPort is the port where Caddy Admin API listens
 	// RATIONALE: Port 2019 is Caddy's default Admin API port
-	// SECURITY: Must be exposed as "127.0.0.1:2019:2019" in docker-compose.yml for host access
-	//           Binding to 127.0.0.1 ensures Admin API is ONLY accessible from localhost, not network
+	//
+	// SECURITY MODEL (CRITICAL P0.9 - Read carefully):
+	// ┌─────────────────────────────────────────────────────────────────────────┐
+	// │ Admin API Security has THREE layers:                                    │
+	// │                                                                          │
+	// │ Layer 1: Host-to-Container Port Mapping                                 │
+	// │   "127.0.0.1:2019:2019" in docker-compose.yml                           │
+	// │   → Binds container port 2019 to host's 127.0.0.1:2019                  │
+	// │   → ONLY accessible from host machine, NOT from network                 │
+	// │   → Prevents remote attackers from accessing Admin API                  │
+	// │                                                                          │
+	// │ Layer 2: Container-Internal Listening Address                           │
+	// │   Caddy listens on 0.0.0.0:2019 INSIDE container                        │
+	// │   → Accessible from ANY container on Docker bridge network              │
+	// │   → This is INTENTIONAL (Eos needs to call it from host via port map)  │
+	// │   → NOT a security issue: Docker network is isolated by default         │
+	// │                                                                          │
+	// │ Layer 3: Network Isolation (Docker Bridge)                              │
+	// │   Docker bridge network isolates containers from host network           │
+	// │   → Other machines on LAN CANNOT access Docker bridge                   │
+	// │   → Only host machine + containers in same bridge can connect           │
+	// │                                                                          │
+	// │ THREAT MODEL:                                                            │
+	// │   ✓ Prevents: Remote network attackers accessing Admin API              │
+	// │   ✓ Prevents: Other VMs on same physical host accessing Admin API       │
+	// │   ✗ Does NOT prevent: Malicious containers on same bridge network       │
+	// │   ✗ Does NOT prevent: Root user on host machine (intended behavior)     │
+	// │                                                                          │
+	// │ FUTURE ENHANCEMENT (ROADMAP):                                            │
+	// │   Add --admin-api flag to enable/disable Admin API port exposure        │
+	// │   Default: DISABLED (more secure, uses docker exec fallback)            │
+	// │   User enables: --admin-api=true (faster, requires port exposure)       │
+	// └─────────────────────────────────────────────────────────────────────────┘
+	//
 	// USAGE: Used for zero-downtime config reloads via `eos update hecate --add`
-	//        If port not exposed, Eos falls back to container restart (brief downtime)
+	//        If port not exposed, Eos falls back to docker exec (also zero-downtime)
 	// REFERENCE: https://caddyserver.com/docs/api
 	// TEMPLATE: pkg/hecate/yaml_generator.go line ~256 exposes this port in docker-compose.yml
 	CaddyAdminAPIPort = 2019

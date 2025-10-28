@@ -96,9 +96,22 @@ func RestartCaddyContainer(rc *eos_io.RuntimeContext) error {
 // Strategy selection (in order of preference):
 //  1. Admin API (fastest, zero-downtime, requires port 2019 exposed)
 //  2. Docker exec validation (fast, zero-downtime, always works)
-//  3. Container restart (slow, brief downtime, guaranteed to work)
+//
+// NOTE: This function NEVER restarts the container. Validation is non-destructive.
+// Container restart only happens in ReloadCaddy as a last resort.
 func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// ASSESS: Verify container is running before attempting validation
+	isRunning, err := IsCaddyRunning(rc)
+	if err != nil {
+		return fmt.Errorf("failed to check Caddy status: %w", err)
+	}
+	if !isRunning {
+		return fmt.Errorf("Caddy container is not running\n\n" +
+			"Start Hecate with:\n" +
+			"  cd /opt/hecate && docker-compose up -d")
+	}
 
 	// ASSESS: Check if Admin API is reachable
 	if IsAdminAPIReachable(rc) {
@@ -126,35 +139,26 @@ func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error 
 		return nil
 	}
 
-	// Admin API not reachable - try docker exec validation
-	logger.Warn("Admin API not reachable, trying docker exec validation")
+	// Admin API not reachable - use docker exec validation
+	logger.Warn("Admin API not reachable, using docker exec validation")
 
 	// Strategy 2: Docker exec validation (zero-downtime, no port exposure needed)
 	if err := hecate.ValidateCaddyfileLive(rc, caddyfilePath); err != nil {
-		// Docker exec validation failed - fall back to restart
-		logger.Warn("Docker exec validation failed, falling back to container restart",
-			zap.Error(err))
-
-		// Strategy 3: Container restart validation (last resort)
-		logger.Warn("Using restart-based validation (causes brief downtime ~2 seconds)")
-
-		if restartErr := RestartCaddyContainer(rc); restartErr != nil {
-			return fmt.Errorf("Caddyfile validation failed (all methods failed): %w\n\n"+
-				"Admin API: not reachable\n"+
-				"Docker exec: %v\n"+
-				"Container restart: %v\n\n"+
-				"File location: %s\n"+
-				"Check Caddy logs: docker logs %s",
-				err, err, restartErr, caddyfilePath, hecate.CaddyContainerName)
-		}
-
-		logger.Info("Caddy configuration validated successfully (via restart)")
-		return nil
+		return fmt.Errorf("Caddyfile validation failed: %w\n\n"+
+			"File location: %s\n"+
+			"Check syntax: docker exec %s caddy validate --config /etc/caddy/Caddyfile",
+			err, caddyfilePath, hecate.CaddyContainerName)
 	}
 
 	// Docker exec validation succeeded
 	logger.Info("Caddy configuration validated successfully (via docker exec)")
 	return nil
+}
+
+// reloadStrategy represents a reload strategy function
+type reloadStrategy struct {
+	name string
+	fn   func(*eos_io.RuntimeContext, string, []byte) error
 }
 
 // ReloadCaddy reloads Caddy configuration using best available method
@@ -165,78 +169,100 @@ func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error 
 func ReloadCaddy(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// ASSESS: Check if Admin API is reachable
-	if IsAdminAPIReachable(rc) {
-		// Strategy 1: Admin API reload (preferred - fastest)
-		logger.Info("Reloading Caddy configuration via Admin API")
-
-		// Read the Caddyfile content
-		caddyfileContent, err := os.ReadFile(caddyfilePath)
-		if err != nil {
-			return fmt.Errorf("failed to read Caddyfile: %w", err)
-		}
-
-		// Create Caddy Admin API client
-		caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
-
-		// Load the Caddyfile (adapt to JSON and apply)
-		err = caddyClient.LoadCaddyfile(rc.Ctx, string(caddyfileContent))
-		if err != nil {
-			// Admin API reload failed - fall back to docker exec
-			logger.Warn("Admin API reload failed, trying docker exec reload",
-				zap.Error(err))
-			goto tryDockerExec
-		}
-
-		logger.Info("Caddy reloaded successfully (via Admin API)")
-
-		// Wait for reload to complete
-		time.Sleep(hecate.CaddyReloadWaitDuration)
-
-		// Verify Caddy is still running
-		if isRunning, checkErr := IsCaddyRunning(rc); checkErr != nil || !isRunning {
-			logger.Warn("Container health check failed after reload, trying docker exec reload")
-			goto tryDockerExec
-		}
-
-		// Verify Admin API is still responsive
-		if err := caddyClient.Health(rc.Ctx); err != nil {
-			logger.Warn("Admin API health check failed after reload (continuing anyway)",
-				zap.Error(err))
-		}
-
-		return nil
+	// Read Caddyfile content once (used by all strategies)
+	caddyfileContent, err := os.ReadFile(caddyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read Caddyfile: %w", err)
 	}
 
-tryDockerExec:
-	// Admin API not reachable - try docker exec reload
-	logger.Warn("Admin API not reachable, trying docker exec reload")
+	// Define strategies in order of preference
+	strategies := []reloadStrategy{
+		{name: "Admin API", fn: reloadViaAdminAPI},
+		{name: "Docker exec", fn: reloadViaDockerExec},
+		{name: "Container restart", fn: reloadViaRestart},
+	}
 
-	// Strategy 2: Docker exec reload (zero-downtime, no port exposure needed)
-	if err := hecate.ReloadCaddyViaExec(rc, caddyfilePath); err != nil {
-		// Docker exec reload failed - fall back to restart
-		logger.Warn("Docker exec reload failed, falling back to container restart",
+	// Try strategies in order
+	var lastErr error
+	for _, strategy := range strategies {
+		logger.Debug("Attempting reload strategy",
+			zap.String("strategy", strategy.name))
+
+		err := strategy.fn(rc, caddyfilePath, caddyfileContent)
+		if err == nil {
+			logger.Info("Caddy reloaded successfully",
+				zap.String("strategy", strategy.name))
+			return nil
+		}
+
+		logger.Warn("Reload strategy failed, trying next",
+			zap.String("strategy", strategy.name),
 			zap.Error(err))
-
-		// Strategy 3: Container restart (last resort)
-		logger.Warn("Using container restart (causes brief downtime ~2 seconds)")
-
-		if restartErr := RestartCaddyContainer(rc); restartErr != nil {
-			return fmt.Errorf("Caddy reload failed (all methods failed): %w\n\n"+
-				"Admin API: not reachable\n"+
-				"Docker exec: %v\n"+
-				"Container restart: %v\n\n"+
-				"Check Caddy logs: docker logs %s",
-				err, err, restartErr, hecate.CaddyContainerName)
-		}
-
-		logger.Info("Caddy reloaded successfully (via restart)")
-		return nil
+		lastErr = err
 	}
 
-	// Docker exec reload succeeded
-	logger.Info("Caddy reloaded successfully (via docker exec)")
+	// All strategies failed
+	return fmt.Errorf("Caddy reload failed (all strategies failed): %w\n\n"+
+		"Check Caddy logs: docker logs %s",
+		lastErr, hecate.CaddyContainerName)
+}
+
+// reloadViaAdminAPI attempts reload using Caddy Admin API
+// CRITICAL P0.8: No separate reachability check to avoid TOCTOU race
+// RATIONALE: Check + operation = race window where API could fail between them
+// PATTERN: Attempt operation directly, rely on strategy fallback if it fails
+func reloadViaAdminAPI(rc *eos_io.RuntimeContext, caddyfilePath string, content []byte) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Attempting Caddy reload via Admin API")
+
+	// Create Admin API client
+	caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
+
+	// CRITICAL P0.8: Attempt operation directly (no separate reachability check)
+	// If Admin API is unreachable, LoadCaddyfile will fail and we'll fallback to next strategy
+	// This is atomic - no TOCTOU race window
+	if err := caddyClient.LoadCaddyfile(rc.Ctx, string(content)); err != nil {
+		return fmt.Errorf("Admin API reload failed: %w", err)
+	}
+
+	// Wait for reload to complete
+	time.Sleep(hecate.CaddyReloadWaitDuration)
+
+	// Verify container is still running
+	isRunning, err := IsCaddyRunning(rc)
+	if err != nil || !isRunning {
+		return fmt.Errorf("container not running after reload")
+	}
+
+	// Verify Admin API is still responsive
+	if err := caddyClient.Health(rc.Ctx); err != nil {
+		logger.Warn("Admin API health check failed after reload (continuing anyway)",
+			zap.Error(err))
+	}
+
 	return nil
+}
+
+// reloadViaDockerExec attempts reload using docker exec
+func reloadViaDockerExec(rc *eos_io.RuntimeContext, caddyfilePath string, content []byte) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check container is running
+	isRunning, err := IsCaddyRunning(rc)
+	if err != nil || !isRunning {
+		return fmt.Errorf("container not running")
+	}
+
+	logger.Info("Reloading Caddy via docker exec")
+	return hecate.ReloadCaddyViaExec(rc, caddyfilePath)
+}
+
+// reloadViaRestart attempts reload by restarting container
+func reloadViaRestart(rc *eos_io.RuntimeContext, caddyfilePath string, content []byte) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Reloading Caddy via container restart (causes brief downtime ~2 seconds)")
+	return RestartCaddyContainer(rc)
 }
 
 // IsCaddyRunning checks if the Caddy container is running using Docker SDK

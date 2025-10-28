@@ -42,10 +42,22 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 				"  sudo eos update hecate add [service] --dns [domain] --upstream [backend]")
 	}
 
-	// If dry-run, show what would be done and exit
+	// If dry-run, show what would be done and exit (no lock needed for read-only)
 	if opts.DryRun {
 		return runDryRun(rc, opts)
 	}
+
+	// CRITICAL P0.4: Acquire file lock to prevent concurrent Caddyfile modifications
+	// This prevents race conditions where two admins run --add simultaneously
+	lock, err := hecate.AcquireCaddyfileLock(rc)
+	if err != nil {
+		return fmt.Errorf("failed to acquire Caddyfile lock: %w", err)
+	}
+	defer func() {
+		if releaseErr := lock.Release(); releaseErr != nil {
+			logger.Error("Failed to release Caddyfile lock", zap.Error(releaseErr))
+		}
+	}()
 
 	// Phase 1: Validation
 	if err := runValidationPhase(rc, opts); err != nil {
@@ -57,18 +69,32 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		return err
 	}
 
-	// Phase 2.5: Service-specific integration (if registered)
-	if err := runServiceIntegration(rc, opts); err != nil {
-		return err
-	}
-
-	// Phase 3: Backup
+	// Phase 3: Backup (BEFORE service integration)
+	// CRITICAL P0.5: Backup MUST happen before service integration
+	// RATIONALE: Service integration may create external resources (Authentik providers)
+	//            that cannot be rolled back. If integration succeeds but Caddyfile append
+	//            fails, we can restore the Caddyfile backup. If integration fails, no backup
+	//            needed since Caddyfile wasn't modified yet.
 	backupPath, err := runBackupPhase(rc, opts)
 	if err != nil {
 		return err
 	}
 
-	// Phase 4: Generate and append route
+	// Phase 4: Service-specific integration (if registered)
+	// Runs AFTER backup so Caddyfile can be restored if integration creates external
+	// resources (e.g., Authentik proxy providers) but subsequent operations fail
+	if err := runServiceIntegration(rc, opts); err != nil {
+		// Integration failed - restore backup
+		logger.Error("Service integration failed, restoring backup", zap.Error(err))
+		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
+			logger.Error("CRITICAL: Failed to restore backup after integration failure", zap.Error(restoreErr))
+			return fmt.Errorf("service integration failed and backup restore failed: %w (restore error: %v)", err, restoreErr)
+		}
+		logger.Info("Backup restored after integration failure")
+		return fmt.Errorf("service integration failed: %w", err)
+	}
+
+	// Phase 5: Generate and append route
 	if err := runAppendRoutePhase(rc, opts); err != nil {
 		// Restore backup on failure
 		logger.Error("Failed to append route, restoring backup", zap.Error(err))
@@ -92,12 +118,12 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		return err // Return original error after successful rollback
 	}
 
-	// Phase 5: Validate and reload Caddy
+	// Phase 6: Validate and reload Caddy
 	if err := runCaddyReloadPhase(rc, backupPath); err != nil {
 		return err
 	}
 
-	// Phase 6: Verify route
+	// Phase 7: Verify route
 	if err := runVerificationPhase(rc, opts); err != nil {
 		// Non-fatal warning
 		logger.Warn("Route verification had issues", zap.Error(err))
