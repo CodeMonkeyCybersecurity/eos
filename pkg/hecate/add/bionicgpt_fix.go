@@ -195,12 +195,21 @@ func (f *BionicGPTFixer) assess(rc *eos_io.RuntimeContext) (*DriftAssessment, er
 		return nil, fmt.Errorf("failed to list applications: %w", err)
 	}
 
+	// Check if application exists for THIS SPECIFIC DNS (P1 #5 fix)
 	appFound := false
+	expectedLaunchURL := fmt.Sprintf("https://%s", assessment.DNS)
 	for _, app := range apps {
-		if app.Slug == "bionicgpt" {
+		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
 			appFound = true
+			logger.Debug("BionicGPT application found for this DNS",
+				zap.String("slug", app.Slug),
+				zap.String("launch_url", app.MetaLaunchURL))
 			break
 		}
+	}
+	if !appFound {
+		logger.Debug("BionicGPT application not found for this DNS",
+			zap.String("expected_launch_url", expectedLaunchURL))
 	}
 	assessment.ApplicationMissing = !appFound
 

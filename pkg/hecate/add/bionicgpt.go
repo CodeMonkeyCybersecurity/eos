@@ -588,20 +588,22 @@ func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *a
 
 // createAuthentikApplication creates the BionicGPT application in Authentik
 func (b *BionicGPTIntegrator) createAuthentikApplication(ctx context.Context, client *authentik.APIClient, providerPK int, domain string) error {
-	// Check if application already exists
+	// Check if application already exists FOR THIS SPECIFIC DNS (P1 #5 fix)
 	apps, err := client.ListApplications(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list applications: %w", err)
 	}
 
+	expectedLaunchURL := fmt.Sprintf("https://%s", domain)
 	for _, app := range apps {
-		if app.Slug == "bionicgpt" {
-			return nil // Already exists
+		// Check both slug AND launch URL to support multiple BionicGPT deployments
+		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
+			return nil // Already exists for this DNS
 		}
 	}
 
 	// Create new application
-	launchURL := fmt.Sprintf("https://%s", domain)
+	launchURL := expectedLaunchURL
 	_, err = client.CreateApplication(
 		ctx,
 		"BionicGPT",
