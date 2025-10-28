@@ -104,6 +104,126 @@ eos update wazuh add authentik --wazuh-url https://wazuh.example.com
 
 ---
 
+## 🔧 Technical Debt - BionicGPT Fix Implementation (Hecate)
+
+**Last Updated**: 2025-10-28
+**Context**: Second-round adversarial analysis of BionicGPT authentication fix implementation
+
+### P2 Items (Medium Priority - Future Sprint)
+
+#### **#2: Slower Assessment Performance**
+- **Issue**: Docker exec validation (~100ms) slower than string parsing (microseconds)
+- **Impact**: Cumulative delay when checking multiple services
+- **Mitigation**: Currently acceptable for single-service fixes
+- **Future**: Consider caching validation results or async validation
+
+#### **#6: PID Timestamp Collision Risk**
+- **Status**: FIXED (now using proper timestamp: `20060102-150405`)
+- **Original issue**: Using PID for backup uniqueness could collide
+- **Resolution**: P0 #5 fix implemented timestamp-based naming
+
+#### **#15: Backend Extraction Inefficiency**
+- **Issue**: `extractBackendFromCaddyfile()` called every template generation, re-reads file
+- **Impact**: Minor performance hit
+- **Better approach**: Extract once during assessment, store in `DriftAssessment` struct
+- **Effort**: Low (1-2 hours)
+
+#### **#17: Busy Wait Polling Instead of Event-Driven**
+- **Issue**: Health check polls every 2 seconds in loop
+- **Better approach**: Use `containerManager.WaitForState(ctx, containerID, "running", timeout)`
+- **Impact**: Unnecessary CPU cycles during wait
+- **Effort**: Medium (refactor health check to use SDK wait)
+
+#### **#19: No Progress Indication During Wait**
+- **Issue**: Logs at Debug level, user sees nothing during 30s wait
+- **User experience**: Command appears frozen
+- **Solution**: Log progress at Info level: "Waiting for container (5s/30s)..."
+- **Effort**: Low (add info-level logging)
+
+#### **#23: Serial Health Checks (40s total)**
+- **Issue**: Container stabilization (30s) + Admin API check (10s) = 40s sequential
+- **Better approach**: Run checks in parallel, aggregate results
+- **Impact**: User waits unnecessarily long
+- **Effort**: Medium (refactor to goroutines with timeout)
+
+### P3 Items (Low Priority - Backlog)
+
+#### **#9: No Dry-Run Rollback Preview**
+- **Issue**: `--dry-run` doesn't show rollback safety mechanism
+- **Impact**: User doesn't know fix has automatic rollback
+- **Solution**: Add to dry-run output: "Rollback enabled: backup will be created at..."
+- **Effort**: Low
+
+#### **#14: No Backend Validation**
+- **Issue**: Extracted backend not validated (could be garbage like `"to"` or `"http:"`)
+- **Risk**: Generate invalid Caddyfile with malformed backend
+- **Solution**: Add regex validation for IP:port or hostname:port format
+- **Effort**: Low
+
+#### **#18: 5s Minimum Uptime May Be Too Short**
+- **Issue**: Caddy might still be loading config when we declare it stable
+- **Scenario**: Container starts → Check passes at 5s → Caddy crashes at 6s due to config load
+- **Better approach**: Adaptive timeout based on service type, or increase to 10s
+- **Effort**: Low
+
+#### **#21: No Restart Detection**
+- **Issue**: Can't distinguish fresh start from recovery after crash
+- **Impact**: Miss crash loop scenarios
+- **Solution**: Track container start count, warn if multiple restarts recently
+- **Effort**: Medium
+
+#### **#24: Hardcoded Admin API Host**
+- **Issue**: `CaddyAdminAPIHost` might not work in all Docker network modes
+- **Impact**: Health check fails in certain configurations
+- **Solution**: Make host configurable or detect from Docker network
+- **Effort**: Medium
+
+#### **#25: 10s HTTP Timeout Arbitrary**
+- **Issue**: No rationale for 10-second timeout
+- **Better approach**: Base on expected Caddy response time (~100ms) + margin
+- **Effort**: Low
+
+#### **#26: Assessment-Fix-Evaluate Coupling**
+- **Issue**: All three phases require container running
+- **Impact**: Architectural fragility, can't fix if container never runs
+- **Solution**: Decouple assessment (can work offline) from fix/evaluate
+- **Effort**: High (architectural refactoring)
+
+#### **#27: No Idempotency Testing**
+- **Issue**: Unknown behavior when running fix twice
+- **Solution**: Add integration test for repeated execution
+- **Effort**: Medium
+
+#### **#28: Error Message Explosion**
+- **Issue**: Nested errors create wall of text
+- **Example**: `"reload failed AND rollback failed: %w (original error: %v)"`
+- **Better approach**: Structured error with primary/secondary context
+- **Effort**: Low
+
+#### **#29: No Metrics/Observability**
+- **Issue**: Can't answer: How often does rollback happen? Success rate? Avg duration?
+- **Solution**: Add metrics collection (OpenTelemetry)
+- **Effort**: Medium
+
+#### **#30: Assumes Existing Deployment**
+- **Issue**: Backend extraction fails on first-time setup (DNS block doesn't exist)
+- **Impact**: Falls back to hardcoded default
+- **Solution**: Detect first-time vs. fix scenario, handle appropriately
+- **Effort**: Low
+
+### Recommendations
+
+**Next Sprint** (pick 2-3):
+- #15: Extract backend once (low effort, clear improvement)
+- #19: Progress indication (low effort, better UX)
+- #14: Backend validation (low effort, prevent bad configs)
+
+**Future Consideration**:
+- #17 + #23: Event-driven health checks (medium effort, significant improvement)
+- #26: Decouple assessment (high effort, architectural improvement)
+
+---
+
 ## 🎯 Current Focus: Secret Manager Architecture Refactoring
 
 ### **Status**: Phase 1 Complete, Phase 2-3 In Progress
