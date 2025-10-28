@@ -59,7 +59,6 @@ func runDeleteHecate(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) er
 			logger.Info("terminal prompt:   - All Consul KV data (routes, DNS, auth policies, etc.)")
 		}
 		logger.Info("terminal prompt: ")
-		logger.Info("terminal prompt: Are you sure you want to continue? [y/N]:")
 
 		confirm := interaction.PromptYesNo(rc.Ctx, "Are you sure you want to continue?", false)
 

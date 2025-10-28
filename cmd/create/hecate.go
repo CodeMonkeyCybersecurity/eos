@@ -93,6 +93,43 @@ Examples:
 			}
 		}
 
+		// ASSESS - Check if Hecate is already installed (idempotency - do no harm)
+		// Check for key indicator files that Hecate is deployed
+		hecateDockerCompose := fmt.Sprintf("%s/docker-compose.yml", outputDir)
+		hecateCaddyfile := fmt.Sprintf("%s/Caddyfile", outputDir)
+		hecateEnvFile := fmt.Sprintf("%s/.env", outputDir)
+
+		if _, err := os.Stat(hecateDockerCompose); err == nil {
+			log.Info("Hecate appears to already be installed",
+				zap.String("location", outputDir))
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: ⚠️  Hecate is already installed at " + outputDir)
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: Found existing deployment:")
+			if _, err := os.Stat(hecateCaddyfile); err == nil {
+				log.Info("terminal prompt:   ✓ Caddyfile")
+			}
+			if _, err := os.Stat(hecateEnvFile); err == nil {
+				log.Info("terminal prompt:   ✓ .env (contains secrets - will NOT be overwritten)")
+			}
+			log.Info("terminal prompt:   ✓ docker-compose.yml")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: To avoid data loss, 'eos create hecate' will not run again.")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: Options:")
+			log.Info("terminal prompt:   1. Update existing deployment:")
+			log.Info("terminal prompt:      eos update hecate --add <service>")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt:   2. Remove and recreate (DESTRUCTIVE):")
+			log.Info("terminal prompt:      sudo rm -rf " + outputDir)
+			log.Info("terminal prompt:      sudo eos create hecate")
+			log.Info("terminal prompt: ")
+			return nil // Exit gracefully - this is NOT an error
+		}
+
+		log.Debug("No existing Hecate installation detected, proceeding with deployment",
+			zap.String("checked_file", hecateDockerCompose))
+
 		// ASSESS - Discover environment for secret management
 		log.Info("Discovering environment configuration")
 		envConfig, err := environment.DiscoverEnvironment(rc)

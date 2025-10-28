@@ -830,8 +830,6 @@ COMPOSE_PORT_HTTPS=%s
 		escapeEnvValue(hecateSecrets.AuthentikWorkerThreads),
 		escapeEnvValue(hecateSecrets.AuthentikBootstrapEmail),
 		escapeEnvValue(hecateSecrets.AuthentikBootstrapPassword),
-		escapeEnvValue(hecateSecrets.AuthentikBootstrapEmail),
-		escapeEnvValue(hecateSecrets.AuthentikBootstrapPassword),
 		escapeEnvValue(hecateSecrets.AuthentikBootstrapToken),
 		escapeEnvValue(hecateSecrets.ComposePortHTTP),
 		escapeEnvValue(hecateSecrets.ComposePortHTTPS),

@@ -5,6 +5,7 @@ package hecate
 import (
 	"bufio"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -45,6 +46,54 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 		logger.Info("terminal prompt: You can add multiple apps. Press Enter to finish.")
 		logger.Info("terminal prompt: ")
 
+		// NEW: Prompt for base domain FIRST (fail fast if invalid)
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: === Base Domain Configuration ===")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Enter your base domain (e.g., example.com):")
+		logger.Info("terminal prompt: This will be used to construct service subdomains:")
+		logger.Info("terminal prompt:   - Authentik SSO: hera.<your-domain>")
+		logger.Info("terminal prompt:   - Apps: <app-name>.<your-domain>")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Base domain: ")
+		fmt.Print("Domain: ")
+
+		reader := bufio.NewReader(os.Stdin)
+		baseDomain, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read base domain: %w", err)
+		}
+		baseDomain = strings.TrimSpace(baseDomain)
+
+		// Validate base domain
+		if baseDomain == "" {
+			return fmt.Errorf("base domain is required - cannot proceed without valid domain")
+		}
+		if strings.Contains(baseDomain, "*") {
+			return fmt.Errorf("base domain cannot contain wildcards - provide actual domain (e.g., example.com, not *.example.com)")
+		}
+
+		// DNS validation for base domain (fail fast)
+		logger.Info("Validating base domain DNS...", zap.String("domain", baseDomain))
+		if _, err := net.LookupIP(baseDomain); err != nil {
+			logger.Error("Base domain DNS lookup failed",
+				zap.String("domain", baseDomain),
+				zap.Error(err))
+			return fmt.Errorf("base domain '%s' does not resolve via DNS\n\n"+
+				"Please configure DNS first:\n"+
+				"  1. Add A record: %s → <your-server-ip>\n"+
+				"  2. Wait for DNS propagation (can take 5-60 minutes)\n"+
+				"  3. Verify: dig %s\n"+
+				"  4. Re-run: eos create hecate",
+				baseDomain, baseDomain, baseDomain)
+		}
+
+		logger.Info("terminal prompt: ✓ Base domain validated", zap.String("domain", baseDomain))
+		logger.Info("terminal prompt: ")
+
+		// Store base domain in config for later use
+		config.BaseDomain = baseDomain
+
 		// Load previous config from Consul KV if available
 		var previousConfig *RawYAMLConfig
 		if configStorage != nil {
@@ -63,7 +112,7 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 			}
 		}
 
-		apps, err := gatherApps(rc, previousConfig)
+		apps, err := gatherApps(rc, previousConfig, baseDomain)
 		if err != nil {
 			return fmt.Errorf("failed to gather app configuration: %w", err)
 		}
@@ -124,7 +173,7 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 }
 
 // gatherApps prompts the user to add apps interactively
-func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[string]RawAppConfig, error) {
+func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig, baseDomain string) (map[string]RawAppConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	reader := bufio.NewReader(os.Stdin)
 	apps := make(map[string]RawAppConfig)
@@ -382,42 +431,29 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 		logger.Info("terminal prompt: You MUST provide an Authentik domain to continue.")
 		logger.Info("terminal prompt: ")
 
-		reader := bufio.NewReader(os.Stdin)
+		// Construct Authentik domain from base domain (no prompt needed!)
+		authentikDomain := "hera." + baseDomain
 
-		// Loop until valid Authentik domain is provided
-		for {
-			logger.Info("terminal prompt: Authentik domain (default: hera.*, press Enter to accept): ")
-			fmt.Print("Domain: ")
-			authentikDomain := strings.TrimSpace(mustReadLine(reader))
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: ✓ Authentik SSO will be configured at: " + authentikDomain)
+		logger.Info("terminal prompt: ")
 
-			// Default to hera.* if no domain provided
-			if authentikDomain == "" {
-				authentikDomain = "hera.*"
-				logger.Info("terminal prompt: ✓ Using default domain: hera.*")
-			}
-
-			// Validate domain format
-			if authentikDomain != "" {
-				// Validate domain format
-				sanitizedDomain := shared.SanitizeURL(authentikDomain)
-				if err := validateDomain(sanitizedDomain); err != nil {
-					logger.Info("terminal prompt: ")
-					logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid domain: %v", err))
-					logger.Info("terminal prompt: ")
-					continue // Keep looping until valid domain
-				}
-
-				// Valid domain provided - add Authentik
-				apps["authentik"] = RawAppConfig{
-					Domain: sanitizedDomain,
-				}
-				logger.Info("terminal prompt: ")
-				logger.Info("terminal prompt: ✓ Added Authentik SSO")
-				logger.Info("terminal prompt:   Domain: " + apps["authentik"].Domain)
-				logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
-				break // Exit the loop
-			}
+		// Validate constructed domain
+		sanitizedDomain := shared.SanitizeURL(authentikDomain)
+		if err := validateDomain(sanitizedDomain); err != nil {
+			return nil, fmt.Errorf("constructed Authentik domain '%s' is invalid: %w\n\n"+
+				"This should not happen - please report this bug.\n"+
+				"Base domain: %s", authentikDomain, err, baseDomain)
 		}
+
+		// Add Authentik with constructed domain
+		apps["authentik"] = RawAppConfig{
+			Domain: sanitizedDomain,
+		}
+		logger.Info("terminal prompt: ✓ Added Authentik SSO")
+		logger.Info("terminal prompt:   Domain: " + apps["authentik"].Domain)
+		logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
+		logger.Info("terminal prompt: ")
 	}
 
 	// Display configuration summary
