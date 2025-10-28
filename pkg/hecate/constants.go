@@ -5,7 +5,11 @@
 
 package hecate
 
-import "time"
+import (
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+)
 
 // ============================================================================
 // SERVICE AND CONTAINER NAMES
@@ -222,9 +226,10 @@ const (
 
 const (
 	// BionicGPTDefaultPort is the port where BionicGPT application listens
-	// RATIONALE: Port 7703 is BionicGPT's default HTTP port
+	// RATIONALE: Use centralized port from pkg/shared/ports.go for consistency (CLAUDE.md Rule #12)
+	// SINGLE SOURCE OF TRUTH: shared.PortBionicGPT = 8513
 	// REFERENCE: https://github.com/bionic-gpt/bionic-gpt
-	BionicGPTDefaultPort = 7703
+	BionicGPTDefaultPort = shared.PortBionicGPT // 8513
 
 	// BionicGPTHealthEndpoint is the health check endpoint for BionicGPT
 	// RATIONALE: Standard health endpoint for container orchestration

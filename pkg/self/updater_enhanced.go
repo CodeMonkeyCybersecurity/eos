@@ -658,9 +658,21 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 		zap.Float64("size_mb", currentSizeMB))
 
 	// Phase 5: Generate backup path and create directory
-	timestamp := time.Now().Format("20060102-150405")
-	transactionID := fmt.Sprintf("%d", time.Now().UnixNano())
-	backupFilename := fmt.Sprintf("eos.backup.%s.%s", timestamp, transactionID)
+	// P0 FIX: Use single time.Now() call + crypto random for true uniqueness in concurrent scenarios
+	// Previous bug: two time.Now() calls could return same nanosecond value under high concurrency
+	now := time.Now()
+	timestamp := now.Format("20060102-150405")
+	nanos := now.UnixNano()
+
+	// Add cryptographically random suffix to guarantee uniqueness even if nanoseconds collide
+	// This handles edge case: two goroutines running on different CPU cores might see same clock value
+	randomSuffix, err := crypto.GenerateHex(4) // 4 bytes = 8 hex chars = 32 bits entropy
+	if err != nil {
+		// Fallback: use PID if crypto random fails (should never happen)
+		randomSuffix = fmt.Sprintf("%d", os.Getpid())
+	}
+
+	backupFilename := fmt.Sprintf("eos.backup.%s.%d.%s", timestamp, nanos, randomSuffix)
 	expectedBackupPath := filepath.Join(eeu.config.BackupDir, backupFilename)
 
 	eeu.transaction.BackupBinaryPath = expectedBackupPath
@@ -711,8 +723,19 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	}
 
 	// Phase 8: Verify backup hash by re-reading from the SAME FD
-	backupFd.Seek(0, 0) // Rewind to start
+	// P0 FIX: Check Seek() error - unchecked seek can cause silent data corruption
+	if _, err := backupFd.Seek(0, 0); err != nil {
+		_ = os.Remove(expectedBackupPath)
+		return "", fmt.Errorf("failed to rewind backup file for verification: %w\n"+
+			"This could indicate:\n"+
+			"  1. File descriptor corruption\n"+
+			"  2. Filesystem errors\n"+
+			"  3. File was deleted during write", err)
+	}
+
 	backupData := make([]byte, currentSize)
+	defer func() { backupData = nil }() // P1 FIX: Explicit hint to GC for large allocations
+
 	n, err = backupFd.Read(backupData)
 	if err != nil || int64(n) != currentSize {
 		_ = os.Remove(expectedBackupPath)

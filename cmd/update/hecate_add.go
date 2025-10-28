@@ -84,11 +84,15 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	skipBackendCheck, _ := cmd.Flags().GetBool("skip-backend-check")
 	backupRetentionDays, _ := cmd.Flags().GetInt("backup-retention-days")
 
+	// Auto-append default port for known services if port is missing
+	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
+	backendWithPort := add.EnsureBackendHasPort(service, upstream)
+
 	// Build options
 	opts := &add.ServiceOptions{
 		Service:             service,
 		DNS:                 dns,
-		Backend:             upstream,
+		Backend:             backendWithPort,
 		SSO:                 sso,
 		SSOProvider:         ssoProvider,
 		CustomDirectives:    customDirectives,

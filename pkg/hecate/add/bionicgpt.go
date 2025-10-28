@@ -16,7 +16,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	// vaultapi "github.com/hashicorp/vault/api" // Commented out: Vault logic commented for .env migration
+	// vaultapi "github.com/hashicorp/vault/api" // Commented - Vault code is commented out for .env migration
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
