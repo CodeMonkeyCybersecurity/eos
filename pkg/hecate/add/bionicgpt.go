@@ -166,15 +166,23 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 
 	// Step 3: Get default authorization flow UUID
 	logger.Info("    Getting authorization flow")
-	flowUUID, err := b.getDefaultAuthFlowUUID(rc.Ctx, authentikClient)
+	authFlowUUID, err := b.getDefaultAuthFlowUUID(rc.Ctx, authentikClient)
 	if err != nil {
 		logger.Warn("Failed to get auth flow, using default slug", zap.Error(err))
-		flowUUID = "default-authentication-flow"
+		authFlowUUID = "default-authentication-flow"
+	}
+
+	// Step 3b: Get default invalidation flow UUID
+	logger.Info("    Getting invalidation flow")
+	invalidationFlowUUID, err := b.getDefaultInvalidationFlowUUID(rc.Ctx, authentikClient)
+	if err != nil {
+		logger.Warn("Failed to get invalidation flow, using default slug", zap.Error(err))
+		invalidationFlowUUID = "default-invalidation-flow"
 	}
 
 	// Step 4: Create proxy provider
 	logger.Info("    Creating proxy provider (forward auth mode)")
-	providerPK, err := b.createProxyProvider(rc.Ctx, authentikClient, opts, flowUUID)
+	providerPK, err := b.createProxyProvider(rc.Ctx, authentikClient, opts, authFlowUUID, invalidationFlowUUID)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy provider: %w", err)
 	}
@@ -470,8 +478,25 @@ func (b *BionicGPTIntegrator) getDefaultAuthFlowUUID(ctx context.Context, client
 	return "default-authentication-flow", nil
 }
 
+// getDefaultInvalidationFlowUUID retrieves the default invalidation flow UUID
+func (b *BionicGPTIntegrator) getDefaultInvalidationFlowUUID(ctx context.Context, client *authentik.APIClient) (string, error) {
+	flows, err := client.ListFlows(ctx, "invalidation")
+	if err != nil {
+		return "", fmt.Errorf("failed to list invalidation flows: %w", err)
+	}
+
+	for _, flow := range flows {
+		if flow.Slug == "default-invalidation-flow" {
+			return flow.PK, nil
+		}
+	}
+
+	// Fallback to slug (some Authentik versions accept slugs)
+	return "default-invalidation-flow", nil
+}
+
 // createProxyProvider creates a proxy provider in Authentik
-func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *authentik.APIClient, opts *ServiceOptions, flowUUID string) (int, error) {
+func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *authentik.APIClient, opts *ServiceOptions, authFlowUUID, invalidationFlowUUID string) (int, error) {
 	// Check if provider already exists
 	providers, err := client.ListProxyProviders(ctx)
 	if err != nil {
@@ -499,7 +524,8 @@ func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *a
 					Mode:              "forward_single",
 					ExternalHost:      externalHost,
 					InternalHost:      internalHost,
-					AuthorizationFlow: flowUUID,
+					AuthorizationFlow: authFlowUUID,
+					InvalidationFlow:  invalidationFlowUUID,
 				}); err != nil {
 					return 0, fmt.Errorf("failed to update proxy provider: %w", err)
 				}
@@ -514,7 +540,8 @@ func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *a
 		Mode:              "forward_single", // Forward auth for single application
 		ExternalHost:      externalHost,
 		InternalHost:      internalHost, // Not actually used in forward auth, but required by API
-		AuthorizationFlow: flowUUID,
+		AuthorizationFlow: authFlowUUID,
+		InvalidationFlow:  invalidationFlowUUID,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create proxy provider: %w", err)

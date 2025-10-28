@@ -18,6 +18,7 @@ type ProxyProviderConfig struct {
 	ExternalHost      string // External URL (e.g., https://app.example.com)
 	InternalHost      string // Internal URL (not used in forward auth mode, but required by API)
 	AuthorizationFlow string // Authorization flow slug or UUID
+	InvalidationFlow  string // Invalidation flow slug or UUID (required by Authentik API)
 }
 
 // ProxyProviderResponse represents a proxy provider from Authentik
@@ -28,6 +29,7 @@ type ProxyProviderResponse struct {
 	ExternalHost      string `json:"external_host"`
 	InternalHost      string `json:"internal_host"`
 	AuthorizationFlow string `json:"authorization_flow"`
+	InvalidationFlow  string `json:"invalidation_flow"`
 }
 
 // CreateProxyProvider creates a new proxy provider in Authentik
@@ -35,6 +37,7 @@ func (c *APIClient) CreateProxyProvider(ctx context.Context, config *ProxyProvid
 	reqBody := map[string]interface{}{
 		"name":               config.Name,
 		"authorization_flow": config.AuthorizationFlow,
+		"invalidation_flow":  config.InvalidationFlow,
 		"mode":               config.Mode,
 		"external_host":      config.ExternalHost,
 		"internal_host":      config.InternalHost,
@@ -175,6 +178,7 @@ func (c *APIClient) UpdateProxyProvider(ctx context.Context, pk int, config *Pro
 	reqBody := map[string]interface{}{
 		"name":               config.Name,
 		"authorization_flow": config.AuthorizationFlow,
+		"invalidation_flow":  config.InvalidationFlow,
 		"mode":               config.Mode,
 		"external_host":      config.ExternalHost,
 		"internal_host":      config.InternalHost,
