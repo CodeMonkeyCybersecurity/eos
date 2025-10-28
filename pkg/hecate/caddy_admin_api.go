@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // CaddyAdminClient represents a client for the Caddy Admin API
@@ -21,13 +20,13 @@ type CaddyAdminClient struct {
 // NewCaddyAdminClient creates a new Caddy Admin API client
 // host should be the hostname or IP (without protocol), e.g., "localhost" or "192.168.1.100"
 func NewCaddyAdminClient(host string) *CaddyAdminClient {
-	// Caddy Admin API typically runs on port 2019
-	baseURL := fmt.Sprintf("http://%s:2019", host)
+	// Caddy Admin API typically runs on port 2019 (see CaddyAdminAPIPort constant)
+	baseURL := fmt.Sprintf("http://%s:%d", host, CaddyAdminAPIPort)
 
 	return &CaddyAdminClient{
 		BaseURL: baseURL,
 		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: CaddyAdminAPITimeout,
 		},
 	}
 }

@@ -401,9 +401,21 @@ func TestIsPeriodicToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isPeriodicToken(rc, tt.secret)
+			// P1 Issue #32 Fix: isPeriodicToken() now returns (bool, int64) tuple
+			result, periodSeconds := isPeriodicToken(rc, tt.secret)
 			assert.Equal(t, tt.expected, result,
 				"isPeriodicToken() returned %v, expected %v", result, tt.expected)
+
+			// If periodic, verify period value is positive
+			if result {
+				assert.Greater(t, periodSeconds, int64(0),
+					"Periodic token should have positive period, got %d", periodSeconds)
+			} else {
+				// Non-periodic tokens can have period <= 0 (or missing/malformed)
+				// We return the actual value for diagnostic purposes, not sanitized to 0
+				assert.LessOrEqual(t, periodSeconds, int64(0),
+					"Non-periodic token should have period <= 0, got %d", periodSeconds)
+			}
 		})
 	}
 }
@@ -423,20 +435,27 @@ func TestIsPeriodicTokenConsistency(t *testing.T) {
 	}
 
 	// Call function 10 times with same input
+	// P1 Issue #32 Fix: isPeriodicToken() now returns (bool, int64) tuple
 	results := make([]bool, 10)
+	periodResults := make([]int64, 10)
 	for i := 0; i < 10; i++ {
-		results[i] = isPeriodicToken(rc, secret)
+		results[i], periodResults[i] = isPeriodicToken(rc, secret)
 	}
 
 	// All results should be identical
 	firstResult := results[0]
+	firstPeriod := periodResults[0]
 	for i, result := range results {
 		assert.Equal(t, firstResult, result,
-			"Call %d returned %v, but first call returned %v (function is non-deterministic!)",
+			"Call %d returned isPeriodic=%v, but first call returned %v (function is non-deterministic!)",
 			i, result, firstResult)
+		assert.Equal(t, firstPeriod, periodResults[i],
+			"Call %d returned period=%d, but first call returned %d (function is non-deterministic!)",
+			i, periodResults[i], firstPeriod)
 	}
 
 	assert.True(t, firstResult, "Secret with period=14400 should be periodic")
+	assert.Equal(t, int64(14400), firstPeriod, "Secret should have period=14400")
 }
 
 // ============================================================================

@@ -3,6 +3,7 @@
 package add
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"time"
@@ -12,16 +13,13 @@ import (
 	dockertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-const (
-	// CaddyContainerName is the name of the Caddy container
-	CaddyContainerName = "hecate-caddy"
-	// CaddyfilePathOnHost is the path to the Caddyfile on the host system
-	CaddyfilePathOnHost = "/opt/hecate/Caddyfile"
-)
+// NOTE: Constants moved to pkg/hecate/constants.go (CLAUDE.md Rule #12 - Single Source of Truth)
+// Import hecate package to access: hecate.CaddyContainerName, CaddyfilePath, etc.
 
 // ValidateCaddyConfig validates the Caddyfile using Caddy Admin API
 // This validates by attempting to adapt the Caddyfile to JSON
@@ -37,7 +35,7 @@ func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error 
 	}
 
 	// Create Caddy Admin API client
-	caddyClient := hecate.NewCaddyAdminClient("localhost")
+	caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
 
 	// Validate by attempting to adapt the Caddyfile to JSON
 	// If this succeeds, the Caddyfile is syntactically valid
@@ -66,20 +64,20 @@ func ReloadCaddy(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	}
 
 	// Create Caddy Admin API client
-	caddyClient := hecate.NewCaddyAdminClient("localhost")
+	caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
 
 	// Load the Caddyfile (adapt to JSON and apply)
 	err = caddyClient.LoadCaddyfile(rc.Ctx, string(caddyfileContent))
 	if err != nil {
 		return fmt.Errorf("failed to reload Caddy: %w\n\n"+
 			"The configuration has been rolled back to the previous working state.\n"+
-			"Check Caddy logs with: docker logs %s", err, CaddyContainerName)
+			"Check Caddy logs with: docker logs %s", err, hecate.CaddyContainerName)
 	}
 
 	logger.Info("Caddy reloaded successfully")
 
-	// Wait a moment for reload to complete
-	time.Sleep(2 * time.Second)
+	// Wait for reload to complete (see hecate.CaddyReloadWaitDuration)
+	time.Sleep(hecate.CaddyReloadWaitDuration)
 
 	// Verify Caddy is still running and healthy
 	isRunning, err := IsCaddyRunning(rc)
@@ -90,7 +88,7 @@ func ReloadCaddy(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	if !isRunning {
 		return fmt.Errorf("Caddy container is not running after reload\n\n"+
 			"This is a critical error. Check Caddy logs with:\n"+
-			"  docker logs %s", CaddyContainerName)
+			"  docker logs %s", hecate.CaddyContainerName)
 	}
 
 	// Verify Admin API is still responsive
@@ -108,7 +106,7 @@ func IsCaddyRunning(rc *eos_io.RuntimeContext) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Debug("Checking if Caddy container is running",
-		zap.String("container", CaddyContainerName))
+		zap.String("container", hecate.CaddyContainerName))
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(
@@ -122,7 +120,7 @@ func IsCaddyRunning(rc *eos_io.RuntimeContext) (bool, error) {
 
 	// Create filters to find our specific container
 	containerFilters := filters.NewArgs()
-	containerFilters.Add("name", CaddyContainerName)
+	containerFilters.Add("name", hecate.CaddyContainerName)
 
 	// List containers matching the filter
 	containers, err := cli.ContainerList(rc.Ctx, dockertypes.ListOptions{
@@ -136,7 +134,7 @@ func IsCaddyRunning(rc *eos_io.RuntimeContext) (bool, error) {
 	// Check if we found the container and it's running
 	if len(containers) == 0 {
 		logger.Warn("Caddy container not found",
-			zap.String("container", CaddyContainerName))
+			zap.String("container", hecate.CaddyContainerName))
 		return false, nil
 	}
 
@@ -155,7 +153,7 @@ func GetCaddyLogs(rc *eos_io.RuntimeContext, lines int) (string, error) {
 
 	logger.Debug("Retrieving Caddy logs",
 		zap.Int("lines", lines),
-		zap.String("container", CaddyContainerName))
+		zap.String("container", hecate.CaddyContainerName))
 
 	// Create Docker client
 	cli, err := client.NewClientWithOpts(
@@ -174,26 +172,23 @@ func GetCaddyLogs(rc *eos_io.RuntimeContext, lines int) (string, error) {
 		Tail:       fmt.Sprintf("%d", lines),
 	}
 
-	logReader, err := cli.ContainerLogs(rc.Ctx, CaddyContainerName, options)
+	logReader, err := cli.ContainerLogs(rc.Ctx, hecate.CaddyContainerName, options)
 	if err != nil {
 		return "", fmt.Errorf("failed to get Caddy logs: %w", err)
 	}
 	defer logReader.Close()
 
-	// Read logs from the reader
-	// Note: Docker logs are multiplexed (8-byte headers), but for display purposes
-	// we can read them directly for now
-	var logs []byte
-	buf := make([]byte, 4096)
-	for {
-		n, err := logReader.Read(buf)
-		if n > 0 {
-			logs = append(logs, buf[:n]...)
-		}
-		if err != nil {
-			break
-		}
+	// P1 #10: Docker logs are multiplexed with 8-byte headers per chunk
+	// Must use stdcopy.StdCopy to properly demultiplex stdout and stderr
+	var stdout, stderr bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdout, &stderr, logReader); err != nil {
+		// If demultiplexing fails, still try to return what we got
+		logger.Warn("Failed to demultiplex Docker logs, may contain headers",
+			zap.Error(err))
+		// Return both streams concatenated
+		return stdout.String() + stderr.String(), nil
 	}
 
-	return string(logs), nil
+	// Combine stdout and stderr (both are useful for debugging)
+	return stdout.String() + stderr.String(), nil
 }

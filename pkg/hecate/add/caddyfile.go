@@ -11,16 +11,18 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
+// NOTE: Constants moved to pkg/hecate/constants.go (CLAUDE.md Rule #12 - Single Source of Truth)
+// Use hecate.CaddyfilePath and hecate.BackupDir instead
 const (
-	// CaddyfilePath is the default location of the Caddyfile
-	CaddyfilePath = "/opt/hecate/Caddyfile"
-
-	// BackupDir is where backups are stored
-	BackupDir = "/opt/hecate/backups"
+	// CaddyfilePath references the centralized constant from pkg/hecate
+	CaddyfilePath = hecate.CaddyfilePath
+	// BackupDir references the centralized constant from pkg/hecate
+	BackupDir = hecate.BackupDir
 )
 
 // Route templates
@@ -72,14 +74,18 @@ const (
 
 // GenerateRouteConfig generates the Caddyfile configuration for a new route
 func GenerateRouteConfig(opts *ServiceOptions) (string, error) {
+	// SECURITY P2 #20: Sanitize service name to prevent directory traversal
+	// filepath.Base removes directory components (../../../etc/passwd → passwd)
+	sanitizedService := filepath.Base(opts.Service)
+
 	config := &RouteConfig{
-		Service:          opts.Service,
+		Service:          sanitizedService,
 		DNS:              opts.DNS,
 		Backend:          opts.Backend,
 		SSO:              opts.SSO,
 		SSOProvider:      opts.SSOProvider,
 		CustomDirectives: opts.CustomDirectives,
-		LogFile:          fmt.Sprintf("/var/log/caddy/%s.log", opts.Service),
+		LogFile:          fmt.Sprintf("/var/log/caddy/%s.log", sanitizedService),
 	}
 
 	// Choose template based on SSO

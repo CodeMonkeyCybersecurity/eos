@@ -14,6 +14,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -403,7 +404,7 @@ func CheckAuthentikInstallation(rc *eos_io.RuntimeContext) error {
 
 	// Try to connect to Authentik API to verify it's actually running
 	// Authentik typically runs on localhost when deployed with Hecate
-	authentikURL := "http://localhost:9000" // Authentik default port in Hecate stack
+	authentikURL := fmt.Sprintf("http://%s:%d", hecate.AuthentikHost, hecate.AuthentikPort)
 
 	authentikClient, err := authentik.NewAuthentikClient(authentikURL, authentikToken)
 	if err != nil {

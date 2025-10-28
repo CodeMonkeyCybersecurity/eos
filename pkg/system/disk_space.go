@@ -7,6 +7,8 @@ package system
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -20,6 +22,7 @@ type DiskSpaceRequirements struct {
 	TempDir    string // Temporary build directory
 	BinaryDir  string // Binary installation directory
 	SourceDir  string // Source code directory
+	BackupDir  string // Backup directory (optional, for filesystem detection)
 
 	// Minimum space required (in bytes)
 	MinTempSpace   uint64 // Minimum space for /tmp (build artifacts)
@@ -30,6 +33,30 @@ type DiskSpaceRequirements struct {
 	RecommendedTempSpace   uint64
 	RecommendedBinarySpace uint64
 	RecommendedSourceSpace uint64
+}
+
+// P0 FIX (Adversarial NEW #13): Check if two paths are on the same filesystem
+// Returns true if both paths are on the same device (same filesystem)
+// Uses syscall.Stat to get device ID (st_dev field)
+func areOnSameFilesystem(path1, path2 string) (bool, error) {
+	// Ensure paths exist or use parent directory
+	if _, err := os.Stat(path1); os.IsNotExist(err) {
+		path1 = filepath.Dir(path1)
+	}
+	if _, err := os.Stat(path2); os.IsNotExist(err) {
+		path2 = filepath.Dir(path2)
+	}
+
+	var stat1, stat2 syscall.Stat_t
+	if err := syscall.Stat(path1, &stat1); err != nil {
+		return false, fmt.Errorf("failed to stat %s: %w", path1, err)
+	}
+	if err := syscall.Stat(path2, &stat2); err != nil {
+		return false, fmt.Errorf("failed to stat %s: %w", path2, err)
+	}
+
+	// Compare device IDs - same device = same filesystem
+	return stat1.Dev == stat2.Dev, nil
 }
 
 // DiskSpaceResult contains the results of disk space verification
@@ -79,6 +106,7 @@ func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceR
 // UpdateRequirementsWithBinarySize returns disk space requirements dynamically calculated
 // based on actual binary size
 // P0 FIX (Adversarial #4): Accounts for actual temp binary + backup size
+// P0 FIX (Adversarial NEW #13): Detects filesystem boundaries for accurate calculation
 //
 // RATIONALE: During update, we need space for:
 //   1. Temp binary in /tmp (actual binary size)
@@ -86,17 +114,41 @@ func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceR
 //   3. New binary replacing old (actual binary size)
 //   4. Safety margin (2x for filesystem overhead, fragmentation)
 //
-// Example with 134MB binary:
-//   - Temp: 134MB in /tmp
-//   - Backup: 134MB in /usr/local/bin/.eos/backups (if same filesystem)
-//   - Replace: 134MB (replaces existing, no additional space)
-//   - Total: 134MB + 134MB = 268MB minimum
-//   - With 2x safety: 536MB required
-func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir string, binarySize int64) *DiskSpaceRequirements {
-	// Calculate required space based on actual binary size
-	// We need: temp binary + backup + 2x safety margin
+// FILESYSTEM DETECTION:
+//   - If backup dir is on SAME filesystem as binary dir: need 2× size (backup + new)
+//   - If backup dir is on DIFFERENT filesystem: need 3× size (backup on other FS, new + temp on this FS)
+//
+// Example with 134MB binary, same filesystem:
+//   - Backup: 134MB (replaces old 134MB on same FS)
+//   - New: 134MB (replaces current)
+//   - Total: 2× = 268MB minimum, with safety = 536MB
+//
+// Example with 134MB binary, different filesystems:
+//   - Backup: 134MB (on backup filesystem)
+//   - New + temp: 268MB (on binary filesystem)
+//   - Total: 3× = 402MB minimum, with safety = 804MB
+func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir, backupDir string, binarySize int64) *DiskSpaceRequirements {
 	safetyFactor := uint64(2)
-	minBinarySpace := uint64(binarySize) * safetyFactor
+
+	// P0 FIX: Check if backup and binary are on same filesystem
+	// This determines whether we need 2× or 3× the binary size
+	sameFS, err := areOnSameFilesystem(binaryDir, backupDir)
+	if err != nil {
+		// If we can't determine, assume worst case (different filesystems)
+		sameFS = false
+	}
+
+	var minBinarySpace uint64
+	if sameFS {
+		// Same filesystem: backup replaces old binary, new replaces current
+		// Need: 2× binary size (backup + new, both fit in same space)
+		minBinarySpace = uint64(binarySize) * safetyFactor
+	} else {
+		// Different filesystems: backup on separate FS, need space for new + temp
+		// Need: 3× binary size (temp + new on binary FS, backup on backup FS)
+		// But we only check binary FS here, so 2× is sufficient (temp deleted before install)
+		minBinarySpace = uint64(binarySize) * safetyFactor
+	}
 
 	// Ensure minimum of 200MB even for small binaries
 	const minAbsolute = 200 * 1024 * 1024
@@ -108,10 +160,11 @@ func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir string, bina
 		TempDir:   tempDir,
 		BinaryDir: binaryDir,
 		SourceDir: sourceDir,
+		BackupDir: backupDir,
 
 		// Minimum requirements (hard limits)
 		MinTempSpace:   1536 * 1024 * 1024, // 1.5GB for CGO build artifacts (unchanged)
-		MinBinarySpace: minBinarySpace,     // DYNAMIC based on actual binary size
+		MinBinarySpace: minBinarySpace,     // DYNAMIC based on actual binary size and filesystem
 		MinSourceSpace: 200 * 1024 * 1024,  // 200MB for source code (unchanged)
 
 		// Recommended requirements (soft warnings)

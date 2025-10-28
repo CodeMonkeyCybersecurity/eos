@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -61,6 +62,18 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		logger.Error("Failed to append route, restoring backup", zap.Error(err))
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
+		} else {
+			// CRITICAL: Must reload Caddy with restored config
+			// Without this, Caddy still has bad config in memory even though file is restored
+			logger.Info("Backup restored to disk, reloading Caddy with restored config")
+			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+				logger.Error("CRITICAL: Backup restored but Caddy reload failed",
+					zap.Error(reloadErr))
+				logger.Error("Manual intervention required: restart Caddy or reload config manually")
+				logger.Error("  docker restart " + hecate.CaddyContainerName)
+			} else {
+				logger.Info("Caddy successfully reloaded with restored configuration")
+			}
 		}
 		return err
 	}
@@ -203,8 +216,13 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 			logger.Warn("The route will be added, but won't be accessible until DNS is configured")
 			logger.Warn(fmt.Sprintf("Ensure %s points to this server's IP address", opts.DNS))
 		} else {
+			// Safe type assertion with fallback
+			matchedIP, ok := dnsResult.Details["matched_ip"].(string)
+			if !ok {
+				matchedIP = "unknown"
+			}
 			logger.Info("✓ DNS points to this server",
-				zap.String("matched_ip", dnsResult.Details["matched_ip"].(string)))
+				zap.String("matched_ip", matchedIP))
 		}
 	}
 
@@ -273,6 +291,17 @@ func runCaddyReloadPhase(rc *eos_io.RuntimeContext, backupPath string) error {
 		logger.Error("Caddy configuration validation failed, restoring backup")
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
+		} else {
+			// CRITICAL: Must reload Caddy with restored config
+			logger.Info("Backup restored to disk, reloading Caddy with restored config")
+			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+				logger.Error("CRITICAL: Backup restored but Caddy reload failed",
+					zap.Error(reloadErr))
+				logger.Error("Manual intervention required: restart Caddy or reload config manually")
+				logger.Error("  docker restart " + hecate.CaddyContainerName)
+			} else {
+				logger.Info("Caddy successfully reloaded with restored configuration")
+			}
 		}
 		return err
 	}
@@ -284,6 +313,17 @@ func runCaddyReloadPhase(rc *eos_io.RuntimeContext, backupPath string) error {
 		logger.Error("Caddy reload failed, restoring backup")
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
+		} else {
+			// CRITICAL: Must reload Caddy with restored config
+			logger.Info("Backup restored to disk, attempting to reload Caddy with restored config")
+			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+				logger.Error("CRITICAL: Backup restored but Caddy reload still failing",
+					zap.Error(reloadErr))
+				logger.Error("Manual intervention required: restart Caddy or reload config manually")
+				logger.Error("  docker restart " + hecate.CaddyContainerName)
+			} else {
+				logger.Info("Caddy successfully reloaded with restored configuration")
+			}
 		}
 		return err
 	}
@@ -297,14 +337,14 @@ func runVerificationPhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Phase 6/6: Verifying new route...")
 
-	// Wait for DNS propagation and route setup
-	time.Sleep(5 * time.Second)
+	// Wait for DNS propagation and route setup (see hecate.RouteVerificationWaitDuration)
+	time.Sleep(hecate.RouteVerificationWaitDuration)
 
 	// Try to connect to the new route
 	url := fmt.Sprintf("https://%s", opts.DNS)
 
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: hecate.RouteVerificationTimeout,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse // Don't follow redirects
 		},
@@ -363,8 +403,8 @@ func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions) {
 	logger.Info(fmt.Sprintf("  4. Test your service at https://%s", opts.DNS))
 	logger.Info("")
 	logger.Info("View Caddy logs with:")
-	logger.Info(fmt.Sprintf("  docker logs %s", CaddyContainerName))
+	logger.Info(fmt.Sprintf("  docker logs %s", hecate.CaddyContainerName))
 	logger.Info("")
 	logger.Info("View service-specific logs:")
-	logger.Info(fmt.Sprintf("  docker exec %s tail -f /var/log/caddy/%s.log", CaddyContainerName, opts.Service))
+	logger.Info(fmt.Sprintf("  docker exec %s tail -f /var/log/caddy/%s.log", hecate.CaddyContainerName, opts.Service))
 }

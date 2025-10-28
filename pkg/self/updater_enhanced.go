@@ -327,10 +327,12 @@ func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 
 	// Define space requirements based on ACTUAL binary size
 	// This prevents underestimation that would cause "no space left on device" errors
+	// P0 FIX: Include backup directory for filesystem boundary detection
 	reqs := system.UpdateRequirementsWithBinarySize(
 		"/tmp",                             // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
 		eeu.config.SourceDir,               // Source directory
+		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
 		binarySize,                         // Actual binary size
 	)
 
@@ -420,6 +422,7 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		"/tmp",                             // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
 		eeu.config.SourceDir,               // Source directory
+		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
 		binaryInfo.Size(),                  // Actual binary size
 	)
 	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
@@ -473,8 +476,19 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 }
 
 // executeUpdateTransaction performs the actual update with transaction tracking
+// P0 FIX (Adversarial NEW #5): Acquire flock BEFORE any operations to prevent concurrent updates
 func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	eeu.logger.Info(" Phase 2: INTERVENE - Executing update transaction")
+
+	// P0 FIX: Acquire exclusive update lock BEFORE backup creation
+	// This prevents concurrent updates during backup, build, and install
+	// Lock is held for entire transaction and automatically released on return
+	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
+	if err != nil {
+		return err // Error already includes detailed message
+	}
+	defer updateLock.Release()
+	eeu.logger.Debug("Update lock acquired - safe to proceed with transaction")
 
 	// Step 1: Create binary backup and record current binary hash
 	currentHash, err := eeu.createTransactionBackup()
@@ -558,18 +572,19 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 }
 
 // createTransactionBackup creates a backup with transaction metadata and returns current binary hash
+// P0 FIX (Adversarial NEW #4): Read file ONCE to eliminate TOCTOU between HashFile and ReadFile
 func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
-	// Get hash and size of current binary before backup
-	currentBinaryInfo, err := os.Stat(eeu.config.BinaryPath)
+	// P0 FIX: Read binary data ONCE into memory (eliminates TOCTOU)
+	// This is the ONLY read of the source binary - all subsequent operations use this data
+	binaryData, err := os.ReadFile(eeu.config.BinaryPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to stat current binary: %w", err)
+		return "", fmt.Errorf("failed to read binary for backup: %w", err)
 	}
-	currentSizeMB := float64(currentBinaryInfo.Size()) / (1024 * 1024)
 
-	currentHash, err := crypto.HashFile(eeu.config.BinaryPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to hash current binary: %w", err)
-	}
+	// Calculate hash and size from in-memory data (no TOCTOU possible)
+	currentHash := crypto.HashData(binaryData)
+	currentSize := int64(len(binaryData))
+	currentSizeMB := float64(currentSize) / (1024 * 1024)
 
 	eeu.logger.Info("Current binary metadata",
 		zap.String("sha256", currentHash[:16]+"..."),
@@ -592,26 +607,7 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	// Copy binary to backup location
-	binaryData, err := os.ReadFile(eeu.config.BinaryPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read binary for backup: %w", err)
-	}
-
-	// P0 FIX (Adversarial #2): Hash the data we just read to detect TOCTOU
-	// Binary could have been replaced between stat and read
-	readHash := crypto.HashData(binaryData)
-	if readHash != currentHash {
-		return "", fmt.Errorf("SECURITY: Binary changed during backup\n"+
-			"Expected hash: %s\n"+
-			"Actual hash:   %s\n"+
-			"This could indicate:\n"+
-			"  1. Concurrent update in progress\n"+
-			"  2. Security compromise (binary replaced)\n"+
-			"  3. File system corruption\n"+
-			"ABORTING for safety", currentHash[:16]+"...", readHash[:16]+"...")
-	}
-
+	// Write backup from in-memory data (same data we hashed)
 	if err := os.WriteFile(expectedBackupPath, binaryData, 0755); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
@@ -622,12 +618,12 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 		return "", fmt.Errorf("backup file not found after creation: %w", err)
 	}
 
-	if backupInfo.Size() != currentBinaryInfo.Size() {
+	if backupInfo.Size() != currentSize {
 		return "", fmt.Errorf("backup size mismatch: expected %d, got %d",
-			currentBinaryInfo.Size(), backupInfo.Size())
+			currentSize, backupInfo.Size())
 	}
 
-	// P2 FIX (Adversarial #11): Verify backup hash matches original
+	// P0 FIX (Adversarial #4): Verify backup hash matches original
 	// This detects silent corruption during backup write
 	backupHash, err := crypto.HashFile(expectedBackupPath)
 	if err != nil {
@@ -679,6 +675,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		"/tmp",                             // Temp directory
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory (critical for install)
 		eeu.config.SourceDir,               // Source directory
+		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
 		binaryInfo.Size(),                  // Actual binary size
 	)
 	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
@@ -688,13 +685,8 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 	}
 	eeu.logger.Debug("Disk space re-verification passed")
 
-	// Acquire exclusive update lock using flock(2)
-	// This prevents concurrent updates and automatically releases on process death
-	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
-	if err != nil {
-		return err  // Error already includes detailed message
-	}
-	defer updateLock.Release()
+	// NOTE: Update lock already acquired in executeUpdateTransaction()
+	// No need to acquire again here - lock is held for entire transaction
 
 	if eeu.enhancedConfig.AtomicInstall {
 		// Atomic rename (same filesystem)
@@ -717,7 +709,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 			return fmt.Errorf("atomic rename failed: %w", err)
 		}
 
-		eeu.logger.Info(" Binary installed atomically with flock protection")
+		eeu.logger.Info(" Binary installed atomically")
 	} else {
 		// Standard installation
 		if err := eeu.InstallBinary(sourcePath); err != nil {
@@ -725,7 +717,6 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		}
 	}
 
-	// Lock automatically released by defer updateLock.Release()
 	return nil
 }
 

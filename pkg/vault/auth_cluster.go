@@ -265,7 +265,9 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		if err == nil && maxTTLSeconds == 0 {
 			// Check if this is a periodic token (which legitimately has explicit_max_ttl=0)
 			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
-			if !isPeriodicToken(rc, secret) {
+			// P1 Issue #32 Fix: Use returned period value (but don't need it here)
+			isPeriodic, _ := isPeriodicToken(rc, secret)
+			if !isPeriodic {
 				// Non-periodic token with explicit_max_ttl=0 is suspicious
 				logger.Warn("⚠️  Token has explicit_max_ttl=0 (may be in revocation queue)",
 					zap.Int64("explicit_max_ttl", maxTTLSeconds))
@@ -278,56 +280,64 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 	// CRITICAL: Periodic tokens auto-renew - don't reject based on low TTL
 	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
 		ttlSeconds, err := ttlRaw.Int64()
-		if err == nil {
-			ttlDuration := time.Duration(ttlSeconds) * time.Second
+		if err != nil {
+			// SECURITY: Malformed TTL is suspicious - reject token
+			// P0 Issue #31 Fix: Don't skip validation on error (regression from previous fix)
+			// Original code with `ttlSeconds, _ := ttlRaw.Int64()` got 0 on error → rejected
+			// Changed to `if err == nil` → skipped validation → accepted invalid token
+			// Now: explicitly reject tokens with malformed TTL
+			logger.Warn("⚠️  Token has malformed TTL field (rejecting token)",
+				zap.String("ttl_raw_type", fmt.Sprintf("%T", ttlRaw)),
+				zap.Int("ttl_raw_length", len(string(ttlRaw))),
+				zap.Error(err))
+			return fmt.Errorf("token has malformed TTL field: %w", err)
+		}
 
-			// Check if token is periodic (auto-renewable, never expires)
-			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
-			isPeriodic := isPeriodicToken(rc, secret)
-			if isPeriodic {
-				// Get period for logging
-				if periodRaw, ok := secret.Data["period"].(json.Number); ok {
-					periodSeconds, _ := periodRaw.Int64()
-					logger.Debug("✓ Token is periodic (auto-renewable)",
-						zap.Int64("current_ttl_seconds", ttlSeconds),
-						zap.Int64("period_seconds", periodSeconds),
-						zap.String("period_human", formatTTLDuration(periodSeconds)))
+		ttlDuration := time.Duration(ttlSeconds) * time.Second
+
+		// Check if token is periodic (auto-renewable, never expires)
+		// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
+		// P1 Issue #32 Fix: Get period value directly, don't re-parse
+		isPeriodic, periodSeconds := isPeriodicToken(rc, secret)
+		if isPeriodic {
+			logger.Debug("✓ Token is periodic (auto-renewable)",
+				zap.Int64("current_ttl_seconds", ttlSeconds),
+				zap.Int64("period_seconds", periodSeconds),
+				zap.String("period_human", formatTTLDuration(periodSeconds)))
+		}
+
+		// Check if token is renewable (can be manually renewed)
+		isRenewable := false
+		if renewableRaw, ok := secret.Data["renewable"].(bool); ok {
+			isRenewable = renewableRaw
+		}
+
+		// Periodic tokens: Don't check TTL (they auto-renew)
+		// Examples: Vault Agent tokens (period=4h), AppRole tokens with period
+		if isPeriodic {
+			logger.Debug("Token is periodic - TTL check skipped (auto-renews)",
+				zap.Int64("current_ttl", ttlSeconds),
+				zap.Bool("periodic", true))
+			// Don't reject periodic tokens regardless of TTL
+		} else {
+			// Non-periodic tokens: Check TTL and warn/reject
+			if ttlSeconds < TTLWarningThreshold {
+				logger.Warn("⚠️  Token expires soon",
+					zap.Int64("ttl_seconds", ttlSeconds),
+					zap.String("ttl_human", formatTTLDuration(ttlSeconds)),
+					zap.Bool("renewable", isRenewable))
+
+				// Reject if token expires too soon (less than minimum required)
+				if ttlSeconds < TTLMinimumRequired {
+					return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
+						"Get a longer-lived token:\n"+
+						"  vault token create -policy=%s -ttl=1h\n"+
+						"  Or use Vault Agent (automatic token renewal)", ttlSeconds, shared.EosAdminPolicyName)
 				}
-			}
-
-			// Check if token is renewable (can be manually renewed)
-			isRenewable := false
-			if renewableRaw, ok := secret.Data["renewable"].(bool); ok {
-				isRenewable = renewableRaw
-			}
-
-			// Periodic tokens: Don't check TTL (they auto-renew)
-			// Examples: Vault Agent tokens (period=4h), AppRole tokens with period
-			if isPeriodic {
-				logger.Debug("Token is periodic - TTL check skipped (auto-renews)",
-					zap.Int64("current_ttl", ttlSeconds),
-					zap.Bool("periodic", true))
-				// Don't reject periodic tokens regardless of TTL
 			} else {
-				// Non-periodic tokens: Check TTL and warn/reject
-				if ttlSeconds < TTLWarningThreshold {
-					logger.Warn("⚠️  Token expires soon",
-						zap.Int64("ttl_seconds", ttlSeconds),
-						zap.String("ttl_human", formatTTLDuration(ttlSeconds)),
-						zap.Bool("renewable", isRenewable))
-
-					// Reject if token expires too soon (less than minimum required)
-					if ttlSeconds < TTLMinimumRequired {
-						return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
-							"Get a longer-lived token:\n"+
-							"  vault token create -policy=%s -ttl=1h\n"+
-							"  Or use Vault Agent (automatic token renewal)", ttlSeconds, shared.EosAdminPolicyName)
-					}
-				} else {
-					logger.Debug("Token TTL acceptable",
-						zap.Duration("ttl", ttlDuration),
-						zap.Bool("renewable", isRenewable))
-				}
+				logger.Debug("Token TTL acceptable",
+					zap.Duration("ttl", ttlDuration),
+					zap.Bool("renewable", isRenewable))
 			}
 		}
 	}
@@ -435,7 +445,8 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		}
 
 		// Check if token WAS periodic at start of validation
-		isPeriodic := isPeriodicToken(rc, secret)
+		// P1 Issue #32 Fix: Get period value (though not needed here)
+		isPeriodic, _ := isPeriodicToken(rc, secret)
 
 		// Only re-check for non-periodic tokens (periodic tokens auto-renew)
 		if !isPeriodic && ttlSeconds < TTLRecheckThreshold {
@@ -460,7 +471,8 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 				// Don't fail - original TTL was acceptable
 			} else if secretRefresh != nil && secretRefresh.Data != nil {
 				// CRITICAL: Check if token became periodic during validation (P0 Issue #13 Fix)
-				isPeriodicRefresh := isPeriodicToken(rc, secretRefresh)
+				// P1 Issue #32 Fix: Get period value (though not needed here)
+				isPeriodicRefresh, _ := isPeriodicToken(rc, secretRefresh)
 
 				if isPeriodicRefresh && !isPeriodic {
 					// Token became periodic during validation - this is OK, it will auto-renew
@@ -555,18 +567,23 @@ func formatTTLDuration(seconds int64) string {
 //
 // This is a centralized helper to ensure consistent periodic token detection
 // across multiple validation checks. It handles error cases consistently:
-// - nil secret or nil Data returns false
-// - type assertion failure returns false
-// - Int64() conversion error returns false (with warning logged)
-// - period <= 0 returns false
+// - nil secret or nil Data returns (false, 0)
+// - type assertion failure returns (false, 0)
+// - Int64() conversion error returns (false, 0) with warning logged
+// - period <= 0 returns (false, 0)
 //
 // P0 Issue #12 Fix: Replaces 3 duplicate isPeriodic checks with inconsistent error handling.
 // P0 Issue #21 Fix: Logs errors when Int64() conversion fails (detects malformed/attack responses).
+// P1 Issue #32 Fix: Returns period value to avoid re-parsing at call sites.
 //
-// Returns: true if token has period > 0, false otherwise
-func isPeriodicToken(rc *eos_io.RuntimeContext, secret *api.Secret) bool {
-	if secret == nil || secret.Data == nil {
-		return false
+// Returns: (isPeriodic bool, periodSeconds int64)
+//   - (true, 14400) for periodic token with 4h period
+//   - (false, 0) for non-periodic or error cases
+func isPeriodicToken(rc *eos_io.RuntimeContext, secret *api.Secret) (bool, int64) {
+	// P0 Issue #38 Fix: Prevent panic from nil RuntimeContext
+	// If rc is nil, we can't log warnings, so return false defensively
+	if rc == nil || secret == nil || secret.Data == nil {
+		return false, 0
 	}
 
 	if periodRaw, ok := secret.Data["period"].(json.Number); ok {
@@ -578,11 +595,12 @@ func isPeriodicToken(rc *eos_io.RuntimeContext, secret *api.Secret) bool {
 			logger.Warn("⚠️  Token has malformed period field (treating as non-periodic)",
 				zap.String("period_raw", string(periodRaw)),
 				zap.Error(err))
-			return false
+			return false, 0
 		}
 		// Only return true if conversion succeeded AND period > 0
-		return periodSeconds > 0
+		isPeriodic := periodSeconds > 0
+		return isPeriodic, periodSeconds
 	}
 
-	return false
+	return false, 0
 }

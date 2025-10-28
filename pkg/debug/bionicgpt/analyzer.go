@@ -264,7 +264,12 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 	for _, result := range report.Results {
 		// Container dependency blocking (critical)
 		if result.Name == "Container Dependency Blocked" && result.Status == debug.StatusError {
-			if blockedCount, ok := result.Metadata["blocked_count"].(int); ok && blockedCount > 0 {
+			// Bug 26 fix: Check if diagnostic execution failed vs containers blocked
+			if result.Error != nil {
+				// Diagnostic itself failed (Docker not running, permission denied, etc.)
+				rootCauses = append(rootCauses, "Container diagnostics failed: "+result.Message)
+			} else if blockedCount, ok := result.Metadata["blocked_count"].(int); ok && blockedCount > 0 {
+				// Diagnostic succeeded, containers ARE blocked
 				if blocked, ok := result.Metadata["blocked_containers"].([]string); ok {
 					for _, container := range blocked {
 						blockingIssues = append(blockingIssues, fmt.Sprintf("├─ %s: Created (never started)", container))
