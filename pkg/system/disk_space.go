@@ -37,65 +37,97 @@ type DiskSpaceRequirements struct {
 	RecommendedBackupSpace uint64
 }
 
-// P0 FIX (Adversarial NEW #13): Check if two paths are on the same filesystem
-// P1 FIX (Adversarial NEW #24 & #25): Improved path handling and error consistency
-// Returns true if both paths are on the same device (same filesystem)
-// Uses syscall.Stat to get device ID (st_dev field)
+// areOnSameFilesystem checks if two paths are on the same filesystem
+// ARCHITECTURAL FIX (Adversarial Analysis Round 4): Use file descriptors to eliminate TOCTOU
+//
+// PREVIOUS ISSUES:
+//   - P0 NEW #30: TOCTOU between findExistingParent and syscall.Stat (path could disappear)
+//   - P0 NEW #29: Wrong worst-case assumption (assumed different FS on error)
+//   - Symlink cycles could cause incorrect results
+//
+// NEW APPROACH:
+//   1. Open each path (or first existing parent) to get a file descriptor
+//   2. fstat(fd) to get device ID - NO RACE, we're statting the open FD
+//   3. Compare device IDs
+//   4. TRUE worst case: if can't determine, assume SAME FS (requires MORE space)
+//
+// RATIONALE FOR WORST CASE:
+//   - If we assume "different FS" and they're actually the SAME FS:
+//     → We count the same space pool TWICE (600MB counted as if it's 1200MB)
+//     → Update proceeds thinking it has enough space
+//     → FAILS mid-transaction with "no space left on device"
+//   - If we assume "same FS" and they're actually DIFFERENT:
+//     → We require MORE space than strictly necessary
+//     → Might reject update that would actually succeed
+//     → But this is SAFE - won't corrupt anything
 func areOnSameFilesystem(path1, path2 string) (bool, error) {
-	// Find existing parent directory for each path
-	// This handles deeply nested nonexistent paths
-	existingPath1, err := findExistingParent(path1)
+	// Open first path (or first existing parent)
+	fd1, err := openPathOrParent(path1)
 	if err != nil {
-		// Can't determine - assume worst case (different filesystems)
-		return false, nil
+		// Can't open path1 - assume SAME filesystem (safe worst case)
+		return true, nil
 	}
-	existingPath2, err := findExistingParent(path2)
+	defer fd1.Close()
+
+	// Open second path (or first existing parent)
+	fd2, err := openPathOrParent(path2)
 	if err != nil {
-		// Can't determine - assume worst case (different filesystems)
-		return false, nil
+		// Can't open path2 - assume SAME filesystem (safe worst case)
+		return true, nil
+	}
+	defer fd2.Close()
+
+	// Get device ID from first FD
+	var stat1 syscall.Stat_t
+	if err := syscall.Fstat(int(fd1.Fd()), &stat1); err != nil {
+		// Can't fstat - assume SAME filesystem (safe worst case)
+		return true, nil
 	}
 
-	var stat1, stat2 syscall.Stat_t
-	if err := syscall.Stat(existingPath1, &stat1); err != nil {
-		// Can't stat existing parent - assume different filesystems
-		return false, nil
-	}
-	if err := syscall.Stat(existingPath2, &stat2); err != nil {
-		// Can't stat existing parent - assume different filesystems
-		return false, nil
+	// Get device ID from second FD
+	var stat2 syscall.Stat_t
+	if err := syscall.Fstat(int(fd2.Fd()), &stat2); err != nil {
+		// Can't fstat - assume SAME filesystem (safe worst case)
+		return true, nil
 	}
 
 	// Compare device IDs - same device = same filesystem
 	return stat1.Dev == stat2.Dev, nil
 }
 
-// P1 FIX (Adversarial NEW #24): Find the first existing parent directory
-// Traverses up the directory tree until an existing directory is found
-// Returns error only if we reach filesystem root without finding anything
-func findExistingParent(path string) (string, error) {
-	// Clean the path first
+// openPathOrParent opens a path, or if it doesn't exist, opens the first existing parent
+// ARCHITECTURAL FIX (Adversarial Analysis Round 4): Returns open FD to eliminate TOCTOU
+//
+// This prevents the race condition where:
+//   1. findExistingParent() confirms /opt/backup exists
+//   2. Attacker deletes /opt/backup
+//   3. syscall.Stat() fails on deleted path
+//
+// By returning an OPEN file descriptor, we guarantee the path stays valid for fstat.
+func openPathOrParent(path string) (*os.File, error) {
 	path = filepath.Clean(path)
 
-	// Try up to 100 levels (prevents infinite loop on malformed paths)
+	// Try up to 100 levels (prevents infinite loop)
 	for i := 0; i < 100; i++ {
-		if _, err := os.Stat(path); err == nil {
-			// Path exists!
-			return path, nil
+		// Try to open the path as a directory
+		fd, err := os.Open(path)
+		if err == nil {
+			// Successfully opened - return the FD
+			return fd, nil
 		}
 
-		// Get parent directory
+		// Path doesn't exist - try parent
 		parent := filepath.Dir(path)
 
 		// Check if we've reached the root
 		if parent == path {
-			// Reached root without finding existing directory
-			return "", fmt.Errorf("no existing parent found for %s", path)
+			return nil, fmt.Errorf("no existing parent found for %s (reached root)", path)
 		}
 
 		path = parent
 	}
 
-	return "", fmt.Errorf("exceeded maximum directory depth for %s", path)
+	return nil, fmt.Errorf("exceeded maximum directory depth searching for %s", path)
 }
 
 // DiskSpaceResult contains the results of disk space verification

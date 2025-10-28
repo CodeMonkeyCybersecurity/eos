@@ -308,6 +308,121 @@ func TestFormatTTLDuration(t *testing.T) {
 }
 
 // ============================================================================
+// Log Sanitization Tests (P1 Issue #40, P2 Issue #43, P3 Issue #44 Fixes)
+// ============================================================================
+
+func TestSanitizeForLogging(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Normal printable string",
+			input:    "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "String with newline (P2 Issue #43 - log injection)",
+			input:    "innocent\nFAKE LOG ENTRY",
+			expected: "innocent FAKE LOG ENTRY", // Newline replaced with space
+		},
+		{
+			name:     "String with carriage return",
+			input:    "line1\rline2",
+			expected: "line1 line2", // CR replaced with space
+		},
+		{
+			name:     "String with tab",
+			input:    "col1\tcol2",
+			expected: "col1 col2", // Tab replaced with space
+		},
+		{
+			name:     "String with ANSI escape sequence",
+			input:    "\x1b[31mRED TEXT\x1b[0m",
+			expected: " [31mRED TEXT [0m", // ESC (27) replaced with space
+		},
+		{
+			name:     "String with null byte",
+			input:    "hello\x00world",
+			expected: "hello world", // Null replaced with space
+		},
+		{
+			name:     "String with DEL character",
+			input:    "hello\x7fworld",
+			expected: "helloworld", // DEL removed
+		},
+		{
+			name:     "String with multiple control characters",
+			input:    "a\nb\rc\td\x00e\x1bf",
+			expected: "a b c d e f", // All replaced with spaces
+		},
+		{
+			name:     "Very long string (P3 Issue #44 - UTF-8 truncation)",
+			input:    "a123456789b123456789c123456789d123456789e123456789f123456789g123456789h123456789i123456789j123456789k123456789",
+			expected: "a123456789b123456789c123456789d123456789e123456789f123456789g123456789h123456789i123456789j123456789...[truncated]",
+		},
+		{
+			name:     "UTF-8 multi-byte characters",
+			input:    "Hello 世界 🌍",
+			expected: "Hello 世界 🌍",
+		},
+		{
+			name:     "Long UTF-8 string (truncation at rune boundary)",
+			input:    "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789世界",
+			expected: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789...[truncated]",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Only control characters",
+			input:    "\n\r\t\x00\x1b",
+			expected: "     ", // All replaced with spaces
+		},
+		{
+			name:     "Exact 100 runes (no truncation)",
+			input:    "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789",
+			expected: "0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789",
+		},
+		{
+			name:     "Log injection attack simulation",
+			input:    "malicious_value\n2025-01-28 INFO [vault] User admin authenticated successfully",
+			expected: "malicious_value 2025-01-28 INFO [vault] User admin authenticated successfully",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeForLogging(tt.input)
+			assert.Equal(t, tt.expected, result,
+				"sanitizeForLogging(%q) = %q, expected %q", tt.input, result, tt.expected)
+
+			// Additional security checks
+			assert.NotContains(t, result, "\n", "Output should not contain newlines")
+			assert.NotContains(t, result, "\r", "Output should not contain carriage returns")
+			assert.NotContains(t, result, "\t", "Output should not contain tabs")
+			assert.NotContains(t, result, "\x00", "Output should not contain null bytes")
+			assert.NotContains(t, result, "\x1b", "Output should not contain ESC character")
+
+			// Check length constraint (P3 Issue #44)
+			runes := []rune(result)
+			if !strings.HasSuffix(result, "...[truncated]") {
+				assert.LessOrEqual(t, len(runes), 100,
+					"Output should be <= 100 runes (was %d)", len(runes))
+			} else {
+				// If truncated, should be exactly 100 + suffix
+				withoutSuffix := strings.TrimSuffix(result, "...[truncated]")
+				assert.Equal(t, 100, len([]rune(withoutSuffix)),
+					"Truncated output should have exactly 100 runes before suffix")
+			}
+		})
+	}
+}
+
+// ============================================================================
 // Periodic Token Detection Tests (P0 Issue #12 Fix)
 // ============================================================================
 

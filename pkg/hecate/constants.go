@@ -215,3 +215,24 @@ const (
 	// RATIONALE: Authentik is the only SSO provider currently integrated with Hecate
 	DefaultSSOProvider = "authentik"
 )
+
+// ============================================================================
+// BIONICGPT SERVICE-SPECIFIC CONSTANTS
+// ============================================================================
+
+const (
+	// BionicGPTDefaultPort is the port where BionicGPT application listens
+	// RATIONALE: Port 7703 is BionicGPT's default HTTP port
+	// REFERENCE: https://github.com/bionic-gpt/bionic-gpt
+	BionicGPTDefaultPort = 7703
+
+	// BionicGPTHealthEndpoint is the health check endpoint for BionicGPT
+	// RATIONALE: Standard health endpoint for container orchestration
+	// USAGE: Caddy health checks, Nomad health monitoring
+	BionicGPTHealthEndpoint = "/health"
+
+	// BionicGPTOAuth2CallbackPath is the OAuth2 callback path for BionicGPT
+	// RATIONALE: Standard OAuth2 callback path used by oauth2-proxy
+	// SECURITY: Must match Authentik OAuth2 provider redirect URI configuration
+	BionicGPTOAuth2CallbackPath = "/oauth2/callback"
+)

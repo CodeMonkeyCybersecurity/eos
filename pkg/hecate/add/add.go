@@ -50,6 +50,11 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		return err
 	}
 
+	// Phase 2.5: Service-specific integration (if registered)
+	if err := runServiceIntegration(rc, opts); err != nil {
+		return err
+	}
+
 	// Phase 3: Backup
 	backupPath, err := runBackupPhase(rc, opts)
 	if err != nil {
@@ -379,6 +384,40 @@ func runVerificationPhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error
 		zap.Int("status_code", resp.StatusCode))
 	logger.Warn("⚠ Route may be experiencing issues")
 	return fmt.Errorf("route returned status %d", resp.StatusCode)
+}
+
+// runServiceIntegration runs service-specific integration if a plugin is registered
+func runServiceIntegration(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if service has a registered integrator
+	integrator, exists := GetServiceIntegrator(opts.Service)
+	if !exists {
+		// No service-specific integration registered - that's OK
+		logger.Debug("No service-specific integration registered for service", zap.String("service", opts.Service))
+		return nil
+	}
+
+	logger.Info("Running service-specific integration", zap.String("service", opts.Service))
+
+	// Step 1: Validate service is running at backend
+	if err := integrator.ValidateService(rc, opts); err != nil {
+		return fmt.Errorf("service validation failed: %w", err)
+	}
+
+	// Step 2: Configure authentication (OAuth2, SSO, etc.)
+	if err := integrator.ConfigureAuthentication(rc, opts); err != nil {
+		return fmt.Errorf("authentication configuration failed: %w", err)
+	}
+
+	// Step 3: Health check
+	if err := integrator.HealthCheck(rc, opts); err != nil {
+		// Non-fatal: log warning but continue
+		logger.Warn("Service-specific health check failed", zap.Error(err))
+	}
+
+	logger.Info("✓ Service-specific integration complete")
+	return nil
 }
 
 // printSuccessMessage prints the final success message

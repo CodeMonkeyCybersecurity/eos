@@ -388,15 +388,20 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 		hasPostgresIssue := false
 		hasDiagnosticFailure := false
 		for _, cause := range rootCauses {
+			// Bug 31 fix: Check for diagnostic failure first, skip service detection if found
+			// This prevents "LiteLLM diagnostics failed" from triggering both infrastructure
+			// AND service-specific remediation (which would conflict)
+			if strings.Contains(cause, "diagnostics failed") {
+				hasDiagnosticFailure = true
+				continue // Don't check service-specific patterns for diagnostic failures
+			}
+
+			// Only detect service issues if NOT a diagnostic failure
 			if strings.Contains(cause, "LiteLLM") {
 				hasLiteLLMIssue = true
 			}
 			if strings.Contains(cause, "PostgreSQL") {
 				hasPostgresIssue = true
-			}
-			// Bug 27 fix: Detect diagnostic failures (Docker not running, permissions, etc.)
-			if strings.Contains(cause, "diagnostics failed") {
-				hasDiagnosticFailure = true
 			}
 		}
 
@@ -449,8 +454,9 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			summary.WriteString("     cd /opt/bionicgpt && docker compose restart postgres\n\n")
 		}
 
-		// Show generic steps only if no specific root cause identified
-		if !hasLiteLLMIssue && !hasPostgresIssue {
+		// Bug 32 fix: Show generic steps only if no specific root cause identified
+		// AND no diagnostic failures (which have their own Docker-specific remediation)
+		if !hasLiteLLMIssue && !hasPostgresIssue && !hasDiagnosticFailure {
 			if len(blockingIssues) > 0 {
 				summary.WriteString("Container Issues:\n")
 				summary.WriteString("  1. Start containers:\n")
