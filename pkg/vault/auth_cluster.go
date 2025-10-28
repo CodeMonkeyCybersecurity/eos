@@ -10,7 +10,9 @@
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -23,6 +25,9 @@ import (
 // and validates it has sufficient capabilities for cluster operations.
 //
 // Used when token is provided via --token flag or VAULT_TOKEN environment variable.
+//
+// SECURITY: Token value is NEVER logged in plain text. Use sanitizeTokenForLogging()
+// if you need to reference the token in logs for debugging.
 //
 // ASSESS: Validate token format
 // INTERVENE: Create client and set token
@@ -69,9 +74,32 @@ func GetVaultClientWithToken(rc *eos_io.RuntimeContext, token string) (*api.Clie
 	return client, nil
 }
 
+// sanitizeTokenForLogging returns a safe version of token for logging.
+// Shows first 4 chars + "..." to help identify which token without exposing value.
+//
+// SECURITY: NEVER log raw token values - use this function for all token logging.
+//
+// Examples:
+//   "hvs.CAES..." → "hvs.***"
+//   "s.1234567890abcdef" → "s.12***"
+func sanitizeTokenForLogging(token string) string {
+	if len(token) <= 4 {
+		return "***" // Token too short, hide completely
+	}
+	// Show prefix to help identify token type (hvs., s., etc.) but hide rest
+	prefix := token[:4]
+	if prefix == "hvs." || prefix == "s.12" {
+		return prefix + "***"
+	}
+	// For other formats, just show "***"
+	return "***"
+}
+
 // validateTokenFormat checks token for dangerous characters.
 // Vault tokens are typically base64-encoded UUID or HVAC format.
 // This validation prevents terminal injection attacks.
+//
+// SECURITY: Token is validated but NEVER logged.
 func validateTokenFormat(token string) error {
 	// Check for control characters that could cause terminal injection
 	for _, r := range token {
@@ -104,6 +132,31 @@ func validateTokenFormat(token string) error {
 func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.Client) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Check 0: Vault must be unsealed (check BEFORE token validation)
+	logger.Debug("Checking Vault seal status")
+	sealStatus, err := client.Sys().SealStatus()
+	if err != nil {
+		logger.Debug("Failed to check seal status", zap.Error(err))
+		return fmt.Errorf("cannot connect to Vault: %w\n\n"+
+			"Possible causes:\n"+
+			"  • Vault service is not running: systemctl status vault\n"+
+			"  • Vault address is incorrect: check VAULT_ADDR\n"+
+			"  • Network connectivity issue", err)
+	}
+
+	if sealStatus.Sealed {
+		return fmt.Errorf("Vault is sealed - cannot perform cluster operations\n\n"+
+			"Unseal Vault first:\n"+
+			"  vault operator unseal\n"+
+			"  Or: eos update vault unseal\n\n"+
+			"Seal status:\n"+
+			"  Sealed: %t\n"+
+			"  Progress: %d/%d keys provided",
+			sealStatus.Sealed, sealStatus.Progress, sealStatus.T)
+	}
+
+	logger.Debug("✓ Vault is unsealed", zap.Int("threshold", sealStatus.T))
+
 	// Check 1: Token must be valid
 	logger.Debug("Checking token validity with Vault")
 	secret, err := client.Auth().Token().LookupSelf()
@@ -114,6 +167,32 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 
 	if secret == nil || secret.Data == nil {
 		return fmt.Errorf("token lookup returned no data (token may be expired)")
+	}
+
+	// Check token TTL (Time To Live)
+	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
+		ttlSeconds, err := ttlRaw.Int64()
+		if err == nil {
+			ttlDuration := time.Duration(ttlSeconds) * time.Second
+
+			// Warn if token expires soon (less than 5 minutes)
+			if ttlSeconds < 300 {
+				logger.Warn("⚠️  Token expires soon",
+					zap.Int64("ttl_seconds", ttlSeconds),
+					zap.String("ttl_human", formatTTLDuration(ttlSeconds)))
+
+				// Reject if token expires too soon (less than 1 minute)
+				if ttlSeconds < 60 {
+					return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
+						"Get a longer-lived token:\n"+
+						"  vault token create -policy=%s -ttl=1h\n"+
+						"  Or use Vault Agent (automatic token renewal)", ttlSeconds, shared.EosAdminPolicyName)
+				}
+			} else {
+				logger.Debug("Token TTL acceptable",
+					zap.Duration("ttl", ttlDuration))
+			}
+		}
 	}
 
 	// Check 2: Token must have required policies
@@ -180,4 +259,26 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		zap.Strings("policies", policyNames))
 
 	return nil
+}
+
+// formatTTLDuration converts seconds into human-readable duration string for TTL display.
+// This is a simple formatter for token TTL (avoids conflict with existing formatDuration).
+//
+// Examples:
+//   45 seconds  → "45s"
+//   120 seconds → "2m"
+//   3665 seconds → "1h1m"
+func formatTTLDuration(seconds int64) string {
+	if seconds < 60 {
+		return fmt.Sprintf("%ds", seconds)
+	} else if seconds < 3600 {
+		minutes := seconds / 60
+		return fmt.Sprintf("%dm", minutes)
+	}
+	hours := seconds / 3600
+	minutes := (seconds % 3600) / 60
+	if minutes > 0 {
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dh", hours)
 }

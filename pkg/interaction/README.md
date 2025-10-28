@@ -1,6 +1,6 @@
 # pkg/interaction
 
-*Last Updated: 2025-01-28*
+*Last Updated: 2025-10-28*
 
 Human-centric interaction utilities for Eos following the principle: **Technology serves humans, not the other way around.**
 
@@ -277,20 +277,59 @@ token := result.Value
 
 See [cmd/update/vault_cluster.go:287-334](../../cmd/update/vault_cluster.go#L287-L334) for production usage (`getAuthenticatedVaultClient` helper).
 
-### Prompting (`prompt.go`)
+### Prompting (`input.go`)
 
-Standard user input prompts with structured logging:
+Standard user input prompts with structured logging.
 
-- `PromptYesNo(ctx, prompt, defaultYes)` - Yes/No questions with configurable defaults
-- `PromptInput(ctx, prompt, defaultValue)` - Text input with optional defaults (accepts default or custom value)
+#### Yes/No Prompts
+
+**PromptYesNoSafe** - RECOMMENDED for new code:
+```go
+func PromptYesNoSafe(rc *RuntimeContext, question string, defaultYes bool) (bool, error)
+```
+- Type-safe signature (explicit RuntimeContext)
+- Returns error (caller decides how to handle failures)
+- Strict input validation (`y`/`yes`/`n`/`no` only)
+- Retry logic with helpful error messages
+- Standard CLI notation: `[Y/n]` or `[y/N]`
+
+**Example:**
+```go
+proceed, err := interaction.PromptYesNoSafe(rc, "Continue with deployment?", false)
+if err != nil {
+    return fmt.Errorf("failed to get user confirmation: %w", err)
+}
+if !proceed {
+    log.Info("Deployment cancelled by user")
+    return nil
+}
+```
+
+**PromptYesNo** - DEPRECATED (variadic, no error return):
+```go
+func PromptYesNo(args ...interface{}) bool
+```
+- Variadic args: `(question, defaultYes)` or `(ctx, question, defaultYes)`
+- No error return (uses default on failure)
+- Kept for backward compatibility until Eos v2.0.0
+- **Use PromptYesNoSafe for new code**
+
+**Accepted inputs (both functions):**
+- `y`, `yes`, `Y`, `YES` → true
+- `n`, `no`, `N`, `NO` → false
+- Empty (press Enter) → uses default
+- **Strict validation:** No longer accepts `yeah`, `ok`, `sure`, `1`, `0` (aligns with git, apt, npm)
+
+#### Other Prompts
+
+- `PromptInput(ctx, prompt, defaultValue)` - Text input with optional defaults
 - `PromptSecret(ctx, prompt)` - Hidden input for passwords/secrets
 - `PromptSelect(ctx, prompt, options)` - Multiple choice selection
 
 All prompts:
 - Log to structured logging (never `fmt.Print*`)
-- Use stderr for prompts to preserve stdout for automation
-- Support context cancellation
-- Provide clear defaults
+- Retry logic with helpful error messages
+- Clear visual indicators
 
 ### Dependency Checking (`dependency.go`)
 
@@ -422,6 +461,15 @@ Input sanitization and validation helpers.
 Low-level reading utilities:
 - `ReadLine(ctx, reader, label)` - Read single line with logging
 - `ReadLines(rc, reader, label, count)` - Read multiple lines
+
+### TTY Detection (`tty.go`)
+
+**IsTTY** - Check if running in interactive terminal:
+```go
+func IsTTY() bool
+```
+
+Used to determine if interactive prompts are possible.
 
 ### Fallback Handling (`fallback.go`)
 

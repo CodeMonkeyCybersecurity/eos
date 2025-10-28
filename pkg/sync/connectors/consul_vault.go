@@ -21,7 +21,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/prompt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/synctypes"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -118,7 +118,7 @@ func (c *ConsulVaultConnector) PreflightCheck(rc *eos_io.RuntimeContext, config 
 			logger.Info("terminal prompt:   4. Continue with Vault-Consul sync")
 			logger.Info("terminal prompt: ")
 
-			proceed, err := prompt.YesNo(rc, "Enable Consul ACLs automatically?", false)
+			proceed, err := interaction.PromptYesNoSafe(rc, "Enable Consul ACLs automatically?", false)
 			if err != nil {
 				return fmt.Errorf("failed to get user input: %w", err)
 			}
@@ -510,7 +510,7 @@ func (c *ConsulVaultConnector) Connect(rc *eos_io.RuntimeContext, config *syncty
 			logger.Warn("For more info: https://developer.hashicorp.com/vault/docs/commands/operator/migrate")
 
 			if !config.Force {
-				proceed, err := prompt.YesNo(rc, "Continue with Consul secrets engine setup?", false)
+				proceed, err := interaction.PromptYesNoSafe(rc, "Continue with Consul secrets engine setup?", false)
 				if err != nil || !proceed {
 					return eos_err.NewUserError("Operation cancelled by user")
 				}

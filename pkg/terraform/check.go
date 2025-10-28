@@ -3,34 +3,67 @@
 package terraform
 
 import (
+	"fmt"
 	"os/exec"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/prompt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
-// CheckTerraformInstalledWithPrompt checks if terraform is installed and prompts to install if not
+// CheckTerraformInstalledWithPrompt checks if terraform is installed and prompts to install if not.
+//
+// This function follows the human-centric dependency checking pattern with informed consent.
+// Uses interaction.PromptYesNoSafe for user consent, then manually calls hashicorp.InstallTool
+// for the actual installation.
+//
+// Pattern: ASSESS → INFORM + CONSENT → INTERVENE → EVALUATE
+//
+// If Terraform is not found:
+//   - Explains what Terraform is and why it's needed
+//   - Asks for user consent via PromptYesNoSafe (Y/n default)
+//   - Calls hashicorp.InstallTool if user consents
+//   - Verifies installation succeeded
 func CheckTerraformInstalledWithPrompt(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check if terraform is already installed
+	// ASSESS: Check if terraform is already installed
 	if _, err := exec.LookPath("terraform"); err == nil {
 		logger.Info("Terraform is already installed")
 		return nil
 	}
 
-	// Terraform is not installed, prompt user
+	// INFORM + CONSENT: Use human-centric pattern to explain and get consent
 	logger.Info("Terraform not found in PATH")
+	logger.Info("Terraform is required to manage infrastructure as code (DNS, cloud resources)")
+	logger.Info("")
 
-	return prompt.PromptInstallDependency(rc, "terraform",
-		"Terraform is required to manage infrastructure as code",
-		func() error {
-			// Use the hashicorp package to install terraform
-			return hashicorp.InstallTool(rc, "terraform")
-		})
+	proceed, err := interaction.PromptYesNoSafe(rc, "Would you like to install Terraform now?", true)
+	if err != nil {
+		return fmt.Errorf("failed to get user consent: %w", err)
+	}
+
+	if !proceed {
+		return fmt.Errorf("terraform is required but installation was declined by user.\n\n" +
+			"To install manually, run:\n" +
+			"  sudo eos install terraform")
+	}
+
+	// INTERVENE: Install terraform using HashiCorp package manager
+	logger.Info("Installing Terraform via HashiCorp package manager...")
+	if err := hashicorp.InstallTool(rc, "terraform"); err != nil {
+		return fmt.Errorf("failed to install terraform: %w", err)
+	}
+
+	// EVALUATE: Verify installation succeeded
+	if _, err := exec.LookPath("terraform"); err != nil {
+		return fmt.Errorf("terraform installation completed but terraform not found in PATH: %w", err)
+	}
+
+	logger.Info("Terraform installed successfully and ready to use")
+	return nil
 }
 
 // TerraformVersionInfo represents Terraform version information

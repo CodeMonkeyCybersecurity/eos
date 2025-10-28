@@ -1,7 +1,7 @@
 # Eos Development Roadmap
 
-**Last Updated**: 2025-10-27
-**Version**: 1.0
+**Last Updated**: 2025-10-28
+**Version**: 1.1
 
 ---
 
@@ -253,6 +253,249 @@ go build -o /tmp/eos-build ./cmd/
 - [ ] Manual testing passes
 - [ ] Performance acceptable (no slowdowns)
 
+### 5.4: Vault Cluster Authentication Improvements (P2) 📅 PLANNED
+
+**Target Completion**: Week of 2025-11-10
+**Effort**: 9 hours
+**Priority**: P2
+
+**Context**: Adversarial analysis of vault cluster authentication (2025-10-28) identified quality issues in the recently implemented authentication system for `eos update vault-cluster` commands.
+
+**Reference**: See adversarial analysis document (created 2025-10-28) for full findings and rationale.
+
+#### 5.4.1: Improve Capability Verification (3 hours)
+
+**File**: `pkg/vault/auth_cluster.go:149-177`
+
+**Current Behavior**: Only checks `sys/storage/raft/configuration` capability
+**Problem**: Autopilot and snapshot operations require additional Vault paths that aren't verified
+
+**Implementation**:
+```go
+func verifyClusterOperationCapabilities(rc, client) error {
+    // Check ALL required paths for cluster operations
+    requiredCapabilities := map[string][]string{
+        "sys/storage/raft/configuration": {"read"},
+        "sys/storage/raft/autopilot/configuration": {"read", "update"},
+        "sys/storage/raft/snapshot": {"read"},
+        "sys/storage/raft/snapshot-force": {"update"}, // For forced restore
+    }
+
+    missingCapabilities := []string{}
+
+    for path, requiredCaps := range requiredCapabilities {
+        capabilities, err := client.Sys().CapabilitiesSelf(path)
+        if err != nil {
+            logger.Debug("Capability check failed",
+                zap.String("path", path), zap.Error(err))
+            continue  // Try other paths
+        }
+
+        for _, required := range requiredCaps {
+            if !sliceContains(capabilities, required) {
+                missingCapabilities = append(missingCapabilities,
+                    fmt.Sprintf("%s on %s", required, path))
+            }
+        }
+    }
+
+    if len(missingCapabilities) > 0 {
+        return fmt.Errorf("token lacks required capabilities:\n"+
+            "  Missing: %v\n\n"+
+            "Ensure your token has one of:\n"+
+            "  • eos-admin-policy (recommended)\n"+
+            "  • root policy (emergency only)", missingCapabilities)
+    }
+
+    return nil
+}
+```
+
+**Testing Checklist**:
+- [ ] Test with token that has partial capabilities (should fail with detailed error showing which capabilities missing)
+- [ ] Test with full eos-admin-policy token (should pass all checks)
+- [ ] Test with root token (should pass all checks)
+- [ ] Test with read-only token (should fail on update capabilities)
+
+---
+
+#### 5.4.2: Add Context Caching for Admin Client (2 hours)
+
+**Files**:
+- `cmd/update/vault_cluster.go:288-326`
+- `pkg/vault/auth_cluster.go:30-70`
+
+**Current Behavior**: Each command re-authenticates independently
+**Problem**: Redundant authentication when running multiple cluster operations in scripts
+
+**Implementation**:
+```go
+// In cmd/update/vault_cluster.go:
+func getAuthenticatedVaultClient(rc, cmd) (string, error) {
+    logger := otelzap.Ctx(rc.Ctx)
+
+    // Check if authenticated token already cached in context
+    if cachedToken := getCachedClusterToken(rc); cachedToken != "" {
+        logger.Debug("Using cached cluster authentication token")
+        // Verify cached token still valid
+        client, err := vault.GetVaultClientWithToken(rc, cachedToken)
+        if err == nil {
+            return cachedToken, nil
+        }
+        logger.Debug("Cached token invalid, re-authenticating")
+    }
+
+    // Try authentication hierarchy...
+    token, err := performAuthentication(rc, cmd)
+    if err != nil {
+        return "", err
+    }
+
+    // Cache token for reuse within this RuntimeContext
+    cacheClusterToken(rc, token)
+    return token, nil
+}
+
+// Add context key and helper functions:
+type clusterTokenKey struct{}
+
+func cacheClusterToken(rc *eos_io.RuntimeContext, token string) {
+    rc.Ctx = context.WithValue(rc.Ctx, clusterTokenKey{}, token)
+}
+
+func getCachedClusterToken(rc *eos_io.RuntimeContext) string {
+    if token, ok := rc.Ctx.Value(clusterTokenKey{}).(string); ok {
+        return token
+    }
+    return ""
+}
+```
+
+**Testing Checklist**:
+- [ ] Test sequential operations reuse cached token (no redundant prompts)
+- [ ] Test cache isolated per RuntimeContext (different commands don't share)
+- [ ] Test cache invalidation when token expires
+- [ ] Test cache doesn't persist across command invocations
+
+---
+
+#### 5.4.3: Improve Error Message Clarity (2 hours)
+
+**File**: `cmd/update/vault_cluster.go:318-322`
+
+**Current Behavior**: Lists 3 authentication methods without explaining when to use each
+**Problem**: Users confused about which method is appropriate for their use case
+
+**Implementation**:
+```go
+return "", fmt.Errorf("admin authentication failed: %w\n\n"+
+    "═══════════════════════════════════════════════\n"+
+    "Cluster operations require admin-level access.\n"+
+    "═══════════════════════════════════════════════\n\n"+
+    "OPTION 1: Use existing token (automation/CI/CD)\n"+
+    "  When: You have a pre-generated Vault token\n"+
+    "  How:  eos update vault-cluster ... --token <your_token>\n"+
+    "  Or:   export VAULT_TOKEN=<your_token>\n\n"+
+    "OPTION 2: Automatic authentication (RECOMMENDED for interactive use)\n"+
+    "  When: Running interactively on server where Eos is installed\n"+
+    "  How:  Run command without --token flag\n"+
+    "  Eos will try (in order):\n"+
+    "    1. Vault Agent (automatic, zero-touch, audited)\n"+
+    "    2. Admin AppRole (stored in /var/lib/eos/secret/)\n"+
+    "    3. Root token (emergency only, requires sudo + consent)\n\n"+
+    "OPTION 3: Manual authentication (custom workflows)\n"+
+    "  When: Remote execution or custom auth method\n"+
+    "  How:  vault login -method=userpass\n"+
+    "        export VAULT_TOKEN=$(vault print token)\n"+
+    "        eos update vault-cluster ...\n\n"+
+    "Troubleshooting:\n"+
+    "  • Vault Agent not running: systemctl status vault-agent-eos\n"+
+    "  • Missing admin credentials: sudo eos create vault --enable-admin-role\n"+
+    "  • Need help: https://docs.eos.com/vault-cluster-auth", err)
+```
+
+**Testing Checklist**:
+- [ ] User testing with 3 people unfamiliar with Eos (measure comprehension)
+- [ ] Verify each option works exactly as described in error message
+- [ ] Check error message formatting in 80-column and 120-column terminals
+- [ ] Verify URL in message points to actual documentation
+
+---
+
+#### 5.4.4: Add Rate Limiting for Token Attempts (2 hours)
+
+**File**: `pkg/vault/auth_cluster.go` (add new rate limiting mechanism)
+
+**Current Behavior**: Unlimited token validation attempts
+**Problem**: Makes brute force attacks easier (though Vault has its own rate limiting)
+
+**Implementation**:
+```go
+// Add token attempt tracking state
+type tokenAttemptKey struct{}
+
+type TokenAttemptState struct {
+    Attempts     int
+    LastAttempt  time.Time
+}
+
+func getTokenAttemptState(rc *eos_io.RuntimeContext) *TokenAttemptState {
+    if state, ok := rc.Ctx.Value(tokenAttemptKey{}).(*TokenAttemptState); ok {
+        return state
+    }
+    state := &TokenAttemptState{}
+    rc.Ctx = context.WithValue(rc.Ctx, tokenAttemptKey{}, state)
+    return state
+}
+
+// In GetVaultClientWithToken(), add at start:
+func GetVaultClientWithToken(rc, token) (*api.Client, error) {
+    logger := otelzap.Ctx(rc.Ctx)
+
+    // Client-side rate limiting (defense in depth)
+    attemptState := getTokenAttemptState(rc)
+    attemptState.Attempts++
+    attemptState.LastAttempt = time.Now()
+
+    if attemptState.Attempts > 3 {
+        // Exponential backoff: 2s, 4s, 6s, 8s, ...
+        delay := time.Duration(attemptState.Attempts-3) * 2 * time.Second
+        logger.Warn("⚠️  Rate limiting token validation",
+            zap.Int("attempt", attemptState.Attempts),
+            zap.Duration("delay", delay),
+            zap.String("reason", "Too many failed token validations"))
+
+        // Wait before next attempt
+        select {
+        case <-time.After(delay):
+        case <-rc.Ctx.Done():
+            return nil, fmt.Errorf("operation cancelled during rate limit delay")
+        }
+    }
+
+    // Continue with token validation...
+}
+```
+
+**Testing Checklist**:
+- [ ] Test first 3 attempts have no delay (normal operation)
+- [ ] Test 4th attempt has 2-second delay
+- [ ] Test 5th attempt has 4-second delay
+- [ ] Test delay cancellable via context (Ctrl+C works)
+- [ ] Test legitimate retry scenarios still work
+- [ ] Verify delay doesn't affect valid tokens (only retries)
+
+---
+
+### 5.4 Success Criteria
+- [ ] All capability verification tests pass
+- [ ] Context caching works (verified with script running 5 sequential operations)
+- [ ] Error messages tested with 3 users (>80% comprehension rate)
+- [ ] Rate limiting prevents rapid retries without breaking legitimate use
+- [ ] Build succeeds: `go build -o /tmp/eos-build ./cmd/`
+- [ ] go vet passes: `go vet ./pkg/vault/... ./cmd/update/...`
+- [ ] No performance regression (benchmark token validation time)
+
 ---
 
 ## Phase 6: Documentation & Migration Guide 📅 PLANNED
@@ -315,6 +558,269 @@ go build -o /tmp/eos-build ./cmd/
 - [ ] CLAUDE.md patterns work
 - [ ] Examples compile and run
 
+### 6.3: Vault Cluster Authentication Documentation (P3) 📅 PLANNED
+
+**Target Completion**: Week of 2025-11-17
+**Effort**: 5 hours
+**Priority**: P3
+
+**Context**: Complete documentation and polish for vault cluster authentication system implemented 2025-10-28.
+
+**Reference**: See adversarial analysis for P3 issue details.
+
+#### 6.3.1: Add Comprehensive Function Documentation (2 hours)
+
+**File**: `cmd/update/vault_cluster.go:279-326`
+
+**Current State**: Basic comment explaining function purpose
+**Missing**: Examples, troubleshooting guide, when to use each authentication method
+
+**Implementation**:
+Add comprehensive godoc-style documentation to `getAuthenticatedVaultClient()`:
+
+```go
+// getAuthenticatedVaultClient handles authentication for Vault cluster operations.
+//
+// This function implements a 3-tier authentication hierarchy optimized for
+// different use cases: explicit tokens (automation), automatic auth (interactive),
+// and manual auth (custom workflows).
+//
+// # Authentication Hierarchy
+//
+//   1. --token flag: User explicitly provided token (highest priority)
+//      - Use case: CI/CD pipelines, automation scripts
+//      - Security: Token stored in secure variable/secret manager
+//      - Example: --token hvs.abc123def456
+//
+//   2. VAULT_TOKEN env: Token from environment variable
+//      - Use case: Scripts, temporary sessions
+//      - Security: Token set via secure environment
+//      - Example: export VAULT_TOKEN=hvs.abc123def456
+//
+//   3. GetAdminClient(): Automatic authentication chain
+//      - Use case: Interactive use on Eos-managed servers
+//      - Methods tried: Vault Agent → Admin AppRole → Root (with consent)
+//      - Security: Vault Agent (audited) or AppRole (rotatable) preferred
+//
+// # Returns
+//
+//   - string: Validated Vault token with cluster operation capabilities
+//   - error: Authentication failure with remediation guidance
+//
+// # Examples
+//
+// Explicit token (automation/CI/CD):
+//
+//   $ eos update vault-cluster autopilot --token hvs.abc123 --min-quorum=3
+//   ✓ Token authenticated and validated for cluster operations
+//   ✓ Autopilot configured successfully
+//
+// Environment token (scripting):
+//
+//   $ export VAULT_TOKEN=hvs.abc123
+//   $ eos update vault-cluster snapshot --output=/backup/snap.snap
+//   Using token from VAULT_TOKEN environment variable
+//   ✓ Snapshot created successfully
+//
+// Automatic authentication (interactive, recommended):
+//
+//   $ eos update vault-cluster peers
+//   No token provided via --token or VAULT_TOKEN
+//   Attempting admin authentication (Vault Agent → AppRole → Root)
+//   ✓ Admin authentication successful (method: vault-agent-with-admin-policy)
+//
+//   Raft Cluster Peers (3 nodes):
+//     node1: leader ⭐ (voter)
+//     node2: follower (voter)
+//     node3: follower (voter)
+//
+// # Error Handling
+//
+// Token validation failures return detailed errors with:
+//   - Which authentication method failed and why
+//   - What the token is missing (expired, invalid, insufficient capabilities)
+//   - How to fix (get new token, check Vault Agent status, use --token)
+//   - Remediation examples (exact commands to run)
+//
+// # Implementation Details
+//
+// The function delegates ALL business logic to pkg/vault, maintaining clean
+// separation between orchestration (cmd/) and implementation (pkg/). This
+// follows the Eos architecture pattern defined in CLAUDE.md.
+//
+// Token validation includes:
+//   - Format validation (prevents injection attacks)
+//   - Seal status check (clear error if Vault sealed)
+//   - Token validity check (not expired or revoked)
+//   - Capability verification (can perform cluster operations)
+//   - TTL warning (if token expires soon)
+//
+// # See Also
+//
+//   - pkg/vault/auth_cluster.go: Token validation implementation
+//   - pkg/vault/client_admin.go: GetAdminClient() implementation
+//   - CLAUDE.md: Vault authentication patterns
+//
+func getAuthenticatedVaultClient(rc *eos_io.RuntimeContext, cmd *cobra.Command) (string, error) {
+    // Implementation...
+}
+```
+
+**Testing Checklist**:
+- [ ] godoc renders documentation correctly
+- [ ] Examples can be copy-pasted and work
+- [ ] Error scenarios documented match actual behavior
+- [ ] Links to related code are correct
+
+---
+
+#### 6.3.2: Add --dry-run Support for Auth Testing (3 hours)
+
+**Files**:
+- `cmd/update/vault_cluster.go:60, 82-84, 117-155, 157-220` (add flag + implement dry-run logic)
+- `pkg/vault/cluster_operations.go` (potentially add validation-only mode)
+
+**Current State**: No way to test token validity without executing dangerous operations
+**Problem**: Users can't verify credentials work before running destructive snapshot restore
+
+**Implementation**:
+
+1. Add --dry-run flag:
+```go
+// In vault_cluster.go init():
+func init() {
+    // ... existing flags ...
+
+    // Dry-run flag (applies to all operations)
+    vaultClusterCmd.Flags().Bool("dry-run", false,
+        "Validate authentication and show planned actions without executing")
+}
+```
+
+2. Implement dry-run in runVaultClusterAutopilot():
+```go
+func runVaultClusterAutopilot(rc, cmd) error {
+    log := otelzap.Ctx(rc.Ctx)
+    dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+    // Authenticate (validation happens here)
+    token, err := getAuthenticatedVaultClient(rc, cmd)
+    if err != nil {
+        return err
+    }
+
+    // Parse configuration
+    cleanupDeadServers, _ := cmd.Flags().GetBool("cleanup-dead-servers")
+    deadServerThreshold, _ := cmd.Flags().GetString("dead-server-threshold")
+    minQuorum, _ := cmd.Flags().GetInt("min-quorum")
+    stabilizationTime, _ := cmd.Flags().GetString("stabilization-time")
+
+    config := &vault.AutopilotConfig{
+        CleanupDeadServers:             cleanupDeadServers,
+        DeadServerLastContactThreshold: deadServerThreshold,
+        MinQuorum:                      minQuorum,
+        ServerStabilizationTime:        stabilizationTime,
+    }
+
+    if dryRun {
+        // Dry-run mode: show what WOULD happen
+        log.Info("")
+        log.Info("═══════════════════════════════════════")
+        log.Info("DRY-RUN MODE (no changes will be made)")
+        log.Info("═══════════════════════════════════════")
+        log.Info("")
+        log.Info("✓ Authentication successful")
+        log.Info("  Token validated with cluster operation capabilities")
+        log.Info("")
+        log.Info("Would configure Autopilot with:")
+        log.Info(fmt.Sprintf("  • cleanup-dead-servers: %v", config.CleanupDeadServers))
+        log.Info(fmt.Sprintf("  • dead-server-threshold: %s", config.DeadServerLastContactThreshold))
+        log.Info(fmt.Sprintf("  • min-quorum: %d", config.MinQuorum))
+        log.Info(fmt.Sprintf("  • server-stabilization-time: %s", config.ServerStabilizationTime))
+        log.Info("")
+        log.Info("Run without --dry-run to apply these changes.")
+        return nil
+    }
+
+    // Normal execution
+    log.Info("Configuring Autopilot", ...)
+    return vault.ConfigureRaftAutopilot(rc, token, config)
+}
+```
+
+3. Implement dry-run in runVaultClusterSnapshot():
+```go
+func runVaultClusterSnapshot(rc, cmd) error {
+    log := otelzap.Ctx(rc.Ctx)
+    dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+    // Authenticate
+    token, err := getAuthenticatedVaultClient(rc, cmd)
+    if err != nil {
+        return err
+    }
+
+    outputPath, _ := cmd.Flags().GetString("output")
+    inputPath, _ := cmd.Flags().GetString("input")
+    force, _ := cmd.Flags().GetBool("force")
+
+    if dryRun {
+        log.Info("")
+        log.Info("═══════════════════════════════════════")
+        log.Info("DRY-RUN MODE (no changes will be made)")
+        log.Info("═══════════════════════════════════════")
+        log.Info("")
+        log.Info("✓ Authentication successful")
+
+        if inputPath != "" {
+            // Restore operation
+            log.Warn("⚠️  SNAPSHOT RESTORE (DESTRUCTIVE)")
+            log.Info(fmt.Sprintf("  Would restore from: %s", inputPath))
+            log.Info(fmt.Sprintf("  Force mode: %v", force))
+            log.Warn("  This would replace ALL Vault data")
+
+            if !force {
+                log.Warn("")
+                log.Warn("  Note: --force flag required for actual restore")
+            }
+        } else if outputPath != "" {
+            // Backup operation
+            log.Info("Snapshot Backup")
+            log.Info(fmt.Sprintf("  Would save to: %s", outputPath))
+            log.Info("  Current cluster state would be captured")
+        }
+
+        log.Info("")
+        log.Info("Run without --dry-run to execute this operation.")
+        return nil
+    }
+
+    // Normal execution...
+}
+```
+
+**Testing Checklist**:
+- [ ] --dry-run with valid token shows planned actions (no Vault changes)
+- [ ] --dry-run with invalid token shows authentication error
+- [ ] --dry-run with expired token shows TTL warning
+- [ ] --dry-run with insufficient capabilities shows which are missing
+- [ ] --dry-run + autopilot shows configuration that would be applied
+- [ ] --dry-run + snapshot backup shows output path
+- [ ] --dry-run + snapshot restore shows warning + force requirement
+- [ ] Verify NO Vault API calls made in dry-run mode (use debug logging)
+- [ ] Works consistently across all operations (peers, health, autopilot, snapshot)
+
+---
+
+### 6.3 Success Criteria
+- [ ] Function documentation complete and reviewed
+- [ ] godoc output verified (correct rendering)
+- [ ] --dry-run implemented for all cluster operations
+- [ ] --dry-run tested with 10 different scenarios (valid/invalid tokens, all operations)
+- [ ] User guide updated with --dry-run examples
+- [ ] Build succeeds: `go build -o /tmp/eos-build ./cmd/`
+- [ ] No Vault state changes during --dry-run (verified with audit logs)
+
 ---
 
 ## Future Phases (Post-Refactoring)
@@ -344,18 +850,21 @@ go build -o /tmp/eos-build ./cmd/
 
 ## Timeline Summary
 
-| Phase | Target Completion | Status | Priority |
-|-------|-------------------|--------|----------|
-| **Phase 1: Foundation** | 2025-10-27 | ✅ COMPLETE | P0 |
-| **Phase 2: Manager Refactoring** | 2025-10-27 | ✅ COMPLETE | P0 |
-| **Phase 3: Critical Bug Fixes** | 2025-10-27 | ✅ COMPLETE | P0 |
-| **Phase 4: Service Migration** | 2025-10-27 | ✅ COMPLETE | P1 |
-| **Phase 5: Upgrade & Test** | 2025-11-10 | 📅 PLANNED | P1 |
-| **Phase 6: Documentation** | 2025-11-17 | 📅 PLANNED | P2 |
-| **Phase 7: vault-client-go** | 2026-Q2 | ⏸️ BLOCKED | P3 |
+| Phase | Target Completion | Status | Priority | Effort |
+|-------|-------------------|--------|----------|--------|
+| **Phase 1: Foundation** | 2025-10-27 | ✅ COMPLETE | P0 | - |
+| **Phase 2: Manager Refactoring** | 2025-10-27 | ✅ COMPLETE | P0 | - |
+| **Phase 3: Critical Bug Fixes** | 2025-10-27 | ✅ COMPLETE | P0 | - |
+| **Phase 4: Service Migration** | 2025-10-27 | ✅ COMPLETE | P1 | - |
+| **Phase 5.1-5.3: Upgrade & Test** | 2025-11-10 | 📅 PLANNED | P1 | TBD |
+| **Phase 5.4: Vault Auth P2 Issues** | 2025-11-10 | 📅 PLANNED | P2 | 9h |
+| **Phase 6.1-6.2: Documentation** | 2025-11-17 | 📅 PLANNED | P2 | TBD |
+| **Phase 6.3: Vault Auth P3 Polish** | 2025-11-17 | 📅 PLANNED | P3 | 5h |
+| **Phase 7: vault-client-go** | 2026-Q2 | ⏸️ BLOCKED | P3 | - |
 
 **Critical Path Complete**: Phases 1-4 completed in 1 day (2025-10-27)
-**Remaining Timeline**: 3 weeks for testing + documentation (Phases 5-6)
+**Remaining Timeline**: 3 weeks for testing + documentation + vault auth improvements (Phases 5-6)
+**Vault Auth Work**: 14 hours total (9h P2 + 5h P3) scheduled across Phases 5.4 and 6.3
 
 ---
 

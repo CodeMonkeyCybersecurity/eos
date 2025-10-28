@@ -55,6 +55,7 @@ func AllDiagnostics() []*debug.Diagnostic {
 		LogHealthDiagnostic(),
 		OllamaConnectivityDiagnostic(),
 		AppContainerMissingDiagnostic(),
+		ContainerDependencyBlockedDiagnostic(), // NEW: Detect containers stuck waiting for unhealthy dependencies
 		LiteLLMHealthCheckDiagnostic(),
 		LiteLLMComprehensiveDiagnostic(),     // NEW: Comprehensive Docker SDK + LiteLLM API health check
 		LiteLLMModelConnectivityDiagnostic(), // NEW: Test actual API calls to Azure models
@@ -488,7 +489,7 @@ func LogHealthDiagnostic() *debug.Diagnostic {
 				Metadata: make(map[string]interface{}),
 			}
 
-			containers := []string{bionicgpt.ContainerApp, bionicgpt.ContainerPostgres, bionicgpt.ContainerRAGEngine}
+			containers := []string{bionicgpt.ContainerApp, bionicgpt.ContainerPostgres, bionicgpt.ContainerRAGEngine, bionicgpt.ContainerLiteLLM}
 			errorCount := 0
 			errorSummary := []string{}
 
@@ -763,6 +764,135 @@ func AppContainerMissingDiagnostic() *debug.Diagnostic {
 	}
 }
 
+// ContainerDependencyBlockedDiagnostic checks for containers stuck in "Created" state waiting for dependencies
+// CRITICAL: Diagnoses the exact issue the user is experiencing - app container never starting due to unhealthy litellm
+func ContainerDependencyBlockedDiagnostic() *debug.Diagnostic {
+	return &debug.Diagnostic{
+		Name:        "Container Dependency Blocked",
+		Category:    "Containers",
+		Description: "Check for containers blocked waiting for unhealthy dependencies",
+		Collect: func(ctx context.Context) (*debug.Result, error) {
+			logger := otelzap.Ctx(ctx)
+			result := &debug.Result{
+				Metadata: make(map[string]interface{}),
+			}
+
+			// Get all BionicGPT containers and their states
+			cmd := exec.CommandContext(ctx, "docker", "ps", "-a",
+				"--filter", "name=bionicgpt",
+				"--format", "{{.Names}}\t{{.State}}\t{{.Status}}")
+			output, err := cmd.CombinedOutput()
+
+			if err != nil {
+				result.Status = debug.StatusError
+				result.Message = "Failed to check container states"
+				result.Error = err
+				logger.Error("Failed to list containers", zap.Error(err))
+				return result, nil
+			}
+
+			outputStr := strings.TrimSpace(string(output))
+			if outputStr == "" {
+				result.Status = debug.StatusOK
+				result.Message = "No BionicGPT containers found"
+				return result, nil
+			}
+
+			var blocked []string
+			var outputParts []string
+			outputParts = append(outputParts, "CONTAINER DEPENDENCY ANALYSIS")
+			outputParts = append(outputParts, strings.Repeat("=", 80))
+
+			lines := strings.Split(outputStr, "\n")
+			for _, line := range lines {
+				parts := strings.Split(line, "\t")
+				if len(parts) < 3 {
+					continue
+				}
+
+				containerName := parts[0]
+				state := parts[1]
+				status := parts[2]
+
+				// Container in "created" state has never been started
+				if state == "created" {
+					blocked = append(blocked, containerName)
+					outputParts = append(outputParts, fmt.Sprintf("\n❌ CRITICAL: %s is BLOCKED", containerName))
+					outputParts = append(outputParts, fmt.Sprintf("   State: %s", state))
+					outputParts = append(outputParts, fmt.Sprintf("   Status: %s", status))
+
+					// Inspect the container to get dependency info
+					inspectCmd := exec.CommandContext(ctx, "docker", "inspect", containerName,
+						"--format", "{{json .Config.Labels}}")
+					inspectOutput, inspectErr := inspectCmd.Output()
+
+					if inspectErr == nil {
+						// Parse depends_on from docker-compose labels
+						labelsStr := string(inspectOutput)
+						if strings.Contains(labelsStr, "com.docker.compose.depends_on") {
+							outputParts = append(outputParts, "\n   Dependency Analysis:")
+
+							// Check health of dependencies
+							// For BionicGPT app, it depends on litellm-proxy with service_healthy condition
+							if containerName == "bionicgpt-app" {
+								outputParts = append(outputParts, "   → Waiting for: litellm-proxy (service_healthy)")
+
+								// Check litellm health
+								healthCmd := exec.CommandContext(ctx, "docker", "inspect", "bionicgpt-litellm",
+									"--format", "{{.State.Health.Status}}")
+								healthOutput, healthErr := healthCmd.Output()
+
+								if healthErr == nil {
+									healthStatus := strings.TrimSpace(string(healthOutput))
+									outputParts = append(outputParts, fmt.Sprintf("   → litellm-proxy health: %s", healthStatus))
+
+									if healthStatus != "healthy" {
+										outputParts = append(outputParts, "\n   ⚠ ROOT CAUSE: litellm-proxy is NOT healthy")
+										outputParts = append(outputParts, "   → App container will NOT start until litellm passes health check")
+										outputParts = append(outputParts, "   → See LiteLLM diagnostics below for details")
+									}
+								}
+							}
+						}
+					}
+
+					// Check how long it's been waiting
+					createdCmd := exec.CommandContext(ctx, "docker", "inspect", containerName,
+						"--format", "{{.Created}}")
+					createdOutput, createdErr := createdCmd.Output()
+					if createdErr == nil {
+						createdStr := strings.TrimSpace(string(createdOutput))
+						outputParts = append(outputParts, fmt.Sprintf("\n   Created at: %s", createdStr))
+						outputParts = append(outputParts, "   ⏱ Container has been waiting since creation (never started)")
+					}
+
+					outputParts = append(outputParts, "")
+				}
+			}
+
+			result.Output = strings.Join(outputParts, "\n")
+			result.Metadata["blocked_containers"] = blocked
+			result.Metadata["blocked_count"] = len(blocked)
+
+			if len(blocked) > 0 {
+				result.Status = debug.StatusError
+				result.Message = fmt.Sprintf("❌ CRITICAL: %d container(s) blocked by unhealthy dependencies", len(blocked))
+				result.Remediation = "Fix the dependency health issues first. For app container: ensure litellm-proxy becomes healthy. " +
+					"Check: docker logs bionicgpt-litellm for errors. Test health: docker exec bionicgpt-litellm curl -v http://localhost:4000/health"
+				logger.Error("Containers blocked by dependencies",
+					zap.Int("count", len(blocked)),
+					zap.Strings("containers", blocked))
+			} else {
+				result.Status = debug.StatusOK
+				result.Message = "✓ No containers blocked by dependencies"
+				logger.Info("All containers started successfully")
+			}
+
+			return result, nil
+		},
+	}
+}
+
 // LiteLLMHealthCheckDiagnostic checks the health status of litellm-proxy container
 func LiteLLMHealthCheckDiagnostic() *debug.Diagnostic {
 	return &debug.Diagnostic{
@@ -805,11 +935,11 @@ func LiteLLMHealthCheckDiagnostic() *debug.Diagnostic {
 				}
 			}
 
-			// Get recent logs (last 30 lines)
-			logsCmd := exec.CommandContext(ctx, "docker", "logs", bionicgpt.ContainerLiteLLM, "--tail", "30")
+			// Get recent logs (last 100 lines)
+			logsCmd := exec.CommandContext(ctx, "docker", "logs", bionicgpt.ContainerLiteLLM, "--tail", "100")
 			logsOutput, logsErr := logsCmd.CombinedOutput()
 			if logsErr == nil {
-				outputParts = append(outputParts, "\nRecent Logs (last 30 lines):")
+				outputParts = append(outputParts, "\nRecent Logs (last 100 lines):")
 				outputParts = append(outputParts, string(logsOutput))
 			}
 
@@ -1021,7 +1151,7 @@ func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
 			logReader, err := mgr.Logs(ctx, bionicgpt.ContainerLiteLLM, container.LogOptions{
 				ShowStdout: true,
 				ShowStderr: true,
-				Tail:       "200", // Get more logs to filter through
+				Tail:       "100", // Standardized log count
 				Timestamps: false,
 			})
 			if err != nil {
@@ -1040,7 +1170,7 @@ func LiteLLMErrorLogsDiagnostic() *debug.Diagnostic {
 			if len(errorLines) == 0 {
 				result.Status = debug.StatusOK
 				result.Message = "✓ No errors, failures, or exceptions found in recent litellm logs"
-				result.Output = "LiteLLM proxy logs are clean (checked last 200 lines)"
+				result.Output = "LiteLLM proxy logs are clean (checked last 100 lines)"
 			} else {
 				result.Status = debug.StatusWarning
 				result.Message = fmt.Sprintf("⚠ Found %d error/failure/exception lines in litellm logs", len(errorLines))
@@ -1314,19 +1444,37 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 			outputParts = append(outputParts, "LITELLM /health ENDPOINT")
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 
+			// Use curl with -w to show HTTP code, -v for verbose output on failure
 			healthCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"curl", "-f", "-s", "-m", "5", "http://localhost:4000/health")
+				"curl", "-m", "5", "-w", "\\nHTTP_CODE:%{http_code}", "http://localhost:4000/health")
 			healthOutput, healthErr := healthCmd.CombinedOutput()
 
+			outputStr := string(healthOutput)
 			if healthErr != nil {
 				outputParts = append(outputParts, "✗ /health endpoint failed")
-				outputParts = append(outputParts, fmt.Sprintf("Error: %v", healthErr))
+				outputParts = append(outputParts, "Full output (with HTTP code):")
+				outputParts = append(outputParts, outputStr)
 				result.Metadata["health_endpoint"] = "failed"
+
+				// Parse HTTP code from output
+				if strings.Contains(outputStr, "HTTP_CODE:") {
+					httpCodeStr := strings.Split(outputStr, "HTTP_CODE:")[1]
+					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
+					result.Metadata["health_http_code"] = httpCodeStr
+					outputParts = append(outputParts, fmt.Sprintf("HTTP Status Code: %s", httpCodeStr))
+				}
 			} else {
 				outputParts = append(outputParts, "✓ /health endpoint responding")
 				outputParts = append(outputParts, "Response:")
-				outputParts = append(outputParts, string(healthOutput))
+				outputParts = append(outputParts, outputStr)
 				result.Metadata["health_endpoint"] = "ok"
+
+				// Extract HTTP code
+				if strings.Contains(outputStr, "HTTP_CODE:") {
+					httpCodeStr := strings.Split(outputStr, "HTTP_CODE:")[1]
+					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
+					result.Metadata["health_http_code"] = httpCodeStr
+				}
 			}
 			outputParts = append(outputParts, "")
 
@@ -1336,18 +1484,35 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 
 			livelinessCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"curl", "-f", "-s", "-m", "5", "http://localhost:4000/health/liveliness")
+				"curl", "-m", "5", "-w", "\\nHTTP_CODE:%{http_code}", "http://localhost:4000/health/liveliness")
 			livelinessOutput, livelinessErr := livelinessCmd.CombinedOutput()
 
+			livelinessStr := string(livelinessOutput)
 			if livelinessErr != nil {
 				outputParts = append(outputParts, "✗ /health/liveliness endpoint failed (or not supported)")
-				outputParts = append(outputParts, fmt.Sprintf("Error: %v", livelinessErr))
+				outputParts = append(outputParts, "Full output (with HTTP code):")
+				outputParts = append(outputParts, livelinessStr)
 				result.Metadata["liveliness_endpoint"] = "failed"
+
+				// Parse HTTP code
+				if strings.Contains(livelinessStr, "HTTP_CODE:") {
+					httpCodeStr := strings.Split(livelinessStr, "HTTP_CODE:")[1]
+					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
+					result.Metadata["liveliness_http_code"] = httpCodeStr
+					outputParts = append(outputParts, fmt.Sprintf("HTTP Status Code: %s", httpCodeStr))
+				}
 			} else {
 				outputParts = append(outputParts, "✓ /health/liveliness endpoint responding")
 				outputParts = append(outputParts, "Response:")
-				outputParts = append(outputParts, string(livelinessOutput))
+				outputParts = append(outputParts, livelinessStr)
 				result.Metadata["liveliness_endpoint"] = "ok"
+
+				// Extract HTTP code
+				if strings.Contains(livelinessStr, "HTTP_CODE:") {
+					httpCodeStr := strings.Split(livelinessStr, "HTTP_CODE:")[1]
+					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
+					result.Metadata["liveliness_http_code"] = httpCodeStr
+				}
 			}
 			outputParts = append(outputParts, "")
 
@@ -1530,23 +1695,44 @@ func LiteLLMModelConnectivityDiagnostic() *debug.Diagnostic {
 			for _, model := range modelNames {
 				outputParts = append(outputParts, fmt.Sprintf("Testing model: %s", model))
 
-				// Make a simple chat completion request
+				// Make a simple chat completion request with HTTP code tracking
 				testPayload := fmt.Sprintf(`{"model": "%s", "messages": [{"role": "user", "content": "test"}], "max_tokens": 1}`, model)
 				testCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-					"curl", "-f", "-s", "-m", "10",
+					"curl", "-m", "10", "-w", "\\nHTTP_CODE:%{http_code}",
 					"-X", "POST",
 					"-H", "Content-Type: application/json",
 					"-d", testPayload,
 					"http://localhost:4000/chat/completions")
 
 				testOutput, testErr := testCmd.CombinedOutput()
+				testOutputStr := string(testOutput)
 
-				if testErr != nil {
-					outputParts = append(outputParts, fmt.Sprintf("  ✗ FAILED: %v", testErr))
-					outputParts = append(outputParts, fmt.Sprintf("  Response: %s", string(testOutput)))
+				// Parse HTTP code
+				var httpCode string
+				if strings.Contains(testOutputStr, "HTTP_CODE:") {
+					httpCode = strings.Split(testOutputStr, "HTTP_CODE:")[1]
+					httpCode = strings.TrimSpace(strings.Split(httpCode, "\n")[0])
+				}
+
+				if testErr != nil || (httpCode != "" && httpCode != "200") {
+					outputParts = append(outputParts, fmt.Sprintf("  ✗ FAILED (HTTP %s)", httpCode))
+					outputParts = append(outputParts, fmt.Sprintf("  Response: %s", testOutputStr))
+
+					// Classify error by HTTP code
+					switch httpCode {
+					case "401", "403":
+						outputParts = append(outputParts, "  → Authentication failure: Check Azure OpenAI API key")
+					case "404":
+						outputParts = append(outputParts, "  → Not found: Verify model deployment name in Azure Portal")
+					case "429":
+						outputParts = append(outputParts, "  → Rate limited: Azure OpenAI quota exceeded")
+					case "500", "502", "503":
+						outputParts = append(outputParts, "  → Server error: Check Azure OpenAI service health")
+					}
+
 					unhealthyModels++
 				} else {
-					outputParts = append(outputParts, "  ✓ SUCCESS: Model is reachable")
+					outputParts = append(outputParts, fmt.Sprintf("  ✓ SUCCESS (HTTP %s): Model is reachable", httpCode))
 					healthyModels++
 				}
 				outputParts = append(outputParts, "")

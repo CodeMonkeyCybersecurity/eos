@@ -745,6 +745,7 @@ Before completing any task, verify:
 - [ ] All logging uses otelzap.Ctx(rc.Ctx)
 - [ ] Secrets use SecretManager
 - [ ] Errors include context and remediation
+- [ ] Required flags use interaction.GetRequiredString() with fallback chain (P0 #13)
 
 **Testing (P0)**:
 - [ ] `go build -o /tmp/eos-build ./cmd/` compiles

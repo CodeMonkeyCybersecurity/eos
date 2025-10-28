@@ -7,7 +7,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/prompt"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -162,14 +161,22 @@ func promptForAuthURL(rc *eos_io.RuntimeContext) (string, error) {
 
 // showConfigurationSummary displays the configuration and asks for confirmation
 func showConfigurationSummary(rc *eos_io.RuntimeContext, config *EnterpriseConfig) (bool, error) {
-	fmt.Println("=== Configuration Summary ===")
-	fmt.Println("────────────────────────────────")
-	fmt.Printf("  Domain:      %s\n", config.Domain)
-	fmt.Printf("  Cloud Node:  %s\n", config.CloudNode)
-	fmt.Printf("  Auth URL:    %s\n", config.AuthURL)
-	fmt.Printf("  Embeddings:  Local (Ollama %s)\n", config.LocalEmbeddingsModel)
-	fmt.Println()
+	logger := otelzap.Ctx(rc.Ctx)
 
-	// Use existing prompt.YesNo function
-	return prompt.YesNo(rc, "Deploy with this configuration?", true)
+	// P0 COMPLIANCE: Use structured logging instead of fmt.Print* (fixes P0 violation)
+	logger.Info("=== Configuration Summary ===")
+	logger.Info("────────────────────────────────")
+	logger.Info(fmt.Sprintf("  Domain:      %s", config.Domain))
+	logger.Info(fmt.Sprintf("  Cloud Node:  %s", config.CloudNode))
+	logger.Info(fmt.Sprintf("  Auth URL:    %s", config.AuthURL))
+	logger.Info(fmt.Sprintf("  Embeddings:  Local (Ollama %s)", config.LocalEmbeddingsModel))
+	logger.Info("")
+
+	// Confirm deployment with user
+	proceed, err := interaction.PromptYesNoSafe(rc, "Deploy with this configuration?", true)
+	if err != nil {
+		return false, fmt.Errorf("failed to get user confirmation: %w", err)
+	}
+
+	return proceed, nil
 }

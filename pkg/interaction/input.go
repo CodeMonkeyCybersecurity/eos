@@ -26,6 +26,25 @@ func getStdinReader() io.Reader {
 	return os.Stdin
 }
 
+// validateYesNoResponse validates a yes/no response and returns (result, valid).
+// This helper eliminates code duplication between PromptYesNo and PromptYesNoSafe.
+//
+// STRICT VALIDATION: Only accepts y/yes/n/no (aligns with standard CLI tools like git, apt, npm).
+//
+// Returns:
+//   - result: true for yes, false for no
+//   - valid: true if input was recognized, false if invalid
+func validateYesNoResponse(response string) (result bool, valid bool) {
+	switch response {
+	case "y", "yes":
+		return true, true
+	case "n", "no":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
 func PromptWithDefault(label, defaultValue string) string {
 	// SECURITY: Use structured logging instead of fmt.Printf per CLAUDE.md P0 rule
@@ -146,14 +165,13 @@ func PromptYesNo(args ...interface{}) bool {
 		}
 
 		// STRICT: Only accept y/yes/n/no (aligns with standard CLI tools like git, apt)
-		switch response {
-		case "y", "yes":
-			logger.Debug("User answered yes", zap.String("response", response))
-			return true
-		case "n", "no":
-			logger.Debug("User answered no", zap.String("response", response))
-			return false
-		default:
+		result, valid := validateYesNoResponse(response)
+		if valid {
+			logger.Debug("User answered",
+				zap.String("response", response),
+				zap.Bool("result", result))
+			return result
+		} else {
 			// Invalid input - retry with guidance
 			logger.Warn("Invalid input. Please enter 'y' or 'yes' for yes, 'n' or 'no' for no, or press Enter for default.",
 				zap.String("input", response),
@@ -254,14 +272,13 @@ func PromptYesNoSafe(rc *eos_io.RuntimeContext, question string, defaultYes bool
 		}
 
 		// STRICT: Only accept y/yes/n/no (aligns with standard CLI tools like git, apt)
-		switch response {
-		case "y", "yes":
-			logger.Debug("User answered yes", zap.String("response", response))
-			return true, nil
-		case "n", "no":
-			logger.Debug("User answered no", zap.String("response", response))
-			return false, nil
-		default:
+		result, valid := validateYesNoResponse(response)
+		if valid {
+			logger.Debug("User answered",
+				zap.String("response", response),
+				zap.Bool("result", result))
+			return result, nil
+		} else {
 			// Invalid input - retry with guidance
 			logger.Warn("Invalid input. Please enter 'y' or 'yes' for yes, 'n' or 'no' for no, or press Enter for default.",
 				zap.String("input", response),

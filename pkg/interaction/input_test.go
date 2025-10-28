@@ -86,3 +86,24 @@ func TestPromptSecrets_ArgumentParsing_Errors(t *testing.T) {
 //   - Verify no panic occurs
 
 // Keeping stdin mocking infrastructure for future use when logger can be properly mocked
+
+// TestStrictInputValidation_Documentation documents the strict input acceptance policy.
+// This is a documentation test - it logs the behavior but doesn't assert anything.
+// Renamed from TestStrictInputValidation to make it clear this is documentation, not validation.
+func TestStrictInputValidation_Documentation(t *testing.T) {
+	// This test documents expected behavior but cannot run with otelzap logger
+	// See manual testing instructions above
+
+	strictlyAccepted := []string{"y", "yes", "Y", "YES", "n", "no", "N", "NO", ""}
+	t.Logf("Strictly accepted inputs: %v", strictlyAccepted)
+
+	previouslyAcceptedNowRejected := []string{
+		"yeah", "yep", "sure", "ok", "true", "1",
+		"nope", "nah", "false", "0",
+	}
+	t.Logf("Previously accepted, now rejected (triggers retry): %v", previouslyAcceptedNowRejected)
+
+	t.Log("This change aligns with standard CLI tools (git, apt, npm) which only accept y/yes/n/no")
+	t.Log("Users who type invalid input will see: \"Invalid input. Please enter 'y' or 'yes' for yes, 'n' or 'no' for no, or press Enter for default.\"")
+	t.Log("After 3 failed attempts, the default value is used")
+}

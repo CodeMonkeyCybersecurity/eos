@@ -21,6 +21,14 @@ const (
 	FlagSourceDefault FlagSource = "default value"
 )
 
+const (
+	// MaxValidationAttempts defines how many times to retry prompt on validation failure
+	// RATIONALE: 3 attempts balances user patience with typo forgiveness
+	// SECURITY: Prevents infinite retry loops that could hang automation
+	// P0 REQUIREMENT: Implements "retry with clear guidance (max 3 attempts)" from CLAUDE.md P0 #13
+	MaxValidationAttempts = 3
+)
+
 // FlagResult contains the resolved flag value and its source
 type FlagResult struct {
 	Value  string
@@ -48,6 +56,30 @@ type RequiredFlagConfig struct {
 
 	// Validation (compose existing PromptConfig.Validator)
 	Validator func(string) error
+}
+
+// Validate checks if the RequiredFlagConfig is properly configured
+// P2 REQUIREMENT: Validate configuration to catch developer errors early
+//
+// Returns error if:
+//   - FlagName is empty (required for error messages)
+//   - PromptMessage is empty (required for interactive fallback)
+//
+// NOTE: HelpText is optional but strongly recommended per P0 #13
+func (c *RequiredFlagConfig) Validate() error {
+	if c.FlagName == "" {
+		return fmt.Errorf("RequiredFlagConfig.FlagName cannot be empty")
+	}
+
+	if c.PromptMessage == "" {
+		return fmt.Errorf("RequiredFlagConfig.PromptMessage cannot be empty for flag %s (needed for interactive fallback)", c.FlagName)
+	}
+
+	// HelpText is optional but recommended
+	// P0 #13 requires "Help text: WHY is this required? HOW to get the value?"
+	// We don't error on missing HelpText to allow simple cases, but warn developers via godoc
+
+	return nil
 }
 
 // GetRequiredString resolves a required string flag with human-centric fallback chain.
@@ -97,9 +129,21 @@ func GetRequiredString(
 ) (*FlagResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate configuration (P2 requirement: catch developer errors early)
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid RequiredFlagConfig: %w", err)
+	}
+
 	// FALLBACK 1: CLI flag (if explicitly set)
 	if flagWasSet {
-		logger.Debug("Using flag from CLI",
+		// Validate CLI flag value if validator provided
+		if config.Validator != nil {
+			if err := config.Validator(flagValue); err != nil {
+				return nil, fmt.Errorf("invalid value for --%s flag: %w", config.FlagName, err)
+			}
+		}
+
+		logger.Info("Using flag from CLI",
 			zap.String("flag", config.FlagName),
 			zap.String("source", string(FlagSourceCLI)))
 		return &FlagResult{
@@ -109,8 +153,19 @@ func GetRequiredString(
 	}
 
 	// FALLBACK 2: Environment variable (if configured)
+	// NOTE: Empty env vars (export TOKEN="") are treated as not-set.
+	// RATIONALE: os.Getenv() cannot distinguish empty from not-set (would need LookupEnv).
+	// DECISION: Document limitation rather than add complexity - empty env vars are rare edge case.
+	// CONSISTENCY: This differs from CLI flags where --flag="" is detected via Changed().
 	if config.EnvVarName != "" {
 		if envValue := os.Getenv(config.EnvVarName); envValue != "" {
+			// Validate environment variable value if validator provided
+			if config.Validator != nil {
+				if err := config.Validator(envValue); err != nil {
+					return nil, fmt.Errorf("invalid value in %s environment variable: %w", config.EnvVarName, err)
+				}
+			}
+
 			logger.Info("Using flag from environment variable",
 				zap.String("flag", config.FlagName),
 				zap.String("env_var", config.EnvVarName),
@@ -133,41 +188,73 @@ func GetRequiredString(
 			logger.Info("terminal prompt: " + config.HelpText)
 		}
 
-		var promptedValue string
-		var err error
+		// P0 REQUIREMENT: Retry validation failures with clear guidance (max 3 attempts)
+		// See CLAUDE.md P0 #13: "Validate input, retry with clear guidance (max 3 attempts)"
+		for attempt := 1; attempt <= MaxValidationAttempts; attempt++ {
+			var promptedValue string
+			var err error
 
-		if config.IsSecret {
-			// Use secure password input (no echo)
-			promptedValue, err = eos_io.PromptSecurePassword(rc, config.PromptMessage)
-		} else {
-			// Use regular input
-			promptedValue, err = eos_io.PromptInput(rc, config.PromptMessage, config.FlagName)
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to prompt for %s: %w", config.FlagName, err)
-		}
-
-		// Validate if validator provided (P0 requirement: validate with retries)
-		if config.Validator != nil {
-			if err := config.Validator(promptedValue); err != nil {
-				return nil, fmt.Errorf("validation failed for %s: %w", config.FlagName, err)
+			if config.IsSecret {
+				// Use secure password input (no echo)
+				promptedValue, err = eos_io.PromptSecurePassword(rc, config.PromptMessage)
+			} else {
+				// Use regular input
+				promptedValue, err = eos_io.PromptInput(rc, config.PromptMessage, config.FlagName)
 			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to prompt for %s: %w", config.FlagName, err)
+			}
+
+			// Validate if validator provided
+			if config.Validator != nil {
+				if validationErr := config.Validator(promptedValue); validationErr != nil {
+					// Validation failed - retry with clear guidance
+					if attempt < MaxValidationAttempts {
+						logger.Warn("Validation failed, please try again",
+							zap.String("flag", config.FlagName),
+							zap.Error(validationErr),
+							zap.Int("attempt", attempt),
+							zap.Int("remaining", MaxValidationAttempts-attempt))
+						logger.Info("terminal prompt: " + validationErr.Error())
+						logger.Info(fmt.Sprintf("terminal prompt: Please try again (attempt %d/%d)", attempt+1, MaxValidationAttempts))
+						continue // Retry
+					}
+					// Max attempts reached - return error
+					logger.Error("Validation failed after maximum attempts",
+						zap.String("flag", config.FlagName),
+						zap.Error(validationErr),
+						zap.Int("attempts", MaxValidationAttempts))
+					return nil, fmt.Errorf("validation failed for %s after %d attempts: %w", config.FlagName, MaxValidationAttempts, validationErr)
+				}
+			}
+
+			// Validation passed (or no validator) - success!
+			logger.Info("Using flag from interactive prompt",
+				zap.String("flag", config.FlagName),
+				zap.String("source", string(FlagSourcePrompt)))
+
+			return &FlagResult{
+				Value:  promptedValue,
+				Source: FlagSourcePrompt,
+			}, nil
 		}
 
-		// P0 requirement: log which source was used (observability)
-		logger.Info("Using flag from interactive prompt",
-			zap.String("flag", config.FlagName),
-			zap.String("source", string(FlagSourcePrompt)))
-
-		return &FlagResult{
-			Value:  promptedValue,
-			Source: FlagSourcePrompt,
-		}, nil
+		// Should never reach here (loop handles all cases), but satisfy compiler
+		return nil, fmt.Errorf("unexpected state after %d validation attempts for %s", MaxValidationAttempts, config.FlagName)
 	}
 
 	// FALLBACK 4: Default value (if allowed)
 	if config.AllowEmpty && config.DefaultValue != "" {
+		// Validate default value if validator provided (P0 REQUIREMENT - SECURITY)
+		// RATIONALE: Default values must be validated like all other inputs
+		// SECURITY: Prevents invalid defaults from bypassing validation
+		if config.Validator != nil {
+			if err := config.Validator(config.DefaultValue); err != nil {
+				return nil, fmt.Errorf("invalid default value for %s: %w", config.FlagName, err)
+			}
+		}
+
 		logger.Info("Using default value for flag",
 			zap.String("flag", config.FlagName),
 			zap.String("source", string(FlagSourceDefault)))
@@ -189,19 +276,22 @@ func GetRequiredString(
 // P0 requirement: errors must include HOW to fix the problem
 func buildRemediationError(config *RequiredFlagConfig) error {
 	var msg string
-	msg += fmt.Sprintf("Required flag --%s not provided\n", config.FlagName)
+	msg += fmt.Sprintf("Required flag --%s not provided\n\n", config.FlagName)
 
+	// Show help text if provided (explains WHY needed and HOW to get)
 	if config.HelpText != "" {
-		msg += fmt.Sprintf("  • Purpose: %s\n", config.HelpText)
+		msg += fmt.Sprintf("%s\n\n", config.HelpText)
 	}
 
-	msg += fmt.Sprintf("  • Provide via: --%s=<value>\n", config.FlagName)
+	// Show remediation options
+	msg += "How to provide:\n"
+	msg += fmt.Sprintf("  • Command-line: --%s=<value>\n", config.FlagName)
 
 	if config.EnvVarName != "" {
-		msg += fmt.Sprintf("  • Or set: export %s=<value>\n", config.EnvVarName)
+		msg += fmt.Sprintf("  • Environment:  export %s=<value>\n", config.EnvVarName)
 	}
 
-	msg += "  • Or run in interactive terminal to be prompted"
+	msg += "  • Interactive:  Run in terminal to be prompted"
 
 	return fmt.Errorf("%s", msg)
 }
@@ -260,15 +350,35 @@ func GetRequiredInt(
 ) (int, FlagSource, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate configuration (P2 requirement: catch developer errors early)
+	if err := config.Validate(); err != nil {
+		return 0, "", fmt.Errorf("invalid RequiredFlagConfig: %w", err)
+	}
+
 	// FALLBACK 1: CLI flag (if explicitly set)
 	if flagWasSet {
-		logger.Debug("Using int flag from CLI",
+		// Validate if validator provided (P0 REQUIREMENT - SECURITY)
+		// RATIONALE: CLI flags must be validated like all other inputs
+		// SECURITY: Prevents invalid CLI values from bypassing validation
+		// NOTE: Validator expects string, convert int back to string for validation
+		if config.Validator != nil {
+			strValue := strconv.Itoa(flagValue)
+			if err := config.Validator(strValue); err != nil {
+				return 0, "", fmt.Errorf("invalid value for --%s flag: %w", config.FlagName, err)
+			}
+		}
+
+		logger.Info("Using int flag from CLI",
 			zap.String("flag", config.FlagName),
 			zap.Int("value", flagValue))
 		return flagValue, FlagSourceCLI, nil
 	}
 
 	// FALLBACK 2: Environment variable (if configured)
+	// NOTE: Empty env vars (export PORT="") are treated as not-set.
+	// RATIONALE: os.Getenv() cannot distinguish empty from not-set (would need LookupEnv).
+	// DECISION: Document limitation rather than add complexity - empty env vars are rare edge case.
+	// CONSISTENCY: This differs from CLI flags where --flag=0 is detected via Changed().
 	if config.EnvVarName != "" {
 		if envValue := os.Getenv(config.EnvVarName); envValue != "" {
 			parsed, err := strconv.Atoi(envValue)
@@ -317,6 +427,16 @@ func GetRequiredInt(
 		if err != nil {
 			return 0, "", fmt.Errorf("invalid default integer: %w", err)
 		}
+
+		// Validate default value if validator provided (P0 REQUIREMENT - SECURITY)
+		// RATIONALE: Default values must be validated like all other inputs
+		// SECURITY: Prevents invalid defaults from bypassing validation
+		if config.Validator != nil {
+			if err := config.Validator(config.DefaultValue); err != nil {
+				return 0, "", fmt.Errorf("invalid default value for %s: %w", config.FlagName, err)
+			}
+		}
+
 		logger.Info("Using default int value",
 			zap.String("flag", config.FlagName),
 			zap.Int("value", parsed))
