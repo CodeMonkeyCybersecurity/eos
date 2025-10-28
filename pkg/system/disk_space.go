@@ -28,35 +28,74 @@ type DiskSpaceRequirements struct {
 	MinTempSpace   uint64 // Minimum space for /tmp (build artifacts)
 	MinBinarySpace uint64 // Minimum space for binary directory
 	MinSourceSpace uint64 // Minimum space for source directory
+	MinBackupSpace uint64 // Minimum space for backup directory (if on different FS)
 
 	// Recommended space (in bytes) - warn if below this
 	RecommendedTempSpace   uint64
 	RecommendedBinarySpace uint64
 	RecommendedSourceSpace uint64
+	RecommendedBackupSpace uint64
 }
 
 // P0 FIX (Adversarial NEW #13): Check if two paths are on the same filesystem
+// P1 FIX (Adversarial NEW #24 & #25): Improved path handling and error consistency
 // Returns true if both paths are on the same device (same filesystem)
 // Uses syscall.Stat to get device ID (st_dev field)
 func areOnSameFilesystem(path1, path2 string) (bool, error) {
-	// Ensure paths exist or use parent directory
-	if _, err := os.Stat(path1); os.IsNotExist(err) {
-		path1 = filepath.Dir(path1)
+	// Find existing parent directory for each path
+	// This handles deeply nested nonexistent paths
+	existingPath1, err := findExistingParent(path1)
+	if err != nil {
+		// Can't determine - assume worst case (different filesystems)
+		return false, nil
 	}
-	if _, err := os.Stat(path2); os.IsNotExist(err) {
-		path2 = filepath.Dir(path2)
+	existingPath2, err := findExistingParent(path2)
+	if err != nil {
+		// Can't determine - assume worst case (different filesystems)
+		return false, nil
 	}
 
 	var stat1, stat2 syscall.Stat_t
-	if err := syscall.Stat(path1, &stat1); err != nil {
-		return false, fmt.Errorf("failed to stat %s: %w", path1, err)
+	if err := syscall.Stat(existingPath1, &stat1); err != nil {
+		// Can't stat existing parent - assume different filesystems
+		return false, nil
 	}
-	if err := syscall.Stat(path2, &stat2); err != nil {
-		return false, fmt.Errorf("failed to stat %s: %w", path2, err)
+	if err := syscall.Stat(existingPath2, &stat2); err != nil {
+		// Can't stat existing parent - assume different filesystems
+		return false, nil
 	}
 
 	// Compare device IDs - same device = same filesystem
 	return stat1.Dev == stat2.Dev, nil
+}
+
+// P1 FIX (Adversarial NEW #24): Find the first existing parent directory
+// Traverses up the directory tree until an existing directory is found
+// Returns error only if we reach filesystem root without finding anything
+func findExistingParent(path string) (string, error) {
+	// Clean the path first
+	path = filepath.Clean(path)
+
+	// Try up to 100 levels (prevents infinite loop on malformed paths)
+	for i := 0; i < 100; i++ {
+		if _, err := os.Stat(path); err == nil {
+			// Path exists!
+			return path, nil
+		}
+
+		// Get parent directory
+		parent := filepath.Dir(path)
+
+		// Check if we've reached the root
+		if parent == path {
+			// Reached root without finding existing directory
+			return "", fmt.Errorf("no existing parent found for %s", path)
+		}
+
+		path = parent
+	}
+
+	return "", fmt.Errorf("exceeded maximum directory depth for %s", path)
 }
 
 // DiskSpaceResult contains the results of disk space verification
@@ -64,14 +103,17 @@ type DiskSpaceResult struct {
 	TempAvailable   uint64
 	BinaryAvailable uint64
 	SourceAvailable uint64
+	BackupAvailable uint64
 
 	TempSufficient   bool
 	BinarySufficient bool
 	SourceSufficient bool
+	BackupSufficient bool
 
 	TempRecommended   bool
 	BinaryRecommended bool
 	SourceRecommended bool
+	BackupRecommended bool
 
 	Warnings []string
 	Errors   []string
@@ -129,31 +171,50 @@ func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceR
 //   - Total: 3× = 402MB minimum, with safety = 804MB
 func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir, backupDir string, binarySize int64) *DiskSpaceRequirements {
 	safetyFactor := uint64(2)
+	binarySizeUint := uint64(binarySize)
 
-	// P0 FIX: Check if backup and binary are on same filesystem
-	// This determines whether we need 2× or 3× the binary size
+	// P0 FIX (Adversarial NEW #26 & #27): Properly handle filesystem boundaries
+	// Check if backup and binary are on same filesystem
 	sameFS, err := areOnSameFilesystem(binaryDir, backupDir)
 	if err != nil {
 		// If we can't determine, assume worst case (different filesystems)
 		sameFS = false
 	}
 
-	var minBinarySpace uint64
+	var minBinarySpace, minBackupSpace uint64
+
 	if sameFS {
-		// Same filesystem: backup replaces old binary, new replaces current
-		// Need: 2× binary size (backup + new, both fit in same space)
-		minBinarySpace = uint64(binarySize) * safetyFactor
+		// SAME FILESYSTEM: Backup and binary share space pool
+		// During update on same FS:
+		//   1. Backup created (134MB) - occupies space
+		//   2. New binary replaces old (134MB) - reuses old binary's space
+		//   3. Peak usage: backup (134MB) + current (134MB) = 2× binary size
+		// Need: 2× binary size on the shared filesystem
+		minBinarySpace = binarySizeUint * safetyFactor
+		minBackupSpace = 0 // No separate check needed - included in binary space
 	} else {
-		// Different filesystems: backup on separate FS, need space for new + temp
-		// Need: 3× binary size (temp + new on binary FS, backup on backup FS)
-		// But we only check binary FS here, so 2× is sufficient (temp deleted before install)
-		minBinarySpace = uint64(binarySize) * safetyFactor
+		// DIFFERENT FILESYSTEMS: Backup and binary have separate space pools
+		// During update on different FS:
+		//   Binary FS:
+		//     1. Old binary exists (134MB)
+		//     2. Temp binary built (134MB) - additional space
+		//     3. New replaces old via atomic rename
+		//     4. Peak: old (134MB) + temp (134MB) = 2× binary size
+		//   Backup FS:
+		//     1. Backup created (134MB) - separate filesystem
+		//     2. Peak: backup (134MB) = 1× binary size
+		// Need: 2× on binary FS + 1× on backup FS
+		minBinarySpace = binarySizeUint * safetyFactor  // 2× for binary FS
+		minBackupSpace = binarySizeUint * safetyFactor  // 1× with safety margin for backup FS
 	}
 
 	// Ensure minimum of 200MB even for small binaries
 	const minAbsolute = 200 * 1024 * 1024
 	if minBinarySpace < minAbsolute {
 		minBinarySpace = minAbsolute
+	}
+	if minBackupSpace > 0 && minBackupSpace < minAbsolute {
+		minBackupSpace = minAbsolute
 	}
 
 	return &DiskSpaceRequirements{
@@ -163,14 +224,16 @@ func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir, backupDir s
 		BackupDir: backupDir,
 
 		// Minimum requirements (hard limits)
-		MinTempSpace:   1536 * 1024 * 1024, // 1.5GB for CGO build artifacts (unchanged)
-		MinBinarySpace: minBinarySpace,     // DYNAMIC based on actual binary size and filesystem
-		MinSourceSpace: 200 * 1024 * 1024,  // 200MB for source code (unchanged)
+		MinTempSpace:   1536 * 1024 * 1024, // 1.5GB for CGO build artifacts
+		MinBinarySpace: minBinarySpace,     // DYNAMIC: 2× binary size
+		MinSourceSpace: 200 * 1024 * 1024,  // 200MB for source code
+		MinBackupSpace: minBackupSpace,     // DYNAMIC: 0 if same FS, 1× if different FS
 
 		// Recommended requirements (soft warnings)
-		RecommendedTempSpace:   2 * 1024 * 1024 * 1024,            // 2GB recommended
-		RecommendedBinarySpace: uint64(binarySize) * safetyFactor, // Same as minimum
-		RecommendedSourceSpace: 500 * 1024 * 1024,                 // 500MB recommended
+		RecommendedTempSpace:   2 * 1024 * 1024 * 1024, // 2GB recommended
+		RecommendedBinarySpace: binarySizeUint * safetyFactor,
+		RecommendedSourceSpace: 500 * 1024 * 1024,
+		RecommendedBackupSpace: minBackupSpace, // Same as minimum
 	}
 }
 
@@ -236,6 +299,31 @@ func VerifyDiskSpace(rc *eos_io.RuntimeContext, reqs *DiskSpaceRequirements) (*D
 		zap.String("required", FormatBytes(reqs.MinSourceSpace)),
 		zap.Bool("sufficient", result.SourceSufficient))
 
+	// P0 FIX (Adversarial NEW #27): Check backup directory if on different filesystem
+	// Only check if MinBackupSpace > 0 (which means different filesystem)
+	if reqs.MinBackupSpace > 0 && reqs.BackupDir != "" {
+		backupAvail, err := getAvailableSpace(reqs.BackupDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check backup directory space: %w\n"+
+				"Directory: %s\n"+
+				"This is required for creating binary backup",
+				err, reqs.BackupDir)
+		}
+		result.BackupAvailable = backupAvail
+		result.BackupSufficient = backupAvail >= reqs.MinBackupSpace
+		result.BackupRecommended = backupAvail >= reqs.RecommendedBackupSpace
+
+		logger.Debug("Backup directory space (separate filesystem)",
+			zap.String("path", reqs.BackupDir),
+			zap.String("available", FormatBytes(backupAvail)),
+			zap.String("required", FormatBytes(reqs.MinBackupSpace)),
+			zap.Bool("sufficient", result.BackupSufficient))
+	} else {
+		// Same filesystem as binary dir - no separate check needed
+		result.BackupSufficient = true
+		result.BackupRecommended = true
+	}
+
 	// Collect errors for insufficient space
 	if !result.TempSufficient {
 		result.Errors = append(result.Errors,
@@ -251,6 +339,12 @@ func VerifyDiskSpace(rc *eos_io.RuntimeContext, reqs *DiskSpaceRequirements) (*D
 		result.Errors = append(result.Errors,
 			fmt.Sprintf("Insufficient space in %s: %s available, %s required",
 				reqs.SourceDir, FormatBytes(sourceAvail), FormatBytes(reqs.MinSourceSpace)))
+	}
+	// P0 FIX (Adversarial NEW #27): Include backup directory errors
+	if !result.BackupSufficient && reqs.MinBackupSpace > 0 {
+		result.Errors = append(result.Errors,
+			fmt.Sprintf("Insufficient space in %s (backup filesystem): %s available, %s required",
+				reqs.BackupDir, FormatBytes(result.BackupAvailable), FormatBytes(reqs.MinBackupSpace)))
 	}
 
 	// Collect warnings for below-recommended space
@@ -268,6 +362,12 @@ func VerifyDiskSpace(rc *eos_io.RuntimeContext, reqs *DiskSpaceRequirements) (*D
 		result.Warnings = append(result.Warnings,
 			fmt.Sprintf("Low space in %s: %s available, %s recommended",
 				reqs.SourceDir, FormatBytes(sourceAvail), FormatBytes(reqs.RecommendedSourceSpace)))
+	}
+	// P0 FIX (Adversarial NEW #27): Include backup directory warnings
+	if result.BackupSufficient && !result.BackupRecommended && reqs.MinBackupSpace > 0 {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Low space in %s (backup filesystem): %s available, %s recommended",
+				reqs.BackupDir, FormatBytes(result.BackupAvailable), FormatBytes(reqs.RecommendedBackupSpace)))
 	}
 
 	// Log warnings

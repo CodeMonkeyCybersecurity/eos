@@ -340,6 +340,25 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 					zap.Bool("renewable", isRenewable))
 			}
 		}
+	} else {
+		// P2 Issue #42 Fix: TTL field is missing or wrong type
+		// SECURITY: Non-periodic tokens MUST have a valid TTL field
+		// If token is periodic, missing TTL is OK (auto-renews)
+		// If token is non-periodic, missing TTL means no expiration - REJECT
+		isPeriodic, _ := isPeriodicToken(rc, secret)
+
+		if !isPeriodic {
+			// Non-periodic token without TTL field - this is a security hole
+			logger.Warn("⚠️  Non-periodic token is missing TTL field (rejecting)",
+				zap.Bool("periodic", isPeriodic),
+				zap.Any("ttl_field_present", secret.Data["ttl"] != nil),
+				zap.String("ttl_field_type", fmt.Sprintf("%T", secret.Data["ttl"])))
+			return fmt.Errorf("non-periodic token must have valid TTL field (token has no expiration)")
+		}
+
+		// Periodic token without TTL field - acceptable (auto-renews)
+		logger.Debug("✓ Periodic token without TTL field (auto-renews, no expiration check needed)",
+			zap.Bool("periodic", isPeriodic))
 	}
 
 	// Check 2: Token must have required policies
@@ -485,7 +504,9 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 				}
 
 				// P1 Issue #22 Fix: Check if token LOST its periodic status during validation
-				if !isPeriodicRefresh && isPeriodic {
+				// P2 Issue #37 Fix: Track this state to reject if TTL is also malformed
+				lostPeriodicStatus := !isPeriodicRefresh && isPeriodic
+				if lostPeriodicStatus {
 					// Token was periodic but is now non-periodic - period was revoked
 					logger.Warn("⚠️  Token lost periodic status during validation",
 						zap.Int64("initial_ttl", ttlSeconds),
@@ -501,9 +522,20 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 						// SECURITY: Log malformed TTL values (could indicate attack or Vault bug)
 						// P2 Issue #25 Fix: Check Int64() error instead of ignoring it
 						// P1 Issue #40 Fix: Sanitize raw input before logging to prevent log injection
+						// P2 Issue #37 Fix: If token lost periodic status AND has malformed TTL, REJECT
 						logger.Warn("⚠️  Refreshed token has malformed TTL field",
 							zap.String("ttl_raw", sanitizeForLogging(string(ttlRefreshRaw))),
+							zap.Bool("lost_periodic_status", lostPeriodicStatus),
 							zap.Error(err))
+
+						if lostPeriodicStatus {
+							// SECURITY: Token lost periodic status (manual revocation or attack)
+							// AND has malformed TTL field. This is highly suspicious - REJECT.
+							// Rationale: We can't validate the fresh TTL, and the token can no
+							// longer auto-renew. Accepting this token would bypass TTL validation.
+							return fmt.Errorf("token lost periodic status and has malformed TTL field (cannot validate security)")
+						}
+
 						// Can't validate fresh TTL, but original validation passed
 						return nil
 					}
@@ -533,6 +565,11 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 							"  Or use Vault Agent (automatic token renewal)",
 							ttlRefresh, ttlSeconds, shared.EosAdminPolicyName)
 					}
+				} else if lostPeriodicStatus {
+					// P2 Issue #37 Fix: Token lost periodic status but TTL field is missing
+					// This is suspicious - we can't validate the token's remaining lifetime
+					logger.Warn("⚠️  Token lost periodic status but TTL field is missing from refresh")
+					return fmt.Errorf("token lost periodic status and TTL field is missing (cannot validate security)")
 				}
 			}
 		}
@@ -580,27 +617,30 @@ func formatTTLDuration(seconds int64) string {
 func sanitizeForLogging(raw string) string {
 	const maxLength = 100
 
-	// Remove control characters (ASCII 0-31 except tab/newline, ASCII 127)
-	// Keep: tab(9), newline(10), carriage return(13), printable(32-126), UTF-8(128+)
+	// P2 Issue #43 Fix: Remove ALL control characters including newlines
+	// SECURITY: Newlines allow log injection attacks (fake log entries)
+	// Original code kept tab/newline/CR - WRONG for log safety
+	// Remove control characters (ASCII 0-31, ASCII 127)
+	// Keep ONLY: printable ASCII (32-126) and UTF-8 (128+)
 	sanitized := strings.Map(func(r rune) rune {
-		// Control characters (except tab, newline, CR)
-		if r < 32 && r != 9 && r != 10 && r != 13 {
-			return -1 // Remove
+		// ALL control characters (0-31) - including tab, newline, CR
+		if r < 32 {
+			return ' ' // Replace with space for readability
 		}
-		// DEL character
+		// DEL character (127)
 		if r == 127 {
 			return -1 // Remove
 		}
-		// ANSI escape sequences start with ESC (27)
-		if r == 27 {
-			return -1 // Remove
-		}
+		// ANSI escape sequences start with ESC (27) - already caught above
 		return r
 	}, raw)
 
-	// Truncate if too long
-	if len(sanitized) > maxLength {
-		return sanitized[:maxLength] + "...[truncated]"
+	// P3 Issue #44 Fix: Truncate on rune boundaries (UTF-8 safe)
+	// Using len() checks byte length, but UTF-8 chars can be 2-4 bytes
+	// Truncating at byte boundary could split a multi-byte character
+	runes := []rune(sanitized)
+	if len(runes) > maxLength {
+		return string(runes[:maxLength]) + "...[truncated]"
 	}
 
 	return sanitized

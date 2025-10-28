@@ -280,28 +280,52 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 
 		// LiteLLM health issues (root cause)
 		if result.Name == "LiteLLM Proxy Health" && result.Status != debug.StatusOK {
-			rootCauses = append(rootCauses, "LiteLLM proxy health check failing")
+			// Bug 28 fix: Distinguish diagnostic failure from service failure
+			if result.Error != nil {
+				// Container not found or Docker issue
+				rootCauses = append(rootCauses, "LiteLLM diagnostics failed: "+result.Message)
+			} else {
+				// Container found but unhealthy
+				rootCauses = append(rootCauses, "LiteLLM proxy health check failing")
+			}
 		}
 
 		// PostgreSQL health issues (root cause) - Loose End 2 fix
 		if result.Name == "PostgreSQL Health" && result.Status == debug.StatusError {
-			rootCauses = append(rootCauses, "PostgreSQL database not responding")
+			// Bug 28 fix: Distinguish diagnostic failure from service failure
+			if result.Error != nil {
+				// Container not found or Docker issue
+				rootCauses = append(rootCauses, "PostgreSQL diagnostics failed: "+result.Message)
+			} else {
+				// Container found but database not responding
+				rootCauses = append(rootCauses, "PostgreSQL database not responding")
+			}
 		}
 
 		// LiteLLM endpoint failures (primary failure)
 		if result.Name == "LiteLLM Comprehensive Health" {
-			// Bug 20 fix: Safe type assertion to prevent panic if metadata format unexpected
-			if endpoint, ok := result.Metadata["health_endpoint"].(string); ok && endpoint == "failed" {
-				primaryFailures = append(primaryFailures, "├─ /health endpoint: FAILED")
-			}
-			if endpoint, ok := result.Metadata["liveliness_endpoint"].(string); ok && endpoint == "failed" {
-				primaryFailures = append(primaryFailures, "├─ /health/liveliness endpoint: FAILED")
+			// Bug 29 fix: Check if diagnostic execution failed first
+			if result.Error != nil {
+				// Diagnostic failed (Docker not running, container not found)
+				rootCauses = append(rootCauses, "LiteLLM comprehensive diagnostics failed: "+result.Message)
+			} else {
+				// Bug 20 fix: Safe type assertion to prevent panic if metadata format unexpected
+				if endpoint, ok := result.Metadata["health_endpoint"].(string); ok && endpoint == "failed" {
+					primaryFailures = append(primaryFailures, "├─ /health endpoint: FAILED")
+				}
+				if endpoint, ok := result.Metadata["liveliness_endpoint"].(string); ok && endpoint == "failed" {
+					primaryFailures = append(primaryFailures, "├─ /health/liveliness endpoint: FAILED")
+				}
 			}
 		}
 
 		// Model connectivity (primary failure)
 		if result.Name == "LiteLLM Model Connectivity" {
-			if unhealthy, ok := result.Metadata["unhealthy_models"].(int); ok && unhealthy > 0 {
+			// Bug 30 fix: Check if diagnostic execution failed first
+			if result.Error != nil {
+				// Diagnostic failed (can't read config, Docker issues)
+				rootCauses = append(rootCauses, "Model connectivity diagnostics failed: "+result.Message)
+			} else if unhealthy, ok := result.Metadata["unhealthy_models"].(int); ok && unhealthy > 0 {
 				if total, ok := result.Metadata["configured_models"].([]string); ok {
 					healthy := len(total) - unhealthy
 					// Bug 21 fix: Defensive bounds check (shouldn't happen but prevents negative counts)
@@ -359,9 +383,10 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 		// Immediate action - Bug 4 & 8 fix: check ALL root causes independently
 		summary.WriteString("IMMEDIATE ACTION REQUIRED:\n\n")
 
-		// Check if any root cause is LiteLLM-related or PostgreSQL-related
+		// Bug 27 fix: Check for diagnostic execution failures vs service failures
 		hasLiteLLMIssue := false
 		hasPostgresIssue := false
+		hasDiagnosticFailure := false
 		for _, cause := range rootCauses {
 			if strings.Contains(cause, "LiteLLM") {
 				hasLiteLLMIssue = true
@@ -369,9 +394,30 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			if strings.Contains(cause, "PostgreSQL") {
 				hasPostgresIssue = true
 			}
+			// Bug 27 fix: Detect diagnostic failures (Docker not running, permissions, etc.)
+			if strings.Contains(cause, "diagnostics failed") {
+				hasDiagnosticFailure = true
+			}
 		}
 
 		// Bug 8 fix: Use independent if blocks, not else if (so BOTH issues show)
+		// Bug 27 fix: Show diagnostic failure remediation FIRST (most fundamental issue)
+		if hasDiagnosticFailure {
+			summary.WriteString("Docker/Infrastructure Issues:\n")
+			summary.WriteString("  Diagnostics cannot run - fix infrastructure first.\n\n")
+			summary.WriteString("  1. Check if Docker is running:\n")
+			summary.WriteString("     sudo systemctl status docker\n\n")
+			summary.WriteString("  2. Start Docker if stopped:\n")
+			summary.WriteString("     sudo systemctl start docker\n\n")
+			summary.WriteString("  3. Verify Docker is accessible:\n")
+			summary.WriteString("     sudo docker ps\n\n")
+			summary.WriteString("  4. If permission denied, add user to docker group:\n")
+			summary.WriteString("     sudo usermod -aG docker $USER\n")
+			summary.WriteString("     (logout and login required after adding to group)\n\n")
+			summary.WriteString("  5. After fixing Docker, re-run diagnostics:\n")
+			summary.WriteString("     sudo eos debug bionicgpt\n\n")
+		}
+
 		if hasLiteLLMIssue {
 			summary.WriteString("LiteLLM Issues:\n")
 			summary.WriteString("  1. Check LiteLLM logs for errors:\n")

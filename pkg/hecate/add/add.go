@@ -25,7 +25,7 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		return eos_err.NewUserError(
 			"Permission denied: /opt/hecate requires root access\n\n" +
 				"Run with sudo:\n" +
-				"  sudo eos update hecate --add ...")
+				"  sudo eos update hecate add [service] --dns [domain] --upstream [backend]")
 	}
 
 	// Display header

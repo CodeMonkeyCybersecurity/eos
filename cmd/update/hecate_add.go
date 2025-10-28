@@ -11,8 +11,9 @@ import (
 
 // addServiceCmd adds a new service to Hecate
 var addServiceCmd = &cobra.Command{
-	Use:   "add",
+	Use:   "add [service]",
 	Short: "Add a new reverse proxy route to Hecate",
+	Args:  cobra.ExactArgs(1),
 	Long: `Add a new service to an existing Hecate installation by modifying the Caddyfile.
 
 This command:
@@ -25,30 +26,26 @@ This command:
 
 Examples:
   # Basic service without SSO
-  eos update hecate add \
-    --service bionicgpt \
+  eos update hecate add bionicgpt \
     --dns chat.codemonkey.ai \
-    --backend 100.64.0.50:8080
+    --upstream 100.64.0.50:8080
 
   # Service with SSO enabled
-  eos update hecate add \
-    --service nextcloud \
+  eos update hecate add nextcloud \
     --dns cloud.codemonkey.ai \
-    --backend 100.64.0.51:80 \
+    --upstream 100.64.0.51:80 \
     --sso
 
   # Dry run to see what would be changed
-  eos update hecate add \
-    --service wazuh \
+  eos update hecate add wazuh \
     --dns wazuh.codemonkey.ai \
-    --backend 100.64.0.52:443 \
+    --upstream 100.64.0.52:443 \
     --dry-run
 
   # With custom Caddy directives
-  eos update hecate add \
-    --service api \
+  eos update hecate add api \
     --dns api.codemonkey.ai \
-    --backend 100.64.0.53:3000 \
+    --upstream 100.64.0.53:3000 \
     --custom-directive "rate_limit 100/m" \
     --custom-directive "header X-Custom-Header value"`,
 	RunE: eos.Wrap(runAddService),
@@ -59,9 +56,8 @@ func init() {
 	updateHecateCmd.AddCommand(addServiceCmd)
 
 	// Required flags with short aliases for better UX
-	addServiceCmd.Flags().StringP("service", "s", "", "Service name (alphanumeric, hyphens, underscores)")
 	addServiceCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for this service (aliases: --domain, --route, --host)")
-	addServiceCmd.Flags().StringP("backend", "b", "", "Backend address (ip:port or hostname:port) (aliases: --upstream, --target)")
+	addServiceCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port) (aliases: --backend, --target)")
 
 	// Optional flags
 	addServiceCmd.Flags().Bool("sso", false, "Enable SSO for this route")
@@ -74,10 +70,12 @@ func init() {
 }
 
 func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	// Get service from positional argument
+	service := args[0]
+
 	// Parse flags
-	service, _ := cmd.Flags().GetString("service")
 	dns, _ := cmd.Flags().GetString("dns")
-	backend, _ := cmd.Flags().GetString("backend")
+	upstream, _ := cmd.Flags().GetString("upstream")
 	sso, _ := cmd.Flags().GetBool("sso")
 	ssoProvider, _ := cmd.Flags().GetString("sso-provider")
 	customDirectives, _ := cmd.Flags().GetStringSlice("custom-directive")
@@ -90,7 +88,7 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	opts := &add.ServiceOptions{
 		Service:             service,
 		DNS:                 dns,
-		Backend:             backend,
+		Backend:             upstream,
 		SSO:                 sso,
 		SSOProvider:         ssoProvider,
 		CustomDirectives:    customDirectives,

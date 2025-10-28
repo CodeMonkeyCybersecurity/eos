@@ -472,6 +472,31 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		zap.String("sha256", newHash[:16]+"..."),
 		zap.Float64("size_mb", newSizeMB))
 
+	// P1 FIX (Adversarial NEW #17): Re-verify disk space with ACTUAL new binary size
+	// Previous check used old binary size, but new binary might be larger
+	// This is the final check before we commit to installing the new binary
+	if builtBinaryInfo.Size() != binaryInfo.Size() {
+		eeu.logger.Debug("New binary size differs from old, re-verifying disk space",
+			zap.Int64("old_size", binaryInfo.Size()),
+			zap.Int64("new_size", builtBinaryInfo.Size()))
+
+		reqs := system.UpdateRequirementsWithBinarySize(
+			"/tmp",
+			filepath.Dir(eeu.config.BinaryPath),
+			eeu.config.SourceDir,
+			eeu.config.BackupDir,
+			builtBinaryInfo.Size(), // NEW binary size
+		)
+		if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
+			_ = os.Remove(tempBinary) // Clean up temp binary
+			return "", fmt.Errorf("disk space insufficient for new binary size: %w\n\n"+
+				"New binary (%s) is larger than old binary (%s).\n"+
+				"Free up space and try again.",
+				err, system.FormatBytes(uint64(builtBinaryInfo.Size())), system.FormatBytes(uint64(binaryInfo.Size())))
+		}
+		eeu.logger.Debug("Disk space re-verification passed for new binary size")
+	}
+
 	return tempBinary, nil
 }
 
@@ -611,6 +636,11 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	if err := os.WriteFile(expectedBackupPath, binaryData, 0755); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
+
+	// P1 FIX (Adversarial NEW #19): Explicit memory cleanup after backup write
+	// NOTE: We intentionally load entire binary (134MB) into memory to prevent TOCTOU
+	// Now that backup is written, release the memory immediately instead of waiting for GC
+	binaryData = nil
 
 	// Verify backup was created successfully
 	backupInfo, err := os.Stat(expectedBackupPath)
