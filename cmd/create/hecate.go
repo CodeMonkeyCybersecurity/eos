@@ -16,7 +16,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
 )
 
 func init() {
@@ -36,8 +35,18 @@ var CreateHecateCmd = &cobra.Command{
 	Short: "Deploy Hecate reverse proxy framework",
 	Long: `Deploy Hecate reverse proxy framework using Docker Compose.
 
-MODE 1: YAML Configuration (Recommended)
-  Deploy from a simple YAML config file that defines your apps and their backends.
+MODE 1: Interactive Wizard (Default - Human-Centric)
+  Run without any flags to start an interactive wizard that guides you through:
+  - Adding apps and their domains
+  - Configuring backends (upstream services)
+  - Optional SSO integration via Authentik
+  - WebRTC/TCP port forwarding setup
+
+  eos create hecate                                 # Interactive wizard (recommended)
+
+MODE 2: YAML Configuration (For Automation)
+  Deploy from a YAML config file that defines your apps and backends.
+  Useful for scripted deployments or complex multi-service setups.
 
   Example config.yaml:
     apps:
@@ -52,22 +61,18 @@ MODE 1: YAML Configuration (Recommended)
       authentik:
         domain: hera.cybermonkey.dev
 
-  eos create hecate --config config.yaml
-
-MODE 2: Interactive Wizard
-  Interactive setup that guides you through configuration.
-
-  eos create hecate
+  eos create hecate --config config.yaml            # Deploy from YAML
 
 The deployment creates configuration files at /opt/hecate/:
 - docker-compose.yml - Container orchestration
 - Caddyfile - Caddy reverse proxy configuration
-- .env - Environment variables (if Authentik is configured)
+- .env - Environment variables (includes Authentik bootstrap credentials)
 
 Examples:
+  eos create hecate                                 # Interactive wizard (starts automatically)
   eos create hecate --config example.yaml           # Deploy from YAML config
   eos create hecate --config example.yaml --output /opt/hecate  # Custom output dir
-  eos create hecate                                 # Interactive wizard
+  eos create config --hecate                        # Generate YAML config only (no deployment)
   eos create hecate --help                          # Show this help message`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
@@ -95,6 +100,7 @@ Examples:
 		}
 
 		var config *hecate.YAMLHecateConfig
+		var tempConfigPath string
 
 		// Check if config file was provided (YAML override)
 		if configFile != "" {
@@ -108,52 +114,36 @@ Examples:
 				return fmt.Errorf("failed to load YAML config: %w", err)
 			}
 		} else {
-			// No YAML file provided - try loading from Consul KV
-			log.Info("No config file provided, checking Consul KV")
+			// No YAML file provided - run interactive wizard
+			log.Info("No config file provided, starting interactive wizard")
 
-			configStorage, err := hecate.NewConfigStorage(rc)
+			// Generate temporary config file path
+			tempConfigPath = "/tmp/hecate-config-wizard.yaml"
+			defer func() {
+				if tempConfigPath != "" {
+					_ = os.Remove(tempConfigPath)
+				}
+			}()
+
+			// Run interactive config generator (same as 'eos create config --hecate')
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: No configuration file provided.")
+			log.Info("terminal prompt: Starting interactive wizard to configure Hecate...")
+			log.Info("terminal prompt: ")
+
+			if err := hecate.GenerateConfigFile(rc, tempConfigPath, true); err != nil {
+				return fmt.Errorf("interactive configuration failed: %w", err)
+			}
+
+			// Load the generated config
+			config, err = hecate.LoadYAMLConfig(rc, tempConfigPath)
 			if err != nil {
-				return fmt.Errorf("failed to initialize Consul storage: %w\n\n"+
-					"Either:\n"+
-					"  1. Provide a YAML config file: eos create hecate --config hecate-config.yaml\n"+
-					"  2. Generate config first: eos create config --hecate\n"+
-					"  3. Ensure Consul is running and accessible", err)
+				return fmt.Errorf("failed to load generated config: %w", err)
 			}
 
-			rawConfig, err := configStorage.LoadConfig(rc)
-			if err != nil {
-				return fmt.Errorf("failed to load config from Consul KV: %w", err)
-			}
-
-			if rawConfig == nil || len(rawConfig.Apps) == 0 {
-				return fmt.Errorf("no configuration found in Consul KV\n\n" +
-					"Please run one of:\n" +
-					"  1. Generate config: eos create config --hecate\n" +
-					"  2. Provide YAML file: eos create hecate --config hecate-config.yaml")
-			}
-
-			log.Info("Configuration loaded from Consul KV",
-				zap.Int("app_count", len(rawConfig.Apps)))
-
-			// Convert RawYAMLConfig to parsed YAMLHecateConfig
-			// We need to create a temporary YAML file to reuse LoadYAMLConfig
-			// Or we can parse it directly here
-			tempYAMLPath := "/tmp/hecate-config-from-consul.yaml"
-			yamlData, err := yaml.Marshal(rawConfig)
-			if err != nil {
-				return fmt.Errorf("failed to marshal config: %w", err)
-			}
-			if err := os.WriteFile(tempYAMLPath, yamlData, 0644); err != nil {
-				return fmt.Errorf("failed to write temp config: %w", err)
-			}
-			defer func() { _ = os.Remove(tempYAMLPath) }()
-
-			config, err = hecate.LoadYAMLConfig(rc, tempYAMLPath)
-			if err != nil {
-				return fmt.Errorf("failed to parse config from Consul: %w", err)
-			}
-
-			log.Info("terminal prompt: Using configuration from Consul KV")
+			log.Info("terminal prompt: ")
+			log.Info("terminal prompt: Configuration complete! Proceeding with deployment...")
+			log.Info("terminal prompt: ")
 		}
 
 		// Display detected apps

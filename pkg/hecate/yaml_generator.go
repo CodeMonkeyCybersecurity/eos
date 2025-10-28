@@ -722,11 +722,32 @@ AUTHENTIK_TAG=%s
 AUTHENTIK_IMAGE=ghcr.io/goauthentik/server
 AUTHENTIK_WORKER__THREADS=%s
 
-# Authentik Bootstrap Credentials
-# Use these to login for the first time - Email: %s, Password: %s
+# Authentik Bootstrap Credentials - ADMIN LOGIN CREDENTIALS
+# Use these to login to Authentik admin UI: https://hera.your-domain/if/admin/
+#
+# Login Email: %s
+# Login Password: %s
+#
+# NOTE: If these values are missing from this file, they may be stored in Consul KV.
+# Retrieve with: consul kv get hecate/secrets/authentik/bootstrap_email
+#                consul kv get hecate/secrets/authentik/bootstrap_password
+#
 AUTHENTIK_BOOTSTRAP_EMAIL=%s
 AUTHENTIK_BOOTSTRAP_PASSWORD=%s
 AUTHENTIK_BOOTSTRAP_TOKEN=%s
+
+# Authentik API Token (REQUIRED for automated service integration)
+# This token is used by 'eos update hecate --add <service>' to configure SSO automatically
+#
+# To create this token (one-time setup):
+#   1. Login to Authentik admin UI: https://hera.your-domain/if/admin/
+#   2. Use bootstrap credentials above (email + password)
+#   3. Navigate to: Directory → Tokens → Create
+#   4. Set: User = admin, Intent = API, Expiry = Never (or 365 days)
+#   5. Copy the generated token and replace the placeholder below
+#
+# Leave empty if you don't plan to use automated SSO integration
+AUTHENTIK_API_TOKEN=
 
 # Ports
 COMPOSE_PORT_HTTP=%s

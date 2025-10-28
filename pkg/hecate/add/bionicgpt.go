@@ -145,14 +145,18 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 	}
 
 	// Step 1: Get Authentik credentials from .env file
-	logger.Info("    Getting Authentik credentials from /opt/bionicgpt/.env")
+	logger.Info("    Getting Authentik credentials from /opt/hecate/.env")
 	authentikToken, authentikBaseURL, err := b.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
 		logger.Warn("Authentik credentials not found, skipping proxy provider setup", zap.Error(err))
-		logger.Warn("To enable authentication, add to /opt/bionicgpt/.env:")
-		logger.Warn("  AUTHENTIK_TOKEN=your_authentik_api_token")
-		logger.Warn("  AUTHENTIK_BASE_URL=http://localhost:9000")
-		logger.Warn("Get API token from: https://hera.your-domain/if/admin/#/core/tokens")
+		logger.Warn("")
+		logger.Warn("To enable authentication:")
+		logger.Warn("  1. Login to Authentik admin: https://hera.codemonkey.net.au/if/admin/")
+		logger.Warn("  2. Create API token: Directory → Tokens → Create")
+		logger.Warn("  3. Add to /opt/hecate/.env:")
+		logger.Warn("     echo 'AUTHENTIK_API_TOKEN=<your_token>' | sudo tee -a /opt/hecate/.env")
+		logger.Warn("  4. Re-run this command")
+		logger.Warn("")
 		return nil // Non-fatal: generic route still works
 	}
 
@@ -286,36 +290,63 @@ func (b *BionicGPTIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
 }
 
 // getAuthentikCredentials retrieves Authentik API credentials from .env files
-// TODO: Migrate to Vault once BionicGPT and Authentik are fully migrated to Vault-based secrets
+//
+// TODO (ROADMAP - 6-12 months): Migrate to Vault-based secret management
+// For now, credentials stored in /opt/hecate/.env (acceptable per CLAUDE.md requirements)
 func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (string, string, error) {
-	// TEMPORARY: Read from .env files until Vault migration is complete
-	// BionicGPT stores Authentik token in /opt/bionicgpt/.env
-	// Authentik base URL can be inferred from Hecate or use default
+	// ARCHITECTURE NOTE: Authentik runs in Hecate stack, credentials are in /opt/hecate/.env
+	// NOT in /opt/bionicgpt/.env (BionicGPT is a separate service proxied through Authentik)
+	//
+	// TODO (UPSTREAM BLOCKER): Automate API token creation when Authentik provides capability
+	// CURRENT STATUS: Authentik doesn't support programmatic API token creation without UI access
+	// (see: https://github.com/goauthentik/authentik/issues/12882)
+	//
+	// WORKAROUND: Manual token creation via Authentik admin UI (one-time setup)
+	//
+	// NOTE: AUTHENTIK_BOOTSTRAP_TOKEN (from .env) is for initial admin user creation,
+	// NOT for API access. We need a separate API token created via UI.
 
-	bionicgptEnv, err := readEnvFile("/opt/bionicgpt/.env")
+	hecateEnv, err := readEnvFile("/opt/hecate/.env")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read /opt/bionicgpt/.env: %w\n"+
-			"Ensure BionicGPT is installed with: eos create bionicgpt", err)
+		return "", "", fmt.Errorf("failed to read /opt/hecate/.env: %w\n"+
+			"Authentik configuration should be in Hecate .env file", err)
 	}
 
-	// Check for AUTHENTIK_TOKEN in BionicGPT .env
-	apiKey := bionicgptEnv["AUTHENTIK_TOKEN"]
+	// Check for AUTHENTIK_API_TOKEN (preferred) or legacy variants
+	apiKey := hecateEnv["AUTHENTIK_API_TOKEN"]
 	if apiKey == "" {
-		// Fallback: Try AUTHENTIK_API_KEY
-		apiKey = bionicgptEnv["AUTHENTIK_API_KEY"]
+		apiKey = hecateEnv["AUTHENTIK_TOKEN"]
+	}
+	if apiKey == "" {
+		apiKey = hecateEnv["AUTHENTIK_API_KEY"]
 	}
 
+	// NOTE: We do NOT fallback to AUTHENTIK_BOOTSTRAP_TOKEN - that's for initial setup,
+	// not API access. Authentik requires a separate API token created via UI.
+
 	if apiKey == "" {
-		return "", "", fmt.Errorf("AUTHENTIK_TOKEN not found in /opt/bionicgpt/.env\n" +
-			"Add to .env file:\n" +
-			"  AUTHENTIK_TOKEN=your_authentik_api_token\n" +
-			"Get token from: https://hera.your-domain/if/admin/#/core/tokens")
+		return "", "", fmt.Errorf("AUTHENTIK_API_TOKEN not found in /opt/hecate/.env\n\n" +
+			"To configure Authentik API access:\n\n" +
+			"1. Login to Authentik admin UI:\n" +
+			"   https://hera.codemonkey.net.au/if/admin/\n\n" +
+			"2. Login with bootstrap credentials:\n" +
+			"   Email: (from AUTHENTIK_BOOTSTRAP_EMAIL in /opt/hecate/.env)\n" +
+			"   Password: (from AUTHENTIK_BOOTSTRAP_PASSWORD in /opt/hecate/.env)\n\n" +
+			"3. Navigate to: Directory → Tokens → Create\n" +
+			"   - User: Select your admin user\n" +
+			"   - Intent: API\n" +
+			"   - Expiry: Never (or long duration like 365 days)\n\n" +
+			"4. Copy the generated token and add to /opt/hecate/.env:\n" +
+			"   echo 'AUTHENTIK_API_TOKEN=<your_token_here>' | sudo tee -a /opt/hecate/.env\n\n" +
+			"5. Re-run this command\n\n" +
+			"NOTE: This is a one-time manual step. Authentik doesn't yet support automated\n" +
+			"API token creation (tracked in https://github.com/goauthentik/authentik/issues/12882)")
 	}
 
 	// Get base URL from env or use default
-	baseURL := bionicgptEnv["AUTHENTIK_BASE_URL"]
+	baseURL := hecateEnv["AUTHENTIK_BASE_URL"]
 	if baseURL == "" {
-		// Default to localhost:9000 (Authentik default in Hecate stack)
+		// Default to localhost:9000 (Authentik server container exposed port)
 		baseURL = "http://localhost:9000"
 	}
 

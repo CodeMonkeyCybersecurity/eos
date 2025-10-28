@@ -130,7 +130,14 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 		logger.Info("terminal prompt: --- Add Application ---")
 
 		// App name
-		logger.Info("terminal prompt: App name (e.g., main, wazuh, nextcloud) [Enter to finish]: ")
+		logger.Info("terminal prompt: App name (e.g., main, wazuh, nextcloud, bionicgpt) [Enter to finish]: ")
+		logger.Info("terminal prompt: ")
+		logger.Info("terminal prompt: Suggested modules:")
+		logger.Info("terminal prompt:   • bionicgpt - AI chatbot with RAG (Retrieval-Augmented Generation)")
+		logger.Info("terminal prompt:   • wazuh     - Security monitoring and SIEM platform")
+		logger.Info("terminal prompt:   • nextcloud - File sharing and collaboration")
+		logger.Info("terminal prompt:   • main      - Your main application/website")
+		logger.Info("terminal prompt: ")
 		fmt.Print("App name: ")
 		appName := strings.TrimSpace(mustReadLine(reader))
 		if appName == "" {

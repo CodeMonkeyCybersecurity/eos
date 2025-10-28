@@ -17,6 +17,14 @@ const (
 	ConsulAuthentikBootstrapEmail    = ConsulHecatePrefix + "secrets/authentik/bootstrap_email"
 	ConsulAuthentikBootstrapPassword = ConsulHecatePrefix + "secrets/authentik/bootstrap_password"
 	ConsulAuthentikBootstrapToken    = ConsulHecatePrefix + "secrets/authentik/bootstrap_token"
+
+	// NOTE: AUTHENTIK_API_TOKEN is NOT stored in Consul for now
+	// RATIONALE: API tokens are created manually via Authentik UI (upstream limitation)
+	// STORAGE: Stored in /opt/hecate/.env (one-time manual setup)
+	// TODO (ROADMAP - 6-12 months): Migrate to Vault when we add full Vault integration
+	//
+	// When we do migrate to Vault, the path should be:
+	// ConsulAuthentikAPIToken = ConsulHecatePrefix + "secrets/authentik/api_token"
 )
 
 // AuthentikBootstrapCredentials holds the bootstrap credentials for Authentik first-time setup
