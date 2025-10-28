@@ -877,8 +877,8 @@ func ContainerDependencyBlockedDiagnostic() *debug.Diagnostic {
 			if len(blocked) > 0 {
 				result.Status = debug.StatusError
 				result.Message = fmt.Sprintf("❌ CRITICAL: %d container(s) blocked by unhealthy dependencies", len(blocked))
-				result.Remediation = "Fix the dependency health issues first. For app container: ensure litellm-proxy becomes healthy. " +
-					"Check: docker logs bionicgpt-litellm for errors. Test health: docker exec bionicgpt-litellm python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health').read().decode())\""
+				result.Remediation = fmt.Sprintf("Fix the dependency health issues first. For app container: ensure litellm-proxy becomes healthy. "+
+					"Check: docker logs bionicgpt-litellm for errors. Test health: docker exec bionicgpt-litellm python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:%d/health').read().decode())\"", bionicgpt.DefaultLiteLLMPort)
 				logger.Error("Containers blocked by dependencies",
 					zap.Int("count", len(blocked)),
 					zap.Strings("containers", blocked))
@@ -1446,8 +1446,10 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 
 			// FIXED 2025-10-28: Use Python urllib instead of curl (curl not in litellm container)
 			// LiteLLM is a Python app, so Python is guaranteed to exist
+			// TIMEOUT: 10s matches docker-compose.yml health check timeout for consistency
+			// PORT: Uses DefaultLiteLLMPort constant (diagnostics don't have access to runtime config)
 			healthCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"python", "-c", "import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health', timeout=5).read().decode())")
+				"python", "-c", fmt.Sprintf("import urllib.request; print(urllib.request.urlopen('http://localhost:%d/health', timeout=10).read().decode())", bionicgpt.DefaultLiteLLMPort))
 			healthOutput, healthErr := healthCmd.CombinedOutput()
 
 			outputStr := string(healthOutput)
@@ -1473,8 +1475,10 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 
 			// FIXED 2025-10-28: Use Python urllib instead of curl (curl not in litellm container)
+			// TIMEOUT: 10s matches docker-compose.yml health check timeout for consistency
+			// PORT: Uses DefaultLiteLLMPort constant (diagnostics don't have access to runtime config)
 			livelinessCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"python", "-c", "import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=5).read().decode())")
+				"python", "-c", fmt.Sprintf("import urllib.request; print(urllib.request.urlopen('http://localhost:%d/health/liveliness', timeout=10).read().decode())", bionicgpt.DefaultLiteLLMPort))
 			livelinessOutput, livelinessErr := livelinessCmd.CombinedOutput()
 
 			livelinessStr := string(livelinessOutput)
@@ -1673,30 +1677,79 @@ func LiteLLMModelConnectivityDiagnostic() *debug.Diagnostic {
 			for _, model := range modelNames {
 				outputParts = append(outputParts, fmt.Sprintf("Testing model: %s", model))
 
+				// FIXED 2025-10-28: Use Python urllib instead of curl (curl not in litellm container)
+				// TIMEOUT: 10s matches health check timeout for consistency
+				// PORT: Uses DefaultLiteLLMPort constant (diagnostics don't have access to runtime config)
 				// Make a simple chat completion request with HTTP code tracking
 				testPayload := fmt.Sprintf(`{"model": "%s", "messages": [{"role": "user", "content": "test"}], "max_tokens": 1}`, model)
+				pythonScript := fmt.Sprintf(`
+import urllib.request
+import json
+import sys
+
+try:
+    data = '''%s'''.encode('utf-8')
+    req = urllib.request.Request('http://localhost:%d/chat/completions', data=data, method='POST')
+    req.add_header('Content-Type', 'application/json')
+
+    response = urllib.request.urlopen(req, timeout=10)
+    print(response.read().decode())
+    print('HTTP_CODE:' + str(response.getcode()))
+except urllib.error.HTTPError as e:
+    print(e.read().decode())
+    print('HTTP_CODE:' + str(e.code))
+    sys.exit(1)
+except Exception as e:
+    print('ERROR:' + str(e))
+    print('HTTP_CODE:0')
+    sys.exit(1)
+`, testPayload, bionicgpt.DefaultLiteLLMPort)
 				testCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-					"curl", "-m", "10", "-w", "\\nHTTP_CODE:%{http_code}",
-					"-X", "POST",
-					"-H", "Content-Type: application/json",
-					"-d", testPayload,
-					"http://localhost:4000/chat/completions")
+					"python", "-c", pythonScript)
 
 				testOutput, testErr := testCmd.CombinedOutput()
 				testOutputStr := string(testOutput)
 
-				// Parse HTTP code
+				// Parse HTTP code (safe split to prevent index out of bounds)
 				var httpCode string
 				if strings.Contains(testOutputStr, "HTTP_CODE:") {
-					httpCode = strings.Split(testOutputStr, "HTTP_CODE:")[1]
-					httpCode = strings.TrimSpace(strings.Split(httpCode, "\n")[0])
+					parts := strings.Split(testOutputStr, "HTTP_CODE:")
+					if len(parts) >= 2 {
+						httpCode = strings.TrimSpace(strings.Split(parts[1], "\n")[0])
+					}
 				}
 
-				if testErr != nil || (httpCode != "" && httpCode != "200") {
+				// Handle different failure scenarios
+				if testErr != nil {
+					// Connection or execution error
+					if httpCode != "" && httpCode != "0" {
+						outputParts = append(outputParts, fmt.Sprintf("  ✗ FAILED (HTTP %s)", httpCode))
+					} else {
+						outputParts = append(outputParts, "  ✗ FAILED (Connection error)")
+					}
+					outputParts = append(outputParts, fmt.Sprintf("  Response: %s", testOutputStr))
+
+					// Classify error by HTTP code if available
+					switch httpCode {
+					case "401", "403":
+						outputParts = append(outputParts, "  → Authentication failure: Check Azure OpenAI API key")
+					case "404":
+						outputParts = append(outputParts, "  → Not found: Verify model deployment name in Azure Portal")
+					case "429":
+						outputParts = append(outputParts, "  → Rate limited: Azure OpenAI quota exceeded")
+					case "500", "502", "503":
+						outputParts = append(outputParts, "  → Server error: Check Azure OpenAI service health")
+					case "", "0":
+						outputParts = append(outputParts, "  → Network/Connection issue: Check LiteLLM container is running and healthy")
+					}
+
+					unhealthyModels++
+				} else if httpCode != "200" {
+					// Got HTTP response but not 200
 					outputParts = append(outputParts, fmt.Sprintf("  ✗ FAILED (HTTP %s)", httpCode))
 					outputParts = append(outputParts, fmt.Sprintf("  Response: %s", testOutputStr))
 
-					// Classify error by HTTP code
+					// Classify error
 					switch httpCode {
 					case "401", "403":
 						outputParts = append(outputParts, "  → Authentication failure: Check Azure OpenAI API key")
@@ -1710,6 +1763,7 @@ func LiteLLMModelConnectivityDiagnostic() *debug.Diagnostic {
 
 					unhealthyModels++
 				} else {
+					// Success - HTTP 200
 					outputParts = append(outputParts, fmt.Sprintf("  ✓ SUCCESS (HTTP %s): Model is reachable", httpCode))
 					healthyModels++
 				}

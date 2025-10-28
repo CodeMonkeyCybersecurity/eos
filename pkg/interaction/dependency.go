@@ -336,3 +336,13 @@ func DisplayDependencyError(name, description, installCmd, startCmd string) stri
 
 	return msg
 }
+
+// CheckDependencyInstalled is a simple helper to check if a command exists in PATH
+// Returns nil if installed, error if not found
+func CheckDependencyInstalled(command string) (string, error) {
+	path, err := exec.LookPath(command)
+	if err != nil {
+		return "", fmt.Errorf("%s not found in PATH", command)
+	}
+	return path, nil
+}

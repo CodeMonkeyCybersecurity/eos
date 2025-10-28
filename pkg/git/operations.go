@@ -118,12 +118,18 @@ func GetCurrentCommit(rc *eos_io.RuntimeContext, repoDir string) (string, error)
 
 // PullLatestCode pulls the latest code from the remote repository
 // Uses --autostash to handle uncommitted changes safely
+// SECURITY: Verifies remote URL is trusted before pulling
 func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Pulling latest changes from git repository",
 		zap.String("repo", repoDir),
 		zap.String("branch", branch))
+
+	// SECURITY CHECK: Verify remote is trusted BEFORE pulling
+	if err := VerifyTrustedRemote(rc, repoDir); err != nil {
+		return err  // Error already includes detailed message
+	}
 
 	// Use --autostash to handle uncommitted changes automatically
 	// This is safer than manual stash management
@@ -141,6 +147,7 @@ func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 }
 
 // PullWithVerification pulls code and returns whether anything actually changed
+// SECURITY: Verifies remote URL before pulling, verifies commit signatures after pulling
 func PullWithVerification(rc *eos_io.RuntimeContext, repoDir, branch string) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -150,7 +157,7 @@ func PullWithVerification(rc *eos_io.RuntimeContext, repoDir, branch string) (bo
 		return false, fmt.Errorf("failed to get commit before pull: %w", err)
 	}
 
-	// Pull changes
+	// Pull changes (includes remote verification)
 	if err := PullLatestCode(rc, repoDir, branch); err != nil {
 		return false, err
 	}
@@ -172,6 +179,23 @@ func PullWithVerification(rc *eos_io.RuntimeContext, repoDir, branch string) (bo
 	logger.Info("Updates pulled",
 		zap.String("from", commitBefore[:8]),
 		zap.String("to", commitAfter[:8]))
+
+	// SECURITY CHECK: Verify GPG signatures on new commits
+	results, err := VerifyCommitChain(rc, repoDir, commitBefore, commitAfter)
+	if err != nil {
+		logger.Error("Commit signature verification failed", zap.Error(err))
+		// Don't fail update for unsigned commits (yet), just warn
+		// This will be enforced when GPG signing is standard practice
+	}
+
+	// Log warnings from signature verification
+	if results != nil {
+		for _, result := range results {
+			for _, warning := range result.Warnings {
+				logger.Warn("SECURITY WARNING", zap.String("warning", warning))
+			}
+		}
+	}
 
 	return true, nil
 }

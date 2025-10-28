@@ -69,10 +69,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Impact**: Diagnostics always showed "failed" even when service was healthy
   - **Solution**: Changed all curl usages to Python urllib
   - **Files**:
-    - [pkg/debug/bionicgpt/diagnostics.go:1449](pkg/debug/bionicgpt/diagnostics.go#L1449) (health endpoint)
-    - [pkg/debug/bionicgpt/diagnostics.go:1487](pkg/debug/bionicgpt/diagnostics.go#L1487) (liveliness endpoint)
+    - [pkg/debug/bionicgpt/diagnostics.go:1452](pkg/debug/bionicgpt/diagnostics.go#L1452) (health endpoint + timeout 10s)
+    - [pkg/debug/bionicgpt/diagnostics.go:1481](pkg/debug/bionicgpt/diagnostics.go#L1481) (liveliness endpoint + timeout 10s)
     - [pkg/debug/bionicgpt/diagnostics.go:881](pkg/debug/bionicgpt/diagnostics.go#L881) (remediation message)
   - **Verification**: `go build` and `go vet` both pass
+
+- **BionicGPT Model Connectivity Tests Use curl** (P1 - Important) - Fixed 2025-10-28
+  - **Problem**: Model connectivity diagnostics used `curl` for POST requests (not available in container)
+  - **Impact**: Model connectivity tests always failed with "curl not found"
+  - **Solution**: Replaced curl POST with Python urllib HTTP POST request including HTTP code tracking
+  - **Files**: [pkg/debug/bionicgpt/diagnostics.go:1680-1708](pkg/debug/bionicgpt/diagnostics.go#L1680-L1708)
+  - **Timeout**: 10s (consistent with health checks)
+  - **Verification**: Build passes, vet clean
+
+- **BionicGPT Hardcoded Ports in Diagnostics** (P1 - Important) - Fixed 2025-10-28
+  - **Problem**: 4 hardcoded `localhost:4000` port references prevented diagnostics from working with custom ports
+  - **Impact**: Diagnostics would fail if user customized LiteLLM port
+  - **Solution**: Replaced all hardcoded ports with `bionicgpt.DefaultLiteLLMPort` constant
+  - **Locations**:
+    - Line 881: Remediation message
+    - Line 1452: Health check endpoint
+    - Line 1481: Liveliness check endpoint
+    - Line 1692: Model connectivity endpoint
+  - **Limitation**: Diagnostics don't have access to runtime config (can't detect custom ports at runtime)
+  - **Comment Added**: "PORT: Uses DefaultLiteLLMPort constant (diagnostics don't have access to runtime config)"
+  - **Verification**: `grep -n "localhost:4000" diagnostics.go` returns no results
 
 - **Issue**: `eos sync --vault --consul` failed with "ACL support disabled" error
   - **Root Cause**: Vault-Consul integration requires ACLs, but default Consul config had `acl.enabled = false`

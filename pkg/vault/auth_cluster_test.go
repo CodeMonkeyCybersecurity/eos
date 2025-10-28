@@ -1,9 +1,11 @@
 package vault
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -88,6 +90,50 @@ func TestSanitizeTokenForLogging(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSanitizeTokenForLogging_ExportedFunction tests that the exported version
+// (SanitizeTokenForLogging) works identically to the internal version.
+// P1 Issue #20 Fix: Verify exported function is usable from other packages.
+func TestSanitizeTokenForLogging_ExportedFunction(t *testing.T) {
+	testTokens := []string{
+		"hvs.CAESIJlU02LQZqEhq1TgQfeQYY",
+		"s.1234567890abcdef",
+		"s.12xxxxxxxxxxxxxxxx", // Regression test case
+		"b.AAAAAQKrRpdJHXZ",
+		"",
+		"unknown_token_format",
+	}
+
+	for _, token := range testTokens {
+		t.Run("token="+token[:min(len(token), 10)], func(t *testing.T) {
+			// Call both versions
+			resultInternal := sanitizeTokenForLogging(token)
+			resultExported := SanitizeTokenForLogging(token)
+
+			// They must return identical results
+			assert.Equal(t, resultInternal, resultExported,
+				"Exported SanitizeTokenForLogging() returned %q but internal sanitizeTokenForLogging() returned %q (must be identical)",
+				resultExported, resultInternal)
+
+			// Verify neither exposes token value
+			if len(token) > 4 {
+				tokenValue := token[4:]
+				assert.NotContains(t, resultExported, tokenValue,
+					"Exported function SECURITY VIOLATION: Result contains token value")
+				assert.NotContains(t, resultInternal, tokenValue,
+					"Internal function SECURITY VIOLATION: Result contains token value")
+			}
+		})
+	}
+}
+
+// min returns the minimum of two integers (helper for test)
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // ============================================================================
@@ -257,6 +303,110 @@ func TestFormatTTLDuration(t *testing.T) {
 				tt.seconds, tt.expected, result)
 		})
 	}
+}
+
+// ============================================================================
+// Periodic Token Detection Tests (P0 Issue #12 Fix)
+// ============================================================================
+
+func TestIsPeriodicToken(t *testing.T) {
+	tests := []struct {
+		name     string
+		secret   *api.Secret
+		expected bool
+	}{
+		{
+			name: "Periodic token with period > 0",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": json.Number("14400"), // 4 hours
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Non-periodic token (period = 0)",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": json.Number("0"),
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Token without period field",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"ttl": json.Number("3600"),
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "Nil secret",
+			secret:   nil,
+			expected: false,
+		},
+		{
+			name: "Secret with nil Data",
+			secret: &api.Secret{
+				Data: nil,
+			},
+			expected: false,
+		},
+		{
+			name: "Period field with wrong type (not json.Number)",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": "14400", // string instead of json.Number
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Period field with invalid json.Number",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": json.Number("invalid"),
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPeriodicToken(tt.secret)
+			assert.Equal(t, tt.expected, result,
+				"isPeriodicToken() returned %v, expected %v", result, tt.expected)
+		})
+	}
+}
+
+// TestIsPeriodicTokenConsistency verifies that isPeriodicToken() is deterministic
+// (same input always produces same output). This is critical for race condition fix.
+func TestIsPeriodicTokenConsistency(t *testing.T) {
+	secret := &api.Secret{
+		Data: map[string]interface{}{
+			"period": json.Number("14400"),
+		},
+	}
+
+	// Call function 10 times with same input
+	results := make([]bool, 10)
+	for i := 0; i < 10; i++ {
+		results[i] = isPeriodicToken(secret)
+	}
+
+	// All results should be identical
+	firstResult := results[0]
+	for i, result := range results {
+		assert.Equal(t, firstResult, result,
+			"Call %d returned %v, but first call returned %v (function is non-deterministic!)",
+			i, result, firstResult)
+	}
+
+	assert.True(t, firstResult, "Secret with period=14400 should be periodic")
 }
 
 // ============================================================================

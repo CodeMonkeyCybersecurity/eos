@@ -22,6 +22,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// TTL threshold constants for token validation
+const (
+	// TTLWarningThreshold is the TTL (in seconds) below which we warn the user
+	// that their token will expire soon. 5 minutes is enough time for cluster ops.
+	TTLWarningThreshold = 300 // 5 minutes
+
+	// TTLMinimumRequired is the absolute minimum TTL (in seconds) required to proceed.
+	// Below this, operations will fail even if token is non-periodic.
+	TTLMinimumRequired = 60 // 1 minute
+
+	// TTLRecheckThreshold is the TTL (in seconds) below which we re-check TTL after
+	// validation to detect race conditions. 2 minutes is chosen because validation
+	// takes ~1-2 seconds for 4 capability checks.
+	TTLRecheckThreshold = 120 // 2 minutes
+)
+
 // GetVaultClientWithToken creates a Vault client with a specific token
 // and validates it has sufficient capabilities for cluster operations.
 //
@@ -87,7 +103,9 @@ func GetVaultClientWithToken(rc *eos_io.RuntimeContext, token string) (*api.Clie
 //   "s.12abc..." → "s.***" (NOT "s.12***" - would expose token data)
 //   "b.AAAAAQKr..." → "b.***"
 //   "unknown" → "***"
-func sanitizeTokenForLogging(token string) string {
+//
+// P1 Issue #20 Fix: Exported for use in other packages (cmd/update, pkg/vault/*)
+func SanitizeTokenForLogging(token string) string {
 	if len(token) == 0 {
 		return "***" // Empty token
 	}
@@ -105,6 +123,12 @@ func sanitizeTokenForLogging(token string) string {
 
 	// Unknown format - hide completely
 	return "***"
+}
+
+// sanitizeTokenForLogging is a lowercase alias for backwards compatibility with internal callers.
+// New code should use the exported SanitizeTokenForLogging() instead.
+func sanitizeTokenForLogging(token string) string {
+	return SanitizeTokenForLogging(token)
 }
 
 // validateTokenFormat checks token for dangerous characters.
@@ -201,13 +225,8 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		maxTTLSeconds, err := explicitMaxTTL.Int64()
 		if err == nil && maxTTLSeconds == 0 {
 			// Check if this is a periodic token (which legitimately has explicit_max_ttl=0)
-			isPeriodic := false
-			if periodRaw, ok := secret.Data["period"].(json.Number); ok {
-				periodSeconds, _ := periodRaw.Int64()
-				isPeriodic = periodSeconds > 0
-			}
-
-			if !isPeriodic {
+			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
+			if !isPeriodicToken(secret) {
 				// Non-periodic token with explicit_max_ttl=0 is suspicious
 				logger.Warn("⚠️  Token has explicit_max_ttl=0 (may be in revocation queue)",
 					zap.Int64("explicit_max_ttl", maxTTLSeconds))
@@ -224,11 +243,12 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 			ttlDuration := time.Duration(ttlSeconds) * time.Second
 
 			// Check if token is periodic (auto-renewable, never expires)
-			isPeriodic := false
-			if periodRaw, ok := secret.Data["period"].(json.Number); ok {
-				periodSeconds, err := periodRaw.Int64()
-				if err == nil && periodSeconds > 0 {
-					isPeriodic = true
+			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
+			isPeriodic := isPeriodicToken(secret)
+			if isPeriodic {
+				// Get period for logging
+				if periodRaw, ok := secret.Data["period"].(json.Number); ok {
+					periodSeconds, _ := periodRaw.Int64()
 					logger.Debug("✓ Token is periodic (auto-renewable)",
 						zap.Int64("current_ttl_seconds", ttlSeconds),
 						zap.Int64("period_seconds", periodSeconds),
@@ -251,14 +271,14 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 				// Don't reject periodic tokens regardless of TTL
 			} else {
 				// Non-periodic tokens: Check TTL and warn/reject
-				if ttlSeconds < 300 {
+				if ttlSeconds < TTLWarningThreshold {
 					logger.Warn("⚠️  Token expires soon",
 						zap.Int64("ttl_seconds", ttlSeconds),
 						zap.String("ttl_human", formatTTLDuration(ttlSeconds)),
 						zap.Bool("renewable", isRenewable))
 
-					// Reject if token expires too soon (less than 1 minute)
-					if ttlSeconds < 60 {
+					// Reject if token expires too soon (less than minimum required)
+					if ttlSeconds < TTLMinimumRequired {
 						return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
 							"Get a longer-lived token:\n"+
 							"  vault token create -policy=%s -ttl=1h\n"+
@@ -359,18 +379,17 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 	// Validation took time (~1-2 seconds for 4 capability checks). For non-periodic tokens,
 	// verify TTL didn't drop below threshold during validation.
 	// Periodic tokens skip this (they auto-renew).
+	//
+	// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
+	// P0 Issue #13 Fix: Check fresh periodic status from secretRefresh (not stale original data)
 	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
 		ttlSeconds, _ := ttlRaw.Int64()
 
-		// Check if token is periodic
-		isPeriodic := false
-		if periodRaw, ok := secret.Data["period"].(json.Number); ok {
-			periodSeconds, _ := periodRaw.Int64()
-			isPeriodic = periodSeconds > 0
-		}
+		// Check if token WAS periodic at start of validation
+		isPeriodic := isPeriodicToken(secret)
 
 		// Only re-check for non-periodic tokens (periodic tokens auto-renew)
-		if !isPeriodic && ttlSeconds < 120 {
+		if !isPeriodic && ttlSeconds < TTLRecheckThreshold {
 			logger.Debug("Token TTL is low, re-checking after validation delay",
 				zap.Int64("initial_ttl", ttlSeconds))
 
@@ -381,16 +400,39 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 					zap.Error(err))
 				// Don't fail - original TTL was acceptable
 			} else if secretRefresh != nil && secretRefresh.Data != nil {
+				// CRITICAL: Check if token became periodic during validation (P0 Issue #13 Fix)
+				isPeriodicRefresh := isPeriodicToken(secretRefresh)
+
+				if isPeriodicRefresh && !isPeriodic {
+					// Token became periodic during validation - this is OK, it will auto-renew
+					logger.Info("✓ Token became periodic during validation - will auto-renew",
+						zap.Int64("initial_ttl", ttlSeconds),
+						zap.Bool("was_periodic", isPeriodic),
+						zap.Bool("is_periodic_now", isPeriodicRefresh))
+					return nil
+				}
+
 				if ttlRefreshRaw, ok := secretRefresh.Data["ttl"].(json.Number); ok {
 					ttlRefresh, _ := ttlRefreshRaw.Int64()
+
+					// Calculate TTL delta (might be negative if token was renewed)
+					ttlDelta := ttlSeconds - ttlRefresh
+					if ttlDelta < 0 {
+						// Token was renewed during validation (TTL increased)
+						logger.Debug("Token was renewed during validation (TTL increased)",
+							zap.Int64("initial_ttl", ttlSeconds),
+							zap.Int64("current_ttl", ttlRefresh),
+							zap.Int64("ttl_increased_by", -ttlDelta))
+						return nil
+					}
 
 					logger.Debug("TTL after validation",
 						zap.Int64("initial_ttl", ttlSeconds),
 						zap.Int64("current_ttl", ttlRefresh),
-						zap.Int64("ttl_dropped_by", ttlSeconds-ttlRefresh))
+						zap.Int64("ttl_dropped_by", ttlDelta))
 
 					// If TTL dropped below threshold during validation, reject
-					if ttlRefresh < 60 {
+					if ttlRefresh < TTLMinimumRequired {
 						return fmt.Errorf("token expired during validation (TTL now %d seconds, was %d)\n\n"+
 							"Validation took time and token TTL was too low.\n"+
 							"Get a longer-lived token:\n"+
@@ -426,4 +468,31 @@ func formatTTLDuration(seconds int64) string {
 		return fmt.Sprintf("%dh%dm", hours, minutes)
 	}
 	return fmt.Sprintf("%dh", hours)
+}
+
+// isPeriodicToken checks if a token is periodic (auto-renewable).
+// Periodic tokens have a non-zero period value and will automatically renew.
+//
+// This is a centralized helper to ensure consistent periodic token detection
+// across multiple validation checks. It handles error cases consistently:
+// - nil secret or nil Data returns false
+// - type assertion failure returns false
+// - Int64() conversion error returns false
+// - period <= 0 returns false
+//
+// P0 Issue #12 Fix: Replaces 3 duplicate isPeriodic checks with inconsistent error handling.
+//
+// Returns: true if token has period > 0, false otherwise
+func isPeriodicToken(secret *api.Secret) bool {
+	if secret == nil || secret.Data == nil {
+		return false
+	}
+
+	if periodRaw, ok := secret.Data["period"].(json.Number); ok {
+		periodSeconds, err := periodRaw.Int64()
+		// Only return true if conversion succeeded AND period > 0
+		return err == nil && periodSeconds > 0
+	}
+
+	return false
 }

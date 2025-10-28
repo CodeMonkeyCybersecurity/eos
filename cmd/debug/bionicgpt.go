@@ -155,13 +155,12 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	var output string
 
 	if bionicgptDebugFormat == "text" || bionicgptDebugFormat == "" {
-		logger.Debug("Generating text format with quick summary and next steps")
+		logger.Debug("Generating text format with executive summary and detailed diagnostics")
 
-		// Add quick health summary at top
-		logger.Debug("Generating quick health summary")
-		quickSummary := debug.GenerateQuickSummary(report, analysis)
-		output = debug.FormatQuickSummary(quickSummary, "bionicgpt")
-		output += "\n\n"
+		// Add executive summary at top (shows root cause immediately)
+		logger.Debug("Generating executive summary")
+		execSummary := debugbionicgpt.GenerateExecutiveSummary(report, analysis)
+		output = execSummary
 
 		logger.Debug("Formatting diagnostic report")
 		output += formatter.Format(report)

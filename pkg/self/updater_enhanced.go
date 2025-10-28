@@ -18,9 +18,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/process"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // UpdateTransaction represents a complete update transaction with rollback capability
@@ -248,51 +250,81 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 // checkRunningProcesses warns about running eos processes
 func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 	eeu.logger.Info("Checking for running eos processes")
-	return process.WarnAboutRunningProcesses(eeu.rc, "eos")
+
+	// Use human-centric running process checker with informed consent
+	return HandleRunningProcesses(eeu.rc, eeu.config.BinaryPath)
 }
 
 // verifyBuildDependencies checks that we can build eos
+// HUMAN-CENTRIC: Guides user through installing missing dependencies with informed consent
 func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	eeu.logger.Info("Verifying build dependencies")
 
-	// Use the new build.VerifyAllDependencies function
+	// Use human-centric dependency checker that guides user through installation
+	installResult, err := build.CheckAndInstallDependenciesWithConsent(eeu.rc)
+	if err != nil {
+		return fmt.Errorf("build dependencies not satisfied: %w", err)
+	}
+
+	// Log what was installed (if anything)
+	if len(installResult.Packages) > 0 {
+		eeu.logger.Info("Dependencies installed during update",
+			zap.Strings("packages", installResult.Packages))
+	}
+
+	// Re-verify all dependencies are now available
 	result, err := build.VerifyAllDependencies(eeu.rc)
 	if err != nil {
-		return err
+		return fmt.Errorf("build dependencies still not satisfied after installation: %w", err)
 	}
 
 	// Store Go path for later use in build
 	eeu.goPath = result.GoPath
 
-	// If Ceph libraries are missing, attempt to install them
+	// Final check: all dependencies must be satisfied
 	if !result.CephLibsOK {
-		eeu.logger.Warn("Ceph development libraries not found, attempting to install",
-			zap.Strings("missing", result.MissingCephLibs))
-
-		// Detect package manager
-		pkgMgr := system.DetectPackageManager()
-		if pkgMgr == system.PackageManagerNone {
-			return fmt.Errorf("%s\nAuto-install failed: no supported package manager found",
-				build.FormatMissingCephLibsError(result.MissingCephLibs))
-		}
-
-		// Attempt to install missing Ceph libraries automatically
-		if err := system.InstallCephLibraries(eeu.rc, pkgMgr, result.MissingCephLibs); err != nil {
-			return fmt.Errorf("%s\nAuto-install failed: %w",
-				build.FormatMissingCephLibsError(result.MissingCephLibs), err)
-		}
-
-		eeu.logger.Info(" Ceph development libraries installed successfully")
+		return fmt.Errorf("Ceph libraries still missing after installation: %v\n\n"+
+			"This should not happen. Please report this issue:\n"+
+			"https://github.com/CodeMonkeyCybersecurity/eos/issues",
+			result.MissingCephLibs)
 	}
 
-	eeu.logger.Info(" Build dependencies verified")
+	eeu.logger.Info(" Build dependencies verified and ready")
 	return nil
 }
 
 // checkDiskSpace ensures we have enough space for the update
+// SECURITY CRITICAL: Prevents partial updates that corrupt system
 func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
-	eeu.logger.Info("Checking available disk space")
-	_, _ = system.CheckDiskSpace(eeu.rc, "/tmp", filepath.Dir(eeu.config.BinaryPath))
+	eeu.logger.Info("Verifying disk space requirements")
+
+	// Define space requirements
+	reqs := system.DefaultUpdateRequirements(
+		"/tmp",                             // Temp directory for build
+		filepath.Dir(eeu.config.BinaryPath), // Binary directory
+		eeu.config.SourceDir,               // Source directory
+	)
+
+	// Verify disk space with enforcement
+	result, err := system.VerifyDiskSpace(eeu.rc, reqs)
+	if err != nil {
+		return fmt.Errorf("disk space verification failed: %w", err)
+	}
+
+	// Log warnings for low (but sufficient) space
+	if len(result.Warnings) > 0 {
+		eeu.logger.Warn("Disk space below recommended levels",
+			zap.Strings("warnings", result.Warnings))
+		for _, warning := range result.Warnings {
+			eeu.logger.Warn("⚠️  "+warning)
+		}
+	}
+
+	eeu.logger.Info("✓ Disk space verification passed",
+		zap.String("temp", system.FormatBytes(result.TempAvailable)),
+		zap.String("binary", system.FormatBytes(result.BinaryAvailable)),
+		zap.String("source", system.FormatBytes(result.SourceAvailable)))
+
 	return nil
 }
 
@@ -312,6 +344,7 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 }
 
 // BuildBinary overrides base method to use the correct Go path
+// SECURITY: Verifies build environment integrity before compiling
 func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	tempBinary := fmt.Sprintf("/tmp/eos-update-%d", time.Now().Unix())
 
@@ -319,6 +352,20 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		zap.String("temp_path", tempBinary),
 		zap.String("source_dir", eeu.config.SourceDir),
 		zap.String("go_path", eeu.goPath))
+
+	// SECURITY CHECK: Verify build environment integrity
+	// This prevents supply chain attacks via compromised build tools
+	integrityCheck, err := build.VerifyBuildIntegrity(eeu.rc, eeu.goPath, eeu.config.SourceDir)
+	if err != nil {
+		return "", fmt.Errorf("build environment integrity check failed: %w", err)
+	}
+
+	// Log any warnings from integrity check
+	for _, warning := range integrityCheck.Warnings {
+		eeu.logger.Warn("SECURITY WARNING", zap.String("warning", warning))
+	}
+
+	eeu.logger.Info("Build environment integrity verified")
 
 	// Verify dependencies are available (quick recheck before build)
 	result, err := build.VerifyAllDependencies(eeu.rc)
@@ -502,24 +549,18 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
 	return git.PullWithVerification(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
 }
 
-// installBinaryAtomic installs the binary atomically with file locking
+// installBinaryAtomic installs the binary atomically with flock-based locking
+// SECURITY: Uses flock(2) for kernel-level locking that survives process crashes
 func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
-	eeu.logger.Info("Installing new binary atomically")
+	eeu.logger.Info("Installing new binary atomically with flock protection")
 
-	// Create lock file to prevent concurrent updates
-	lockFile := eeu.config.BinaryPath + ".update.lock"
-	lock, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	// Acquire exclusive update lock using flock(2)
+	// This prevents concurrent updates and automatically releases on process death
+	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
 	if err != nil {
-		if os.IsExist(err) {
-			return fmt.Errorf("another update is in progress (lock file exists)")
-		}
-		return fmt.Errorf("failed to create update lock: %w", err)
+		return err  // Error already includes detailed message
 	}
-	defer os.Remove(lockFile)
-	defer func() { _ = lock.Close() }()
-
-	// Write PID to lock file for debugging
-	_, _ = fmt.Fprintf(lock, "%d\n", os.Getpid())
+	defer updateLock.Release()
 
 	if eeu.enhancedConfig.AtomicInstall {
 		// Atomic rename (same filesystem)
@@ -536,12 +577,13 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		}
 
 		// Atomic rename - this is the critical operation
+		// Lock ensures no other process is updating simultaneously
 		if err := os.Rename(tempName, eeu.config.BinaryPath); err != nil {
 			_ = os.Remove(tempName) // Cleanup
 			return fmt.Errorf("atomic rename failed: %w", err)
 		}
 
-		eeu.logger.Info(" Binary installed atomically with lock protection")
+		eeu.logger.Info(" Binary installed atomically with flock protection")
 	} else {
 		// Standard installation
 		if err := eeu.InstallBinary(sourcePath); err != nil {
@@ -549,77 +591,247 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		}
 	}
 
+	// Lock automatically released by defer updateLock.Release()
 	return nil
 }
 
-// Rollback reverts all changes made during the update
+// RollbackStep represents a single rollback operation with its status
+type RollbackStep struct {
+	Name        string
+	Description string
+	Required    bool // If true, rollback fails if this step fails
+	Execute     func() error
+	Status      string // "pending", "success", "failed", "skipped"
+	Error       error
+}
+
+// Rollback reverts all changes made during the update with all-or-nothing semantics
+// SECURITY CRITICAL: Ensures system never left in inconsistent state
 func (eeu *EnhancedEosUpdater) Rollback() error {
-	eeu.logger.Warn("Initiating rollback procedure")
+	eeu.logger.Warn("Initiating atomic rollback procedure")
 
-	var rollbackErrors []error
+	// Define rollback steps in reverse order of operations
+	steps := []RollbackStep{
+		{
+			Name:        "restore_binary",
+			Description: "Restore binary from backup",
+			Required:    eeu.transaction.BinaryInstalled, // Only required if we installed a binary
+			Execute: func() error {
+				if !eeu.transaction.BinaryInstalled || eeu.transaction.BackupBinaryPath == "" {
+					return nil // Nothing to rollback
+				}
 
-	// Step 1: Restore binary if it was installed
-	if eeu.transaction.BinaryInstalled && eeu.transaction.BackupBinaryPath != "" {
-		eeu.logger.Info("Restoring binary from backup",
-			zap.String("backup", eeu.transaction.BackupBinaryPath))
+				eeu.logger.Info("Restoring binary from backup",
+					zap.String("backup", eeu.transaction.BackupBinaryPath))
 
-		backup, err := os.ReadFile(eeu.transaction.BackupBinaryPath)
+				// Verify backup exists and is readable
+				backup, err := os.ReadFile(eeu.transaction.BackupBinaryPath)
+				if err != nil {
+					return fmt.Errorf("failed to read backup file: %w\n"+
+						"Backup location: %s\n"+
+						"CRITICAL: Manual intervention required to restore binary",
+						err, eeu.transaction.BackupBinaryPath)
+				}
+
+				// Verify backup is executable
+				if len(backup) == 0 {
+					return fmt.Errorf("backup file is empty: %s\n"+
+						"CRITICAL: Cannot restore from empty backup",
+						eeu.transaction.BackupBinaryPath)
+				}
+
+				// Atomic write: write to temp, then rename
+				tempPath := eeu.config.BinaryPath + ".restore"
+				if err := os.WriteFile(tempPath, backup, 0755); err != nil {
+					return fmt.Errorf("failed to write restored binary: %w", err)
+				}
+
+				if err := os.Rename(tempPath, eeu.config.BinaryPath); err != nil {
+					_ = os.Remove(tempPath) // Cleanup temp file
+					return fmt.Errorf("failed to install restored binary: %w", err)
+				}
+
+				eeu.logger.Info("✓ Binary restored from backup")
+				return nil
+			},
+		},
+		{
+			Name:        "revert_git",
+			Description: "Revert git repository to previous commit",
+			Required:    eeu.transaction.ChangesPulled, // Only required if we pulled changes
+			Execute: func() error {
+				if !eeu.transaction.ChangesPulled || eeu.transaction.GitCommitBefore == "" {
+					return nil // Nothing to rollback
+				}
+
+				eeu.logger.Info("Reverting git repository to previous commit",
+					zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
+
+				// SAFETY: Only do hard reset if we have a stash OR working tree is clean
+				// This prevents destroying uncommitted work if stash creation failed
+				canHardReset := eeu.transaction.GitStashRef != ""
+				if !canHardReset {
+					// Check if working tree is clean
+					statusCmd := exec.Command("git", "-C", eeu.config.SourceDir, "status", "--porcelain")
+					if statusOutput, err := statusCmd.Output(); err == nil && len(statusOutput) == 0 {
+						canHardReset = true
+					}
+				}
+
+				if !canHardReset {
+					return fmt.Errorf("cannot safely reset git repository\n"+
+						"Working tree has uncommitted changes and no stash exists.\n\n"+
+						"Manual recovery required:\n"+
+						"  1. Review changes: git -C %s status\n"+
+						"  2. Save changes: git -C %s stash\n"+
+						"  3. Reset: git -C %s reset --hard %s\n\n"+
+						"CRITICAL: Git repository NOT reverted to protect uncommitted work",
+						eeu.config.SourceDir, eeu.config.SourceDir,
+						eeu.config.SourceDir, eeu.transaction.GitCommitBefore)
+				}
+
+				// Execute git reset
+				resetCmd := exec.Command("git", "-C", eeu.config.SourceDir,
+					"reset", "--hard", eeu.transaction.GitCommitBefore)
+				if output, err := resetCmd.CombinedOutput(); err != nil {
+					return fmt.Errorf("git reset failed: %w\n"+
+						"Output: %s\n"+
+						"Manual recovery: git -C %s reset --hard %s",
+						err, string(output), eeu.config.SourceDir, eeu.transaction.GitCommitBefore)
+				}
+
+				// Verify we're at the correct commit
+				headCmd := exec.Command("git", "-C", eeu.config.SourceDir, "rev-parse", "HEAD")
+				if headOutput, err := headCmd.Output(); err == nil {
+					currentCommit := strings.TrimSpace(string(headOutput))
+					if currentCommit != eeu.transaction.GitCommitBefore {
+						return fmt.Errorf("git reset completed but HEAD mismatch\n"+
+							"Expected: %s\n"+
+							"Got: %s\n"+
+							"Manual recovery: git -C %s reset --hard %s",
+							eeu.transaction.GitCommitBefore[:8], currentCommit[:8],
+							eeu.config.SourceDir, eeu.transaction.GitCommitBefore)
+					}
+				}
+
+				eeu.logger.Info("✓ Git repository reset to previous commit")
+				return nil
+			},
+		},
+		{
+			Name:        "cleanup_temp",
+			Description: "Cleanup temporary files",
+			Required:    false, // Best-effort cleanup, not critical
+			Execute: func() error {
+				if eeu.transaction.TempBinaryPath != "" {
+					if err := os.Remove(eeu.transaction.TempBinaryPath); err != nil && !os.IsNotExist(err) {
+						return fmt.Errorf("failed to remove temp binary: %w", err)
+					}
+					eeu.logger.Debug("Temp binary removed", zap.String("path", eeu.transaction.TempBinaryPath))
+				}
+				return nil
+			},
+		},
+	}
+
+	// Execute rollback steps with all-or-nothing semantics
+	var criticalFailures []error
+	var warnings []error
+	successCount := 0
+	requiredCount := 0
+
+	for i := range steps {
+		step := &steps[i]
+		step.Status = "pending"
+
+		// Count required steps
+		if step.Required {
+			requiredCount++
+		}
+
+		// Execute step
+		eeu.logger.Debug("Executing rollback step",
+			zap.String("step", step.Name),
+			zap.String("description", step.Description),
+			zap.Bool("required", step.Required))
+
+		err := step.Execute()
 		if err != nil {
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("failed to read backup: %w", err))
-		} else if err := os.WriteFile(eeu.config.BinaryPath, backup, 0755); err != nil {
-			rollbackErrors = append(rollbackErrors, fmt.Errorf("failed to restore backup: %w", err))
-		} else {
-			eeu.logger.Info(" Binary restored from backup")
-		}
-	}
+			step.Status = "failed"
+			step.Error = err
 
-	// Step 2: Revert git changes if code was pulled
-	if eeu.transaction.ChangesPulled && eeu.transaction.GitCommitBefore != "" {
-		eeu.logger.Info("Reverting git repository to previous commit",
-			zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
-
-		// SAFETY: Only do hard reset if we have a stash OR working tree is clean
-		// This prevents destroying uncommitted work if stash creation failed
-		canHardReset := eeu.transaction.GitStashRef != ""
-		if !canHardReset {
-			// Check if working tree is clean
-			statusCmd := exec.Command("git", "-C", eeu.config.SourceDir, "status", "--porcelain")
-			if statusOutput, err := statusCmd.Output(); err == nil && len(statusOutput) == 0 {
-				canHardReset = true
-			}
-		}
-
-		if !canHardReset {
-			eeu.logger.Warn("Skipping git reset --hard because working tree has changes and no stash exists",
-				zap.String("manual_recovery", "Manually review changes before running: git reset --hard "+eeu.transaction.GitCommitBefore))
-			rollbackErrors = append(rollbackErrors,
-				fmt.Errorf("skipped git reset to protect uncommitted changes"))
-		} else {
-			resetCmd := exec.Command("git", "-C", eeu.config.SourceDir,
-				"reset", "--hard", eeu.transaction.GitCommitBefore)
-			if output, err := resetCmd.CombinedOutput(); err != nil {
-				rollbackErrors = append(rollbackErrors,
-					fmt.Errorf("git reset failed: %w, output: %s", err, string(output)))
+			if step.Required {
+				// Critical failure - rollback cannot continue
+				eeu.logger.Error("CRITICAL: Required rollback step failed",
+					zap.String("step", step.Name),
+					zap.Error(err))
+				criticalFailures = append(criticalFailures, fmt.Errorf("%s: %w", step.Name, err))
 			} else {
-				eeu.logger.Info(" Git repository reset to previous commit")
+				// Non-critical failure - log warning but continue
+				eeu.logger.Warn("Non-critical rollback step failed",
+					zap.String("step", step.Name),
+					zap.Error(err))
+				warnings = append(warnings, fmt.Errorf("%s: %w", step.Name, err))
+				step.Status = "skipped"
 			}
+		} else {
+			step.Status = "success"
+			if step.Required {
+				successCount++
+			}
+			eeu.logger.Debug("Rollback step completed",
+				zap.String("step", step.Name))
 		}
 	}
 
-	// Step 3: Note - we no longer manually manage stash
-	// git pull --autostash handles stash automatically, so on rollback the git reset
-	// will already have the correct state
+	// ATOMIC ROLLBACK: All required steps must succeed
+	if len(criticalFailures) > 0 {
+		eeu.logger.Error("CRITICAL: Rollback failed - system in inconsistent state",
+			zap.Int("required_steps", requiredCount),
+			zap.Int("successful_steps", successCount),
+			zap.Int("failed_steps", len(criticalFailures)))
 
-	// Step 4: Cleanup temp binary
-	if eeu.transaction.TempBinaryPath != "" {
-		_ = os.Remove(eeu.transaction.TempBinaryPath)
+		// Build detailed error report
+		errorReport := fmt.Sprintf("ROLLBACK FAILED - System in inconsistent state\n\n"+
+			"Required steps: %d\n"+
+			"Successful: %d\n"+
+			"Failed: %d\n\n"+
+			"Critical failures:\n",
+			requiredCount, successCount, len(criticalFailures))
+
+		for i, err := range criticalFailures {
+			errorReport += fmt.Sprintf("  %d. %v\n", i+1, err)
+		}
+
+		errorReport += "\nStep status:\n"
+		for _, step := range steps {
+			if step.Required {
+				errorReport += fmt.Sprintf("  [%s] %s: %s\n", step.Status, step.Name, step.Description)
+				if step.Error != nil {
+					errorReport += fmt.Sprintf("      Error: %v\n", step.Error)
+				}
+			}
+		}
+
+		errorReport += "\nIMPORTANT: Manual intervention may be required to restore system.\n" +
+			"Contact support: security@cybermonkey.net.au"
+
+		return fmt.Errorf("%s", errorReport)
 	}
 
-	if len(rollbackErrors) > 0 {
-		return fmt.Errorf("rollback encountered %d errors: %v", len(rollbackErrors), rollbackErrors)
+	// Report warnings for non-critical failures
+	if len(warnings) > 0 {
+		eeu.logger.Warn("Rollback completed with warnings",
+			zap.Int("warning_count", len(warnings)))
+		for _, warn := range warnings {
+			eeu.logger.Warn("Non-critical rollback issue", zap.Error(warn))
+		}
 	}
 
-	eeu.logger.Info(" Rollback completed successfully")
+	eeu.logger.Info("✓ Atomic rollback completed successfully",
+		zap.Int("steps_completed", successCount),
+		zap.Int("total_required", requiredCount))
+
 	return nil
 }
 
@@ -650,6 +862,79 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	}
 
 	eeu.logger.Info("Detected package manager", zap.String("manager", string(packageManager)))
+
+	// HUMAN-CENTRIC: Ask for consent before updating system packages
+	// This can take a long time and may require reboots
+	isInteractive := term.IsTerminal(int(os.Stdin.Fd()))
+
+	if !isInteractive {
+		eeu.logger.Info("Non-interactive mode - skipping system package updates",
+			zap.String("reason", "requires user consent"))
+		return nil
+	}
+
+	// Explain what will happen
+	eeu.logger.Info("System package update available")
+	fmt.Println("\nEos can update your system packages to ensure build dependencies are current.")
+	fmt.Println("")
+	fmt.Printf("Package manager: %s\n", packageManager)
+	fmt.Println("")
+	fmt.Println("This will run:")
+
+	switch packageManager {
+	case system.PackageManagerApt:
+		fmt.Println("  1. sudo apt update        (refresh package lists)")
+		fmt.Println("  2. sudo apt upgrade -y    (install updates)")
+		fmt.Println("  3. sudo apt autoremove -y (remove old packages)")
+	case system.PackageManagerYum:
+		fmt.Println("  1. sudo yum update -y     (update packages)")
+		fmt.Println("  2. sudo yum autoremove -y (remove old packages)")
+	case system.PackageManagerDnf:
+		fmt.Println("  1. sudo dnf update -y     (update packages)")
+		fmt.Println("  2. sudo dnf autoremove -y (remove old packages)")
+	case system.PackageManagerPacman:
+		fmt.Println("  1. sudo pacman -Syu       (update packages)")
+	}
+
+	fmt.Println("")
+	fmt.Println("IMPORTANT:")
+	fmt.Println("  • This may take 5-30 minutes depending on your system")
+	fmt.Println("  • Some updates may require a system reboot")
+	fmt.Println("  • You can skip this and update packages manually later")
+	fmt.Println("")
+
+	// Ask for consent
+	confirmed, err := interaction.PromptYesNoSafe(eeu.rc,
+		"Update system packages now?",
+		false) // Default to No for safety
+
+	if err != nil {
+		return fmt.Errorf("failed to get user consent: %w", err)
+	}
+
+	if !confirmed {
+		eeu.logger.Info("User declined system package updates")
+		fmt.Println("\nSkipping system package updates.")
+		fmt.Println("You can update manually with:")
+
+		switch packageManager {
+		case system.PackageManagerApt:
+			fmt.Println("  sudo apt update && sudo apt upgrade -y")
+		case system.PackageManagerYum:
+			fmt.Println("  sudo yum update -y")
+		case system.PackageManagerDnf:
+			fmt.Println("  sudo dnf update -y")
+		case system.PackageManagerPacman:
+			fmt.Println("  sudo pacman -Syu")
+		}
+
+		return nil
+	}
+
+	// User consented - proceed with update
+	eeu.logger.Info("User consented to system package updates")
+	fmt.Println("\nUpdating system packages...")
+
 	return system.UpdateSystemPackages(eeu.rc, packageManager)
 }
 

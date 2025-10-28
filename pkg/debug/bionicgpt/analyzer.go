@@ -227,3 +227,118 @@ func GenerateNextSteps(report *debug.Report, analysis *debug.Analysis) []string 
 
 	return steps
 }
+
+// GenerateExecutiveSummary creates a concise summary of BionicGPT deployment status
+// This appears at the TOP of diagnostic output for immediate root cause visibility
+func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) string {
+	var summary strings.Builder
+
+	summary.WriteString(strings.Repeat("═", 80) + "\n")
+	summary.WriteString("BIONICGPT DEPLOYMENT STATUS\n")
+	summary.WriteString(strings.Repeat("═", 80) + "\n\n")
+
+	// Overall status
+	accessible := true
+	rootCauses := []string{}
+	blockingIssues := []string{}
+	primaryFailures := []string{}
+
+	// Check if accessible
+	for _, result := range report.Results {
+		if result.Name == "Container Dependency Blocked" && result.Status == debug.StatusError {
+			accessible = false
+			if blockedCount, ok := result.Metadata["blocked_count"].(int); ok && blockedCount > 0 {
+				if blocked, ok := result.Metadata["blocked_containers"].([]string); ok {
+					for _, container := range blocked {
+						blockingIssues = append(blockingIssues, fmt.Sprintf("├─ %s: Created (never started)", container))
+					}
+				}
+			}
+		}
+
+		if result.Name == "LiteLLM Proxy Health" && result.Status != debug.StatusOK {
+			rootCauses = append(rootCauses, "LiteLLM proxy health check failing")
+		}
+
+		if result.Name == "LiteLLM Comprehensive Health" {
+			if result.Metadata["health_endpoint"] == "failed" {
+				primaryFailures = append(primaryFailures, "├─ /health endpoint: FAILED")
+			}
+			if result.Metadata["liveliness_endpoint"] == "failed" {
+				primaryFailures = append(primaryFailures, "├─ /health/liveliness endpoint: FAILED")
+			}
+		}
+
+		if result.Name == "LiteLLM Model Connectivity" {
+			if unhealthy, ok := result.Metadata["unhealthy_models"].(int); ok && unhealthy > 0 {
+				if total, ok := result.Metadata["configured_models"].([]string); ok {
+					healthy := len(total) - unhealthy
+					primaryFailures = append(primaryFailures, fmt.Sprintf("├─ Models reachable: %d/%d", healthy, len(total)))
+				}
+			}
+		}
+
+		if result.Name == "App Container Running Check" && result.Status == debug.StatusError {
+			blockingIssues = append(blockingIssues, "├─ bionicgpt-app: Not running")
+		}
+	}
+
+	// Status line
+	if accessible && len(rootCauses) == 0 && len(blockingIssues) == 0 {
+		summary.WriteString("STATUS: ✅ ACCESSIBLE\n\n")
+		summary.WriteString("All services are running and healthy.\n")
+	} else {
+		summary.WriteString("STATUS: ❌ NOT ACCESSIBLE\n\n")
+
+		if len(rootCauses) > 0 {
+			summary.WriteString("ROOT CAUSE:\n")
+			for _, cause := range rootCauses {
+				summary.WriteString(fmt.Sprintf("  • %s\n", cause))
+			}
+			summary.WriteString("\n")
+		}
+
+		if len(blockingIssues) > 0 {
+			summary.WriteString("BLOCKING ISSUES:\n")
+			for _, issue := range blockingIssues {
+				summary.WriteString(fmt.Sprintf("  %s\n", issue))
+			}
+			summary.WriteString("\n")
+		}
+
+		if len(primaryFailures) > 0 {
+			summary.WriteString("PRIMARY FAILURES:\n")
+			for _, failure := range primaryFailures {
+				summary.WriteString(fmt.Sprintf("  %s\n", failure))
+			}
+			summary.WriteString("\n")
+		}
+
+		// Immediate action
+		summary.WriteString("IMMEDIATE ACTION REQUIRED:\n")
+		if len(rootCauses) > 0 && strings.Contains(rootCauses[0], "LiteLLM") {
+			summary.WriteString("  1. Check LiteLLM logs for errors:\n")
+			summary.WriteString("     docker logs bionicgpt-litellm --tail 50 | grep -i error\n\n")
+			summary.WriteString("  2. Verify Azure OpenAI credentials:\n")
+			summary.WriteString("     sudo cat /opt/bionicgpt/.env.litellm | grep AZURE_OPENAI_API_KEY\n\n")
+			summary.WriteString("  3. Test LiteLLM health manually:\n")
+			summary.WriteString("     docker exec bionicgpt-litellm python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health').read().decode())\"\n\n")
+			summary.WriteString("  4. Check Azure Portal: Verify deployment names match config\n")
+			summary.WriteString("     https://portal.azure.com → Azure OpenAI → Deployments\n")
+		} else if len(blockingIssues) > 0 {
+			summary.WriteString("  1. Start containers:\n")
+			summary.WriteString("     cd /opt/bionicgpt && sudo docker compose up -d\n\n")
+			summary.WriteString("  2. Check container logs:\n")
+			summary.WriteString("     docker compose logs --tail 50\n")
+		} else {
+			summary.WriteString("  1. Review detailed diagnostics below\n")
+			summary.WriteString("  2. Check container logs: docker compose -f /opt/bionicgpt/docker-compose.yml logs\n")
+		}
+	}
+
+	summary.WriteString("\n" + strings.Repeat("═", 80) + "\n")
+	summary.WriteString("DETAILED DIAGNOSTICS\n")
+	summary.WriteString(strings.Repeat("═", 80) + "\n\n")
+
+	return summary.String()
+}
