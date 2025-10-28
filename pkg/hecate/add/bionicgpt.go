@@ -38,9 +38,25 @@ func init() {
 	})
 }
 
-// IsConfigured checks if BionicGPT SSO integration is already configured
+// IsConfigured checks if BionicGPT is FULLY configured (Caddyfile + Authentik SSO)
 // P1 #4: Plugin-based idempotency check instead of hardcoded service checks
+// ARCHITECTURE: Comprehensive check - both routing layer AND SSO layer must be correct
 func (b *BionicGPTIntegrator) IsConfigured(rc *eos_io.RuntimeContext, opts *ServiceOptions) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check 1: Caddyfile route exists and is correct
+	caddyfileOK, err := b.checkCaddyfileConfiguration(rc, opts.DNS)
+	if err != nil {
+		logger.Debug("Caddyfile check failed", zap.Error(err))
+		return false, nil // Non-fatal - treat as not configured
+	}
+
+	if !caddyfileOK {
+		logger.Debug("Caddyfile configuration incomplete or incorrect")
+		return false, nil
+	}
+
+	// Check 2: Authentik SSO configured
 	// Use credential discovery logic to get Authentik API access
 	authentikToken, authentikURL, err := b.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
@@ -57,21 +73,59 @@ func (b *BionicGPTIntegrator) IsConfigured(rc *eos_io.RuntimeContext, opts *Serv
 	}
 
 	expectedLaunchURL := fmt.Sprintf("https://%s", opts.DNS)
-	logger := otelzap.Ctx(rc.Ctx)
 
 	for _, app := range apps {
 		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
-			logger.Debug("BionicGPT application found in Authentik for this DNS",
+			logger.Debug("BionicGPT fully configured (Caddyfile + Authentik SSO)",
 				zap.String("slug", app.Slug),
 				zap.String("name", app.Name),
 				zap.String("launch_url", app.MetaLaunchURL))
-			return true, nil
+			return true, nil // Both Caddyfile AND Authentik are configured
 		}
 	}
 
 	logger.Debug("BionicGPT application not found in Authentik for this DNS",
 		zap.String("expected_launch_url", expectedLaunchURL))
 	return false, nil
+}
+
+// checkCaddyfileConfiguration verifies Caddyfile has correct route with headers
+// Returns true only if: route exists, no duplicates, headers present
+func (b *BionicGPTIntegrator) checkCaddyfileConfiguration(rc *eos_io.RuntimeContext, dns string) (bool, error) {
+	content, err := os.ReadFile(hecate.CaddyfilePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read Caddyfile: %w", err)
+	}
+
+	caddyfileContent := string(content)
+
+	// Check 1: Route exists (at least once)
+	dnsPattern := fmt.Sprintf("\n%s {", dns)
+	count := strings.Count(caddyfileContent, dnsPattern)
+
+	if count == 0 {
+		return false, nil // Route doesn't exist
+	}
+
+	if count > 1 {
+		return false, nil // Duplicates exist - not correctly configured
+	}
+
+	// Check 2: Required headers are present
+	requiredHeaders := []string{
+		"header_up X-Auth-Request-Email",
+		"header_up X-Auth-Request-User",
+		"header_up X-Auth-Request-Groups",
+	}
+
+	for _, header := range requiredHeaders {
+		if !strings.Contains(caddyfileContent, header) {
+			return false, nil // Missing critical header mapping
+		}
+	}
+
+	// All checks passed - route exists, no duplicates, headers present
+	return true, nil
 }
 
 // ValidateService checks if BionicGPT is running at the backend address

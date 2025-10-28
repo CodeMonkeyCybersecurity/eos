@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -249,9 +250,17 @@ func (f *BionicGPTFixer) assess(rc *eos_io.RuntimeContext) (*DriftAssessment, er
 	assessment.OutpostNotAssigned = false // TODO: Implement full check
 
 	// Check Caddyfile for duplicates and missing headers
+	// P1 - CRITICAL: Caddyfile assessment is REQUIRED for BionicGPT drift correction
+	// Fail fast with clear error message if Caddyfile cannot be read
 	if err := f.assessCaddyfile(rc, assessment); err != nil {
-		logger.Warn("Failed to assess Caddyfile", zap.Error(err))
-		// Non-fatal - continue with other checks
+		return nil, fmt.Errorf("failed to assess Caddyfile configuration: %w\n\n"+
+			"BionicGPT drift correction requires access to Caddyfile.\n"+
+			"Expected location: %s\n\n"+
+			"Remediation:\n"+
+			"  1. Verify Hecate is installed: ls -la /opt/hecate/\n"+
+			"  2. Check Caddyfile exists: ls -la %s\n"+
+			"  3. Verify file permissions: sudo chmod 644 %s",
+			err, hecate.CaddyfilePath, hecate.CaddyfilePath, hecate.CaddyfilePath)
 	}
 
 	return assessment, nil
@@ -425,9 +434,8 @@ func (f *BionicGPTFixer) checkGroupExists(ctx context.Context, client *authentik
 // assessCaddyfile checks for duplicate entries and missing headers in Caddyfile
 func (f *BionicGPTFixer) assessCaddyfile(rc *eos_io.RuntimeContext, assessment *DriftAssessment) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	caddyfilePath := "/etc/caddy/Caddyfile"
 
-	content, err := os.ReadFile(caddyfilePath)
+	content, err := os.ReadFile(hecate.CaddyfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read Caddyfile: %w", err)
 	}
@@ -471,7 +479,6 @@ func (f *BionicGPTFixer) assessCaddyfile(rc *eos_io.RuntimeContext, assessment *
 // fixCaddyfileDuplicates removes duplicate entries and ensures correct headers
 func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, assessment *DriftAssessment) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	caddyfilePath := "/etc/caddy/Caddyfile"
 
 	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders {
 		return nil // Nothing to fix
@@ -481,7 +488,7 @@ func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, asses
 		zap.Int("duplicates", assessment.CaddyfileDuplicates),
 		zap.Bool("missing_headers", assessment.CaddyfileMissingHeaders))
 
-	content, err := os.ReadFile(caddyfilePath)
+	content, err := os.ReadFile(hecate.CaddyfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read Caddyfile: %w", err)
 	}
@@ -526,7 +533,7 @@ func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, asses
 	newContent := strings.Join(filteredLines, "\n")
 
 	// Write back to Caddyfile
-	if err := os.WriteFile(caddyfilePath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(hecate.CaddyfilePath, []byte(newContent), 0644); err != nil {
 		return fmt.Errorf("failed to write Caddyfile: %w", err)
 	}
 
@@ -534,7 +541,7 @@ func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, asses
 
 	// Reload Caddy to apply changes
 	logger.Info("Reloading Caddy configuration...")
-	if err := ReloadCaddy(rc, caddyfilePath); err != nil {
+	if err := ReloadCaddy(rc, hecate.CaddyfilePath); err != nil {
 		return fmt.Errorf("failed to reload Caddy: %w", err)
 	}
 

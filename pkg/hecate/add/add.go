@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
@@ -240,10 +239,12 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		// SPECIAL CASE: BionicGPT with SSO flag - may need to configure Authentik integration
 		// even if Caddyfile route exists (user may have added route manually or integration failed)
 		if opts.Service == "bionicgpt" && opts.SSO {
-			logger.Info("BionicGPT route already exists, checking if SSO integration is complete...")
+			logger.Info("BionicGPT route already exists, checking if configuration is complete...")
 
-			// Check if Authentik application exists for this service
-			authentikConfigured, checkErr := isBionicGPTAuthentikConfigured(rc, opts.DNS)
+			// Check if FULLY configured (Caddyfile + Authentik SSO)
+			// Use integrator's comprehensive check (checks both routing and SSO layers)
+			integrator := &BionicGPTIntegrator{resources: &IntegrationResources{}}
+			authentikConfigured, checkErr := integrator.IsConfigured(rc, opts)
 
 			// If fully configured (route + SSO), exit gracefully
 			if checkErr == nil && authentikConfigured {
@@ -615,43 +616,10 @@ func runServiceIntegration(rc *eos_io.RuntimeContext, opts *ServiceOptions) erro
 	return nil
 }
 
-// isBionicGPTAuthentikConfigured checks if BionicGPT application exists in Authentik
-func isBionicGPTAuthentikConfigured(rc *eos_io.RuntimeContext, dns string) (bool, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Use BionicGPT integrator's credential discovery logic (P0 #1 fix: reuse existing helper)
-	integrator := &BionicGPTIntegrator{resources: &IntegrationResources{}}
-	authentikToken, authentikURL, err := integrator.getAuthentikCredentials(rc.Ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get Authentik credentials: %w", err)
-	}
-
-	// Connect to Authentik API
-	authentikClient := authentik.NewClient(authentikURL, authentikToken)
-
-	// Check if BionicGPT application exists for THIS SPECIFIC DNS
-	// P1 #5 FIX: Check DNS-specific app configuration, not just "any bionicgpt app exists"
-	apps, err := authentikClient.ListApplications(rc.Ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to list Authentik applications: %w", err)
-	}
-
-	expectedLaunchURL := fmt.Sprintf("https://%s", dns)
-
-	for _, app := range apps {
-		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
-			logger.Debug("BionicGPT application found in Authentik for this DNS",
-				zap.String("slug", app.Slug),
-				zap.String("name", app.Name),
-				zap.String("launch_url", app.MetaLaunchURL))
-			return true, nil
-		}
-	}
-
-	logger.Debug("BionicGPT application not found in Authentik for this DNS",
-		zap.String("expected_launch_url", expectedLaunchURL))
-	return false, nil
-}
+// NOTE: isBionicGPTAuthentikConfigured() function REMOVED
+// Replaced with BionicGPTIntegrator.IsConfigured() for consistency
+// This eliminates code duplication and ensures both --add and --fix use the same comprehensive check
+// See: bionicgpt.go:41-130 for the unified implementation
 
 // printSuccessMessage prints the final success message
 // verificationErr indicates if route verification failed (non-fatal, but affects message)
