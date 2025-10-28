@@ -60,14 +60,19 @@ func HashString(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// HashData returns the SHA256 hash of byte data as hex.
+func HashData(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
 // HashFile returns the SHA256 hash of a file as hex.
 func HashFile(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
+	return HashData(data), nil
 }
 
 // HashStrings returns SHA256 hashes of each string in the input slice.

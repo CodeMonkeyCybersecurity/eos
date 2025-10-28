@@ -121,6 +121,13 @@ func PromptYesNo(args ...interface{}) bool {
 		return false
 	}
 
+	// Validate question is not empty (defensive programming)
+	if strings.TrimSpace(question) == "" {
+		logger := otelzap.L()
+		logger.Error("PromptYesNo called with empty question")
+		return defaultYes // Deprecated function can't return error, use default
+	}
+
 	prompt := question
 	if defaultYes {
 		prompt += " [Y/n]: "
@@ -129,7 +136,12 @@ func PromptYesNo(args ...interface{}) bool {
 	}
 
 	logger := otelzap.L()
-	logger.Info("terminal prompt: yes/no question", zap.String("question", question))
+
+	// NOTE: Terminal prompts use string concatenation instead of structured logging.
+	// RATIONALE: Human-facing ephemeral output prioritizes visual continuity. Including
+	// [Y/n]/[y/N] indicators in the message improves UX and matches pattern in pkg/eos_io/consent.go:22.
+	// Trade-off: Lost zap.String("question") field, but terminal prompts aren't for machine parsing.
+	logger.Info("terminal prompt: " + prompt)
 
 	const maxAttempts = 3
 	var lastErr error
@@ -229,6 +241,11 @@ func PromptYesNo(args ...interface{}) bool {
 func PromptYesNoSafe(rc *eos_io.RuntimeContext, question string, defaultYes bool) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate question is not empty (defensive programming)
+	if strings.TrimSpace(question) == "" {
+		return false, fmt.Errorf("question cannot be empty")
+	}
+
 	prompt := question
 	if defaultYes {
 		prompt += " [Y/n]: "
@@ -236,7 +253,11 @@ func PromptYesNoSafe(rc *eos_io.RuntimeContext, question string, defaultYes bool
 		prompt += " [y/N]: "
 	}
 
-	logger.Info("terminal prompt: yes/no question", zap.String("question", question))
+	// NOTE: Terminal prompts use string concatenation instead of structured logging.
+	// RATIONALE: Human-facing ephemeral output prioritizes visual continuity. Including
+	// [Y/n]/[y/N] indicators in the message improves UX and matches pattern in pkg/eos_io/consent.go:22.
+	// Trade-off: Lost zap.String("question") field, but terminal prompts aren't for machine parsing.
+	logger.Info("terminal prompt: " + prompt)
 
 	const maxAttempts = 3
 	var lastErr error

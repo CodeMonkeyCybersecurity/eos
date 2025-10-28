@@ -6,6 +6,7 @@ package bionicgpt
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/debug"
 )
@@ -233,20 +234,36 @@ func GenerateNextSteps(report *debug.Report, analysis *debug.Analysis) []string 
 func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) string {
 	var summary strings.Builder
 
+	// Loose End 1 fix: Add timestamp to show when diagnostic was run
+	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
 	summary.WriteString(strings.Repeat("═", 80) + "\n")
-	summary.WriteString("BIONICGPT DEPLOYMENT STATUS\n")
+	summary.WriteString(fmt.Sprintf("BIONICGPT DEPLOYMENT STATUS (%s)\n", timestamp))
 	summary.WriteString(strings.Repeat("═", 80) + "\n\n")
 
-	// Overall status
-	accessible := true
+	// Handle empty or nil report (Bug 6 fix)
+	if report == nil || len(report.Results) == 0 {
+		summary.WriteString("STATUS: UNKNOWN\n\n")
+		summary.WriteString("No diagnostic data available.\n\n")
+		summary.WriteString("This may indicate:\n")
+		summary.WriteString("  • Diagnostics collection failed\n")
+		summary.WriteString("  • BionicGPT not installed\n")
+		summary.WriteString("  • Permission issues (try: sudo eos debug bionicgpt)\n\n")
+		summary.WriteString("IMMEDIATE ACTION:\n")
+		summary.WriteString("  1. Check if BionicGPT is installed: ls -la /opt/bionicgpt\n")
+		summary.WriteString("  2. Check Docker is running: docker ps\n")
+		summary.WriteString("  3. Re-run with sudo: sudo eos debug bionicgpt\n\n")
+		return summary.String()
+	}
+
+	// Collect status information from diagnostics
 	rootCauses := []string{}
 	blockingIssues := []string{}
 	primaryFailures := []string{}
 
-	// Check if accessible
+	// Analyze diagnostic results
 	for _, result := range report.Results {
+		// Container dependency blocking (critical)
 		if result.Name == "Container Dependency Blocked" && result.Status == debug.StatusError {
-			accessible = false
 			if blockedCount, ok := result.Metadata["blocked_count"].(int); ok && blockedCount > 0 {
 				if blocked, ok := result.Metadata["blocked_containers"].([]string); ok {
 					for _, container := range blocked {
@@ -256,10 +273,17 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			}
 		}
 
+		// LiteLLM health issues (root cause)
 		if result.Name == "LiteLLM Proxy Health" && result.Status != debug.StatusOK {
 			rootCauses = append(rootCauses, "LiteLLM proxy health check failing")
 		}
 
+		// PostgreSQL health issues (root cause) - Loose End 2 fix
+		if result.Name == "PostgreSQL Health" && result.Status == debug.StatusError {
+			rootCauses = append(rootCauses, "PostgreSQL database not responding")
+		}
+
+		// LiteLLM endpoint failures (primary failure)
 		if result.Name == "LiteLLM Comprehensive Health" {
 			if result.Metadata["health_endpoint"] == "failed" {
 				primaryFailures = append(primaryFailures, "├─ /health endpoint: FAILED")
@@ -269,6 +293,7 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			}
 		}
 
+		// Model connectivity (primary failure)
 		if result.Name == "LiteLLM Model Connectivity" {
 			if unhealthy, ok := result.Metadata["unhealthy_models"].(int); ok && unhealthy > 0 {
 				if total, ok := result.Metadata["configured_models"].([]string); ok {
@@ -278,17 +303,24 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			}
 		}
 
-		if result.Name == "App Container Running Check" && result.Status == debug.StatusError {
-			blockingIssues = append(blockingIssues, "├─ bionicgpt-app: Not running")
-		}
+		// NOTE: Removed duplicate "App Container Running Check" detection (Bug 5 fix)
+		// This is already covered by "Container Dependency Blocked" diagnostic above
 	}
 
-	// Status line
-	if accessible && len(rootCauses) == 0 && len(blockingIssues) == 0 {
-		summary.WriteString("STATUS: ✅ ACCESSIBLE\n\n")
-		summary.WriteString("All services are running and healthy.\n")
+	// Calculate accessible status (Bug 1 fix - based on ALL conditions, not just one flag)
+	accessible := len(rootCauses) == 0 && len(blockingIssues) == 0 && len(primaryFailures) == 0
+
+	// Generate status line (Bug 9 fix - check warnings for DEGRADED status)
+	if accessible {
+		if analysis != nil && len(analysis.Warnings) > 0 {
+			summary.WriteString("STATUS: DEGRADED\n\n")
+			summary.WriteString(fmt.Sprintf("Services running with %d warnings. Review diagnostics below.\n", len(analysis.Warnings)))
+		} else {
+			summary.WriteString("STATUS: ACCESSIBLE\n\n")
+			summary.WriteString("All services are running and healthy.\n")
+		}
 	} else {
-		summary.WriteString("STATUS: ❌ NOT ACCESSIBLE\n\n")
+		summary.WriteString("STATUS: NOT ACCESSIBLE\n\n")
 
 		if len(rootCauses) > 0 {
 			summary.WriteString("ROOT CAUSE:\n")
@@ -314,25 +346,66 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			summary.WriteString("\n")
 		}
 
-		// Immediate action
-		summary.WriteString("IMMEDIATE ACTION REQUIRED:\n")
-		if len(rootCauses) > 0 && strings.Contains(rootCauses[0], "LiteLLM") {
+		// Immediate action - Bug 4 & 8 fix: check ALL root causes independently
+		summary.WriteString("IMMEDIATE ACTION REQUIRED:\n\n")
+
+		// Check if any root cause is LiteLLM-related or PostgreSQL-related
+		hasLiteLLMIssue := false
+		hasPostgresIssue := false
+		for _, cause := range rootCauses {
+			if strings.Contains(cause, "LiteLLM") {
+				hasLiteLLMIssue = true
+			}
+			if strings.Contains(cause, "PostgreSQL") {
+				hasPostgresIssue = true
+			}
+		}
+
+		// Bug 8 fix: Use independent if blocks, not else if (so BOTH issues show)
+		if hasLiteLLMIssue {
+			summary.WriteString("LiteLLM Issues:\n")
 			summary.WriteString("  1. Check LiteLLM logs for errors:\n")
 			summary.WriteString("     docker logs bionicgpt-litellm --tail 50 | grep -i error\n\n")
 			summary.WriteString("  2. Verify Azure OpenAI credentials:\n")
-			summary.WriteString("     sudo cat /opt/bionicgpt/.env.litellm | grep AZURE_OPENAI_API_KEY\n\n")
+			summary.WriteString("     sudo cat /opt/bionicgpt/.env.litellm | grep AZURE_OPENAI_API_KEY\n")
+			summary.WriteString("     To update: sudo nano /opt/bionicgpt/.env.litellm\n\n")
 			summary.WriteString("  3. Test LiteLLM health manually:\n")
+			// NOTE: Port 4000 is LiteLLM default (from bionicgpt.DefaultLiteLLMPort)
+			// Hardcoded here to avoid circular import (analyzer → bionicgpt → analyzer)
 			summary.WriteString("     docker exec bionicgpt-litellm python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health').read().decode())\"\n\n")
 			summary.WriteString("  4. Check Azure Portal: Verify deployment names match config\n")
-			summary.WriteString("     https://portal.azure.com → Azure OpenAI → Deployments\n")
-		} else if len(blockingIssues) > 0 {
-			summary.WriteString("  1. Start containers:\n")
-			summary.WriteString("     cd /opt/bionicgpt && sudo docker compose up -d\n\n")
-			summary.WriteString("  2. Check container logs:\n")
-			summary.WriteString("     docker compose logs --tail 50\n")
-		} else {
-			summary.WriteString("  1. Review detailed diagnostics below\n")
-			summary.WriteString("  2. Check container logs: docker compose -f /opt/bionicgpt/docker-compose.yml logs\n")
+			summary.WriteString("     https://portal.azure.com -> Azure OpenAI -> Deployments\n\n")
+			// Bug 15 fix: Add restart instructions
+			summary.WriteString("  5. After fixing credentials, restart LiteLLM:\n")
+			summary.WriteString("     cd /opt/bionicgpt && docker compose restart litellm-proxy\n\n")
+		}
+
+		if hasPostgresIssue {
+			summary.WriteString("PostgreSQL Issues:\n")
+			summary.WriteString("  1. Check PostgreSQL container status:\n")
+			summary.WriteString("     docker ps -a --filter name=bionicgpt-postgres\n\n")
+			summary.WriteString("  2. Check PostgreSQL logs:\n")
+			summary.WriteString("     docker logs bionicgpt-postgres --tail 50\n\n")
+			summary.WriteString("  3. Test PostgreSQL connection:\n")
+			summary.WriteString("     docker exec bionicgpt-postgres pg_isready -U postgres\n\n")
+			// Bug 15 fix: Add restart instructions
+			summary.WriteString("  4. If database is corrupted, restart PostgreSQL:\n")
+			summary.WriteString("     cd /opt/bionicgpt && docker compose restart postgres\n\n")
+		}
+
+		// Show generic steps only if no specific root cause identified
+		if !hasLiteLLMIssue && !hasPostgresIssue {
+			if len(blockingIssues) > 0 {
+				summary.WriteString("Container Issues:\n")
+				summary.WriteString("  1. Start containers:\n")
+				summary.WriteString("     cd /opt/bionicgpt && sudo docker compose up -d\n\n")
+				summary.WriteString("  2. Check container logs:\n")
+				summary.WriteString("     docker compose logs --tail 50\n")
+			} else {
+				summary.WriteString("General Troubleshooting:\n")
+				summary.WriteString("  1. Review detailed diagnostics below\n")
+				summary.WriteString("  2. Check container logs: docker compose -f /opt/bionicgpt/docker-compose.yml logs\n")
+			}
 		}
 	}
 

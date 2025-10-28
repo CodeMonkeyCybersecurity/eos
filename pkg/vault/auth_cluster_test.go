@@ -1,10 +1,12 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -372,11 +374,34 @@ func TestIsPeriodicToken(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "Negative period (malicious Vault response) - P2 Issue #23",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": json.Number("-1"),
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Period overflow (Int64 conversion error) - P2 Issue #23",
+			secret: &api.Secret{
+				Data: map[string]interface{}{
+					"period": json.Number("99999999999999999999"), // Overflows int64
+				},
+			},
+			expected: false,
+		},
+	}
+
+	// Create test RuntimeContext
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isPeriodicToken(tt.secret)
+			result := isPeriodicToken(rc, tt.secret)
 			assert.Equal(t, tt.expected, result,
 				"isPeriodicToken() returned %v, expected %v", result, tt.expected)
 		})
@@ -386,6 +411,11 @@ func TestIsPeriodicToken(t *testing.T) {
 // TestIsPeriodicTokenConsistency verifies that isPeriodicToken() is deterministic
 // (same input always produces same output). This is critical for race condition fix.
 func TestIsPeriodicTokenConsistency(t *testing.T) {
+	// Create test RuntimeContext
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
+	}
+
 	secret := &api.Secret{
 		Data: map[string]interface{}{
 			"period": json.Number("14400"),
@@ -395,7 +425,7 @@ func TestIsPeriodicTokenConsistency(t *testing.T) {
 	// Call function 10 times with same input
 	results := make([]bool, 10)
 	for i := 0; i < 10; i++ {
-		results[i] = isPeriodicToken(secret)
+		results[i] = isPeriodicToken(rc, secret)
 	}
 
 	// All results should be identical

@@ -54,8 +54,9 @@ from masterless mode to a fully managed node.`,
 		RunE: eos.Wrap(enrollSystem),
 	}
 
-	updateSystemPackages bool
-	updateGoVersion      bool
+	updateSystemPackages  bool
+	updateGoVersion       bool
+	forcePackageErrors    bool
 )
 
 func init() {
@@ -66,6 +67,7 @@ func init() {
 	// Setup UpdateCmd flags
 	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", true, "Update system packages (apt/yum/dnf/pacman)")
 	UpdateCmd.Flags().BoolVar(&updateGoVersion, "go-version", false, "Update Go compiler to latest version")
+	UpdateCmd.Flags().BoolVar(&forcePackageErrors, "force-package-errors", false, "Continue despite system package update errors (not recommended)")
 
 	// Setup EnrollCmd flags
 	setupEnrollFlags()
@@ -220,6 +222,7 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		MaxRollbackAttempts:     3,
 		UpdateSystemPackages:    updateSystemPackages, // Update system packages if requested
 		UpdateGoVersion:         updateGoVersion,      // Update Go version if requested
+		ForcePackageErrors:      forcePackageErrors,   // Continue despite package errors (not recommended)
 	}
 
 	updater := selfpkg.NewEnhancedEosUpdater(rc, config)

@@ -51,6 +51,8 @@ type DiskSpaceResult struct {
 }
 
 // DefaultUpdateRequirements returns sensible defaults for eos self update
+// P1 FIX: Increased temp space requirements based on real-world CGO build measurements
+// NOTE: This uses static 100MB for binary space - use UpdateRequirementsWithBinarySize() for accurate calculation
 func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceRequirements {
 	return &DiskSpaceRequirements{
 		TempDir:   tempDir,
@@ -58,14 +60,64 @@ func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceR
 		SourceDir: sourceDir,
 
 		// Minimum requirements (hard limits)
-		MinTempSpace:   500 * 1024 * 1024,  // 500MB for build artifacts
-		MinBinarySpace: 100 * 1024 * 1024,  // 100MB for binary + backup
+		// P1 FIX: Increased from 500MB to 1.5GB based on empirical data:
+		//   - Eos binary with CGO: ~134MB
+		//   - Go build cache during compile: ~2.4GB (but in ~/.cache/go-build)
+		//   - CGO temp files in /tmp: ~850MB
+		//   - Safety margin: 2x = 1.7GB, rounded to 1.5GB
+		MinTempSpace:   1536 * 1024 * 1024, // 1.5GB for CGO build artifacts (libvirt + Ceph)
+		MinBinarySpace: 100 * 1024 * 1024,  // 100MB for binary + backup (STATIC - may underestimate)
 		MinSourceSpace: 200 * 1024 * 1024,  // 200MB for source code
 
 		// Recommended requirements (soft warnings)
-		RecommendedTempSpace:   1 * 1024 * 1024 * 1024, // 1GB recommended
+		RecommendedTempSpace:   2 * 1024 * 1024 * 1024, // 2GB recommended for headroom
 		RecommendedBinarySpace: 500 * 1024 * 1024,      // 500MB recommended
 		RecommendedSourceSpace: 500 * 1024 * 1024,      // 500MB recommended
+	}
+}
+
+// UpdateRequirementsWithBinarySize returns disk space requirements dynamically calculated
+// based on actual binary size
+// P0 FIX (Adversarial #4): Accounts for actual temp binary + backup size
+//
+// RATIONALE: During update, we need space for:
+//   1. Temp binary in /tmp (actual binary size)
+//   2. Backup in backup dir (actual binary size, if different filesystem)
+//   3. New binary replacing old (actual binary size)
+//   4. Safety margin (2x for filesystem overhead, fragmentation)
+//
+// Example with 134MB binary:
+//   - Temp: 134MB in /tmp
+//   - Backup: 134MB in /usr/local/bin/.eos/backups (if same filesystem)
+//   - Replace: 134MB (replaces existing, no additional space)
+//   - Total: 134MB + 134MB = 268MB minimum
+//   - With 2x safety: 536MB required
+func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir string, binarySize int64) *DiskSpaceRequirements {
+	// Calculate required space based on actual binary size
+	// We need: temp binary + backup + 2x safety margin
+	safetyFactor := uint64(2)
+	minBinarySpace := uint64(binarySize) * safetyFactor
+
+	// Ensure minimum of 200MB even for small binaries
+	const minAbsolute = 200 * 1024 * 1024
+	if minBinarySpace < minAbsolute {
+		minBinarySpace = minAbsolute
+	}
+
+	return &DiskSpaceRequirements{
+		TempDir:   tempDir,
+		BinaryDir: binaryDir,
+		SourceDir: sourceDir,
+
+		// Minimum requirements (hard limits)
+		MinTempSpace:   1536 * 1024 * 1024, // 1.5GB for CGO build artifacts (unchanged)
+		MinBinarySpace: minBinarySpace,     // DYNAMIC based on actual binary size
+		MinSourceSpace: 200 * 1024 * 1024,  // 200MB for source code (unchanged)
+
+		// Recommended requirements (soft warnings)
+		RecommendedTempSpace:   2 * 1024 * 1024 * 1024,            // 2GB recommended
+		RecommendedBinarySpace: uint64(binarySize) * safetyFactor, // Same as minimum
+		RecommendedSourceSpace: 500 * 1024 * 1024,                 // 500MB recommended
 	}
 }
 

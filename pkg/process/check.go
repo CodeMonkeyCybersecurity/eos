@@ -26,6 +26,7 @@ type RunningProcessInfo struct {
 
 // CheckRunningProcesses checks for running processes matching a pattern
 // Returns information about matching processes, excluding the specified PID
+// P1 FIX: Uses exact binary name matching with verification to prevent false positives
 func CheckRunningProcesses(rc *eos_io.RuntimeContext, processName string, excludePID int) (*RunningProcessInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -34,8 +35,9 @@ func CheckRunningProcesses(rc *eos_io.RuntimeContext, processName string, exclud
 		ExcludedPID: excludePID,
 	}
 
-	// Use pgrep to find processes matching the name
-	cmd := exec.Command("pgrep", "-f", processName)
+	// P1 FIX: Use pgrep -x for EXACT binary name match (not substring)
+	// This prevents false positives like "videos.txt" matching "eos"
+	cmd := exec.Command("pgrep", "-x", processName)
 	output, err := cmd.Output()
 
 	// pgrep returns exit code 1 if no processes found (not an error)
@@ -56,13 +58,41 @@ func CheckRunningProcesses(rc *eos_io.RuntimeContext, processName string, exclud
 		return info, nil
 	}
 
-	// Parse PIDs
+	// Parse PIDs and verify each one is actually the binary we're looking for
 	processes := strings.Split(strings.TrimSpace(string(output)), "\n")
 	for _, pidStr := range processes {
 		pidStr = strings.TrimSpace(pidStr)
 		if pidStr == "" {
 			continue
 		}
+
+		// P1 FIX: Verify this PID is actually running our binary
+		// Read /proc/$PID/exe symlink to get actual binary path
+		exePath := fmt.Sprintf("/proc/%s/exe", pidStr)
+		target, err := os.Readlink(exePath)
+		if err != nil {
+			// Process may have exited, or we don't have permission
+			logger.Debug("Cannot read process exe link (may have exited)",
+				zap.String("pid", pidStr),
+				zap.Error(err))
+			continue
+		}
+
+		// Extract binary name from full path (e.g., /usr/local/bin/eos -> eos)
+		binaryName := target
+		if lastSlash := strings.LastIndex(target, "/"); lastSlash != -1 {
+			binaryName = target[lastSlash+1:]
+		}
+
+		// Only include if binary name matches exactly
+		if binaryName != processName {
+			logger.Debug("PID binary name mismatch (false positive from pgrep)",
+				zap.String("pid", pidStr),
+				zap.String("expected", processName),
+				zap.String("actual", binaryName))
+			continue
+		}
+
 		info.PIDs = append(info.PIDs, pidStr)
 
 		// Check if this is the excluded PID

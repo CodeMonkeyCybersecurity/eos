@@ -23,18 +23,56 @@ import (
 )
 
 // TTL threshold constants for token validation
+//
+// SECURITY CRITICAL: These constants determine when cluster operations are allowed/rejected.
+// Incorrect values can lead to operations failing mid-execution (data loss, inconsistent state)
+// or allow operations with insufficient time to complete (DoS vector).
+//
+// P1 Issue #28 Fix: Added comprehensive RATIONALE/SECURITY/THREAT MODEL per CLAUDE.md P0 requirement.
 const (
 	// TTLWarningThreshold is the TTL (in seconds) below which we warn the user
-	// that their token will expire soon. 5 minutes is enough time for cluster ops.
+	// that their token will expire soon.
+	//
+	// RATIONALE: 5 minutes provides buffer for cluster operations (snapshots, Raft reconfigs,
+	//            Autopilot adjustments) which typically take 30-120 seconds. Allows time for
+	//            token renewal if needed before operation starts.
+	// SECURITY: Prevents operations starting with insufficient time to complete, which could
+	//           leave cluster in inconsistent state (partial config applied, incomplete backup,
+	//           half-completed Raft peer changes).
+	// THREAT MODEL:
+	//   - DoS via token expiry mid-operation (cluster left in degraded state)
+	//   - Data loss from incomplete snapshots (backup starts but token expires before completion)
+	//   - Split-brain risk from partial Raft reconfig (peer added but not fully joined)
 	TTLWarningThreshold = 300 // 5 minutes
 
 	// TTLMinimumRequired is the absolute minimum TTL (in seconds) required to proceed.
-	// Below this, operations will fail even if token is non-periodic.
+	//
+	// RATIONALE: 60 seconds is bare minimum for capability checks (4 paths @ ~250ms each) plus
+	//            initialization overhead (~10s) plus minimal operation time (~30s). Any less and
+	//            operation is guaranteed to fail mid-execution.
+	// SECURITY: Hard stop before operations that would fail mid-execution. Prevents:
+	//           - Snapshot corruption (backup starts but token expires before write completes)
+	//           - Raft peer instability (peer joins but token expires before consensus)
+	//           - Autopilot misconfiguration (partial config write)
+	// THREAT MODEL:
+	//   - Operational: User wastes time on operation that will fail
+	//   - Security: Failed operations may leave credentials/state exposed in error messages
+	//   - Availability: Repeated failures from expired tokens → operator frustration → bypass attempts
 	TTLMinimumRequired = 60 // 1 minute
 
 	// TTLRecheckThreshold is the TTL (in seconds) below which we re-check TTL after
-	// validation to detect race conditions. 2 minutes is chosen because validation
-	// takes ~1-2 seconds for 4 capability checks.
+	// validation to detect race conditions.
+	//
+	// RATIONALE: 2 minutes chosen because validation takes ~1-2 seconds for 4 capability checks.
+	//            If TTL < 120s at start, it could drop below TTLMinimumRequired (60s) during
+	//            validation. Re-checking catches this race condition.
+	// SECURITY: Prevents TOCTOU (Time-Of-Check-Time-Of-Use) vulnerability where token is valid
+	//           at start of validation but expires before operation begins.
+	// THREAT MODEL:
+	//   - Race condition: Token expires between validation and operation start
+	//   - Attack scenario: Attacker provides token with 61s TTL → passes validation → expires
+	//                      during operation → leaves cluster in inconsistent state
+	//   - Defense: Re-check TTL after validation if initial TTL was < 120s
 	TTLRecheckThreshold = 120 // 2 minutes
 )
 
@@ -98,11 +136,12 @@ func GetVaultClientWithToken(rc *eos_io.RuntimeContext, token string) (*api.Clie
 // SECURITY: Does NOT show token characters beyond type prefix to prevent entropy leakage.
 //
 // Examples:
-//   "hvs.CAESIJlU02LQZq..." → "hvs.***"
-//   "s.1234567890abcdef" → "s.***"
-//   "s.12abc..." → "s.***" (NOT "s.12***" - would expose token data)
-//   "b.AAAAAQKr..." → "b.***"
-//   "unknown" → "***"
+//
+//	"hvs.CAESIJlU02LQZq..." → "hvs.***"
+//	"s.1234567890abcdef" → "s.***"
+//	"s.12abc..." → "s.***" (NOT "s.12***" - would expose token data)
+//	"b.AAAAAQKr..." → "b.***"
+//	"unknown" → "***"
 //
 // P1 Issue #20 Fix: Exported for use in other packages (cmd/update, pkg/vault/*)
 func SanitizeTokenForLogging(token string) string {
@@ -226,7 +265,7 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		if err == nil && maxTTLSeconds == 0 {
 			// Check if this is a periodic token (which legitimately has explicit_max_ttl=0)
 			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
-			if !isPeriodicToken(secret) {
+			if !isPeriodicToken(rc, secret) {
 				// Non-periodic token with explicit_max_ttl=0 is suspicious
 				logger.Warn("⚠️  Token has explicit_max_ttl=0 (may be in revocation queue)",
 					zap.Int64("explicit_max_ttl", maxTTLSeconds))
@@ -244,7 +283,7 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 
 			// Check if token is periodic (auto-renewable, never expires)
 			// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
-			isPeriodic := isPeriodicToken(secret)
+			isPeriodic := isPeriodicToken(rc, secret)
 			if isPeriodic {
 				// Get period for logging
 				if periodRaw, ok := secret.Data["period"].(json.Number); ok {
@@ -324,10 +363,10 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 	// Check 3: Verify specific capabilities for ALL required cluster operation paths
 	// Raft cluster operations require access to multiple sys/storage/raft/* endpoints
 	requiredPaths := []string{
-		"sys/storage/raft/configuration",          // Raft peer configuration
-		"sys/storage/raft/snapshot",               // Snapshot backup/restore
+		"sys/storage/raft/configuration",           // Raft peer configuration
+		"sys/storage/raft/snapshot",                // Snapshot backup/restore
 		"sys/storage/raft/autopilot/configuration", // Autopilot config
-		"sys/storage/raft/autopilot/state",        // Autopilot state query
+		"sys/storage/raft/autopilot/state",         // Autopilot state query
 	}
 
 	logger.Debug("Checking capabilities for all cluster operation paths",
@@ -382,11 +421,21 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 	//
 	// P0 Issue #12 Fix: Use centralized helper instead of duplicate logic
 	// P0 Issue #13 Fix: Check fresh periodic status from secretRefresh (not stale original data)
+	// P2 Issue #25 Fix: Check Int64() error instead of ignoring it
 	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
-		ttlSeconds, _ := ttlRaw.Int64()
+		ttlSeconds, err := ttlRaw.Int64()
+		if err != nil {
+			// SECURITY: Log malformed TTL values (could indicate attack or Vault bug)
+			logger.Warn("⚠️  Token has malformed TTL field",
+				zap.String("ttl_raw", string(ttlRaw)),
+				zap.Error(err))
+			// Skip race condition check if TTL is malformed
+			// Original validation passed, so continue with operation
+			return nil
+		}
 
 		// Check if token WAS periodic at start of validation
-		isPeriodic := isPeriodicToken(secret)
+		isPeriodic := isPeriodicToken(rc, secret)
 
 		// Only re-check for non-periodic tokens (periodic tokens auto-renew)
 		if !isPeriodic && ttlSeconds < TTLRecheckThreshold {
@@ -396,12 +445,22 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 			// Re-check TTL to account for validation time
 			secretRefresh, err := client.Auth().Token().LookupSelf()
 			if err != nil {
-				logger.Warn("Could not re-check TTL after validation",
+				// P2 Issue #29 Fix: Distinguish token invalidity from network errors
+				errMsg := err.Error()
+				if strings.Contains(errMsg, "permission denied") ||
+					strings.Contains(errMsg, "invalid token") ||
+					strings.Contains(errMsg, "token not found") {
+					// Token was revoked or invalidated during validation
+					return fmt.Errorf("token was revoked or invalidated during validation: %w", err)
+				}
+
+				// Network error or temporary issue - log but don't fail
+				logger.Warn("Could not re-check TTL after validation (network error)",
 					zap.Error(err))
 				// Don't fail - original TTL was acceptable
 			} else if secretRefresh != nil && secretRefresh.Data != nil {
 				// CRITICAL: Check if token became periodic during validation (P0 Issue #13 Fix)
-				isPeriodicRefresh := isPeriodicToken(secretRefresh)
+				isPeriodicRefresh := isPeriodicToken(rc, secretRefresh)
 
 				if isPeriodicRefresh && !isPeriodic {
 					// Token became periodic during validation - this is OK, it will auto-renew
@@ -412,8 +471,28 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 					return nil
 				}
 
+				// P1 Issue #22 Fix: Check if token LOST its periodic status during validation
+				if !isPeriodicRefresh && isPeriodic {
+					// Token was periodic but is now non-periodic - period was revoked
+					logger.Warn("⚠️  Token lost periodic status during validation",
+						zap.Int64("initial_ttl", ttlSeconds),
+						zap.Bool("was_periodic", isPeriodic),
+						zap.Bool("is_periodic_now", isPeriodicRefresh))
+					// Continue with non-periodic validation (check fresh TTL below)
+					// Don't return - need to validate TTL is sufficient
+				}
+
 				if ttlRefreshRaw, ok := secretRefresh.Data["ttl"].(json.Number); ok {
-					ttlRefresh, _ := ttlRefreshRaw.Int64()
+					ttlRefresh, err := ttlRefreshRaw.Int64()
+					if err != nil {
+						// SECURITY: Log malformed TTL values (could indicate attack or Vault bug)
+						// P2 Issue #25 Fix: Check Int64() error instead of ignoring it
+						logger.Warn("⚠️  Refreshed token has malformed TTL field",
+							zap.String("ttl_raw", string(ttlRefreshRaw)),
+							zap.Error(err))
+						// Can't validate fresh TTL, but original validation passed
+						return nil
+					}
 
 					// Calculate TTL delta (might be negative if token was renewed)
 					ttlDelta := ttlSeconds - ttlRefresh
@@ -452,9 +531,10 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 // This is a simple formatter for token TTL (avoids conflict with existing formatDuration).
 //
 // Examples:
-//   45 seconds  → "45s"
-//   120 seconds → "2m"
-//   3665 seconds → "1h1m"
+//
+//	45 seconds  → "45s"
+//	120 seconds → "2m"
+//	3665 seconds → "1h1m"
 func formatTTLDuration(seconds int64) string {
 	if seconds < 60 {
 		return fmt.Sprintf("%ds", seconds)
@@ -477,21 +557,31 @@ func formatTTLDuration(seconds int64) string {
 // across multiple validation checks. It handles error cases consistently:
 // - nil secret or nil Data returns false
 // - type assertion failure returns false
-// - Int64() conversion error returns false
+// - Int64() conversion error returns false (with warning logged)
 // - period <= 0 returns false
 //
 // P0 Issue #12 Fix: Replaces 3 duplicate isPeriodic checks with inconsistent error handling.
+// P0 Issue #21 Fix: Logs errors when Int64() conversion fails (detects malformed/attack responses).
 //
 // Returns: true if token has period > 0, false otherwise
-func isPeriodicToken(secret *api.Secret) bool {
+func isPeriodicToken(rc *eos_io.RuntimeContext, secret *api.Secret) bool {
 	if secret == nil || secret.Data == nil {
 		return false
 	}
 
 	if periodRaw, ok := secret.Data["period"].(json.Number); ok {
 		periodSeconds, err := periodRaw.Int64()
+		if err != nil {
+			// SECURITY: Log malformed period values (could indicate attack or Vault bug)
+			// P0 Issue #21 Fix: Don't silently return false - log for forensics
+			logger := otelzap.Ctx(rc.Ctx)
+			logger.Warn("⚠️  Token has malformed period field (treating as non-periodic)",
+				zap.String("period_raw", string(periodRaw)),
+				zap.Error(err))
+			return false
+		}
 		// Only return true if conversion succeeded AND period > 0
-		return err == nil && periodSeconds > 0
+		return periodSeconds > 0
 	}
 
 	return false

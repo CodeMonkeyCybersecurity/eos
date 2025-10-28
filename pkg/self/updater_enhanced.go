@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -47,6 +46,7 @@ type EnhancedUpdateConfig struct {
 	MaxRollbackAttempts     int
 	UpdateSystemPackages    bool // Run system package manager update (apt/yum/dnf)
 	UpdateGoVersion         bool // Check and update Go compiler if needed
+	ForcePackageErrors      bool // Continue despite package manager errors (not recommended)
 }
 
 // EnhancedEosUpdater handles self-update with comprehensive error recovery
@@ -110,8 +110,22 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	if eeu.enhancedConfig.UpdateSystemPackages {
 		eeu.logger.Info("System package updates enabled (use --system-packages=false to skip)")
 		if err := eeu.UpdateSystemPackages(); err != nil {
-			eeu.logger.Warn("System package update had issues", zap.Error(err))
-			// Non-fatal - continue
+			// P0 FIX: System package errors are now FATAL by default
+			// Broken packages can prevent eos build and leave system in inconsistent state
+			if !eeu.enhancedConfig.ForcePackageErrors {
+				eeu.logger.Error("System package update failed", zap.Error(err))
+				return fmt.Errorf("system package update failed: %w\n\n"+
+					"This is a fatal error because broken packages can prevent eos from building.\n"+
+					"To force update despite package errors, use: --force-package-errors\n"+
+					"(Not recommended - may leave system with broken packages)", err)
+			} else {
+				// User explicitly forced continuation despite errors
+				eeu.logger.Warn("System package update failed but continuing due to --force-package-errors",
+					zap.Error(err))
+				eeu.logger.Warn("⚠️  WARNING: System may have broken packages")
+			}
+		} else {
+			eeu.logger.Info("✓ System packages updated successfully")
 		}
 	}
 
@@ -295,14 +309,29 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 
 // checkDiskSpace ensures we have enough space for the update
 // SECURITY CRITICAL: Prevents partial updates that corrupt system
+// P0 FIX (Adversarial #4): Dynamically calculates space based on actual binary size
 func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 	eeu.logger.Info("Verifying disk space requirements")
 
-	// Define space requirements
-	reqs := system.DefaultUpdateRequirements(
+	// P0 FIX: Get actual binary size for accurate space calculation
+	binaryInfo, err := os.Stat(eeu.config.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat binary for disk space calculation: %w", err)
+	}
+	binarySize := binaryInfo.Size()
+	binarySizeMB := float64(binarySize) / (1024 * 1024)
+
+	eeu.logger.Debug("Binary size for disk space calculation",
+		zap.Int64("bytes", binarySize),
+		zap.Float64("mb", binarySizeMB))
+
+	// Define space requirements based on ACTUAL binary size
+	// This prevents underestimation that would cause "no space left on device" errors
+	reqs := system.UpdateRequirementsWithBinarySize(
 		"/tmp",                             // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
 		eeu.config.SourceDir,               // Source directory
+		binarySize,                         // Actual binary size
 	)
 
 	// Verify disk space with enforcement
@@ -378,6 +407,21 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	}
 
 	eeu.logger.Info("Build dependencies verified")
+
+	// P0 FIX: Re-verify disk space immediately before build
+	// This prevents TOCTOU vulnerability where space was consumed between initial check and now
+	eeu.logger.Debug("Re-verifying disk space before build (TOCTOU prevention)")
+	reqs := system.DefaultUpdateRequirements(
+		"/tmp",                             // Temp directory for build
+		filepath.Dir(eeu.config.BinaryPath), // Binary directory
+		eeu.config.SourceDir,               // Source directory
+	)
+	if _, err := system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
+		return "", fmt.Errorf("disk space insufficient at build time: %w\n\n"+
+			"Space may have been consumed by other processes between initial check and build.\n"+
+			"Free up space and try again.", err)
+	}
+	eeu.logger.Debug("Disk space re-verification passed")
 
 	// Build command - use the Go path we found during verification
 	buildArgs := []string{"build", "-o", tempBinary, "."}
@@ -525,21 +569,84 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 		zap.String("sha256", currentHash[:16]+"..."),
 		zap.Float64("size_mb", currentSizeMB))
 
-	if err := eeu.CreateBackup(); err != nil {
-		return "", err
+	// P0 FIX: Generate deterministic backup filename and store BEFORE calling CreateBackup
+	// This prevents glob-based selection from picking up wrong backup in concurrent scenarios
+	timestamp := time.Now().Format("20060102-150405")
+	transactionID := fmt.Sprintf("%d", time.Now().UnixNano())
+	backupFilename := fmt.Sprintf("eos.backup.%s.%s", timestamp, transactionID)
+	expectedBackupPath := filepath.Join(eeu.config.BackupDir, backupFilename)
+
+	// Store backup path in transaction BEFORE creating it
+	eeu.transaction.BackupBinaryPath = expectedBackupPath
+	eeu.logger.Debug("Pre-allocated backup path for transaction",
+		zap.String("path", expectedBackupPath))
+
+	// Create backup directory if it doesn't exist
+	if err := os.MkdirAll(eeu.config.BackupDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	// Get the actual backup path that was just created
-	// CreateBackup() generates its own timestamp, so find the most recent backup
-	backups, err := filepath.Glob(filepath.Join(eeu.config.BackupDir, "eos.backup.*"))
-	if err != nil || len(backups) == 0 {
-		return "", fmt.Errorf("backup created but cannot find backup file")
+	// Copy binary to backup location
+	binaryData, err := os.ReadFile(eeu.config.BinaryPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read binary for backup: %w", err)
 	}
 
-	sort.Strings(backups)
-	eeu.transaction.BackupBinaryPath = backups[len(backups)-1] // Most recent
+	// P0 FIX (Adversarial #2): Hash the data we just read to detect TOCTOU
+	// Binary could have been replaced between stat and read
+	readHash := crypto.HashData(binaryData)
+	if readHash != currentHash {
+		return "", fmt.Errorf("SECURITY: Binary changed during backup\n"+
+			"Expected hash: %s\n"+
+			"Actual hash:   %s\n"+
+			"This could indicate:\n"+
+			"  1. Concurrent update in progress\n"+
+			"  2. Security compromise (binary replaced)\n"+
+			"  3. File system corruption\n"+
+			"ABORTING for safety", currentHash[:16]+"...", readHash[:16]+"...")
+	}
 
-	eeu.logger.Debug("Transaction backup recorded", zap.String("path", eeu.transaction.BackupBinaryPath))
+	if err := os.WriteFile(expectedBackupPath, binaryData, 0755); err != nil {
+		return "", fmt.Errorf("failed to write backup file: %w", err)
+	}
+
+	// Verify backup was created successfully
+	backupInfo, err := os.Stat(expectedBackupPath)
+	if err != nil {
+		return "", fmt.Errorf("backup file not found after creation: %w", err)
+	}
+
+	if backupInfo.Size() != currentBinaryInfo.Size() {
+		return "", fmt.Errorf("backup size mismatch: expected %d, got %d",
+			currentBinaryInfo.Size(), backupInfo.Size())
+	}
+
+	// P2 FIX (Adversarial #11): Verify backup hash matches original
+	// This detects silent corruption during backup write
+	backupHash, err := crypto.HashFile(expectedBackupPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to verify backup hash: %w", err)
+	}
+
+	if backupHash != currentHash {
+		// Backup is corrupted - delete it and fail
+		_ = os.Remove(expectedBackupPath)
+		return "", fmt.Errorf("backup hash mismatch after write\n"+
+			"Expected: %s\n"+
+			"Got:      %s\n"+
+			"Backup file deleted. This could indicate:\n"+
+			"  1. Disk write error\n"+
+			"  2. File system corruption\n"+
+			"  3. Out of space (partial write)\n"+
+			"Check disk health: sudo smartctl -a /dev/sda",
+			currentHash[:16]+"...", backupHash[:16]+"...")
+	}
+
+	eeu.logger.Info("Transaction backup created and verified",
+		zap.String("path", expectedBackupPath),
+		zap.Float64("size_mb", float64(backupInfo.Size())/(1024*1024)),
+		zap.String("sha256", currentHash[:16]+"..."))
+
 	return currentHash, nil
 }
 
@@ -553,6 +660,21 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
 // SECURITY: Uses flock(2) for kernel-level locking that survives process crashes
 func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 	eeu.logger.Info("Installing new binary atomically with flock protection")
+
+	// P0 FIX: Re-verify disk space immediately before installation
+	// This prevents TOCTOU vulnerability where space was consumed between build and install
+	eeu.logger.Debug("Re-verifying disk space before install (TOCTOU prevention)")
+	reqs := system.DefaultUpdateRequirements(
+		"/tmp",                             // Temp directory
+		filepath.Dir(eeu.config.BinaryPath), // Binary directory (critical for install)
+		eeu.config.SourceDir,               // Source directory
+	)
+	if _, err := system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
+		return fmt.Errorf("disk space insufficient at install time: %w\n\n"+
+			"Space may have been consumed by other processes between build and install.\n"+
+			"Free up space and try again.", err)
+	}
+	eeu.logger.Debug("Disk space re-verification passed")
 
 	// Acquire exclusive update lock using flock(2)
 	// This prevents concurrent updates and automatically releases on process death
@@ -610,8 +732,54 @@ type RollbackStep struct {
 func (eeu *EnhancedEosUpdater) Rollback() error {
 	eeu.logger.Warn("Initiating atomic rollback procedure")
 
+	// P0 FIX (Adversarial #1): Acquire flock BEFORE rollback operations
+	// This prevents race condition where concurrent update could run during rollback
+	// Without this, two processes could fight over the binary during restore
+	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
+	if err != nil {
+		eeu.logger.Error("Cannot acquire lock for rollback - another update may be in progress",
+			zap.Error(err))
+		return fmt.Errorf("cannot acquire rollback lock: %w\n\n"+
+			"Another eos update may be in progress.\n"+
+			"Wait for it to complete before retrying.\n"+
+			"If stuck, check: ps aux | grep eos", err)
+	}
+	defer updateLock.Release()
+
+	eeu.logger.Debug("Rollback lock acquired - safe to proceed")
+
 	// Define rollback steps in reverse order of operations
 	steps := []RollbackStep{
+		{
+			Name:        "cleanup_new_temp",
+			Description: "Cleanup .new temp file from failed atomic install",
+			Required:    false, // Best-effort cleanup, not critical
+			Execute: func() error {
+				// P0 FIX: Clean up .new temp file that may have been left by failed atomic install
+				tempNewPath := eeu.config.BinaryPath + ".new"
+				if _, err := os.Stat(tempNewPath); err == nil {
+					eeu.logger.Warn("Found stale .new temp file from failed install",
+						zap.String("path", tempNewPath))
+					if err := os.Remove(tempNewPath); err != nil {
+						return fmt.Errorf("failed to remove .new temp file: %w", err)
+					}
+					eeu.logger.Info("✓ Removed stale .new temp file")
+				}
+
+				// Also check for .restore temp file from previous rollback
+				tempRestorePath := eeu.config.BinaryPath + ".restore"
+				if _, err := os.Stat(tempRestorePath); err == nil {
+					eeu.logger.Warn("Found stale .restore temp file from failed rollback",
+						zap.String("path", tempRestorePath))
+					if err := os.Remove(tempRestorePath); err != nil {
+						return fmt.Errorf("failed to remove .restore temp file: %w", err)
+					}
+					eeu.logger.Info("✓ Removed stale .restore temp file")
+				}
+
+				return nil
+			},
+		},
 		{
 			Name:        "restore_binary",
 			Description: "Restore binary from backup",
@@ -651,7 +819,19 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					return fmt.Errorf("failed to install restored binary: %w", err)
 				}
 
-				eeu.logger.Info("✓ Binary restored from backup")
+				// P1 FIX: Verify restored binary is executable and functional
+				eeu.logger.Debug("Verifying restored binary is executable")
+				testCmd := exec.Command(eeu.config.BinaryPath, "version")
+				testCmd.Env = append(os.Environ(), "EOS_SKIP_UPDATE_CHECK=1") // Prevent recursion
+				if output, err := testCmd.CombinedOutput(); err != nil {
+					return fmt.Errorf("restored binary is not executable: %w\n"+
+						"Output: %s\n"+
+						"CRITICAL: Restored binary is corrupted - manual recovery required\n"+
+						"Restore from: %s",
+						err, string(output), eeu.transaction.BackupBinaryPath)
+				}
+
+				eeu.logger.Info("✓ Binary restored from backup and verified executable")
 				return nil
 			},
 		},
@@ -705,11 +885,13 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				if headOutput, err := headCmd.Output(); err == nil {
 					currentCommit := strings.TrimSpace(string(headOutput))
 					if currentCommit != eeu.transaction.GitCommitBefore {
+						// P1 FIX: Use full 40-char hashes in error messages (not truncated)
+						// Prevents ambiguity in large repos where short hashes may match multiple commits
 						return fmt.Errorf("git reset completed but HEAD mismatch\n"+
 							"Expected: %s\n"+
 							"Got: %s\n"+
 							"Manual recovery: git -C %s reset --hard %s",
-							eeu.transaction.GitCommitBefore[:8], currentCommit[:8],
+							eeu.transaction.GitCommitBefore, currentCommit,
 							eeu.config.SourceDir, eeu.transaction.GitCommitBefore)
 					}
 				}

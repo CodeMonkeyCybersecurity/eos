@@ -35,11 +35,13 @@ func PromptForConsent(rc *RuntimeContext, prompt string, defaultNo bool) (bool, 
 		return !defaultNo, nil
 	}
 
-	// Check for yes responses
+	// STRICT VALIDATION: Only accept y/yes/n/no (aligns with interaction/input.go and standard CLI tools)
+	// BREAKING CHANGE (2025-01-28): Removed "yeah", "ok", "sure", "nope", "nah" for consistency
+	// Rationale: Matches git/apt/npm behavior, aligns with documented policy (input_test.go:170)
 	switch response {
-	case "y", "yes", "yeah", "yep", "sure", "ok", "okay":
+	case "y", "yes":
 		return true, nil
-	case "n", "no", "nope", "nah":
+	case "n", "no":
 		return false, nil
 	default:
 		// Invalid response, ask again

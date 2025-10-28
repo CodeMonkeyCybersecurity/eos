@@ -13,18 +13,30 @@ import (
 )
 
 var updateHecateRouteCmd = &cobra.Command{
-	Use:   "hecate-route",
-	Short: "Update an existing Hecate route configuration",
-	Long: `Update an existing reverse proxy route configuration in Hecate.
+	Use:   "route",
+	Short: "Add or update Hecate route configuration",
+	Long: `Add a new route or update an existing reverse proxy route configuration in Hecate.
 
-This command allows you to modify various aspects of a route including its
-upstream backend, authentication policy, headers, and health check settings.
+Use the --add flag to create a new route. Without --add, this command updates an existing route.
+
+This command allows you to:
+  - Create new routes with --add flag
+  - Modify upstream backend addresses
+  - Update authentication policies
+  - Add or remove custom headers
+  - Configure health check settings
 
 Examples:
-  eos update hecate-route --domain app.example.com --upstream localhost:3001
-  eos update hecate-route --domain api.example.com --auth-policy new-api-policy
-  eos update hecate-route --domain secure.example.com --add-header "X-Custom-Header=value"
-  eos update hecate-route --domain app.example.com --health-check-path /health`,
+  # Add a new route
+  eos update hecate route --add --domain app.example.com --upstream localhost:3000
+  eos update hecate route --add --domain api.example.com --upstream localhost:8080 --auth-policy api-users
+  eos update hecate route --add  # Interactive mode (prompts for inputs)
+
+  # Update an existing route
+  eos update hecate route --domain app.example.com --upstream localhost:3001
+  eos update hecate route --domain api.example.com --auth-policy new-api-policy
+  eos update hecate route --domain secure.example.com --add-header "X-Custom-Header=value"
+  eos update hecate route --domain app.example.com --health-check-path /health`,
 	RunE: eos_cli.Wrap(runUpdateHecateRoute),
 }
 
@@ -32,32 +44,39 @@ func init() {
 	UpdateCmd.AddCommand(updateHecateRouteCmd)
 
 	// Define flags
-	updateHecateRouteCmd.Flags().String("domain", "", "Domain name of the route to update (prompted if not provided)")
-	updateHecateRouteCmd.Flags().String("upstream", "", "New upstream backend address")
-	updateHecateRouteCmd.Flags().String("auth-policy", "", "New authentication policy name")
+	updateHecateRouteCmd.Flags().Bool("add", false, "Create a new route instead of updating an existing one")
+	updateHecateRouteCmd.Flags().String("domain", "", "Domain name of the route (prompted if not provided)")
+	updateHecateRouteCmd.Flags().String("upstream", "", "Upstream backend address (prompted if not provided with --add)")
+	updateHecateRouteCmd.Flags().Bool("require-auth", false, "Require Authentik SSO authentication")
 	updateHecateRouteCmd.Flags().StringSlice("add-header", []string{}, "Add custom headers in key=value format")
 	updateHecateRouteCmd.Flags().StringSlice("remove-header", []string{}, "Remove custom headers by key")
-	updateHecateRouteCmd.Flags().String("health-check-path", "", "New health check endpoint path")
-	updateHecateRouteCmd.Flags().String("health-check-interval", "", "New health check interval")
-	updateHecateRouteCmd.Flags().Bool("disable-auth", false, "Remove authentication requirement")
-	updateHecateRouteCmd.Flags().Bool("enable-mfa", false, "Enable MFA requirement for authentication")
-	updateHecateRouteCmd.Flags().Bool("force", false, "Force update without confirmation")
+	updateHecateRouteCmd.Flags().String("auth-policy", "", "Authentication policy name (for update only)")
+	updateHecateRouteCmd.Flags().Bool("disable-auth", false, "Remove authentication requirement (for update only)")
+	updateHecateRouteCmd.Flags().Bool("force", false, "Skip confirmation prompt")
 }
 
 func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Parse flags
+	addMode, _ := cmd.Flags().GetBool("add")
 	domain, _ := cmd.Flags().GetString("domain")
 	upstream, _ := cmd.Flags().GetString("upstream")
-	authPolicy, _ := cmd.Flags().GetString("auth-policy")
+	requireAuth, _ := cmd.Flags().GetBool("require-auth")
 	addHeaders, _ := cmd.Flags().GetStringSlice("add-header")
-	removeHeaders, _ := cmd.Flags().GetStringSlice("remove-header")
-	healthCheckPath, _ := cmd.Flags().GetString("health-check-path")
-	healthCheckInterval, _ := cmd.Flags().GetString("health-check-interval")
-	disableAuth, _ := cmd.Flags().GetBool("disable-auth")
 	force, _ := cmd.Flags().GetBool("force")
 
+	// Branch on --add flag: create new route vs update existing
+	if addMode {
+		return runCreateNewRoute(rc, domain, upstream, requireAuth, addHeaders, force)
+	}
+
+	// UPDATE EXISTING ROUTE - parse additional update-specific flags
+	authPolicy, _ := cmd.Flags().GetString("auth-policy")
+	removeHeaders, _ := cmd.Flags().GetStringSlice("remove-header")
+	disableAuth, _ := cmd.Flags().GetBool("disable-auth")
+
+	// UPDATE EXISTING ROUTE LOGIC
 	// Prompt for domain if not provided
 	if domain == "" {
 		logger.Info("Domain not provided via flag, prompting user")
@@ -95,7 +114,7 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
-		
+
 		currentRoute, err := hecate.GetRoute(rc, config, domain)
 		if err != nil {
 			return fmt.Errorf("failed to get current route: %w", err)
@@ -126,18 +145,6 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		updates["headers"] = headers
 	}
 
-	// Handle health check updates
-	if healthCheckPath != "" || healthCheckInterval != "" {
-		healthCheckUpdates := make(map[string]interface{})
-		if healthCheckPath != "" {
-			healthCheckUpdates["path"] = healthCheckPath
-		}
-		if healthCheckInterval != "" {
-			healthCheckUpdates["interval"] = healthCheckInterval
-		}
-		updates["health_check"] = healthCheckUpdates
-	}
-
 	// Check if any updates were specified
 	if len(updates) == 0 {
 		return fmt.Errorf("no updates specified")
@@ -152,7 +159,7 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Confirm unless force flag is set
 	if !force {
 		logger.Info("terminal prompt: Do you want to proceed with these updates? (y/N)")
-		
+
 		confirm, err := eos_io.PromptInput(rc, "Confirm", "Proceed with updates? (y/N)")
 		if err != nil {
 			return fmt.Errorf("failed to read confirmation: %w", err)
@@ -169,26 +176,26 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	// Convert updates map to Route object
 	updatedRoute := &hecate.Route{
 		Domain: domain,
 	}
-	
+
 	if upstream, ok := updates["upstream"]; ok {
 		updatedRoute.Upstream = &hecate.Upstream{URL: upstream.(string)}
 	}
-	
+
 	if authPolicy, ok := updates["auth_policy"]; ok {
 		if authPolicy.(string) != "" {
 			updatedRoute.AuthPolicy = &hecate.AuthPolicy{Name: authPolicy.(string)}
 		}
 	}
-	
+
 	if headers, ok := updates["headers"]; ok {
 		updatedRoute.Headers = headers.(map[string]string)
 	}
-	
+
 	if err := hecate.UpdateRoute(rc, config, domain, updatedRoute); err != nil {
 		return fmt.Errorf("failed to update route: %w", err)
 	}
@@ -199,7 +206,7 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	// Display success message
 	logger.Info("terminal prompt: Route updated successfully!")
 	logger.Info("terminal prompt: Domain", zap.String("value", domain))
-	
+
 	if upstream != "" {
 		logger.Info("terminal prompt: New Upstream", zap.String("value", upstream))
 	}
@@ -212,7 +219,7 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Verify the route is still working
 	logger.Info("terminal prompt: Verifying route functionality...")
-	
+
 	// Get the route for health check
 	route, err := hecate.GetRoute(rc, config, domain)
 	if err != nil {
@@ -233,4 +240,18 @@ func runUpdateHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	}
 
 	return nil
+}
+
+// runCreateNewRoute handles the --add flag to create a new route
+// This is now a thin wrapper around the shared pkg/hecate/CreateRouteInteractive
+func runCreateNewRoute(rc *eos_io.RuntimeContext, domain, upstream string, requireAuth bool, headers []string, force bool) error {
+	opts := &hecate.RouteCreationOptions{
+		Domain:      domain,
+		Upstream:    upstream,
+		RequireAuth: requireAuth,
+		Headers:     headers,
+		Force:       force,
+	}
+
+	return hecate.CreateRouteInteractive(rc, opts)
 }
