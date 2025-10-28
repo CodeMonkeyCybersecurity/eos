@@ -11,7 +11,7 @@ import (
 
 // addServiceCmd adds a new service to Hecate
 var addServiceCmd = &cobra.Command{
-	Use:   "--add",
+	Use:   "add",
 	Short: "Add a new reverse proxy route to Hecate",
 	Long: `Add a new service to an existing Hecate installation by modifying the Caddyfile.
 
@@ -25,27 +25,27 @@ This command:
 
 Examples:
   # Basic service without SSO
-  eos update hecate --add \
+  eos update hecate add \
     --service bionicgpt \
     --dns chat.codemonkey.ai \
     --backend 100.64.0.50:8080
 
   # Service with SSO enabled
-  eos update hecate --add \
+  eos update hecate add \
     --service nextcloud \
     --dns cloud.codemonkey.ai \
     --backend 100.64.0.51:80 \
     --sso
 
   # Dry run to see what would be changed
-  eos update hecate --add \
+  eos update hecate add \
     --service wazuh \
     --dns wazuh.codemonkey.ai \
     --backend 100.64.0.52:443 \
     --dry-run
 
   # With custom Caddy directives
-  eos update hecate --add \
+  eos update hecate add \
     --service api \
     --dns api.codemonkey.ai \
     --backend 100.64.0.53:3000 \
@@ -58,10 +58,10 @@ func init() {
 	// Add as subcommand of updateHecateCmd
 	updateHecateCmd.AddCommand(addServiceCmd)
 
-	// Required flags
-	addServiceCmd.Flags().String("service", "", "Service name (alphanumeric, hyphens, underscores)")
-	addServiceCmd.Flags().String("dns", "", "Domain/subdomain for this service")
-	addServiceCmd.Flags().String("backend", "", "Backend address (ip:port or hostname:port)")
+	// Required flags with short aliases for better UX
+	addServiceCmd.Flags().StringP("service", "s", "", "Service name (alphanumeric, hyphens, underscores)")
+	addServiceCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for this service (aliases: --domain, --route, --host)")
+	addServiceCmd.Flags().StringP("backend", "b", "", "Backend address (ip:port or hostname:port) (aliases: --upstream, --target)")
 
 	// Optional flags
 	addServiceCmd.Flags().Bool("sso", false, "Enable SSO for this route")

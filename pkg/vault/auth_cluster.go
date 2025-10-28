@@ -436,8 +436,9 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		ttlSeconds, err := ttlRaw.Int64()
 		if err != nil {
 			// SECURITY: Log malformed TTL values (could indicate attack or Vault bug)
+			// P1 Issue #40 Fix: Sanitize raw input before logging to prevent log injection
 			logger.Warn("⚠️  Token has malformed TTL field",
-				zap.String("ttl_raw", string(ttlRaw)),
+				zap.String("ttl_raw", sanitizeForLogging(string(ttlRaw))),
 				zap.Error(err))
 			// Skip race condition check if TTL is malformed
 			// Original validation passed, so continue with operation
@@ -499,8 +500,9 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 					if err != nil {
 						// SECURITY: Log malformed TTL values (could indicate attack or Vault bug)
 						// P2 Issue #25 Fix: Check Int64() error instead of ignoring it
+						// P1 Issue #40 Fix: Sanitize raw input before logging to prevent log injection
 						logger.Warn("⚠️  Refreshed token has malformed TTL field",
-							zap.String("ttl_raw", string(ttlRefreshRaw)),
+							zap.String("ttl_raw", sanitizeForLogging(string(ttlRefreshRaw))),
 							zap.Error(err))
 						// Can't validate fresh TTL, but original validation passed
 						return nil
@@ -562,6 +564,48 @@ func formatTTLDuration(seconds int64) string {
 	return fmt.Sprintf("%dh", hours)
 }
 
+// sanitizeForLogging truncates and sanitizes potentially malicious input before logging.
+// This prevents log injection attacks and excessive log file consumption.
+//
+// P1 Issue #40 Fix: Malicious Vault responses could contain:
+//   - Extremely long strings (DoS log files)
+//   - Control characters (log injection, terminal escape sequences)
+//   - ANSI escape codes (terminal manipulation)
+//
+// Security properties:
+//   - Truncates to 100 chars max (prevents log file DoS)
+//   - Removes control characters (prevents log injection)
+//   - Preserves printable ASCII and common UTF-8
+//   - Adds ellipsis if truncated
+func sanitizeForLogging(raw string) string {
+	const maxLength = 100
+
+	// Remove control characters (ASCII 0-31 except tab/newline, ASCII 127)
+	// Keep: tab(9), newline(10), carriage return(13), printable(32-126), UTF-8(128+)
+	sanitized := strings.Map(func(r rune) rune {
+		// Control characters (except tab, newline, CR)
+		if r < 32 && r != 9 && r != 10 && r != 13 {
+			return -1 // Remove
+		}
+		// DEL character
+		if r == 127 {
+			return -1 // Remove
+		}
+		// ANSI escape sequences start with ESC (27)
+		if r == 27 {
+			return -1 // Remove
+		}
+		return r
+	}, raw)
+
+	// Truncate if too long
+	if len(sanitized) > maxLength {
+		return sanitized[:maxLength] + "...[truncated]"
+	}
+
+	return sanitized
+}
+
 // isPeriodicToken checks if a token is periodic (auto-renewable).
 // Periodic tokens have a non-zero period value and will automatically renew.
 //
@@ -591,9 +635,10 @@ func isPeriodicToken(rc *eos_io.RuntimeContext, secret *api.Secret) (bool, int64
 		if err != nil {
 			// SECURITY: Log malformed period values (could indicate attack or Vault bug)
 			// P0 Issue #21 Fix: Don't silently return false - log for forensics
+			// P1 Issue #40 Fix: Sanitize raw input before logging to prevent log injection
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Warn("⚠️  Token has malformed period field (treating as non-periodic)",
-				zap.String("period_raw", string(periodRaw)),
+				zap.String("period_raw", sanitizeForLogging(string(periodRaw))),
 				zap.Error(err))
 			return false, 0
 		}
