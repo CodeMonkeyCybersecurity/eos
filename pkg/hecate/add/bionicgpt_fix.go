@@ -5,6 +5,8 @@ package add
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -76,14 +78,16 @@ func (f *BionicGPTFixer) Fix(rc *eos_io.RuntimeContext, opts *FixOptions) error 
 
 // DriftAssessment tracks what needs fixing
 type DriftAssessment struct {
-	AuthentikClient      *authentik.APIClient
-	DNS                  string
-	ProxyProviderMissing bool
-	ProxyProviderPK      int
+	AuthentikClient         *authentik.APIClient
+	DNS                     string
+	ProxyProviderMissing    bool
+	ProxyProviderPK         int
 	InvalidationFlowMissing bool
-	ApplicationMissing   bool
-	GroupsMissing        []string
-	OutpostNotAssigned   bool
+	ApplicationMissing      bool
+	GroupsMissing           []string
+	OutpostNotAssigned      bool
+	CaddyfileDuplicates     int  // Number of duplicate entries in Caddyfile
+	CaddyfileMissingHeaders bool // True if header_up mappings are missing
 }
 
 // dryRun shows what would be fixed
@@ -132,6 +136,21 @@ func (f *BionicGPTFixer) dryRun(rc *eos_io.RuntimeContext) error {
 		issuesFound++
 	} else {
 		logger.Info("✓ Application assigned to outpost")
+	}
+
+	// Caddyfile issues
+	if assessment.CaddyfileDuplicates > 1 {
+		logger.Info(fmt.Sprintf("Would fix: Remove %d duplicate Caddyfile entries", assessment.CaddyfileDuplicates-1))
+		issuesFound++
+	}
+
+	if assessment.CaddyfileMissingHeaders {
+		logger.Info("Would fix: Add missing X-Auth-Request-* header mappings to Caddyfile")
+		issuesFound++
+	}
+
+	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders {
+		logger.Info("✓ Caddyfile configuration is correct")
 	}
 
 	logger.Info("")
@@ -229,6 +248,12 @@ func (f *BionicGPTFixer) assess(rc *eos_io.RuntimeContext) (*DriftAssessment, er
 	// Full implementation would query outpost providers
 	assessment.OutpostNotAssigned = false // TODO: Implement full check
 
+	// Check Caddyfile for duplicates and missing headers
+	if err := f.assessCaddyfile(rc, assessment); err != nil {
+		logger.Warn("Failed to assess Caddyfile", zap.Error(err))
+		// Non-fatal - continue with other checks
+	}
+
 	return assessment, nil
 }
 
@@ -321,6 +346,14 @@ func (f *BionicGPTFixer) intervene(rc *eos_io.RuntimeContext, assessment *DriftA
 		}
 	}
 
+	// Fix Caddyfile duplicates and missing headers
+	if assessment.CaddyfileDuplicates > 1 || assessment.CaddyfileMissingHeaders {
+		if err := f.fixCaddyfileDuplicates(rc, assessment); err != nil {
+			return fixedCount, fmt.Errorf("failed to fix Caddyfile: %w", err)
+		}
+		fixedCount++
+	}
+
 	return fixedCount, nil
 }
 
@@ -387,4 +420,167 @@ func (f *BionicGPTFixer) checkGroupExists(ctx context.Context, client *authentik
 	}
 
 	return false, nil
+}
+
+// assessCaddyfile checks for duplicate entries and missing headers in Caddyfile
+func (f *BionicGPTFixer) assessCaddyfile(rc *eos_io.RuntimeContext, assessment *DriftAssessment) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	caddyfilePath := "/etc/caddy/Caddyfile"
+
+	content, err := os.ReadFile(caddyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read Caddyfile: %w", err)
+	}
+
+	caddyfileContent := string(content)
+	dns := assessment.DNS
+
+	// Count how many times this DNS appears as a site block
+	// Pattern: "dns.example.com {" at start of line
+	dnsPattern := fmt.Sprintf("\n%s {", dns)
+	duplicateCount := strings.Count(caddyfileContent, dnsPattern)
+
+	if duplicateCount > 1 {
+		assessment.CaddyfileDuplicates = duplicateCount
+		logger.Debug("Found duplicate Caddyfile entries",
+			zap.String("dns", dns),
+			zap.Int("count", duplicateCount))
+	}
+
+	// Check if header_up mappings exist
+	// These are CRITICAL for BionicGPT authentication
+	requiredHeaders := []string{
+		"header_up X-Auth-Request-Email",
+		"header_up X-Auth-Request-User",
+		"header_up X-Auth-Request-Groups",
+	}
+
+	missingHeaders := false
+	for _, header := range requiredHeaders {
+		if !strings.Contains(caddyfileContent, header) {
+			missingHeaders = true
+			logger.Debug("Missing header mapping in Caddyfile", zap.String("header", header))
+			break
+		}
+	}
+	assessment.CaddyfileMissingHeaders = missingHeaders
+
+	return nil
+}
+
+// fixCaddyfileDuplicates removes duplicate entries and ensures correct headers
+func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, assessment *DriftAssessment) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	caddyfilePath := "/etc/caddy/Caddyfile"
+
+	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders {
+		return nil // Nothing to fix
+	}
+
+	logger.Info("Fixing Caddyfile configuration",
+		zap.Int("duplicates", assessment.CaddyfileDuplicates),
+		zap.Bool("missing_headers", assessment.CaddyfileMissingHeaders))
+
+	content, err := os.ReadFile(caddyfilePath)
+	if err != nil {
+		return fmt.Errorf("failed to read Caddyfile: %w", err)
+	}
+
+	dns := assessment.DNS
+	caddyfileContent := string(content)
+
+	// Strategy: Remove ALL blocks for this DNS, then add ONE correct block
+	lines := strings.Split(caddyfileContent, "\n")
+	var filteredLines []string
+	insideTargetBlock := false
+	braceDepth := 0
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Check if this line starts a block for our DNS
+		if strings.HasPrefix(trimmed, dns+" {") {
+			insideTargetBlock = true
+			braceDepth = 1
+			continue // Skip this line
+		}
+
+		if insideTargetBlock {
+			// Track brace depth to know when block ends
+			braceDepth += strings.Count(line, "{")
+			braceDepth -= strings.Count(line, "}")
+
+			if braceDepth == 0 {
+				insideTargetBlock = false
+			}
+			continue // Skip all lines in this block
+		}
+
+		filteredLines = append(filteredLines, line)
+	}
+
+	// Now append ONE correct block at the end
+	correctBlock := f.generateCorrectCaddyfileBlock(assessment)
+	filteredLines = append(filteredLines, "", "", correctBlock)
+
+	newContent := strings.Join(filteredLines, "\n")
+
+	// Write back to Caddyfile
+	if err := os.WriteFile(caddyfilePath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("failed to write Caddyfile: %w", err)
+	}
+
+	logger.Info("✓ Caddyfile duplicates removed and correct configuration added")
+
+	// Reload Caddy to apply changes
+	logger.Info("Reloading Caddy configuration...")
+	if err := ReloadCaddy(rc, caddyfilePath); err != nil {
+		return fmt.Errorf("failed to reload Caddy: %w", err)
+	}
+
+	logger.Info("✓ Caddy reloaded successfully")
+	return nil
+}
+
+// generateCorrectCaddyfileBlock generates the correct Caddyfile block with all required headers
+func (f *BionicGPTFixer) generateCorrectCaddyfileBlock(assessment *DriftAssessment) string {
+	// Get backend from existing route or use default
+	backend := "100.71.196.79:8513" // TODO: Extract from existing Caddyfile
+
+	return fmt.Sprintf(`# Service: bionicgpt (BionicGPT with Authentik Forward Auth)
+%s {
+    import cybermonkey_common
+
+    # CRITICAL: Proxy Authentik outpost paths for forward auth to work
+    # Without this, forward_auth validation will fail
+    handle /outpost.goauthentik.io/* {
+        reverse_proxy http://localhost:9000
+    }
+
+    # Forward auth to Authentik for authentication
+    # Authentik validates session and returns X-Authentik-* headers
+    forward_auth http://localhost:9000 {
+        uri /outpost.goauthentik.io/auth/caddy
+        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid
+    }
+
+    # Map Authentik headers → BionicGPT expected headers
+    # BionicGPT expects X-Auth-Request-* (oauth2-proxy format)
+    # Authentik sends X-Authentik-*
+    # Caddy maps between them here
+    header_up X-Auth-Request-Email {http.request.header.X-Authentik-Email}
+    header_up X-Auth-Request-User {http.request.header.X-Authentik-Username}
+    header_up X-Auth-Request-Groups {http.request.header.X-Authentik-Groups}
+
+    # Additional logging for this service
+    log {
+        output file /var/log/caddy/bionicgpt.log
+        format json
+        level DEBUG
+    }
+
+    # Reverse proxy to BionicGPT backend
+    # Backend receives X-Auth-Request-* headers and trusts them for authentication
+    reverse_proxy http://%s
+}`, assessment.DNS, backend)
 }

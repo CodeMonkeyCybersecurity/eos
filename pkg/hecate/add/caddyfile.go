@@ -74,7 +74,7 @@ const (
 	bionicgptForwardAuthTemplate = `
 # Service: {{.Service}} (BionicGPT with Authentik Forward Auth)
 {{.DNS}} {
-    import common
+    import cybermonkey_common
 
     # CRITICAL: Proxy Authentik outpost paths for forward auth to work
     # Without this, forward_auth validation will fail

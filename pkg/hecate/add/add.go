@@ -436,6 +436,21 @@ func runAppendRoutePhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error 
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Phase 4/6: Updating Caddyfile...")
 
+	// SAFETY CHECK: Re-verify no duplicate before appending
+	// This prevents race conditions and guards against logic bugs
+	duplicateResult, err := CheckDuplicateService(rc, CaddyfilePath, opts.Service, opts.DNS)
+	if err != nil {
+		return fmt.Errorf("failed to check for duplicates before append: %w", err)
+	}
+
+	if duplicateResult.HasDuplicate {
+		logger.Warn("Route already exists in Caddyfile - skipping append to prevent duplicate",
+			zap.String("dns", opts.DNS),
+			zap.String("service", opts.Service))
+		logger.Info("✓ Route already configured (no changes needed)")
+		return nil
+	}
+
 	// Generate route configuration
 	routeConfig, err := GenerateRouteConfig(opts)
 	if err != nil {
