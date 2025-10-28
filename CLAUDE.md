@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-01-24*
+*Last Updated: 2025-01-28*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -76,6 +76,43 @@ These violations cause immediate failure:
       - ✗ `os.WriteFile(file, data, 0600)` - use `vault.VaultSecretFilePerm`
       - ✗ `os.Chmod(file, 0644)` - use `vault.VaultConfigPerm`
     - **Required for**: SOC2, PCI-DSS, HIPAA compliance audits
+13. **Required Flag Prompting - HUMAN-CENTRIC (P0 - BREAKING)**: If a required flag is missing, NEVER fail immediately. ALWAYS offer interactive fallback with informed consent.
+    - **Philosophy**: "Technology serves humans, not the other way around" - missing flags are barriers to entry that violate human-centric design
+    - **Violation example**: `if flag == "" { return fmt.Errorf("--flag is required") }` ← BREAKS HUMAN-CENTRICITY
+    - **Correct pattern**: Use fallback chain with informed consent:
+      1. CLI flag (if explicitly set via `cmd.Flags().Changed()`)
+      2. Environment variable (if configured, e.g., `VAULT_TOKEN`)
+      3. Interactive prompt (if TTY available, with help text explaining WHY and HOW)
+      4. Default value (if `AllowEmpty` is true and default makes sense)
+      5. Error with remediation (if non-interactive mode, include clear steps)
+    - **Required elements** (all MUST be present):
+      - ✓ **Help text**: WHY is this required? HOW to get the value? (e.g., "Get via: vault token create")
+      - ✓ **Source logging**: ALWAYS log which fallback was used (CLI/env/prompt) for observability
+      - ✓ **Validation**: Validate input, retry with clear guidance (max 3 attempts)
+      - ✓ **Security**: Use `IsSecret: true` for passwords/tokens (no terminal echo)
+      - ✓ **Non-interactive handling**: Detect early, return error with actionable remediation
+      - ✓ **Empty detection**: Use `cmd.Flags().Changed()` to distinguish `--flag=""` from not provided
+    - **Implementation pattern**:
+      ```go
+      // GOOD: Human-centric with fallback chain
+      tokenFlag, _ := cmd.Flags().GetString("token")
+      tokenWasSet := cmd.Flags().Changed("token")
+
+      result, err := interaction.GetRequiredString(rc, tokenFlag, tokenWasSet, &interaction.RequiredFlagConfig{
+          FlagName:      "token",
+          EnvVarName:    "VAULT_TOKEN",
+          PromptMessage: "Enter Vault root token: ",
+          HelpText:      "Required for cluster operations. Get via: vault token create",
+          IsSecret:      true,
+      })
+      if err != nil {
+          return fmt.Errorf("failed to get vault token: %w", err)
+      }
+
+      log.Info("Using Vault token", zap.String("source", string(result.Source)))
+      ```
+    - **Reference implementation**: [cmd/update/vault_cluster.go:287-334](cmd/update/vault_cluster.go#L287-L334) (`getAuthenticatedVaultClient` helper demonstrates pattern)
+    - **Migration**: Required for NEW code starting 2025-01-28. Existing ad-hoc patterns grandfathered but encouraged to migrate.
 
 
 ## Quick Decision Trees
@@ -86,9 +123,16 @@ New Service Deployment?
 ├─ Web application (Umami, Grafana) → Docker Compose in /opt/[service]
 └─ Infrastructure (Vault, Consul) → Check existing patterns in pkg/
 
-Need User Input?
-├─ Flag provided → Use it
-└─ Flag missing → Prompt interactively (eos_io.PromptInput)
+Need User Input (P0 - Human-Centric)?
+├─ Flag explicitly provided (cmd.Flags().Changed) → Use it
+├─ Env var set (and configured in RequiredFlagConfig) → Use it, log source
+├─ Flag required & missing & TTY available → Use interaction.GetRequiredString(...)
+│  ├─ Show help text (WHY needed, HOW to get)
+│  ├─ Prompt with validation (IsSecret: true for passwords)
+│  ├─ Retry on validation failure (max 3 attempts)
+│  └─ Log which source provided value (observability)
+├─ Flag required & missing & non-interactive → Error with remediation steps
+└─ Flag optional → Use default value, don't prompt
 
 Error Type?
 ├─ User fixable → eos_err.NewUserError() → exit(0)
@@ -730,6 +774,11 @@ Before completing any task, verify:
 | `eos fix vault` | `eos update vault --fix` (fix is deprecated) |
 | `eos fix consul` | `eos update consul --fix` |
 | `eos fix mattermost` | `eos update mattermost --fix` |
+| `if flag == "" { return error }` | Use `interaction.GetRequiredString()` (P0 - human-centric) |
+| Ad-hoc flag prompting in cmd/ | Use unified `pkg/interaction/required_flag.go` pattern |
+| Prompt without help text | Always include HelpText (WHY needed, HOW to get) |
+| Silent env var fallback | Always log which source provided value (observability) |
+| Can't detect `--flag=""` vs missing | Use `cmd.Flags().Changed()` to distinguish |
 
 ## Priority Levels
 

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/term"
@@ -76,9 +77,15 @@ func PromptInput(args ...interface{}) string {
 	return PromptRequired("")
 }
 
-// PromptYesNo prompts for yes/no and returns true for yes
-// P0 FIX: Added error handling, input validation, and retry logic
-// For new code, use pkg/prompt.YesNo which has RuntimeContext support
+// PromptYesNo prompts for yes/no and returns true for yes.
+//
+// DEPRECATED: Use PromptYesNoSafe for new code. This function has:
+//   - Variadic args (less type-safe)
+//   - No error return (hides failures, uses default instead)
+//   - Kept for backward compatibility until Eos v2.0.0
+//
+// Accepted inputs: y, yes, n, no (case-insensitive), or Enter for default.
+// Displays: [Y/n] for default=yes, [y/N] for default=no.
 func PromptYesNo(args ...interface{}) bool {
 	var question string
 	var defaultYes bool
@@ -138,17 +145,17 @@ func PromptYesNo(args ...interface{}) bool {
 			return defaultYes
 		}
 
-		// P0 FIX: Validate input and accept common variations
+		// STRICT: Only accept y/yes/n/no (aligns with standard CLI tools like git, apt)
 		switch response {
-		case "y", "yes", "yeah", "yep", "sure", "ok", "true", "1":
+		case "y", "yes":
 			logger.Debug("User answered yes", zap.String("response", response))
 			return true
-		case "n", "no", "nope", "nah", "false", "0":
+		case "n", "no":
 			logger.Debug("User answered no", zap.String("response", response))
 			return false
 		default:
-			// P0 FIX: Invalid input - retry with guidance (was: silent wrong answer)
-			logger.Warn("Invalid input. Please enter 'y' for yes or 'n' for no.",
+			// Invalid input - retry with guidance
+			logger.Warn("Invalid input. Please enter 'y' or 'yes' for yes, 'n' or 'no' for no, or press Enter for default.",
 				zap.String("input", response),
 				zap.Int("attempt", attempt),
 				zap.Int("remaining", maxAttempts-attempt))
@@ -170,6 +177,111 @@ func PromptYesNo(args ...interface{}) bool {
 		zap.Error(lastErr),
 		zap.Bool("default", defaultYes))
 	return defaultYes
+}
+
+// PromptYesNoSafe prompts for yes/no with explicit RuntimeContext and error handling.
+//
+// RECOMMENDED for new code. Provides:
+//   - Type-safe signature (no variadic args)
+//   - Explicit RuntimeContext parameter
+//   - Error return (caller can decide how to handle failures)
+//   - Same behavior as PromptYesNo (retry logic, defaults, strict validation)
+//
+// Parameters:
+//   - rc: RuntimeContext for logging and context propagation
+//   - question: The question to ask (e.g., "Deploy with this configuration?")
+//   - defaultYes: Default answer if user presses Enter (true = [Y/n], false = [y/N])
+//
+// Returns:
+//   - bool: User's answer (true = yes, false = no)
+//   - error: nil on success, error if reading fails or reaches max attempts
+//
+// Accepted inputs: y, yes, n, no (case-insensitive), or Enter for default.
+//
+// Example:
+//
+//	proceed, err := interaction.PromptYesNoSafe(rc, "Continue with deployment?", false)
+//	if err != nil {
+//	    return fmt.Errorf("failed to get user confirmation: %w", err)
+//	}
+//	if !proceed {
+//	    log.Info("Deployment cancelled by user")
+//	    return nil
+//	}
+func PromptYesNoSafe(rc *eos_io.RuntimeContext, question string, defaultYes bool) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	prompt := question
+	if defaultYes {
+		prompt += " [Y/n]: "
+	} else {
+		prompt += " [y/N]: "
+	}
+
+	logger.Info("terminal prompt: yes/no question", zap.String("question", question))
+
+	const maxAttempts = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		reader := bufio.NewReader(getStdinReader())
+		response, err := reader.ReadString('\n')
+
+		// Handle errors
+		if err != nil {
+			lastErr = err
+			if err == io.EOF {
+				logger.Warn("Reached end of input (EOF), using default",
+					zap.Bool("default", defaultYes),
+					zap.String("question", question))
+				return defaultYes, nil
+			}
+			logger.Warn("Failed to read input, retrying",
+				zap.Error(err),
+				zap.Int("attempt", attempt),
+				zap.Int("max_attempts", maxAttempts))
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		response = strings.TrimSpace(strings.ToLower(response))
+
+		// Handle empty input (use default)
+		if response == "" {
+			logger.Debug("Empty input, using default",
+				zap.Bool("default", defaultYes))
+			return defaultYes, nil
+		}
+
+		// STRICT: Only accept y/yes/n/no (aligns with standard CLI tools like git, apt)
+		switch response {
+		case "y", "yes":
+			logger.Debug("User answered yes", zap.String("response", response))
+			return true, nil
+		case "n", "no":
+			logger.Debug("User answered no", zap.String("response", response))
+			return false, nil
+		default:
+			// Invalid input - retry with guidance
+			logger.Warn("Invalid input. Please enter 'y' or 'yes' for yes, 'n' or 'no' for no, or press Enter for default.",
+				zap.String("input", response),
+				zap.Int("attempt", attempt),
+				zap.Int("remaining", maxAttempts-attempt))
+
+			if attempt == maxAttempts {
+				logger.Error("Maximum attempts reached",
+					zap.String("question", question),
+					zap.Int("attempts", maxAttempts))
+				return false, fmt.Errorf("maximum input attempts (%d) exceeded for question: %s", maxAttempts, question)
+			}
+
+			// Prompt again
+			logger.Info("terminal prompt: " + prompt)
+		}
+	}
+
+	// Should never reach here, but handle gracefully
+	return false, fmt.Errorf("unexpected prompt state after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // PromptSelect prompts the user to select from options

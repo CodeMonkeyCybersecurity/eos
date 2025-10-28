@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -116,14 +117,14 @@ func runVaultClusterJoin(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 func runVaultClusterAutopilot(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// Get token
-	token, _ := cmd.Flags().GetString("token")
-	if token == "" {
-		token = os.Getenv("VAULT_TOKEN")
+	// ASSESS: Get authenticated client (delegates to pkg/vault for authentication)
+	client, token, err := getAuthenticatedVaultClient(rc, cmd)
+	if err != nil {
+		return err // Error already includes remediation guidance
 	}
-	if token == "" {
-		return fmt.Errorf("vault token required (use --token or set VAULT_TOKEN)")
-	}
+
+	// Use client to ensure it's not unused
+	_ = client
 
 	// Parse Autopilot configuration
 	cleanupDeadServers, _ := cmd.Flags().GetBool("cleanup-dead-servers")
@@ -156,14 +157,14 @@ func runVaultClusterAutopilot(rc *eos_io.RuntimeContext, cmd *cobra.Command) err
 func runVaultClusterSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// Get token
-	token, _ := cmd.Flags().GetString("token")
-	if token == "" {
-		token = os.Getenv("VAULT_TOKEN")
+	// ASSESS: Get authenticated client (delegates to pkg/vault for authentication)
+	client, token, err := getAuthenticatedVaultClient(rc, cmd)
+	if err != nil {
+		return err // Error already includes remediation guidance
 	}
-	if token == "" {
-		return fmt.Errorf("vault token required (use --token or set VAULT_TOKEN)")
-	}
+
+	// Use client to ensure it's not unused
+	_ = client
 
 	outputPath, _ := cmd.Flags().GetString("output")
 	inputPath, _ := cmd.Flags().GetString("input")
@@ -171,7 +172,24 @@ func runVaultClusterSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 
 	// Determine operation: backup or restore
 	if inputPath != "" {
-		// Restore operation
+		// Restore operation (DANGEROUS - requires explicit confirmation)
+		log.Warn("⚠️  SNAPSHOT RESTORE IS DESTRUCTIVE")
+		log.Warn("This will replace all Vault data with the snapshot.")
+		log.Warn("All unsealed Vault nodes must be sealed before restore.")
+		log.Warn("")
+
+		if !force {
+			// Require explicit --force flag for safety
+			log.Info("To proceed with snapshot restore, use the --force flag:")
+			log.Info("  eos update vault-cluster snapshot --input=<path> --force")
+			log.Info("")
+			log.Info("⚠️  WARNING: Snapshot restore will:")
+			log.Info("  • Replace all Vault data (KV secrets, policies, auth methods)")
+			log.Info("  • Require all nodes to be restarted")
+			log.Info("  • Cannot be undone without a backup")
+			return fmt.Errorf("snapshot restore requires --force flag for safety")
+		}
+
 		log.Warn("Restoring Raft snapshot", zap.String("input", inputPath), zap.Bool("force", force))
 
 		if err := vault.RestoreRaftSnapshot(rc, token, inputPath, force); err != nil {
@@ -256,4 +274,53 @@ func runVaultClusterHealth(rc *eos_io.RuntimeContext, _ *cobra.Command) error {
 	}
 
 	return nil
+}
+
+// getAuthenticatedVaultClient handles authentication for cluster operations.
+// This is orchestration code (stays in cmd/) that delegates to pkg/vault for business logic.
+//
+// Authentication hierarchy:
+// 1. --token flag (explicit user-provided token)
+// 2. VAULT_TOKEN environment variable (CI/CD or scripted usage)
+// 3. Admin authentication (Vault Agent → Admin AppRole → Root Token with consent)
+//
+// Returns: (*api.Client, token_string, error)
+func getAuthenticatedVaultClient(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*api.Client, string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Try 1: --token flag (highest priority - user explicitly provided)
+	if token, _ := cmd.Flags().GetString("token"); token != "" {
+		logger.Info("Using token from --token flag")
+		client, err := vault.GetVaultClientWithToken(rc, token)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid token from --token flag: %w", err)
+		}
+		return client, token, nil
+	}
+
+	// Try 2: VAULT_TOKEN environment variable (CI/CD usage)
+	if token := os.Getenv("VAULT_TOKEN"); token != "" {
+		logger.Info("Using token from VAULT_TOKEN environment variable")
+		client, err := vault.GetVaultClientWithToken(rc, token)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid token from VAULT_TOKEN: %w", err)
+		}
+		return client, token, nil
+	}
+
+	// Try 3: Admin authentication hierarchy (interactive or automated)
+	logger.Info("No token provided via --token or VAULT_TOKEN")
+	logger.Info("Attempting admin authentication (Vault Agent → AppRole → Root)")
+	logger.Info("")
+
+	adminClient, err := vault.GetAdminClient(rc)
+	if err != nil {
+		return nil, "", fmt.Errorf("admin authentication failed: %w\n\n"+
+			"Cluster operations require admin-level access. Provide token via:\n"+
+			"  eos update vault-cluster ... --token <token>\n"+
+			"  VAULT_TOKEN=<token> eos update vault-cluster ...\n"+
+			"  <interactive>  Let Eos authenticate automatically (Vault Agent, AppRole, or emergency root)", err)
+	}
+
+	return adminClient, adminClient.Token(), nil
 }

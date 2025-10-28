@@ -336,3 +336,28 @@ func DisplayDependencyError(name, description, installCmd, startCmd string) stri
 
 	return msg
 }
+
+// CheckDependency checks if a command exists in PATH.
+//
+// This is a simple wrapper around exec.LookPath for convenience.
+// Ported from pkg/prompt.CheckDependency to consolidate dependency utilities.
+//
+// Parameters:
+//   - command: Command name to check (e.g., "docker", "terraform", "vault")
+//
+// Returns:
+//   - true if command is found in PATH
+//   - false otherwise
+//
+// Example:
+//
+//	if !interaction.CheckDependency("docker") {
+//	    return fmt.Errorf("docker is required but not found in PATH")
+//	}
+//
+// Note: For more comprehensive checks with user prompts and installation,
+// use CheckDependencyWithPrompt() instead.
+func CheckDependency(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil
+}

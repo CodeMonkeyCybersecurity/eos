@@ -1,6 +1,6 @@
 # pkg/interaction
 
-*Last Updated: 2025-10-26*
+*Last Updated: 2025-01-28*
 
 Human-centric interaction utilities for Eos following the principle: **Technology serves humans, not the other way around.**
 
@@ -9,6 +9,273 @@ Human-centric interaction utilities for Eos following the principle: **Technolog
 This package provides utilities for interacting with users in a respectful, informative, and consent-based manner. All interactions follow the feminist principle of **informed consent** - users should always know what will happen, why it's needed, and have the ability to decline.
 
 ## Key Modules
+
+### Required Flag Prompting (`required_flag.go`) - P0 REQUIREMENT
+
+**NEW**: Human-centric required flag resolution with fallback chain. This implements CLAUDE.md P0 #13: "Technology serves humans" - never fail immediately when a required flag is missing.
+
+#### Philosophy
+
+Traditional CLI tools fail immediately when required flags are missing:
+```bash
+$ eos update vault-cluster autopilot
+Error: --token is required
+# User must re-run entire command with --token
+# This is HOSTILE UX - technology dictating to humans
+```
+
+Human-centric approach offers informed consent and fallback chain:
+```bash
+$ eos update vault-cluster autopilot
+Vault token required for Autopilot configuration
+No token provided via --token flag or VAULT_TOKEN environment variable
+
+Required for cluster operations. Get via: vault token create
+
+Enter Vault root token: ****
+Using Vault token from interactive prompt
+✓ Autopilot configured successfully
+```
+
+#### Fallback Chain (P0 Requirement)
+
+Every required flag follows this precedence:
+
+1. **CLI flag** (if explicitly set via `cmd.Flags().Changed()`)
+2. **Environment variable** (if configured, e.g., `VAULT_TOKEN`)
+3. **Interactive prompt** (if TTY available, with help text explaining WHY and HOW)
+4. **Default value** (if `AllowEmpty` is true and default makes sense)
+5. **Error with remediation** (if non-interactive mode, include clear steps)
+
+#### Core Functions
+
+```go
+// GetRequiredString resolves a required string flag with fallback chain
+func GetRequiredString(
+    rc *eos_io.RuntimeContext,
+    flagValue string,
+    flagWasSet bool,
+    config *RequiredFlagConfig,
+) (*FlagResult, error)
+
+// GetRequiredInt resolves a required int flag (prompts as string, parses to int)
+func GetRequiredInt(
+    rc *eos_io.RuntimeContext,
+    flagValue int,
+    flagWasSet bool,
+    config *RequiredFlagConfig,
+) (int, FlagSource, error)
+```
+
+#### RequiredFlagConfig Fields
+
+```go
+type RequiredFlagConfig struct {
+    // Metadata
+    FlagName   string   // For error messages: "token"
+    EnvVarName string   // Optional: "VAULT_TOKEN", "" if no env var
+
+    // User-facing prompt (only used if prompting needed)
+    PromptMessage string   // "Enter Vault root token: "
+    HelpText      string   // "Required for cluster operations. Get via: vault token create"
+
+    // Behavior
+    IsSecret     bool     // Use PromptSecurePassword (no echo)
+    AllowEmpty   bool     // Can user press enter for empty?
+    DefaultValue string   // Used if AllowEmpty && user presses enter
+
+    // Validation
+    Validator func(string) error   // Optional custom validation
+}
+```
+
+#### Example Usage - String Flag
+
+```go
+// cmd/update/vault_cluster.go
+func runVaultClusterAutopilot(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+    log := otelzap.Ctx(rc.Ctx)
+
+    // STEP 1: Get flag value and detect if it was explicitly set
+    tokenFlag, _ := cmd.Flags().GetString("token")
+    tokenWasSet := cmd.Flags().Changed("token")
+
+    // STEP 2: Use unified interface to resolve with fallback chain
+    result, err := interaction.GetRequiredString(rc, tokenFlag, tokenWasSet, &interaction.RequiredFlagConfig{
+        FlagName:      "token",
+        EnvVarName:    "VAULT_TOKEN",
+        PromptMessage: "Enter Vault root token: ",
+        HelpText:      "Required for Autopilot configuration. Get via: vault token create",
+        IsSecret:      true,
+    })
+    if err != nil {
+        return fmt.Errorf("failed to get vault token: %w", err)
+    }
+
+    // STEP 3: Log which source was used (observability)
+    log.Info("Using Vault token", zap.String("source", string(result.Source)))
+
+    token := result.Value
+
+    // ... proceed with business logic
+}
+```
+
+#### Example Usage - Int Flag
+
+```go
+portFlag, _ := cmd.Flags().GetInt("port")
+portWasSet := cmd.Flags().Changed("port")
+
+port, source, err := interaction.GetRequiredInt(rc, portFlag, portWasSet, &interaction.RequiredFlagConfig{
+    FlagName:      "port",
+    EnvVarName:    "SERVICE_PORT",
+    PromptMessage: "Enter service port: ",
+    HelpText:      "Port number for service (1024-65535)",
+    Validator: func(s string) error {
+        p, _ := strconv.Atoi(s)
+        if p < 1024 || p > 65535 {
+            return fmt.Errorf("port must be between 1024 and 65535")
+        }
+        return nil
+    },
+})
+if err != nil {
+    return fmt.Errorf("failed to get port: %w", err)
+}
+
+log.Info("Using service port", zap.Int("port", port), zap.String("source", string(source)))
+```
+
+#### FlagSource Type
+
+Track where flag values came from for observability:
+
+```go
+type FlagSource string
+
+const (
+    FlagSourceCLI     FlagSource = "command-line flag"
+    FlagSourceEnv     FlagSource = "environment variable"
+    FlagSourcePrompt  FlagSource = "interactive prompt"
+    FlagSourceDefault FlagSource = "default value"
+)
+```
+
+#### Required Elements (P0 Compliance)
+
+When using `GetRequiredString()` or `GetRequiredInt()`, you MUST:
+
+- ✓ **Help text**: Explain WHY required and HOW to get (e.g., "Get via: vault token create")
+- ✓ **Source logging**: ALWAYS log which fallback was used (observability)
+- ✓ **Changed() detection**: Use `cmd.Flags().Changed()` to distinguish `--flag=""` from not provided
+- ✓ **Security**: Set `IsSecret: true` for passwords/tokens (no terminal echo)
+- ✓ **Remediation**: Error messages include actionable steps (auto-generated by `buildRemediationError()`)
+
+#### What the User Sees
+
+**Scenario: Flag provided via CLI**
+```bash
+$ eos update vault-cluster autopilot --token s.abc123
+Using Vault token from command-line flag
+✓ Autopilot configured successfully
+```
+
+**Scenario: Flag provided via environment variable**
+```bash
+$ export VAULT_TOKEN=s.abc123
+$ eos update vault-cluster autopilot
+Using Vault token from environment variable
+✓ Autopilot configured successfully
+```
+
+**Scenario: Interactive prompt**
+```bash
+$ eos update vault-cluster autopilot
+Required for Autopilot configuration. Get via: vault token create
+
+Enter Vault root token: ****
+Using Vault token from interactive prompt
+✓ Autopilot configured successfully
+```
+
+**Scenario: Non-interactive mode (CI/CD)**
+```bash
+$ eos update vault-cluster autopilot
+Error: Required flag --token not provided
+  • Purpose: Required for Autopilot configuration. Get via: vault token create
+  • Provide via: --token=<value>
+  • Or set: export VAULT_TOKEN=<value>
+  • Or run in interactive terminal to be prompted
+```
+
+#### Testing
+
+See `required_flag_test.go` for comprehensive test coverage:
+- ✓ Fallback 1: CLI flag provided
+- ✓ Fallback 2: Environment variable
+- ✓ Fallback 4: Default value
+- ✓ Fallback 5: Error with remediation
+- ✓ Precedence: CLI > env > prompt > default
+- ✓ Empty detection: `Changed()` vs not provided
+- ✓ Int parsing: CLI, env, default
+- ✓ Error messages: Remediation quality
+
+Note: Fallback 3 (interactive prompt) tested manually due to TTY requirements.
+
+#### Migration from Ad-Hoc Patterns
+
+**Before** (ad-hoc, 20+ lines per command):
+```go
+token, _ := cmd.Flags().GetString("token")
+if token == "" {
+    token = os.Getenv("VAULT_TOKEN")
+}
+if token == "" {
+    log.Info("Vault token required for Autopilot configuration")
+    log.Info("No token provided via --token flag or VAULT_TOKEN environment variable")
+    log.Info("")
+
+    var err error
+    token, err = eos_io.PromptSecurePassword(rc, "Enter Vault root token: ")
+    if err != nil {
+        return fmt.Errorf("failed to read vault token: %w", err)
+    }
+
+    if token == "" {
+        return fmt.Errorf("vault token cannot be empty")
+    }
+}
+// ... proceed with token
+```
+
+**After** (unified, 7 lines):
+```go
+tokenFlag, _ := cmd.Flags().GetString("token")
+tokenWasSet := cmd.Flags().Changed("token")
+
+result, err := interaction.GetRequiredString(rc, tokenFlag, tokenWasSet, &interaction.RequiredFlagConfig{
+    FlagName: "token", EnvVarName: "VAULT_TOKEN",
+    PromptMessage: "Enter Vault root token: ", HelpText: "Required for Autopilot configuration",
+    IsSecret: true,
+})
+if err != nil { return fmt.Errorf("failed to get vault token: %w", err) }
+
+log.Info("Using Vault token", zap.String("source", string(result.Source)))
+token := result.Value
+```
+
+**Benefits**:
+- ✓ DRY: Eliminates 20+ lines of boilerplate per command
+- ✓ Observability: Logs which source provided value
+- ✓ Validation: Centralized, testable
+- ✓ Security: Proper secret handling
+- ✓ Human-centric: Clear help text, informed consent
+- ✓ Testable: No cobra dependency in business logic
+
+#### Reference Implementation
+
+See [cmd/update/vault_cluster.go:287-334](../../cmd/update/vault_cluster.go#L287-L334) for production usage (`getAuthenticatedVaultClient` helper).
 
 ### Prompting (`prompt.go`)
 
