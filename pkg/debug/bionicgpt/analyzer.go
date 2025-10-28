@@ -285,10 +285,11 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 
 		// LiteLLM endpoint failures (primary failure)
 		if result.Name == "LiteLLM Comprehensive Health" {
-			if result.Metadata["health_endpoint"] == "failed" {
+			// Bug 20 fix: Safe type assertion to prevent panic if metadata format unexpected
+			if endpoint, ok := result.Metadata["health_endpoint"].(string); ok && endpoint == "failed" {
 				primaryFailures = append(primaryFailures, "├─ /health endpoint: FAILED")
 			}
-			if result.Metadata["liveliness_endpoint"] == "failed" {
+			if endpoint, ok := result.Metadata["liveliness_endpoint"].(string); ok && endpoint == "failed" {
 				primaryFailures = append(primaryFailures, "├─ /health/liveliness endpoint: FAILED")
 			}
 		}
@@ -298,6 +299,10 @@ func GenerateExecutiveSummary(report *debug.Report, analysis *debug.Analysis) st
 			if unhealthy, ok := result.Metadata["unhealthy_models"].(int); ok && unhealthy > 0 {
 				if total, ok := result.Metadata["configured_models"].([]string); ok {
 					healthy := len(total) - unhealthy
+					// Bug 21 fix: Defensive bounds check (shouldn't happen but prevents negative counts)
+					if healthy < 0 {
+						healthy = 0
+					}
 					primaryFailures = append(primaryFailures, fmt.Sprintf("├─ Models reachable: %d/%d", healthy, len(total)))
 				}
 			}

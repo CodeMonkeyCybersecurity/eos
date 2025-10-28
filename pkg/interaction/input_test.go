@@ -221,7 +221,7 @@ func TestPromptYesNo_DisplayFormat(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Build expected prompt using same logic as implementation
-			// (lines 131-135 for PromptYesNo, lines 249-253 for PromptYesNoSafe)
+			// (lines 132-137 for PromptYesNo, lines 249-254 for PromptYesNoSafe)
 			prompt := tt.question
 			if tt.defaultYes {
 				prompt += " [Y/n]: "
@@ -277,8 +277,9 @@ func TestPromptYesNo_EmptyQuestionValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// PromptYesNo (deprecated): should return default value (can't return error)
-			// We can't easily test the logger.Error() call, but we verify it doesn't panic
+			// PromptYesNo (deprecated): should trigger early return and return default value
+			// NOTE: We cannot verify logger.Error() was called due to otelzap stdio interactions (see file header).
+			// This test verifies the function returns the correct default value without panicking.
 			result := PromptYesNo(tt.question, false)
 			if result != false {
 				t.Errorf("PromptYesNo with empty question should return default (false), got %v", result)

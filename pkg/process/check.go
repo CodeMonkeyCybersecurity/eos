@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -20,8 +21,84 @@ import (
 type RunningProcessInfo struct {
 	ProcessName    string
 	PIDs           []string
-	ExcludedPID    int  // PID to exclude from results (e.g., current process)
+	ExcludedPID    int      // PID to exclude from results (e.g., current process)
 	OtherProcesses []string // PIDs excluding the excluded PID
+}
+
+// P0 FIX (Adversarial #3): Platform-specific binary path detection
+// getProcessBinaryPath returns the full path to a process's binary
+// RATIONALE: /proc/$PID/exe only exists on Linux. macOS and BSD use different mechanisms.
+func getProcessBinaryPath(pid string) (string, error) {
+	switch runtime.GOOS {
+	case "linux":
+		// Linux: Read /proc/$PID/exe symlink
+		exePath := fmt.Sprintf("/proc/%s/exe", pid)
+		target, err := os.Readlink(exePath)
+		if err != nil {
+			return "", fmt.Errorf("cannot read /proc/%s/exe: %w", pid, err)
+		}
+		return target, nil
+
+	case "darwin":
+		// macOS: Use lsof to get binary path
+		// lsof -p $PID -Fn | grep ^ntxt | head -1
+		cmd := exec.Command("lsof", "-p", pid, "-Fn")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("lsof failed for PID %s: %w", pid, err)
+		}
+
+		// Parse lsof output for txt (binary) entry
+		// Format: n/path/to/binary
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			// Look for the txt file (the actual binary)
+			if strings.HasPrefix(line, "ntxt") || strings.HasPrefix(line, "n/") {
+				// Skip the 'n' prefix
+				if len(line) > 1 {
+					path := line[1:]
+					// Return first executable path found
+					if strings.Contains(path, "/") {
+						return path, nil
+					}
+				}
+			}
+		}
+		return "", fmt.Errorf("could not determine binary path from lsof output for PID %s", pid)
+
+	case "freebsd", "openbsd", "netbsd":
+		// BSD: Use procstat on FreeBSD, or fall back to ps
+		cmd := exec.Command("procstat", "binary", pid)
+		output, err := cmd.Output()
+		if err != nil {
+			// Fall back to ps if procstat not available
+			cmd = exec.Command("ps", "-p", pid, "-o", "comm=")
+			output, err = cmd.Output()
+			if err != nil {
+				return "", fmt.Errorf("cannot determine binary path on BSD for PID %s: %w", pid, err)
+			}
+		}
+		path := strings.TrimSpace(string(output))
+		if path == "" {
+			return "", fmt.Errorf("empty binary path from procstat/ps for PID %s", pid)
+		}
+		return path, nil
+
+	default:
+		// Unsupported platform - fall back to ps which works everywhere
+		// but may give just the command name, not full path
+		cmd := exec.Command("ps", "-p", pid, "-o", "comm=")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("ps failed for PID %s on %s: %w", pid, runtime.GOOS, err)
+		}
+		path := strings.TrimSpace(string(output))
+		if path == "" {
+			return "", fmt.Errorf("empty command from ps for PID %s", pid)
+		}
+		// ps may return just command name, not full path - warn about this
+		return path, nil
+	}
 }
 
 // CheckRunningProcesses checks for running processes matching a pattern
@@ -67,13 +144,13 @@ func CheckRunningProcesses(rc *eos_io.RuntimeContext, processName string, exclud
 		}
 
 		// P1 FIX: Verify this PID is actually running our binary
-		// Read /proc/$PID/exe symlink to get actual binary path
-		exePath := fmt.Sprintf("/proc/%s/exe", pidStr)
-		target, err := os.Readlink(exePath)
+		// P0 FIX (Adversarial #3): Use platform-specific binary path detection
+		target, err := getProcessBinaryPath(pidStr)
 		if err != nil {
-			// Process may have exited, or we don't have permission
-			logger.Debug("Cannot read process exe link (may have exited)",
+			// Process may have exited, permission denied, or platform issue
+			logger.Debug("Cannot determine process binary path (may have exited)",
 				zap.String("pid", pidStr),
+				zap.String("platform", runtime.GOOS),
 				zap.Error(err))
 			continue
 		}

@@ -410,13 +410,19 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 
 	// P0 FIX: Re-verify disk space immediately before build
 	// This prevents TOCTOU vulnerability where space was consumed between initial check and now
+	// P0 FIX (Adversarial #4): Use actual binary size for accurate calculation
 	eeu.logger.Debug("Re-verifying disk space before build (TOCTOU prevention)")
-	reqs := system.DefaultUpdateRequirements(
+	binaryInfo, err := os.Stat(eeu.config.BinaryPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat binary for disk space re-verification: %w", err)
+	}
+	reqs := system.UpdateRequirementsWithBinarySize(
 		"/tmp",                             // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
 		eeu.config.SourceDir,               // Source directory
+		binaryInfo.Size(),                  // Actual binary size
 	)
-	if _, err := system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
+	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
 		return "", fmt.Errorf("disk space insufficient at build time: %w\n\n"+
 			"Space may have been consumed by other processes between initial check and build.\n"+
 			"Free up space and try again.", err)
@@ -444,12 +450,12 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	}
 
 	// Validate the binary was created and is valid
-	binaryInfo, err := os.Stat(tempBinary)
+	builtBinaryInfo, err := os.Stat(tempBinary)
 	if err != nil {
 		return "", fmt.Errorf("built binary does not exist at %s: %w", tempBinary, err)
 	}
 
-	newSizeMB := float64(binaryInfo.Size()) / (1024 * 1024)
+	newSizeMB := float64(builtBinaryInfo.Size()) / (1024 * 1024)
 	newHash, err := crypto.HashFile(tempBinary)
 	if err != nil {
 		return "", fmt.Errorf("failed to hash new binary: %w", err)
@@ -457,7 +463,7 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 
 	eeu.logger.Info("Build successful",
 		zap.String("binary", tempBinary),
-		zap.Int64("size_bytes", binaryInfo.Size()))
+		zap.Int64("size_bytes", builtBinaryInfo.Size()))
 
 	eeu.logger.Info("New binary metadata",
 		zap.String("sha256", newHash[:16]+"..."),
@@ -663,13 +669,19 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 
 	// P0 FIX: Re-verify disk space immediately before installation
 	// This prevents TOCTOU vulnerability where space was consumed between build and install
+	// P0 FIX (Adversarial #4): Use actual binary size for accurate calculation
 	eeu.logger.Debug("Re-verifying disk space before install (TOCTOU prevention)")
-	reqs := system.DefaultUpdateRequirements(
+	binaryInfo, err := os.Stat(eeu.config.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat binary for disk space re-verification: %w", err)
+	}
+	reqs := system.UpdateRequirementsWithBinarySize(
 		"/tmp",                             // Temp directory
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory (critical for install)
 		eeu.config.SourceDir,               // Source directory
+		binaryInfo.Size(),                  // Actual binary size
 	)
-	if _, err := system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
+	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
 		return fmt.Errorf("disk space insufficient at install time: %w\n\n"+
 			"Space may have been consumed by other processes between build and install.\n"+
 			"Free up space and try again.", err)

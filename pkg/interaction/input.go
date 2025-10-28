@@ -121,9 +121,10 @@ func PromptYesNo(args ...interface{}) bool {
 		return false
 	}
 
+	logger := otelzap.L()
+
 	// Validate question is not empty (defensive programming)
 	if strings.TrimSpace(question) == "" {
-		logger := otelzap.L()
 		logger.Error("PromptYesNo called with empty question")
 		return defaultYes // Deprecated function can't return error, use default
 	}
@@ -134,8 +135,6 @@ func PromptYesNo(args ...interface{}) bool {
 	} else {
 		prompt += " [y/N]: "
 	}
-
-	logger := otelzap.L()
 
 	// NOTE: Terminal prompts use string concatenation instead of structured logging.
 	// RATIONALE: Human-facing ephemeral output prioritizes visual continuity. Including

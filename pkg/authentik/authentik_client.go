@@ -327,3 +327,54 @@ func (c *AuthentikClient) GetEvents(action string, since time.Time) ([]Authentik
 func (c *AuthentikClient) GetRegistrationEvents(since time.Time) ([]AuthentikEvent, error) {
 	return c.GetEvents("user_write", since)
 }
+
+// Health checks if the Authentik API is accessible and responding
+func (c *AuthentikClient) Health() error {
+	resp, err := c.makeRequest("GET", "/api/v3/", nil)
+	if err != nil {
+		return fmt.Errorf("authentik API not responding: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("authentik API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// GetVersion retrieves the Authentik version information
+func (c *AuthentikClient) GetVersion() (string, error) {
+	resp, err := c.makeRequest("GET", "/api/v3/root/config/", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get version: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Logger not available in this context, silently ignore (HTTP client best practice)
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to get version: %s - %s", resp.Status, string(body))
+	}
+
+	var config map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+		return "", fmt.Errorf("failed to decode version response: %w", err)
+	}
+
+	if version, ok := config["version"].(string); ok {
+		return version, nil
+	}
+
+	return "unknown", nil
+}
