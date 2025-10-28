@@ -378,3 +378,41 @@ func (c *AuthentikClient) GetVersion() (string, error) {
 
 	return "unknown", nil
 }
+
+// CreateUser creates a new user in Authentik
+func (c *AuthentikClient) CreateUser(username, name, email, password string) (*AuthentikUser, error) {
+	body := map[string]interface{}{
+		"username":  username,
+		"name":      name,
+		"email":     email,
+		"password":  password,
+		"is_active": true,
+	}
+
+	resp, err := c.makeRequest("POST", "/api/v3/core/users/", body)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to create user: %s - %s", resp.Status, string(respBody))
+	}
+
+	var user AuthentikUser
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if err := json.Unmarshal(respBody, &user); err != nil {
+		return nil, fmt.Errorf("failed to decode user response: %w", err)
+	}
+
+	return &user, nil
+}

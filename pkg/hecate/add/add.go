@@ -407,6 +407,15 @@ func runServiceIntegration(rc *eos_io.RuntimeContext, opts *ServiceOptions) erro
 
 	// Step 2: Configure authentication (OAuth2, SSO, etc.)
 	if err := integrator.ConfigureAuthentication(rc, opts); err != nil {
+		// Attempt rollback on authentication configuration failure
+		logger.Error("Authentication configuration failed, attempting rollback", zap.Error(err))
+		if rollbackErr := integrator.Rollback(rc); rollbackErr != nil {
+			logger.Error("Rollback failed - manual cleanup may be required",
+				zap.Error(rollbackErr),
+				zap.String("service", opts.Service))
+		} else {
+			logger.Info("Rollback completed successfully")
+		}
 		return fmt.Errorf("authentication configuration failed: %w", err)
 	}
 
@@ -432,15 +441,51 @@ func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions) {
 		logger.Info(fmt.Sprintf("SSO: Enabled (%s)", opts.SSOProvider))
 	}
 	logger.Info("")
-	logger.Info("Next steps:")
-	logger.Info(fmt.Sprintf("  1. Ensure DNS for %s points to this server", opts.DNS))
-	logger.Info(fmt.Sprintf("  2. Verify the backend service is running at %s", opts.Backend))
-	if opts.SSO {
+
+	// BionicGPT-specific success information
+	if opts.Service == "bionicgpt" && opts.SSO {
+		logger.Info("BionicGPT Authentication Flow:")
+		logger.Info("  User -> Caddy forward_auth -> Authentik -> BionicGPT")
+		logger.Info("")
+		logger.Info(fmt.Sprintf("  1. User visits https://%s", opts.DNS))
+		logger.Info("  2. Caddy checks authentication via Authentik forward auth")
+		logger.Info("  3. If not authenticated, Authentik shows login page")
+		logger.Info("  4. After login, Authentik returns X-Authentik-* headers")
+		logger.Info("  5. Caddy forwards request to BionicGPT with headers")
+		logger.Info("")
+		logger.Info("Admin Credentials:")
+		logger.Info("  Username: bionicgpt-admin")
+		logger.Info("  Password: Retrieve with:")
+		logger.Info("    vault kv get -field=value secret/bionicgpt/admin_password")
+		logger.Info("")
+		logger.Info("Authentik Groups Created:")
+		logger.Info("  - bionicgpt-superadmin (admin users)")
+		logger.Info("  - bionicgpt-demo (demo/viewer users)")
+		logger.Info("")
+		logger.Info("Troubleshooting:")
+		logger.Info("  - Check Authentik outpost: https://hera.your-domain/if/admin/#/outpost/outposts")
+		logger.Info("  - Check proxy provider assignment")
+		logger.Info("  - Verify /outpost.goauthentik.io/* route in Caddyfile")
+		logger.Info("  - Check Caddy logs for forward_auth errors")
+		logger.Info("")
+	} else if opts.SSO {
+		// Generic SSO success message
+		logger.Info("Next steps:")
+		logger.Info(fmt.Sprintf("  1. Ensure DNS for %s points to this server", opts.DNS))
+		logger.Info(fmt.Sprintf("  2. Verify the backend service is running at %s", opts.Backend))
 		logger.Info("  3. Configure SSO application in Authentik")
 		logger.Info("     Visit: https://hera.your-domain/if/admin/")
+		logger.Info(fmt.Sprintf("  4. Test your service at https://%s", opts.DNS))
+		logger.Info("")
+	} else {
+		// No SSO
+		logger.Info("Next steps:")
+		logger.Info(fmt.Sprintf("  1. Ensure DNS for %s points to this server", opts.DNS))
+		logger.Info(fmt.Sprintf("  2. Verify the backend service is running at %s", opts.Backend))
+		logger.Info(fmt.Sprintf("  3. Test your service at https://%s", opts.DNS))
+		logger.Info("")
 	}
-	logger.Info(fmt.Sprintf("  4. Test your service at https://%s", opts.DNS))
-	logger.Info("")
+
 	logger.Info("View Caddy logs with:")
 	logger.Info(fmt.Sprintf("  docker logs %s", hecate.CaddyContainerName))
 	logger.Info("")

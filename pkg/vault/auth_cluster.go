@@ -631,14 +631,19 @@ func sanitizeForLogging(raw string) string {
 	//   - U+202A-U+202E (Bidi controls) - text direction attacks
 	//   - U+FEFF (BOM) - encoding confusion
 	//
-	// Use unicode.IsControl() to catch ALL control characters (ASCII + Unicode)
+	// Use unicode.IsControl() to catch control characters + additional format chars
 	sanitized := strings.Map(func(r rune) rune {
 		// Remove ALL control characters (ASCII 0-31, 127, and Unicode controls)
 		if unicode.IsControl(r) {
 			return ' ' // Replace with space for readability
 		}
-		// Also remove non-standard Unicode spaces that could be used for attacks
-		// Keep only regular space (U+0020), remove all other Unicode spaces
+		// Remove Unicode format characters (invisible, direction controls, zero-width)
+		// These are NOT classified as "control" but are dangerous for logs
+		if unicode.In(r, unicode.Cf) { // Cf = Format, other
+			return ' ' // Replace format chars (includes U+200B, U+202E, U+FEFF)
+		}
+		// Also normalize non-standard Unicode spaces
+		// Keep only regular space (U+0020), normalize all other Unicode spaces
 		if unicode.IsSpace(r) && r != ' ' {
 			return ' ' // Normalize to regular space
 		}

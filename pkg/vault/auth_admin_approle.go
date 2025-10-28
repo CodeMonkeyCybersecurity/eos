@@ -38,24 +38,25 @@ import (
 func readAdminAppRoleCredsFromDisk(rc *eos_io.RuntimeContext) (string, string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Debug("Reading admin AppRole credentials from disk",
+	// SECURITY FIX (Phase 2): Use SecureReadCredential for admin credentials
+	log.Debug("Reading admin AppRole credentials from disk (secure FD-based)",
 		zap.String("role_id_path", shared.AdminAppRolePaths.RoleID),
 		zap.String("secret_id_path", shared.AdminAppRolePaths.SecretID))
 
-	// Read role_id
-	roleIDBytes, err := os.ReadFile(shared.AdminAppRolePaths.RoleID)
+	// Read role_id securely
+	roleIDRaw, err := SecureReadCredential(rc, shared.AdminAppRolePaths.RoleID, "admin_role_id")
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Debug("Admin AppRole role_id file not found (admin AppRole not configured)",
 				zap.String("path", shared.AdminAppRolePaths.RoleID))
 			return "", "", cerr.Wrap(err, "admin AppRole not configured")
 		}
-		log.Error("Failed to read admin AppRole role_id from disk",
+		log.Error("Failed to securely read admin AppRole role_id from disk",
 			zap.String("path", shared.AdminAppRolePaths.RoleID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read admin role_id from disk")
+		return "", "", cerr.Wrap(err, "securely read admin role_id from disk")
 	}
-	roleID := strings.TrimSpace(string(roleIDBytes))
+	roleID := strings.TrimSpace(roleIDRaw)
 
 	// Validate role_id
 	if roleID == "" {
@@ -75,20 +76,20 @@ func readAdminAppRoleCredsFromDisk(rc *eos_io.RuntimeContext) (string, string, e
 	log.Debug("Admin AppRole role_id read and validated successfully",
 		zap.Int("length", len(roleID)))
 
-	// Read secret_id
-	secretIDBytes, err := os.ReadFile(shared.AdminAppRolePaths.SecretID)
+	// Read secret_id securely
+	secretIDRaw, err := SecureReadCredential(rc, shared.AdminAppRolePaths.SecretID, "admin_secret_id")
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Debug("Admin AppRole secret_id file not found",
 				zap.String("path", shared.AdminAppRolePaths.SecretID))
 			return "", "", cerr.Wrap(err, "admin AppRole secret_id not found")
 		}
-		log.Error("Failed to read admin AppRole secret_id from disk",
+		log.Error("Failed to securely read admin AppRole secret_id from disk",
 			zap.String("path", shared.AdminAppRolePaths.SecretID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read admin secret_id from disk")
+		return "", "", cerr.Wrap(err, "securely read admin secret_id from disk")
 	}
-	secretID := strings.TrimSpace(string(secretIDBytes))
+	secretID := strings.TrimSpace(secretIDRaw)
 
 	// Validate secret_id
 	if secretID == "" {

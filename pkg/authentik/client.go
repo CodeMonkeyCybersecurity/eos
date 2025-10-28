@@ -4,6 +4,7 @@ package authentik
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,11 +31,24 @@ func NewClient(baseURL, token string) *APIClient {
 	// Use centralized URL sanitization to handle trailing slashes, whitespace, etc.
 	baseURL = shared.SanitizeURL(baseURL)
 
+	// Configure TLS with minimum version TLS 1.2
+	// RATIONALE: TLS 1.0/1.1 are deprecated and vulnerable (POODLE, BEAST attacks)
+	// SECURITY: Enforces modern TLS for API communication with Authentik
+	// NOTE: InsecureSkipVerify is false by default - validates certificates
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		// InsecureSkipVerify: false (default) - ALWAYS verify certificates in production
+		// Only set to true during development with self-signed certs
+	}
+
 	return &APIClient{
 		BaseURL: baseURL,
 		Token:   token,
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+			},
 		},
 	}
 }

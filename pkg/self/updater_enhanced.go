@@ -672,8 +672,9 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	}
 
 	// Phase 6: Write backup atomically from in-memory data
-	// Use O_WRONLY|O_CREATE|O_EXCL to ensure we create a NEW file (fail if exists)
-	backupFd, err := os.OpenFile(expectedBackupPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+	// Use O_RDWR|O_CREATE|O_EXCL to ensure we create a NEW file (fail if exists)
+	// P0 FIX: Must use O_RDWR (not O_WRONLY) because we re-read for verification at line 715
+	backupFd, err := os.OpenFile(expectedBackupPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0755)
 	if err != nil {
 		return "", fmt.Errorf("failed to create backup file: %w", err)
 	}

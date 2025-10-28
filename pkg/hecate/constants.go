@@ -230,9 +230,27 @@ const (
 	// RATIONALE: Standard health endpoint for container orchestration
 	// USAGE: Caddy health checks, Nomad health monitoring
 	BionicGPTHealthEndpoint = "/health"
+)
 
-	// BionicGPTOAuth2CallbackPath is the OAuth2 callback path for BionicGPT
-	// RATIONALE: Standard OAuth2 callback path used by oauth2-proxy
-	// SECURITY: Must match Authentik OAuth2 provider redirect URI configuration
-	BionicGPTOAuth2CallbackPath = "/oauth2/callback"
+// ============================================================================
+// AUTHENTIK FORWARD AUTH CONSTANTS
+// ============================================================================
+
+const (
+	// AuthentikOutpostPath is the path prefix for Authentik outpost endpoints
+	// RATIONALE: Authentik uses /outpost.goauthentik.io/* for forward auth communication
+	// SECURITY: This path must be proxied to Authentik for forward auth to work
+	// REFERENCE: https://docs.goauthentik.io/add-secure-apps/providers/proxy/
+	AuthentikOutpostPath = "/outpost.goauthentik.io"
+
+	// AuthentikForwardAuthPath is the forward auth validation endpoint
+	// RATIONALE: Caddy forward_auth directive calls this endpoint to validate requests
+	// FLOW: Caddy → Authentik (validates session) → Returns headers → Caddy forwards to app
+	// REFERENCE: https://docs.goauthentik.io/add-secure-apps/providers/proxy/server_caddy
+	AuthentikForwardAuthPath = "/outpost.goauthentik.io/auth/caddy"
+
+	// AuthentikEmbeddedOutpostName is the name of Authentik's default embedded outpost
+	// RATIONALE: Used to find and assign proxy providers to the embedded outpost
+	// NOTE: This is Authentik's default outpost name, created during installation
+	AuthentikEmbeddedOutpostName = "authentik Embedded Outpost"
 )

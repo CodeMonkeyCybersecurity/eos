@@ -1,9 +1,10 @@
-// pkg/hecate/add/bionicgpt.go - BionicGPT-specific integration
+// pkg/hecate/add/bionicgpt.go - BionicGPT-specific integration using Authentik forward auth
 
 package add
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"strings"
@@ -19,11 +20,16 @@ import (
 )
 
 // BionicGPTIntegrator implements service-specific integration for BionicGPT
-type BionicGPTIntegrator struct{}
+// Uses Authentik forward auth (NOT oauth2-proxy)
+type BionicGPTIntegrator struct {
+	resources *IntegrationResources // Track created resources for rollback
+}
 
 func init() {
 	// Register BionicGPT integrator
-	RegisterServiceIntegrator("bionicgpt", &BionicGPTIntegrator{})
+	RegisterServiceIntegrator("bionicgpt", &BionicGPTIntegrator{
+		resources: &IntegrationResources{},
+	})
 }
 
 // ValidateService checks if BionicGPT is running at the backend address
@@ -31,21 +37,28 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("  [1/3] Validating BionicGPT is running at backend", zap.String("backend", opts.Backend))
 
-	// Try to connect to BionicGPT
-	// BionicGPT typically runs on port 7703
+	// Add default port if not specified
 	backend := opts.Backend
 	if !strings.Contains(backend, ":") {
+		logger.Warn("No port specified in --upstream, using BionicGPT default",
+			zap.Int("port", hecate.BionicGPTDefaultPort),
+			zap.String("help", "Specify explicit port with --upstream IP:PORT"))
 		backend = fmt.Sprintf("%s:%d", backend, hecate.BionicGPTDefaultPort)
 	}
 
-	// Try root endpoint and health endpoint
+	// Try to connect to BionicGPT (use HTTPS with TLS skip verify for self-signed certs)
 	endpoints := []string{
-		fmt.Sprintf("http://%s/", backend),
-		fmt.Sprintf("http://%s%s", backend, hecate.BionicGPTHealthEndpoint),
+		fmt.Sprintf("https://%s/", backend),
+		fmt.Sprintf("https://%s%s", backend, hecate.BionicGPTHealthEndpoint),
 	}
 
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // BionicGPT often uses self-signed certs in dev
+			},
+		},
 	}
 
 	var lastErr error
@@ -55,7 +68,7 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 			lastErr = err
 			continue
 		}
-		resp.Body.Close()
+		defer resp.Body.Close()
 
 		// BionicGPT should respond with 200 OK or redirect
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
@@ -71,17 +84,26 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 		"Expected: BionicGPT service listening on port %d", backend, lastErr, hecate.BionicGPTDefaultPort)
 }
 
-// ConfigureAuthentication sets up Authentik OAuth2 for BionicGPT
+// ConfigureAuthentication sets up Authentik proxy provider for BionicGPT (forward auth mode)
 func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("  [2/3] Configuring Authentik OAuth2 integration")
+	logger.Info("  [2/3] Configuring Authentik proxy provider (forward auth mode)")
 
-	// Step 1: Get Authentik credentials from Vault
+	if opts.DryRun {
+		logger.Info("    [DRY RUN] Would create Authentik proxy provider (forward auth mode)")
+		logger.Info("    [DRY RUN] Would create Authentik application 'BionicGPT'")
+		logger.Info("    [DRY RUN] Would create groups: bionicgpt-superadmin, bionicgpt-demo")
+		logger.Info("    [DRY RUN] Would assign application to embedded outpost")
+		logger.Info("    [DRY RUN] Would create BionicGPT admin user")
+		return nil
+	}
+
+	// Step 1: Get Authentik credentials from Vault (with permission check)
 	logger.Info("    Getting Authentik credentials from Vault")
 	authentikToken, authentikBaseURL, err := b.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
-		logger.Warn("Authentik credentials not found in Vault, skipping OAuth2 setup", zap.Error(err))
-		logger.Warn("To enable OAuth2: vault kv put secret/bionicgpt/authentik api_key=... base_url=...")
+		logger.Warn("Authentik credentials not found in Vault, skipping proxy provider setup", zap.Error(err))
+		logger.Warn("To enable authentication: vault kv put secret/bionicgpt/authentik api_key=... base_url=...")
 		return nil // Non-fatal: generic route still works
 	}
 
@@ -89,20 +111,22 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 	logger.Info("    Initializing Authentik API client", zap.String("base_url", authentikBaseURL))
 	authentikClient := authentik.NewClient(authentikBaseURL, authentikToken)
 
-	// Step 3: Create OAuth2 provider
-	logger.Info("    Creating OAuth2 provider")
-	providerPK, clientID, clientSecret, err := b.createOAuth2Provider(rc.Ctx, authentikClient, opts.DNS)
+	// Step 3: Get default authorization flow UUID
+	logger.Info("    Getting authorization flow")
+	flowUUID, err := b.getDefaultAuthFlowUUID(rc.Ctx, authentikClient)
 	if err != nil {
-		return fmt.Errorf("failed to create OAuth2 provider: %w", err)
+		logger.Warn("Failed to get auth flow, using default slug", zap.Error(err))
+		flowUUID = "default-authentication-flow"
 	}
-	logger.Info("    ✓ OAuth2 provider created", zap.Int("provider_pk", providerPK))
 
-	// Step 4: Store OAuth2 credentials in Vault
-	logger.Info("    Storing OAuth2 credentials in Vault")
-	if err := b.storeOAuth2Credentials(rc.Ctx, clientID, clientSecret); err != nil {
-		return fmt.Errorf("failed to store OAuth2 credentials: %w", err)
+	// Step 4: Create proxy provider
+	logger.Info("    Creating proxy provider (forward auth mode)")
+	providerPK, err := b.createProxyProvider(rc.Ctx, authentikClient, opts, flowUUID)
+	if err != nil {
+		return fmt.Errorf("failed to create proxy provider: %w", err)
 	}
-	logger.Info("    ✓ Credentials stored at secret/bionicgpt/oauth")
+	logger.Info("    ✓ Proxy provider created", zap.Int("provider_pk", providerPK))
+	b.resources.ProxyProviderPK = providerPK // Track for rollback
 
 	// Step 5: Create Authentik application
 	logger.Info("    Creating Authentik application")
@@ -110,27 +134,48 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 		return fmt.Errorf("failed to create application: %w", err)
 	}
 	logger.Info("    ✓ Application 'BionicGPT' created")
+	b.resources.ApplicationSlug = "bionicgpt" // Track for rollback
 
-	// Step 6: Create groups
+	// Step 6: Assign application to embedded outpost
+	logger.Info("    Assigning application to embedded outpost")
+	if err := b.assignToOutpost(rc.Ctx, authentikClient, providerPK); err != nil {
+		return fmt.Errorf("failed to assign to outpost: %w", err)
+	}
+	logger.Info("    ✓ Application assigned to outpost")
+
+	// Step 7: Create groups
 	logger.Info("    Creating Authentik groups (superadmin, demo)")
 	if err := b.createAuthentikGroups(rc.Ctx, authentikClient); err != nil {
 		return fmt.Errorf("failed to create groups: %w", err)
 	}
 	logger.Info("    ✓ Groups configured")
 
-	logger.Info("  ✓ Authentik OAuth2 configuration complete")
+	// Step 8: Create BionicGPT admin user
+	logger.Info("    Creating BionicGPT admin user")
+	// Note: User creation uses AuthentikClient (different from APIClient used for providers)
+	authentikUserClient, err := authentik.NewAuthentikClient(authentikBaseURL, authentikToken)
+	if err != nil {
+		logger.Warn("Failed to create user client", zap.Error(err))
+	} else {
+		if err := b.createBionicGPTAdmin(rc.Ctx, authentikUserClient, opts); err != nil {
+			logger.Warn("Failed to create admin user", zap.Error(err))
+			// Non-fatal
+		}
+	}
+
+	logger.Info("  ✓ Authentik proxy provider configuration complete")
 	return nil
 }
 
-// HealthCheck verifies OAuth2 redirect flow is configured
+// HealthCheck verifies Authentik forward auth configuration
 func (b *BionicGPTIntegrator) HealthCheck(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("  [3/3] Verifying OAuth2 configuration")
+	logger.Info("  [3/3] Verifying Authentik configuration")
 
 	// Basic check: verify Authentik application is reachable
 	authentikToken, authentikBaseURL, err := b.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
-		logger.Warn("Skipping OAuth2 health check (Authentik not configured)")
+		logger.Warn("Skipping health check (Authentik not configured)")
 		return nil // Non-fatal
 	}
 
@@ -145,7 +190,7 @@ func (b *BionicGPTIntegrator) HealthCheck(rc *eos_io.RuntimeContext, opts *Servi
 
 	for _, app := range apps {
 		if app.Slug == "bionicgpt" {
-			logger.Info("    ✓ OAuth2 redirect flow configured", zap.String("application", app.Name))
+			logger.Info("    ✓ Authentik forward auth configured", zap.String("application", app.Name))
 			return nil
 		}
 	}
@@ -154,12 +199,67 @@ func (b *BionicGPTIntegrator) HealthCheck(rc *eos_io.RuntimeContext, opts *Servi
 	return nil // Non-fatal
 }
 
-// getAuthentikCredentials retrieves Authentik API credentials from Vault
+// Rollback removes BionicGPT integration resources from Authentik
+func (b *BionicGPTIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Warn("Rolling back BionicGPT integration")
+
+	if b.resources == nil {
+		logger.Debug("No resources to rollback")
+		return nil
+	}
+
+	token, baseURL, err := b.getAuthentikCredentials(rc.Ctx)
+	if err != nil {
+		return fmt.Errorf("cannot rollback without Authentik credentials: %w", err)
+	}
+	client := authentik.NewClient(baseURL, token)
+
+	// Delete application
+	if b.resources.ApplicationSlug != "" {
+		logger.Info("Deleting Authentik application", zap.String("slug", b.resources.ApplicationSlug))
+		if err := client.DeleteApplication(rc.Ctx, b.resources.ApplicationSlug); err != nil {
+			logger.Warn("Failed to delete application", zap.Error(err))
+		}
+	}
+
+	// Delete proxy provider
+	if b.resources.ProxyProviderPK > 0 {
+		logger.Info("Deleting proxy provider", zap.Int("pk", b.resources.ProxyProviderPK))
+		if err := client.DeleteProxyProvider(rc.Ctx, b.resources.ProxyProviderPK); err != nil {
+			logger.Warn("Failed to delete proxy provider", zap.Error(err))
+		}
+	}
+
+	// Note: Don't delete groups (might be used by other apps)
+	logger.Info("✓ Rollback complete")
+	return nil
+}
+
+// getAuthentikCredentials retrieves Authentik API credentials from Vault with permission check
 func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (string, string, error) {
 	// Create Vault client
 	vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	// SECURITY: Validate token permissions BEFORE reading
+	capabilities, err := vaultClient.Sys().CapabilitiesSelf("secret/data/bionicgpt/authentik")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to check Vault permissions: %w", err)
+	}
+
+	hasRead := false
+	for _, cap := range capabilities {
+		if cap == "read" || cap == "root" {
+			hasRead = true
+			break
+		}
+	}
+
+	if !hasRead {
+		return "", "", fmt.Errorf("Vault token lacks 'read' permission for secret/bionicgpt/authentik")
 	}
 
 	// Read Authentik credentials from Vault
@@ -190,64 +290,74 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 	return apiKey, baseURL, nil
 }
 
-// createOAuth2Provider creates an OAuth2 provider in Authentik
-func (b *BionicGPTIntegrator) createOAuth2Provider(ctx context.Context, client *authentik.APIClient, domain string) (int, string, string, error) {
-	// Check if provider already exists
-	providers, err := client.ListOAuth2Providers(ctx)
+// getDefaultAuthFlowUUID retrieves the default authentication flow UUID
+func (b *BionicGPTIntegrator) getDefaultAuthFlowUUID(ctx context.Context, client *authentik.APIClient) (string, error) {
+	flows, err := client.ListFlows(ctx, "authentication")
 	if err != nil {
-		return 0, "", "", fmt.Errorf("failed to list providers: %w", err)
+		return "", fmt.Errorf("failed to list authentication flows: %w", err)
 	}
+
+	for _, flow := range flows {
+		if flow.Slug == "default-authentication-flow" {
+			return flow.PK, nil
+		}
+	}
+
+	// Fallback to slug (some Authentik versions accept slugs)
+	return "default-authentication-flow", nil
+}
+
+// createProxyProvider creates a proxy provider in Authentik
+func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *authentik.APIClient, opts *ServiceOptions, flowUUID string) (int, error) {
+	// Check if provider already exists
+	providers, err := client.ListProxyProviders(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list proxy providers: %w", err)
+	}
+
+	// Sanitize DNS (remove protocol, port)
+	domain := strings.TrimPrefix(opts.DNS, "http://")
+	domain = strings.TrimPrefix(domain, "https://")
+	if colonPos := strings.Index(domain, ":"); colonPos != -1 {
+		domain = domain[:colonPos] // Strip port
+	}
+	domain = strings.TrimSpace(domain)
+
+	externalHost := fmt.Sprintf("https://%s", domain)
+	internalHost := fmt.Sprintf("http://%s", opts.Backend)
 
 	for _, provider := range providers {
 		if provider.Name == "BionicGPT" {
-			return provider.PK, provider.ClientID, provider.ClientSecret, nil
+			// Check if external host changed
+			if provider.ExternalHost != externalHost {
+				// Update provider
+				if err := client.UpdateProxyProvider(ctx, provider.PK, &authentik.ProxyProviderConfig{
+					Name:              "BionicGPT",
+					Mode:              "forward_single",
+					ExternalHost:      externalHost,
+					InternalHost:      internalHost,
+					AuthorizationFlow: flowUUID,
+				}); err != nil {
+					return 0, fmt.Errorf("failed to update proxy provider: %w", err)
+				}
+			}
+			return provider.PK, nil
 		}
 	}
 
 	// Create new provider
-	redirectURI := fmt.Sprintf("https://%s%s", domain, hecate.BionicGPTOAuth2CallbackPath)
-	provider, err := client.CreateOAuth2Provider(
-		ctx,
-		"BionicGPT",
-		[]string{redirectURI},
-		"default-authentication-flow", // TODO: Get actual flow UUID from Authentik
-	)
+	provider, err := client.CreateProxyProvider(ctx, &authentik.ProxyProviderConfig{
+		Name:              "BionicGPT",
+		Mode:              "forward_single", // Forward auth for single application
+		ExternalHost:      externalHost,
+		InternalHost:      internalHost, // Not actually used in forward auth, but required by API
+		AuthorizationFlow: flowUUID,
+	})
 	if err != nil {
-		return 0, "", "", fmt.Errorf("failed to create provider: %w", err)
+		return 0, fmt.Errorf("failed to create proxy provider: %w", err)
 	}
 
-	return provider.PK, provider.ClientID, provider.ClientSecret, nil
-}
-
-// storeOAuth2Credentials stores OAuth2 credentials in Vault
-func (b *BionicGPTIntegrator) storeOAuth2Credentials(ctx context.Context, clientID, clientSecret string) error {
-	// Create Vault client
-	vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create Vault client: %w", err)
-	}
-
-	// Generate cookie secret
-	cookieSecret, err := crypto.GeneratePassword(32)
-	if err != nil {
-		return fmt.Errorf("failed to generate cookie secret: %w", err)
-	}
-
-	// Store credentials in Vault
-	secretData := map[string]interface{}{
-		"data": map[string]interface{}{
-			"client_id":     clientID,
-			"client_secret": clientSecret,
-			"cookie_secret": cookieSecret,
-		},
-	}
-
-	_, err = vaultClient.Logical().Write("secret/data/bionicgpt/oauth", secretData)
-	if err != nil {
-		return fmt.Errorf("failed to write to Vault: %w", err)
-	}
-
-	return nil
+	return provider.PK, nil
 }
 
 // createAuthentikApplication creates the BionicGPT application in Authentik
@@ -280,6 +390,34 @@ func (b *BionicGPTIntegrator) createAuthentikApplication(ctx context.Context, cl
 	return nil
 }
 
+// assignToOutpost assigns the BionicGPT application to the embedded outpost
+func (b *BionicGPTIntegrator) assignToOutpost(ctx context.Context, client *authentik.APIClient, providerPK int) error {
+	// Get embedded outpost
+	outposts, err := client.ListOutposts(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list outposts: %w", err)
+	}
+
+	var embeddedOutpost *authentik.OutpostResponse
+	for i, outpost := range outposts {
+		if outpost.Name == hecate.AuthentikEmbeddedOutpostName {
+			embeddedOutpost = &outposts[i]
+			break
+		}
+	}
+
+	if embeddedOutpost == nil {
+		return fmt.Errorf("embedded outpost not found (expected: %s)", hecate.AuthentikEmbeddedOutpostName)
+	}
+
+	// Add provider to outpost
+	if err := client.AddProviderToOutpost(ctx, embeddedOutpost.PK, providerPK); err != nil {
+		return fmt.Errorf("failed to add provider to outpost: %w", err)
+	}
+
+	return nil
+}
+
 // createAuthentikGroups creates required groups in Authentik
 func (b *BionicGPTIntegrator) createAuthentikGroups(ctx context.Context, client *authentik.APIClient) error {
 	// Create superadmin group
@@ -303,6 +441,58 @@ func (b *BionicGPTIntegrator) createAuthentikGroups(ctx context.Context, client 
 	_, err = client.CreateGroupIfNotExists(ctx, "bionicgpt-demo", demoAttrs)
 	if err != nil {
 		return fmt.Errorf("failed to create demo group: %w", err)
+	}
+
+	return nil
+}
+
+// createBionicGPTAdmin creates a BionicGPT admin user in Authentik
+func (b *BionicGPTIntegrator) createBionicGPTAdmin(ctx context.Context, client *authentik.AuthentikClient, opts *ServiceOptions) error {
+	adminUsername := "bionicgpt-admin"
+	adminEmail := fmt.Sprintf("admin@%s", opts.DNS)
+
+	// Check if admin user already exists
+	existingUser, err := client.GetUserByUsername(adminUsername)
+	if err == nil && existingUser != nil {
+		// Ensure user is in superadmin group
+		if err := client.AddUserToGroup(adminUsername, "bionicgpt-superadmin"); err != nil {
+			return fmt.Errorf("failed to add user to superadmin group: %w", err)
+		}
+		return nil
+	}
+
+	// Generate random password
+	password, err := crypto.GeneratePassword(16)
+	if err != nil {
+		return fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	// Create user
+	user, err := client.CreateUser(adminUsername, "BionicGPT Administrator", adminEmail, password)
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Add to superadmin group
+	if err := client.AddUserToGroup(user.Username, "bionicgpt-superadmin"); err != nil {
+		return fmt.Errorf("failed to add user to group: %w", err)
+	}
+
+	// Store password in Vault for user retrieval
+	vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
+	if err == nil {
+		secretData := map[string]interface{}{
+			"data": map[string]interface{}{
+				"username": adminUsername,
+				"password": password,
+				"email":    adminEmail,
+			},
+		}
+		if _, err := vaultClient.Logical().Write("secret/data/bionicgpt/admin", secretData); err != nil {
+			// Non-fatal: log warning
+			logger := otelzap.Ctx(ctx)
+			logger.Warn("Failed to store admin password in Vault", zap.Error(err))
+		}
 	}
 
 	return nil

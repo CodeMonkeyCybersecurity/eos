@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/vault/api"
@@ -350,7 +351,7 @@ func TestSanitizeForLogging(t *testing.T) {
 		{
 			name:     "String with DEL character",
 			input:    "hello\x7fworld",
-			expected: "helloworld", // DEL removed
+			expected: "hello world", // DEL replaced with space (unicode.IsControl catches it)
 		},
 		{
 			name:     "String with multiple control characters",
@@ -441,12 +442,28 @@ func TestSanitizeForLogging(t *testing.T) {
 			assert.Equal(t, tt.expected, result,
 				"sanitizeForLogging(%q) = %q, expected %q", tt.input, result, tt.expected)
 
-			// Additional security checks
+			// Additional security checks - ASCII control characters
 			assert.NotContains(t, result, "\n", "Output should not contain newlines")
 			assert.NotContains(t, result, "\r", "Output should not contain carriage returns")
 			assert.NotContains(t, result, "\t", "Output should not contain tabs")
 			assert.NotContains(t, result, "\x00", "Output should not contain null bytes")
 			assert.NotContains(t, result, "\x1b", "Output should not contain ESC character")
+
+			// P2 Issue #48 & #50 Fix: Unicode control character checks
+			assert.NotContains(t, result, "\u2028", "Output should not contain Unicode Line Separator (U+2028)")
+			assert.NotContains(t, result, "\u2029", "Output should not contain Unicode Paragraph Separator (U+2029)")
+			assert.NotContains(t, result, "\u200B", "Output should not contain Zero-Width Space (U+200B)")
+			assert.NotContains(t, result, "\u200C", "Output should not contain Zero-Width Non-Joiner (U+200C)")
+			assert.NotContains(t, result, "\u200D", "Output should not contain Zero-Width Joiner (U+200D)")
+			assert.NotContains(t, result, "\u202E", "Output should not contain Right-to-Left Override (U+202E)")
+			assert.NotContains(t, result, "\uFEFF", "Output should not contain BOM (U+FEFF)")
+			assert.NotContains(t, result, "\u0080", "Output should not contain C1 control (U+0080)")
+
+			// Verify NO Unicode control characters remain (comprehensive check)
+			for _, r := range result {
+				assert.False(t, unicode.IsControl(r) && r != ' ',
+					"Output should not contain control character: U+%04X", r)
+			}
 
 			// Check length constraint (P3 Issue #44)
 			runes := []rune(result)

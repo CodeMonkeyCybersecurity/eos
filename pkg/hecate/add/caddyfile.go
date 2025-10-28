@@ -70,6 +70,39 @@ const (
     reverse_proxy http://{{.Backend}}
 }
 `
+
+	bionicgptForwardAuthTemplate = `
+# Service: {{.Service}} (BionicGPT with Authentik Forward Auth)
+{{.DNS}} {
+    import common
+
+    # CRITICAL: Proxy Authentik outpost paths for forward auth to work
+    # Without this, forward_auth validation will fail
+    handle /outpost.goauthentik.io/* {
+        reverse_proxy http://localhost:9000
+    }
+
+    # Forward auth to Authentik for authentication
+    # Authentik validates session and returns X-Authentik-* headers
+    forward_auth http://localhost:9000 {
+        uri /outpost.goauthentik.io/auth/caddy
+        copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid
+    }
+
+    # Additional logging for this service
+    log {
+        output file {{.LogFile}}
+        format json
+        level DEBUG
+    }
+{{range .CustomDirectives}}
+    {{.}}
+{{end}}
+    # Reverse proxy to BionicGPT backend
+    # Headers from forward_auth are automatically passed to backend
+    reverse_proxy http://{{.Backend}}
+}
+`
 )
 
 // GenerateRouteConfig generates the Caddyfile configuration for a new route
@@ -88,11 +121,17 @@ func GenerateRouteConfig(opts *ServiceOptions) (string, error) {
 		LogFile:          fmt.Sprintf("/var/log/caddy/%s.log", sanitizedService),
 	}
 
-	// Choose template based on SSO
+	// Choose template based on service type and SSO
 	var tmplStr string
-	if opts.SSO {
+	if sanitizedService == "bionicgpt" && opts.SSO {
+		// BionicGPT requires special forward auth configuration
+		// CRITICAL: Must include /outpost.goauthentik.io/* proxy for forward auth to work
+		tmplStr = bionicgptForwardAuthTemplate
+	} else if opts.SSO {
+		// Generic SSO template for other services
 		tmplStr = ssoRouteTemplate
 	} else {
+		// Basic reverse proxy without authentication
 		tmplStr = basicRouteTemplate
 	}
 

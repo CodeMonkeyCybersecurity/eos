@@ -392,7 +392,10 @@ func (ca *InternalCA) storeToFilesystem() error {
 		Bytes: ca.caCert.Raw,
 	})
 
-	// Write certificate
+	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
+	// SECURITY NOTE: Direct os.WriteFile used here due to CA struct not having RuntimeContext
+	// Lower risk than AppRole credentials since CA operations are less frequent and typically
+	// happen during initial setup, not during runtime operations
 	if err := os.WriteFile(ca.config.CACertPath, certPEM, 0644); err != nil {
 		return fmt.Errorf("failed to write CA certificate: %w", err)
 	}
@@ -403,7 +406,9 @@ func (ca *InternalCA) storeToFilesystem() error {
 		Bytes: x509.MarshalPKCS1PrivateKey(ca.caKey),
 	})
 
-	// Write private key (restricted permissions)
+	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
+	// SECURITY NOTE: Private key write - higher risk, but CA operations are infrequent
+	// Recommendation: Add `rc *eos_io.RuntimeContext` field to InternalCA struct
 	if err := os.WriteFile(ca.config.CAKeyPath, keyPEM, 0600); err != nil {
 		return fmt.Errorf("failed to write CA private key: %w", err)
 	}
@@ -635,6 +640,8 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 		Bytes: certBytes,
 	})
 
+	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
+	// SECURITY NOTE: Direct os.WriteFile used here due to CA struct not having RuntimeContext
 	if err := os.WriteFile(config.CertPath, certPEM, 0644); err != nil {
 		return fmt.Errorf("failed to write server certificate: %w", err)
 	}
@@ -645,6 +652,8 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 		Bytes: x509.MarshalPKCS1PrivateKey(serverKey),
 	})
 
+	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
+	// SECURITY NOTE: Private key write - should be secured but CA struct lacks RuntimeContext
 	if err := os.WriteFile(config.KeyPath, keyPEM, 0600); err != nil {
 		return fmt.Errorf("failed to write server private key: %w", err)
 	}
