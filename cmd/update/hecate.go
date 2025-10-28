@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/add"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // updateHecateCmd represents the "update hecate" command.
@@ -69,12 +70,29 @@ Examples:
 		addService, _ := cmd.Flags().GetString("add")
 		addWasSet := cmd.Flags().Changed("add")
 
+		// Check if --remove flag is explicitly set
+		removeService, _ := cmd.Flags().GetString("remove")
+		removeWasSet := cmd.Flags().Changed("remove")
+
+		// Validate mutually exclusive flags
+		if addWasSet && removeWasSet {
+			return fmt.Errorf("cannot use --add and --remove together\nUse one at a time")
+		}
+
 		if addWasSet {
 			if addService == "" {
 				return fmt.Errorf("--add requires a service name\nExample: eos update hecate --add bionicgpt --dns chat.example.com --upstream 100.64.0.1:8080")
 			}
 			// Delegate to add service flow
 			return runAddServiceFromFlag(rc, cmd, addService)
+		}
+
+		if removeWasSet {
+			if removeService == "" {
+				return fmt.Errorf("--remove requires a service name\nExample: eos update hecate --remove bionicgpt")
+			}
+			// Delegate to remove service flow
+			return runRemoveServiceFromFlag(rc, cmd, removeService)
 		}
 
 		logger.Info("Regenerating Hecate deployment from Consul KV configuration")
@@ -96,6 +114,7 @@ func init() {
 
 	// Add service management flags
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
+	updateHecateCmd.Flags().String("remove", "", "Remove a service from Hecate (service name)")
 	updateHecateCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for the service (required with --add)")
 	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
 
@@ -156,6 +175,25 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 
 	// Execute the add operation
 	return add.AddService(rc, opts)
+}
+
+// runRemoveServiceFromFlag handles removing a service when --remove flag is used
+func runRemoveServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, service string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Removing service from Hecate",
+		zap.String("service", service))
+
+	// Get dry-run flag (for future implementation)
+	_ , _ = cmd.Flags().GetBool("dry-run")
+
+	// TODO: Create remove package and implement RemoveService function
+	// For now, return not implemented error with clear workaround
+	return fmt.Errorf("--remove functionality not yet implemented\n\n" +
+		"Workaround: Manually remove service block from /opt/hecate/Caddyfile\n" +
+		"Then reload Caddy: docker exec hecate-caddy caddy reload --config /etc/caddy/Caddyfile\n\n" +
+		"Service to remove: %s\n" +
+		"Look for: # Service: %s", service, service)
 }
 
 // runK3sCmd updates the k3s deployment configuration.

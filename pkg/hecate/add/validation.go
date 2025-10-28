@@ -491,8 +491,10 @@ func CheckDuplicateService(rc *eos_io.RuntimeContext, caddyfilePath, service, dn
 	serviceComment := fmt.Sprintf("# Service: %s", service)
 	if strings.Contains(contentStr, serviceComment) {
 		return fmt.Errorf("service '%s' already exists in Caddyfile\n\n"+
-			"To update existing service, use:\n"+
-			"  eos update hecate --modify --service %s", service, service)
+			"To replace existing service:\n"+
+			"  1. Remove old service: eos update hecate --remove %s\n"+
+			"  2. Add updated service: eos update hecate --add %s --dns <domain> --upstream <backend>",
+			service, service, service)
 	}
 
 	// Check for duplicate DNS
