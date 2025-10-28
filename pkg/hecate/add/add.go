@@ -20,21 +20,27 @@ import (
 func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check for root permissions
-	if os.Geteuid() != 0 {
-		return eos_err.NewUserError(
-			"Permission denied: /opt/hecate requires root access\n\n" +
-				"Run with sudo:\n" +
-				"  sudo eos update hecate add [service] --dns [domain] --upstream [backend]")
+	// Display header with telemetry (BEFORE permission check for complete metrics)
+	invocationMethod := opts.InvocationMethod
+	if invocationMethod == "" {
+		invocationMethod = "unknown" // Explicit "unknown" clearer than empty string
 	}
 
-	// Display header with telemetry
 	logger.Info("Adding new service to Hecate",
 		zap.String("service", opts.Service),
 		zap.String("dns", opts.DNS),
 		zap.String("backend", opts.Backend),
 		zap.Bool("sso", opts.SSO),
-		zap.String("invocation_method", opts.InvocationMethod)) // Track UX preference
+		zap.String("invocation_method", invocationMethod)) // Track UX preference
+
+	// Check for root permissions
+	if os.Geteuid() != 0 {
+		return eos_err.NewUserError(
+			"Permission denied: /opt/hecate requires root access\n\n" +
+				"Run with sudo (either syntax works):\n" +
+				"  sudo eos update hecate --add [service] --dns [domain] --upstream [backend]\n" +
+				"  sudo eos update hecate add [service] --dns [domain] --upstream [backend]")
+	}
 
 	// If dry-run, show what would be done and exit
 	if opts.DryRun {

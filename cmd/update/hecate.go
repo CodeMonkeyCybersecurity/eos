@@ -136,6 +136,9 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
 	backendWithPort := add.EnsureBackendHasPort(service, upstream)
 
+	// NOTE: No logging here - business layer (pkg/hecate/add/add.go:32) provides detailed log
+	//       to avoid duplicate output. Orchestration layer stays thin per CLAUDE.md architecture.
+
 	// Build options (with telemetry for UX measurement)
 	opts := &add.ServiceOptions{
 		Service:             service,
