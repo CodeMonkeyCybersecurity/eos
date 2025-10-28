@@ -34,6 +34,15 @@ func init() {
 	})
 }
 
+// endpointAttempt tracks a single endpoint connection attempt for debugging
+type endpointAttempt struct {
+	URL        string
+	StatusCode int
+	Status     string
+	Error      string
+	Protocol   string // "HTTP" or "HTTPS"
+}
+
 // ValidateService checks if BionicGPT is running at the backend address
 func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -67,34 +76,62 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 		Timeout: 10 * time.Second,
 	}
 
+	// Track all attempts for detailed error reporting
+	var attempts []endpointAttempt
+
 	// Try HTTP first (common for internal services on non-standard ports like 8513)
+	// Priority: root path first (most likely to work), then /health endpoint
 	httpEndpoints := []string{
 		fmt.Sprintf("http://%s/", backend),
 		fmt.Sprintf("http://%s%s", backend, hecate.BionicGPTHealthEndpoint),
 	}
 
-	var lastErr error
 	for _, endpoint := range httpEndpoints {
+		logger.Debug("Trying HTTP endpoint", zap.String("endpoint", endpoint))
+
 		resp, err := httpClient.Get(endpoint)
 		if err != nil {
-			lastErr = err
+			logger.Debug("HTTP connection failed",
+				zap.String("endpoint", endpoint),
+				zap.Error(err))
+			attempts = append(attempts, endpointAttempt{
+				URL:      endpoint,
+				Error:    err.Error(),
+				Protocol: "HTTP",
+			})
 			continue
 		}
 		defer resp.Body.Close()
 
-		// BionicGPT should respond with 200 OK or redirect
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+		logger.Debug("HTTP response received",
+			zap.String("endpoint", endpoint),
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("status", resp.Status))
+
+		// Accept all 2xx (success) and 3xx (redirect) status codes
+		// BionicGPT may redirect to login, return 404 for /health, etc. - all indicate service is running
+		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			logger.Info("    ✓ BionicGPT is responding correctly",
 				zap.String("endpoint", endpoint),
-				zap.String("protocol", "HTTP"))
+				zap.String("protocol", "HTTP"),
+				zap.Int("status_code", resp.StatusCode))
 			return nil
 		}
 
-		lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		attempts = append(attempts, endpointAttempt{
+			URL:        endpoint,
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Protocol:   "HTTP",
+		})
+
+		// P0 FIX: Continue to try next endpoint instead of breaking
+		continue
 	}
 
 	// Try HTTPS if HTTP fails (service might be using TLS)
-	logger.Debug("HTTP connection failed, trying HTTPS", zap.Error(lastErr))
+	logger.Debug("HTTP connection failed, trying HTTPS",
+		zap.Int("http_attempts", len(attempts)))
 
 	httpsEndpoints := []string{
 		fmt.Sprintf("https://%s/", backend),
@@ -102,27 +139,99 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 	}
 
 	for _, endpoint := range httpsEndpoints {
+		logger.Debug("Trying HTTPS endpoint", zap.String("endpoint", endpoint))
+
 		resp, err := httpsClient.Get(endpoint)
 		if err != nil {
-			lastErr = err
+			logger.Debug("HTTPS connection failed",
+				zap.String("endpoint", endpoint),
+				zap.Error(err))
+			attempts = append(attempts, endpointAttempt{
+				URL:      endpoint,
+				Error:    err.Error(),
+				Protocol: "HTTPS",
+			})
 			continue
 		}
 		defer resp.Body.Close()
 
-		// BionicGPT should respond with 200 OK or redirect
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+		logger.Debug("HTTPS response received",
+			zap.String("endpoint", endpoint),
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("status", resp.Status))
+
+		// Accept all 2xx (success) and 3xx (redirect) status codes
+		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			logger.Info("    ✓ BionicGPT is responding correctly",
 				zap.String("endpoint", endpoint),
-				zap.String("protocol", "HTTPS"))
+				zap.String("protocol", "HTTPS"),
+				zap.Int("status_code", resp.StatusCode))
 			return nil
 		}
 
-		lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		attempts = append(attempts, endpointAttempt{
+			URL:        endpoint,
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Protocol:   "HTTPS",
+		})
+
+		// P0 FIX: Continue to try next endpoint instead of breaking
+		continue
 	}
 
-	return fmt.Errorf("BionicGPT not responding at %s: %w\n\n"+
-		"Ensure BionicGPT is running at the backend address.\n"+
-		"Expected: BionicGPT service listening on port %d", backend, lastErr, hecate.BionicGPTDefaultPort)
+	// All attempts failed - build detailed error message
+	return b.buildValidationError(backend, attempts)
+}
+
+// buildValidationError creates a detailed error message showing all attempted endpoints
+func (b *BionicGPTIntegrator) buildValidationError(backend string, attempts []endpointAttempt) error {
+	var errorMsg strings.Builder
+
+	errorMsg.WriteString(fmt.Sprintf("BionicGPT not responding at %s\n\n", backend))
+
+	// Show HTTP attempts
+	errorMsg.WriteString("Tried HTTP endpoints:\n")
+	httpAttempts := 0
+	for _, attempt := range attempts {
+		if attempt.Protocol == "HTTP" {
+			httpAttempts++
+			if attempt.Error != "" {
+				errorMsg.WriteString(fmt.Sprintf("  ✗ %s → %s\n", attempt.URL, attempt.Error))
+			} else {
+				errorMsg.WriteString(fmt.Sprintf("  ✗ %s → %d %s\n", attempt.URL, attempt.StatusCode, attempt.Status))
+			}
+		}
+	}
+	if httpAttempts == 0 {
+		errorMsg.WriteString("  (none attempted)\n")
+	}
+
+	// Show HTTPS attempts
+	errorMsg.WriteString("\nTried HTTPS endpoints:\n")
+	httpsAttempts := 0
+	for _, attempt := range attempts {
+		if attempt.Protocol == "HTTPS" {
+			httpsAttempts++
+			if attempt.Error != "" {
+				errorMsg.WriteString(fmt.Sprintf("  ✗ %s → %s\n", attempt.URL, attempt.Error))
+			} else {
+				errorMsg.WriteString(fmt.Sprintf("  ✗ %s → %d %s\n", attempt.URL, attempt.StatusCode, attempt.Status))
+			}
+		}
+	}
+	if httpsAttempts == 0 {
+		errorMsg.WriteString("  (none attempted)\n")
+	}
+
+	errorMsg.WriteString("\nEnsure BionicGPT is running at the backend address.\n")
+	errorMsg.WriteString(fmt.Sprintf("Expected: BionicGPT service listening on port %d (HTTP or HTTPS)\n", hecate.BionicGPTDefaultPort))
+	errorMsg.WriteString("\nTroubleshooting:\n")
+	errorMsg.WriteString("  1. Verify service is running: docker ps | grep bionicgpt\n")
+	errorMsg.WriteString("  2. Check service logs: docker logs bionicgpt\n")
+	errorMsg.WriteString(fmt.Sprintf("  3. Test connectivity: curl -v http://%s/\n", backend))
+
+	return fmt.Errorf("%s", errorMsg.String())
 }
 
 // ConfigureAuthentication sets up Authentik proxy provider for BionicGPT (forward auth mode)
