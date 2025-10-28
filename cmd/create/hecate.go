@@ -5,12 +5,16 @@ package create
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
@@ -286,6 +290,53 @@ Examples:
 		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: ✓ Hecate infrastructure generated successfully!")
 		log.Info("terminal prompt: ")
+
+		// INTERVENE - Pull Docker images and start containers
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: === Starting Hecate Services ===")
+		log.Info("terminal prompt: ")
+
+		composeFile := filepath.Join(outputDir, "docker-compose.yml")
+
+		// Step 1: Pull images with progress display
+		log.Info("terminal prompt: Pulling Docker images...")
+		log.Info("Pulling Docker Compose images", zap.String("compose_file", composeFile))
+
+		if err := docker.PullComposeImagesWithProgress(rc, composeFile); err != nil {
+			log.Warn("Image pull reported warnings (this is usually OK)",
+				zap.Error(err))
+			// Continue anyway - docker compose up will pull missing images
+		}
+
+		// Step 2: Start containers with docker compose up -d
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: Starting containers...")
+		log.Debug("Executing docker compose up",
+			zap.String("command", "docker"),
+			zap.Strings("args", []string{"compose", "-f", composeFile, "up", "-d"}),
+			zap.String("working_dir", outputDir),
+			zap.Duration("timeout", 15*time.Minute))
+
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"compose", "-f", composeFile, "up", "-d"},
+			Dir:     outputDir,
+			Capture: true,
+			Timeout: 15 * time.Minute, // Large images can take time
+		})
+
+		if err != nil {
+			log.Error("Docker compose up failed",
+				zap.Error(err),
+				zap.String("output", output))
+			return fmt.Errorf("failed to start containers: %w\n\nOutput:\n%s\n\n"+
+				"Try manually:\n  cd %s && sudo docker compose up -d",
+				err, output, outputDir)
+		}
+
+		log.Info("Docker compose up completed", zap.String("output", output))
+		log.Info("terminal prompt: ✓ Containers started successfully!")
+		log.Info("terminal prompt: ")
 		log.Info("terminal prompt:   PREREQUISITES:")
 		log.Info("terminal prompt:   • DNS records must point to this server:")
 
@@ -306,16 +357,20 @@ Examples:
 			log.Info("terminal prompt:   • TCP ports must be available for stream proxying")
 		}
 		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: === Deployment Complete! ===")
+		log.Info("terminal prompt: ")
+		log.Info("terminal prompt: ✓ Containers are now running")
+		log.Info("terminal prompt: ")
 		log.Info("terminal prompt: Next steps:")
-		log.Info("terminal prompt:   1. Review generated files in " + outputDir)
-		stepNum := 2
+		stepNum := 1
 		if config.HasAuthentik {
-			log.Info("terminal prompt:   2. Check .env file for Authentik bootstrap credentials")
-			stepNum = 3
+			log.Info("terminal prompt:   1. Check .env file for Authentik bootstrap credentials:")
+			log.Info("terminal prompt:      sudo cat " + filepath.Join(outputDir, ".env") + " | grep BOOTSTRAP")
+			stepNum = 2
 		}
-		log.Info(fmt.Sprintf("terminal prompt:   %d. Start services: cd %s && docker compose up -d", stepNum, outputDir))
+		log.Info(fmt.Sprintf("terminal prompt:   %d. Check container status: cd %s && docker compose ps", stepNum, outputDir))
 		stepNum++
-		log.Info(fmt.Sprintf("terminal prompt:   %d. Check status: docker compose ps", stepNum))
+		log.Info(fmt.Sprintf("terminal prompt:   %d. View logs: docker compose logs -f", stepNum))
 		stepNum++
 
 		// Consul registration step (only if not disabled)
@@ -325,7 +380,7 @@ Examples:
 			stepNum++
 		}
 
-		log.Info(fmt.Sprintf("terminal prompt:   %d. View logs: docker compose logs -f", stepNum))
+		log.Info(fmt.Sprintf("terminal prompt:   %d. Access services via configured domains (ensure DNS is set up)", stepNum))
 
 		return nil
 	}),

@@ -20,6 +20,24 @@ var serviceDefaultPorts = map[string]int{
 	// Add more services as needed - refer to pkg/shared/ports.go for port constants
 }
 
+// serviceRequiresSSO maps service names to whether they require SSO by default
+// RATIONALE: "Default module" pattern - services that ALWAYS use SSO (matches wizard behavior)
+// ARCHITECTURE: Aligns with Caddyfile template selection (pkg/hecate/add/caddyfile.go:134-147)
+//
+// Services in this map will automatically:
+// 1. Use forward auth Caddyfile template (regardless of --sso flag)
+// 2. Trigger Authentik integration during installation
+// 3. Create necessary Authentik resources (providers, applications, groups)
+//
+// WHY THIS MATTERS:
+// - BionicGPT requires authentication (no public access mode)
+// - Reduces operator cognitive load (one way to deploy)
+// - Matches wizard behavior (always configures SSO for these services)
+var serviceRequiresSSO = map[string]bool{
+	"bionicgpt": true, // BionicGPT ALWAYS uses Authentik forward auth
+	// Add more services as requirements emerge (e.g., admin panels, sensitive tools)
+}
+
 // EnsureBackendHasPort appends the default port for known services if port is missing
 // This improves UX by allowing users to specify just IP/hostname for known services
 // Correctly handles IPv4, IPv6, and hostnames
@@ -57,4 +75,11 @@ func EnsureBackendHasPort(service, backend string) string {
 
 	// IPv4 or hostname without port - add port directly
 	return fmt.Sprintf("%s:%d", backend, defaultPort)
+}
+
+// ServiceRequiresSSO returns true if the service requires SSO by default
+// This determines whether to automatically enable SSO even if --sso flag not provided
+func ServiceRequiresSSO(service string) bool {
+	requiresSSO, exists := serviceRequiresSSO[service]
+	return exists && requiresSSO
 }

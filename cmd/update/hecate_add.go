@@ -96,12 +96,18 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
 	backendWithPort := add.EnsureBackendHasPort(service, upstream)
 
+	// Auto-enable SSO for services that require it (e.g., BionicGPT)
+	// This matches wizard behavior and reduces operator cognitive load
+	// If user explicitly provided --sso flag, respect their choice
+	// If service requires SSO by default, enable it automatically
+	ssoEnabled := sso || add.ServiceRequiresSSO(service)
+
 	// Build options (with telemetry for UX measurement)
 	opts := &add.ServiceOptions{
 		Service:             service,
 		DNS:                 dns,
 		Backend:             backendWithPort,
-		SSO:                 sso,
+		SSO:                 ssoEnabled, // Auto-enabled for services that require it
 		SSOProvider:         ssoProvider,
 		AllowInsecureTLS:    allowInsecureTLS,
 		CustomDirectives:    customDirectives,

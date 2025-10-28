@@ -47,12 +47,17 @@ Examples:
   eos update hecate certs                        # Only renew certificates
   eos update hecate k3s                          # Update k3s deployment
 
-  # Add new service (basic)
+  # Add BionicGPT (auto-detects port :8513 and enables SSO automatically)
   eos update hecate --add bionicgpt \
     --dns chat.codemonkey.ai \
-    --upstream 100.64.0.50:8080
+    --upstream 100.64.0.50
 
-  # Add new service with SSO
+  # Add service with custom port
+  eos update hecate --add bionicgpt \
+    --dns chat.codemonkey.ai \
+    --upstream 100.64.0.50:7703
+
+  # Add service with SSO
   eos update hecate --add nextcloud \
     --dns cloud.codemonkey.ai \
     --upstream 100.64.0.51:80 \
@@ -155,6 +160,12 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 	// This improves UX by allowing: --upstream 100.71.196.79 instead of --upstream 100.71.196.79:8513
 	backendWithPort := add.EnsureBackendHasPort(service, upstream)
 
+	// Auto-enable SSO for services that require it (e.g., BionicGPT)
+	// This matches wizard behavior and reduces operator cognitive load
+	// If user explicitly provided --sso flag, respect their choice
+	// If service requires SSO by default, enable it automatically
+	ssoEnabled := sso || add.ServiceRequiresSSO(service)
+
 	// NOTE: No logging here - business layer (pkg/hecate/add/add.go:32) provides detailed log
 	//       to avoid duplicate output. Orchestration layer stays thin per CLAUDE.md architecture.
 
@@ -163,7 +174,7 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 		Service:             service,
 		DNS:                 dns,
 		Backend:             backendWithPort,
-		SSO:                 sso,
+		SSO:                 ssoEnabled, // Auto-enabled for services that require it
 		SSOProvider:         ssoProvider,
 		CustomDirectives:    customDirectives,
 		DryRun:              dryRun,

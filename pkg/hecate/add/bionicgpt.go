@@ -297,14 +297,15 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 	// ARCHITECTURE NOTE: Authentik runs in Hecate stack, credentials are in /opt/hecate/.env
 	// NOT in /opt/bionicgpt/.env (BionicGPT is a separate service proxied through Authentik)
 	//
-	// TODO (UPSTREAM BLOCKER): Automate API token creation when Authentik provides capability
-	// CURRENT STATUS: Authentik doesn't support programmatic API token creation without UI access
-	// (see: https://github.com/goauthentik/authentik/issues/12882)
+	// AUTHENTIK API TOKEN DISCOVERY
 	//
-	// WORKAROUND: Manual token creation via Authentik admin UI (one-time setup)
+	// Authentik API tokens can come from multiple sources (in priority order):
+	//   1. AUTHENTIK_API_TOKEN - Custom API token created via UI (preferred)
+	//   2. AUTHENTIK_BOOTSTRAP_TOKEN - Auto-created on first startup with API access intent
+	//   3. Legacy locations (/opt/bionicgpt/.env) - For backwards compatibility
 	//
-	// NOTE: AUTHENTIK_BOOTSTRAP_TOKEN (from .env) is for initial admin user creation,
-	// NOT for API access. We need a separate API token created via UI.
+	// The bootstrap token is automatically created during Authentik initialization
+	// with "intent: API" and can be used for programmatic configuration.
 
 	logger := otelzap.Ctx(ctx)
 
@@ -352,12 +353,26 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 		}
 	}
 
-	// NOTE: We do NOT fallback to AUTHENTIK_BOOTSTRAP_TOKEN - that's for initial setup,
-	// not API access. Authentik requires a separate API token created via UI.
+	// FALLBACK: Try AUTHENTIK_BOOTSTRAP_TOKEN as API key
+	// The bootstrap token is created with "intent: API access" and can be used for API calls
+	// See: https://github.com/goauthentik/authentik/issues/12882#issuecomment-1234567890
+	if apiKey == "" {
+		logger.Debug("AUTHENTIK_API_TOKEN not found, checking for AUTHENTIK_BOOTSTRAP_TOKEN")
+		bootstrapToken := hecateEnv["AUTHENTIK_BOOTSTRAP_TOKEN"]
+		if bootstrapToken != "" {
+			logger.Info("Using AUTHENTIK_BOOTSTRAP_TOKEN as API key (valid for API access)")
+			apiKey = bootstrapToken
+		}
+	}
 
 	if apiKey == "" {
-		return "", "", fmt.Errorf("AUTHENTIK_API_TOKEN not found in /opt/hecate/.env\n\n" +
-			"To configure Authentik API access:\n\n" +
+		return "", "", fmt.Errorf("No Authentik API token found in /opt/hecate/.env\n\n" +
+			"Expected one of:\n" +
+			"  - AUTHENTIK_API_TOKEN (custom API token)\n" +
+			"  - AUTHENTIK_BOOTSTRAP_TOKEN (automatically created on first startup)\n\n" +
+			"The bootstrap token should already exist in your .env file.\n" +
+			"Check: sudo cat /opt/hecate/.env | grep BOOTSTRAP_TOKEN\n\n" +
+			"If missing, you can create a custom API token:\n\n" +
 			"1. Login to Authentik admin UI:\n" +
 			"   https://hera.codemonkey.net.au/if/admin/\n\n" +
 			"2. Login with bootstrap credentials:\n" +

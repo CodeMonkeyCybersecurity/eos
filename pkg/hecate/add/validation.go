@@ -476,13 +476,22 @@ func getServerIPs() ([]net.IP, error) {
 	return ips, nil
 }
 
+// DuplicateCheckResult represents the result of checking for duplicate services
+type DuplicateCheckResult struct {
+	HasDuplicate       bool   // True if duplicate found
+	DuplicateType      string // "service" or "dns"
+	DuplicateName      string // Name of duplicate (service name or DNS)
+	ExistingServiceRef string // Service reference in Caddyfile (if known)
+}
+
 // CheckDuplicateService checks if a service with this name or DNS already exists
-func CheckDuplicateService(rc *eos_io.RuntimeContext, caddyfilePath, service, dns string) error {
+// Returns a result struct with details about any duplicates found
+func CheckDuplicateService(rc *eos_io.RuntimeContext, caddyfilePath, service, dns string) (*DuplicateCheckResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	content, err := os.ReadFile(caddyfilePath)
 	if err != nil {
-		return fmt.Errorf("failed to read Caddyfile: %w", err)
+		return nil, fmt.Errorf("failed to read Caddyfile: %w", err)
 	}
 
 	contentStr := string(content)
@@ -490,23 +499,30 @@ func CheckDuplicateService(rc *eos_io.RuntimeContext, caddyfilePath, service, dn
 	// Check for duplicate service name
 	serviceComment := fmt.Sprintf("# Service: %s", service)
 	if strings.Contains(contentStr, serviceComment) {
-		return fmt.Errorf("service '%s' already exists in Caddyfile\n\n"+
-			"To replace existing service:\n"+
-			"  1. Remove old service: eos update hecate --remove %s\n"+
-			"  2. Add updated service: eos update hecate --add %s --dns <domain> --upstream <backend>",
-			service, service, service)
+		logger.Info("Duplicate service name detected",
+			zap.String("service", service))
+		return &DuplicateCheckResult{
+			HasDuplicate:       true,
+			DuplicateType:      "service",
+			DuplicateName:      service,
+			ExistingServiceRef: serviceComment,
+		}, nil
 	}
 
 	// Check for duplicate DNS
 	dnsBlock := fmt.Sprintf("%s {", dns)
 	if strings.Contains(contentStr, dnsBlock) {
-		return fmt.Errorf("DNS '%s' already exists in Caddyfile\n\n"+
-			"Each domain can only have one route. Check existing routes with:\n"+
-			"  eos list hecate routes", dns)
+		logger.Info("Duplicate DNS detected",
+			zap.String("dns", dns))
+		return &DuplicateCheckResult{
+			HasDuplicate:  true,
+			DuplicateType: "dns",
+			DuplicateName: dns,
+		}, nil
 	}
 
 	logger.Info("No duplicate service or DNS found")
-	return nil
+	return &DuplicateCheckResult{HasDuplicate: false}, nil
 }
 
 // ValidateCustomDirectives validates custom Caddy directives
