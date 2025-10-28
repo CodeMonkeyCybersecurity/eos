@@ -74,20 +74,22 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		logger.Error("Failed to append route, restoring backup", zap.Error(err))
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
-		} else {
-			// CRITICAL: Must reload Caddy with restored config
-			// Without this, Caddy still has bad config in memory even though file is restored
-			logger.Info("Backup restored to disk, reloading Caddy with restored config")
-			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
-				logger.Error("CRITICAL: Backup restored but Caddy reload failed",
-					zap.Error(reloadErr))
-				logger.Error("Manual intervention required: restart Caddy or reload config manually")
-				logger.Error("  docker restart " + hecate.CaddyContainerName)
-			} else {
-				logger.Info("Caddy successfully reloaded with restored configuration")
-			}
+			return fmt.Errorf("append route failed and backup restore failed: %w (restore error: %v)", err, restoreErr)
 		}
-		return err
+
+		// CRITICAL: Must reload Caddy with restored config
+		// ReloadCaddy now has restart fallback built-in
+		logger.Info("Backup restored to disk, reloading Caddy with restored config")
+		if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+			logger.Error("CRITICAL: Backup restored but Caddy reload failed",
+				zap.Error(reloadErr))
+			logger.Error("Manual intervention required: restart Caddy manually")
+			logger.Error("  docker restart " + hecate.CaddyContainerName)
+			return fmt.Errorf("append route failed and restored config reload failed: %w (reload error: %v)", err, reloadErr)
+		}
+
+		logger.Info("Caddy successfully reloaded with restored configuration")
+		return err // Return original error after successful rollback
 	}
 
 	// Phase 5: Validate and reload Caddy
@@ -209,6 +211,22 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	}
 	logger.Info("✓ Caddy container is running")
 
+	// Check Admin API reachability (determines validation strategy)
+	if IsAdminAPIReachable(rc) {
+		logger.Info("✓ Caddy Admin API is accessible (will use zero-downtime reload)")
+	} else {
+		logger.Warn("Caddy Admin API not accessible from host",
+			zap.String("url", fmt.Sprintf("http://%s:%d", hecate.CaddyAdminAPIHost, hecate.CaddyAdminAPIPort)))
+		logger.Warn("This is expected if port 2019 is not exposed in docker-compose.yml")
+		logger.Warn("Validation will use container restart method (brief downtime)")
+		logger.Warn("")
+		logger.Warn("To enable zero-downtime reloads:")
+		logger.Warn("  1. Edit /opt/hecate/docker-compose.yml")
+		logger.Warn("  2. Add to caddy ports: - \"127.0.0.1:2019:2019\"")
+		logger.Warn("  3. Restart: cd /opt/hecate && docker-compose up -d")
+		logger.Warn("")
+	}
+
 	// Check Authentik if SSO is enabled
 	if opts.SSO {
 		if err := CheckAuthentikInstallation(rc); err != nil {
@@ -303,43 +321,48 @@ func runCaddyReloadPhase(rc *eos_io.RuntimeContext, backupPath string) error {
 		logger.Error("Caddy configuration validation failed, restoring backup")
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
-		} else {
-			// CRITICAL: Must reload Caddy with restored config
-			logger.Info("Backup restored to disk, reloading Caddy with restored config")
-			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
-				logger.Error("CRITICAL: Backup restored but Caddy reload failed",
-					zap.Error(reloadErr))
-				logger.Error("Manual intervention required: restart Caddy or reload config manually")
-				logger.Error("  docker restart " + hecate.CaddyContainerName)
-			} else {
-				logger.Info("Caddy successfully reloaded with restored configuration")
-			}
+			return fmt.Errorf("validation failed and backup restore failed: %w (restore error: %v)", err, restoreErr)
 		}
-		return err
+
+		// CRITICAL: Must reload Caddy with restored config
+		// ReloadCaddy now has restart fallback built-in, so this will work even if Admin API unavailable
+		logger.Info("Backup restored to disk, reloading Caddy with restored config")
+		if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+			logger.Error("CRITICAL: Backup restored but Caddy reload failed",
+				zap.Error(reloadErr))
+			logger.Error("Manual intervention required: restart Caddy manually")
+			logger.Error("  docker restart " + hecate.CaddyContainerName)
+			return fmt.Errorf("validation failed and restored config reload failed: %w (reload error: %v)", err, reloadErr)
+		}
+
+		logger.Info("Caddy successfully reloaded with restored configuration")
+		return err // Return original validation error after successful rollback
 	}
 	logger.Info("✓ Caddy configuration validated")
 
-	// Reload Caddy
+	// Reload Caddy with new configuration
 	if err := ReloadCaddy(rc, CaddyfilePath); err != nil {
 		// Restore backup on reload failure
 		logger.Error("Caddy reload failed, restoring backup")
 		if restoreErr := RestoreBackup(rc, backupPath); restoreErr != nil {
 			logger.Error("CRITICAL: Failed to restore backup", zap.Error(restoreErr))
-		} else {
-			// CRITICAL: Must reload Caddy with restored config
-			logger.Info("Backup restored to disk, attempting to reload Caddy with restored config")
-			if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
-				logger.Error("CRITICAL: Backup restored but Caddy reload still failing",
-					zap.Error(reloadErr))
-				logger.Error("Manual intervention required: restart Caddy or reload config manually")
-				logger.Error("  docker restart " + hecate.CaddyContainerName)
-			} else {
-				logger.Info("Caddy successfully reloaded with restored configuration")
-			}
+			return fmt.Errorf("reload failed and backup restore failed: %w (restore error: %v)", err, restoreErr)
 		}
-		return err
+
+		// Reload with restored config (restart fallback built-in)
+		logger.Info("Backup restored to disk, reloading Caddy with restored config")
+		if reloadErr := ReloadCaddy(rc, CaddyfilePath); reloadErr != nil {
+			logger.Error("CRITICAL: Backup restored but Caddy reload still failing",
+				zap.Error(reloadErr))
+			logger.Error("Manual intervention required: restart Caddy manually")
+			logger.Error("  docker restart " + hecate.CaddyContainerName)
+			return fmt.Errorf("reload failed and restored config reload failed: %w (reload error: %v)", err, reloadErr)
+		}
+
+		logger.Info("Caddy successfully reloaded with restored configuration")
+		return err // Return original reload error after successful rollback
 	}
-	logger.Info("✓ Caddy reloaded successfully (zero downtime)")
+	logger.Info("✓ Caddy reloaded successfully")
 
 	return nil
 }

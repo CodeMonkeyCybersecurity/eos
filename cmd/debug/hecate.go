@@ -10,6 +10,7 @@ import (
 var (
 	hecateComponent      string
 	hecateAuthentikCheck bool
+	hecateBionicGPTCheck bool
 	hecatePath           string
 	hecateVerbose        bool
 )
@@ -55,9 +56,22 @@ Authentik-specific diagnostics (--authentik flag):
   • Memory usage analysis
   • Backup status
 
+BionicGPT integration diagnostics (--bionicgpt flag):
+  • Authentik → Caddy → BionicGPT triangle validation
+  • Caddy forward_auth configuration check
+  • Header mapping verification (X-Authentik-* → X-Auth-Request-*)
+  • Authentik proxy provider status
+  • Authentik application and outpost assignment
+  • BionicGPT backend connectivity
+  • BionicGPT header trust configuration
+  • Authentik group and user synchronization status
+  • End-to-end authentication flow test
+  • Common misconfigurations detection
+
 Flags:
   --component <name>  Only check specific component (caddy|authentik|postgresql|redis|nginx|coturn)
   --authentik         Run comprehensive Authentik pre-upgrade health check
+  --bionicgpt         Run BionicGPT integration diagnostics (Authentik-Caddy-BionicGPT)
   --path <path>       Path to Hecate installation (default: /opt/hecate)
   --verbose           Show detailed diagnostic output
 
@@ -65,6 +79,7 @@ Examples:
   eos debug hecate                      # Full diagnostics + file display
   eos debug hecate --component authentik  # Only diagnose Authentik
   eos debug hecate --authentik          # Full Authentik pre-upgrade check
+  eos debug hecate --bionicgpt          # BionicGPT integration diagnostics
   eos debug hecate --path /custom/path  # Custom installation path
 
 Output is automatically saved to ~/.eos/debug/eos-debug-hecate-{timestamp}.txt`,
@@ -74,6 +89,7 @@ Output is automatically saved to ~/.eos/debug/eos-debug-hecate-{timestamp}.txt`,
 func init() {
 	hecateCmd.Flags().StringVar(&hecateComponent, "component", "", "Specific component to check")
 	hecateCmd.Flags().BoolVar(&hecateAuthentikCheck, "authentik", false, "Run comprehensive Authentik pre-upgrade check")
+	hecateCmd.Flags().BoolVar(&hecateBionicGPTCheck, "bionicgpt", false, "Run BionicGPT integration diagnostics (Authentik-Caddy-BionicGPT triangle)")
 	hecateCmd.Flags().StringVar(&hecatePath, "path", "/opt/hecate", "Path to Hecate installation")
 	hecateCmd.Flags().BoolVar(&hecateVerbose, "verbose", false, "Show detailed diagnostic output")
 	debugCmd.AddCommand(hecateCmd)

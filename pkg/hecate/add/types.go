@@ -14,6 +14,8 @@ type ServiceOptions struct {
 	// Optional fields
 	SSO                 bool     // Enable SSO for this route
 	SSOProvider         string   // SSO provider to use (default: authentik)
+	SAMLEntityID        string   // SAML entity ID (for SAML-based integrations like Wazuh)
+	AllowInsecureTLS    bool     // Allow InsecureSkipVerify for TLS connections (INSECURE - use with caution)
 	CustomDirectives    []string // Custom Caddy directives
 	DryRun              bool     // Show changes without applying
 	SkipDNSCheck        bool     // Skip DNS resolution validation
@@ -55,4 +57,14 @@ type HealthCheckResult struct {
 	Latency   time.Duration
 	Error     string
 	Details   map[string]interface{}
+}
+
+// endpointAttempt tracks individual HTTP validation attempts
+// Used by Wazuh integrator for detailed error reporting
+type endpointAttempt struct {
+	URL        string // Endpoint URL attempted
+	StatusCode int    // HTTP status code (0 if connection failed)
+	Status     string // HTTP status text
+	Error      string // Error message if connection failed
+	Protocol   string // "HTTP" or "HTTPS"
 }

@@ -46,6 +46,28 @@ func (c *AuthentikWazuhConnector) PreflightCheck(rc *eos_io.RuntimeContext, conf
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running pre-flight checks for Authentik and Wazuh")
 
+	// DEPRECATION WARNING
+	logger.Warn("⚠️  DEPRECATION WARNING: 'eos sync --authentik --wazuh' is deprecated")
+	logger.Warn("")
+	logger.Warn("This command will be removed in Eos v2.0.0 (approximately 6 months).")
+	logger.Warn("")
+	logger.Warn("Use the new service-specific commands instead:")
+	logger.Warn("  1. On Hecate/reverse proxy server:")
+	logger.Warn("     eos update hecate add wazuh \\")
+	logger.Warn("       --dns wazuh.yourdomain.com \\")
+	logger.Warn("       --upstream WAZUH_IP:443")
+	logger.Warn("")
+	logger.Warn("  2. On Wazuh backend server:")
+	logger.Warn("     eos update wazuh add authentik \\")
+	logger.Warn("       --wazuh-url https://wazuh.yourdomain.com")
+	logger.Warn("")
+	logger.Warn("Benefits of new commands:")
+	logger.Warn("  - Clearer separation of concerns (proxy vs backend)")
+	logger.Warn("  - Better error messages and rollback support")
+	logger.Warn("  - Follows Eos architecture patterns")
+	logger.Warn("  - Secrets stored in Vault (not environment variables)")
+	logger.Warn("")
+
 	// ASSESS - Detect server role to provide helpful guidance
 	logger.Debug("Detecting server role")
 	serverRole, err := environment.DetectServerRole(rc)

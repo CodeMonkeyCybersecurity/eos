@@ -21,83 +21,221 @@ import (
 // NOTE: Constants moved to pkg/hecate/constants.go (CLAUDE.md Rule #12 - Single Source of Truth)
 // Import hecate package to access: hecate.CaddyContainerName, CaddyfilePath, etc.
 
-// ValidateCaddyConfig validates the Caddyfile using Caddy Admin API
-// This validates by attempting to adapt the Caddyfile to JSON
-func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error {
+// IsAdminAPIReachable checks if Caddy Admin API is accessible from the host
+// Returns true if reachable, false if connection refused or other network error
+func IsAdminAPIReachable(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Debug("Validating Caddy configuration via Admin API")
-
-	// Read the Caddyfile content
-	caddyfileContent, err := os.ReadFile(caddyfilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read Caddyfile: %w", err)
-	}
+	logger.Debug("Checking Caddy Admin API reachability",
+		zap.String("host", hecate.CaddyAdminAPIHost),
+		zap.Int("port", hecate.CaddyAdminAPIPort))
 
 	// Create Caddy Admin API client
 	caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
 
-	// Validate by attempting to adapt the Caddyfile to JSON
-	// If this succeeds, the Caddyfile is syntactically valid
-	_, err = caddyClient.AdaptCaddyfile(rc.Ctx, string(caddyfileContent))
-	if err != nil {
-		return fmt.Errorf("Caddyfile validation failed: %w\n\n"+
-			"The configuration has been rolled back to the previous working state.\n"+
-			"File location: %s", err, caddyfilePath)
+	// Try to connect to Admin API
+	if err := caddyClient.Health(rc.Ctx); err != nil {
+		logger.Debug("Caddy Admin API not reachable",
+			zap.Error(err),
+			zap.String("url", fmt.Sprintf("http://%s:%d", hecate.CaddyAdminAPIHost, hecate.CaddyAdminAPIPort)))
+		return false
 	}
 
-	logger.Info("Caddy configuration validated successfully")
+	logger.Debug("Caddy Admin API is reachable")
+	return true
+}
+
+// RestartCaddyContainer restarts the Caddy container using Docker SDK
+// This is a fallback when Admin API is unavailable (brief downtime)
+func RestartCaddyContainer(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Restarting Caddy container",
+		zap.String("container", hecate.CaddyContainerName),
+		zap.String("reason", "Admin API unavailable or reload failed"))
+
+	// Create Docker client
+	cli, err := client.NewClientWithOpts(
+		client.FromEnv,
+		client.WithAPIVersionNegotiation(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+
+	// Restart container with 30 second timeout
+	restartTimeout := 30
+	stopOptions := dockertypes.StopOptions{
+		Timeout: &restartTimeout,
+	}
+
+	if err := cli.ContainerRestart(rc.Ctx, hecate.CaddyContainerName, stopOptions); err != nil {
+		return fmt.Errorf("failed to restart container: %w", err)
+	}
+
+	logger.Info("Caddy container restarted successfully")
+
+	// Wait for container to be fully ready (see hecate.CaddyReloadWaitDuration)
+	time.Sleep(hecate.CaddyReloadWaitDuration)
+
+	// Verify container is running
+	isRunning, err := IsCaddyRunning(rc)
+	if err != nil {
+		return fmt.Errorf("failed to verify Caddy status after restart: %w", err)
+	}
+	if !isRunning {
+		return fmt.Errorf("Caddy container is not running after restart")
+	}
+
+	logger.Info("Caddy container verified running after restart")
 	return nil
 }
 
-// ReloadCaddy reloads Caddy configuration without restarting using Caddy Admin API
-// This performs a zero-downtime reload, preserving TLS certificates and active connections
+// ValidateCaddyConfig validates the Caddyfile using best available method
+// Strategy selection (in order of preference):
+//  1. Admin API (fastest, zero-downtime, requires port 2019 exposed)
+//  2. Docker exec validation (fast, zero-downtime, always works)
+//  3. Container restart (slow, brief downtime, guaranteed to work)
+func ValidateCaddyConfig(rc *eos_io.RuntimeContext, caddyfilePath string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// ASSESS: Check if Admin API is reachable
+	if IsAdminAPIReachable(rc) {
+		// Strategy 1: Admin API validation (preferred - fastest)
+		logger.Debug("Validating Caddy configuration via Admin API")
+
+		// Read the Caddyfile content
+		caddyfileContent, err := os.ReadFile(caddyfilePath)
+		if err != nil {
+			return fmt.Errorf("failed to read Caddyfile: %w", err)
+		}
+
+		// Create Caddy Admin API client
+		caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
+
+		// Validate by attempting to adapt the Caddyfile to JSON
+		_, err = caddyClient.AdaptCaddyfile(rc.Ctx, string(caddyfileContent))
+		if err != nil {
+			return fmt.Errorf("Caddyfile validation failed: %w\n\n"+
+				"The configuration has been rolled back to the previous working state.\n"+
+				"File location: %s", err, caddyfilePath)
+		}
+
+		logger.Info("Caddy configuration validated successfully (via Admin API)")
+		return nil
+	}
+
+	// Admin API not reachable - try docker exec validation
+	logger.Warn("Admin API not reachable, trying docker exec validation")
+
+	// Strategy 2: Docker exec validation (zero-downtime, no port exposure needed)
+	if err := hecate.ValidateCaddyfileLive(rc, caddyfilePath); err != nil {
+		// Docker exec validation failed - fall back to restart
+		logger.Warn("Docker exec validation failed, falling back to container restart",
+			zap.Error(err))
+
+		// Strategy 3: Container restart validation (last resort)
+		logger.Warn("Using restart-based validation (causes brief downtime ~2 seconds)")
+
+		if restartErr := RestartCaddyContainer(rc); restartErr != nil {
+			return fmt.Errorf("Caddyfile validation failed (all methods failed): %w\n\n"+
+				"Admin API: not reachable\n"+
+				"Docker exec: %v\n"+
+				"Container restart: %v\n\n"+
+				"File location: %s\n"+
+				"Check Caddy logs: docker logs %s",
+				err, err, restartErr, caddyfilePath, hecate.CaddyContainerName)
+		}
+
+		logger.Info("Caddy configuration validated successfully (via restart)")
+		return nil
+	}
+
+	// Docker exec validation succeeded
+	logger.Info("Caddy configuration validated successfully (via docker exec)")
+	return nil
+}
+
+// ReloadCaddy reloads Caddy configuration using best available method
+// Strategy selection (in order of preference):
+//  1. Admin API (fastest, zero-downtime, requires port 2019 exposed)
+//  2. Docker exec reload (fast, zero-downtime, always works)
+//  3. Container restart (slow, brief downtime, guaranteed to work)
 func ReloadCaddy(rc *eos_io.RuntimeContext, caddyfilePath string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Reloading Caddy configuration via Admin API")
+	// ASSESS: Check if Admin API is reachable
+	if IsAdminAPIReachable(rc) {
+		// Strategy 1: Admin API reload (preferred - fastest)
+		logger.Info("Reloading Caddy configuration via Admin API")
 
-	// Read the Caddyfile content
-	caddyfileContent, err := os.ReadFile(caddyfilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read Caddyfile: %w", err)
+		// Read the Caddyfile content
+		caddyfileContent, err := os.ReadFile(caddyfilePath)
+		if err != nil {
+			return fmt.Errorf("failed to read Caddyfile: %w", err)
+		}
+
+		// Create Caddy Admin API client
+		caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
+
+		// Load the Caddyfile (adapt to JSON and apply)
+		err = caddyClient.LoadCaddyfile(rc.Ctx, string(caddyfileContent))
+		if err != nil {
+			// Admin API reload failed - fall back to docker exec
+			logger.Warn("Admin API reload failed, trying docker exec reload",
+				zap.Error(err))
+			goto tryDockerExec
+		}
+
+		logger.Info("Caddy reloaded successfully (via Admin API)")
+
+		// Wait for reload to complete
+		time.Sleep(hecate.CaddyReloadWaitDuration)
+
+		// Verify Caddy is still running
+		if isRunning, checkErr := IsCaddyRunning(rc); checkErr != nil || !isRunning {
+			logger.Warn("Container health check failed after reload, trying docker exec reload")
+			goto tryDockerExec
+		}
+
+		// Verify Admin API is still responsive
+		if err := caddyClient.Health(rc.Ctx); err != nil {
+			logger.Warn("Admin API health check failed after reload (continuing anyway)",
+				zap.Error(err))
+		}
+
+		return nil
 	}
 
-	// Create Caddy Admin API client
-	caddyClient := hecate.NewCaddyAdminClient(hecate.CaddyAdminAPIHost)
+tryDockerExec:
+	// Admin API not reachable - try docker exec reload
+	logger.Warn("Admin API not reachable, trying docker exec reload")
 
-	// Load the Caddyfile (adapt to JSON and apply)
-	err = caddyClient.LoadCaddyfile(rc.Ctx, string(caddyfileContent))
-	if err != nil {
-		return fmt.Errorf("failed to reload Caddy: %w\n\n"+
-			"The configuration has been rolled back to the previous working state.\n"+
-			"Check Caddy logs with: docker logs %s", err, hecate.CaddyContainerName)
-	}
-
-	logger.Info("Caddy reloaded successfully")
-
-	// Wait for reload to complete (see hecate.CaddyReloadWaitDuration)
-	time.Sleep(hecate.CaddyReloadWaitDuration)
-
-	// Verify Caddy is still running and healthy
-	isRunning, err := IsCaddyRunning(rc)
-	if err != nil {
-		return fmt.Errorf("failed to verify Caddy status: %w", err)
-	}
-
-	if !isRunning {
-		return fmt.Errorf("Caddy container is not running after reload\n\n"+
-			"This is a critical error. Check Caddy logs with:\n"+
-			"  docker logs %s", hecate.CaddyContainerName)
-	}
-
-	// Verify Admin API is still responsive
-	if err := caddyClient.Health(rc.Ctx); err != nil {
-		logger.Warn("Caddy Admin API health check failed after reload",
+	// Strategy 2: Docker exec reload (zero-downtime, no port exposure needed)
+	if err := hecate.ReloadCaddyViaExec(rc, caddyfilePath); err != nil {
+		// Docker exec reload failed - fall back to restart
+		logger.Warn("Docker exec reload failed, falling back to container restart",
 			zap.Error(err))
-		// Don't fail the operation - container is running, API might be temporarily unresponsive
+
+		// Strategy 3: Container restart (last resort)
+		logger.Warn("Using container restart (causes brief downtime ~2 seconds)")
+
+		if restartErr := RestartCaddyContainer(rc); restartErr != nil {
+			return fmt.Errorf("Caddy reload failed (all methods failed): %w\n\n"+
+				"Admin API: not reachable\n"+
+				"Docker exec: %v\n"+
+				"Container restart: %v\n\n"+
+				"Check Caddy logs: docker logs %s",
+				err, err, restartErr, hecate.CaddyContainerName)
+		}
+
+		logger.Info("Caddy reloaded successfully (via restart)")
+		return nil
 	}
 
+	// Docker exec reload succeeded
+	logger.Info("Caddy reloaded successfully (via docker exec)")
 	return nil
 }
 

@@ -55,13 +55,24 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	// Get flags
 	component, _ := cmd.Flags().GetString("component")
 	authentikCheck, _ := cmd.Flags().GetBool("authentik")
+	bionicgptCheck, _ := cmd.Flags().GetBool("bionicgpt")
 	hecatePath, _ := cmd.Flags().GetString("path")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
 	logger.Info("Starting Hecate diagnostics",
 		zap.String("component_filter", component),
 		zap.String("path", hecatePath),
-		zap.Bool("authentik_check", authentikCheck))
+		zap.Bool("authentik_check", authentikCheck),
+		zap.Bool("bionicgpt_check", bionicgptCheck))
+
+	// If --bionicgpt flag is set, run BionicGPT integration diagnostics
+	if bionicgptCheck {
+		config := &BionicGPTDebugConfig{
+			HecatePath: hecatePath,
+			Verbose:    verbose,
+		}
+		return RunBionicGPTIntegrationDebug(rc, config)
+	}
 
 	// If --authentik flag is set, run comprehensive Authentik check
 	// Delegate to pkg/authentik for business logic

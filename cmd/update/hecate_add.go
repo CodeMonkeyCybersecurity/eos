@@ -8,13 +8,16 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/add"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // addServiceCmd adds a new service to Hecate
 var addServiceCmd = &cobra.Command{
-	Use:   "add [service]",
-	Short: "Add a new reverse proxy route to Hecate",
-	Args:  cobra.ExactArgs(1),
+	Use:        "add [service]",
+	Short:      "Add a new reverse proxy route to Hecate",
+	Args:       cobra.ExactArgs(1),
+	Deprecated: "Use 'eos update hecate --add [service]' instead. Subcommand syntax will be removed in v2.0 (approximately 6 months).",
 	Long: `Add a new service to an existing Hecate installation by modifying the Caddyfile.
 
 This command:
@@ -25,30 +28,18 @@ This command:
   5. Validates and reloads Caddy (no restart)
   6. Verifies the new route is working
 
-Examples:
+DEPRECATED: This subcommand syntax is deprecated. Use 'eos update hecate --add [service]' instead.
+
+Examples (DEPRECATED - use flag syntax instead):
   # Basic service without SSO
   eos update hecate add bionicgpt \
     --dns chat.codemonkey.ai \
     --upstream 100.64.0.50:8080
 
-  # Service with SSO enabled
-  eos update hecate add nextcloud \
-    --dns cloud.codemonkey.ai \
-    --upstream 100.64.0.51:80 \
-    --sso
-
-  # Dry run to see what would be changed
-  eos update hecate add wazuh \
-    --dns wazuh.codemonkey.ai \
-    --upstream 100.64.0.52:443 \
-    --dry-run
-
-  # With custom Caddy directives
-  eos update hecate add api \
-    --dns api.codemonkey.ai \
-    --upstream 100.64.0.53:3000 \
-    --custom-directive "rate_limit 100/m" \
-    --custom-directive "header X-Custom-Header value"`,
+  # PREFERRED FLAG-BASED SYNTAX:
+  eos update hecate --add bionicgpt \
+    --dns chat.codemonkey.ai \
+    --upstream 100.64.0.50:8080`,
 	RunE: eos.Wrap(runAddService),
 }
 
@@ -67,10 +58,20 @@ func init() {
 	addServiceCmd.Flags().Bool("dry-run", false, "Show what would be changed without applying")
 	addServiceCmd.Flags().Bool("skip-dns-check", false, "Skip DNS resolution validation")
 	addServiceCmd.Flags().Bool("skip-backend-check", false, "Skip backend connectivity check")
+	addServiceCmd.Flags().Bool("allow-insecure-tls", false, "Allow InsecureSkipVerify for TLS connections (INSECURE - use only with self-signed certs)")
 	addServiceCmd.Flags().Int("backup-retention-days", 30, "Days to keep old backups (0 = keep forever)")
 }
 
 func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// DEPRECATION WARNING: Soft deprecation phase (v1.X)
+	logger.Warn("DEPRECATED: Subcommand syntax is deprecated and will be removed in v2.0",
+		zap.String("current_syntax", "eos update hecate add "+args[0]),
+		zap.String("preferred_syntax", "eos update hecate --add "+args[0]),
+		zap.String("removal_version", "v2.0.0"),
+		zap.String("timeline", "approximately 6 months"))
+
 	// CRITICAL: Detect flag-like args (--force, -f, etc.) to prevent '--' separator bypass
 	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
 		return err
@@ -88,6 +89,7 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	skipDNSCheck, _ := cmd.Flags().GetBool("skip-dns-check")
 	skipBackendCheck, _ := cmd.Flags().GetBool("skip-backend-check")
+	allowInsecureTLS, _ := cmd.Flags().GetBool("allow-insecure-tls")
 	backupRetentionDays, _ := cmd.Flags().GetInt("backup-retention-days")
 
 	// Auto-append default port for known services if port is missing
@@ -101,6 +103,7 @@ func runAddService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		Backend:             backendWithPort,
 		SSO:                 sso,
 		SSOProvider:         ssoProvider,
+		AllowInsecureTLS:    allowInsecureTLS,
 		CustomDirectives:    customDirectives,
 		DryRun:              dryRun,
 		SkipDNSCheck:        skipDNSCheck,

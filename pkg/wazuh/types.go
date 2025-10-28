@@ -3,6 +3,8 @@
 package wazuh
 
 import (
+	"time"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
@@ -86,10 +88,88 @@ const (
 	OpenSearchInternalUsers = OpenSearchIndexerDir + "internal_users.yml"
 	OpenSearchActionGroups  = OpenSearchIndexerDir + "action_groups.yml"
 
+	// SSO/SAML configs
+	// RATIONALE: Metadata file location for Authentik SAML IdP
+	// SECURITY: World-readable (0644) as it contains public metadata only
+	OpenSearchSAMLMetadataFile = OpenSearchIndexerDir + "authentik-metadata.xml"
+
+	// RATIONALE: SAML exchange key for encrypted assertions
+	// SECURITY: Must be 0600 (read-only by indexer user) as it contains private key material
+	// THREAT MODEL: Prevents unauthorized access to decrypt SAML assertions
+	OpenSearchSAMLExchangeKey = OpenSearchIndexerDir + "exchange.key"
+
 	// Dashboard configs
 	OpenSearchDashboardYml = "/etc/wazuh-dashboard/opensearch_dashboards.yml"
 
 	APIAgentConfig = "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
+
+	// Security admin tool
+	// RATIONALE: OpenSearch security configuration tool location
+	SecurityAdminTool = "/usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh"
+
+	// Certificate paths
+	// RATIONALE: TLS certificates for OpenSearch Security admin operations
+	// SECURITY: Used for mTLS authentication when applying security config
+	OpenSearchCertsDir        = "/etc/wazuh-indexer/certs/"
+	OpenSearchRootCA          = OpenSearchCertsDir + "root-ca.pem"
+	OpenSearchAdminCert       = OpenSearchCertsDir + "admin.pem"
+	OpenSearchAdminKey        = OpenSearchCertsDir + "admin-key.pem"
+
+	// Backup directory
+	// RATIONALE: Centralized location for Eos-managed Wazuh backups
+	WazuhBackupDir = "/opt/eos/backups/"
+)
+
+// File permissions constants
+// SECURITY CRITICAL: These permissions are required for compliance and threat mitigation
+const (
+	// RATIONALE: SAML metadata is public information, world-readable
+	// SECURITY: Contains only public IdP metadata (certificates, endpoints)
+	// THREAT MODEL: No confidential data, safe for broad read access
+	SAMLMetadataFilePerm = 0644
+
+	// RATIONALE: Exchange key is private key material, must be owner-only
+	// SECURITY: Protects SAML assertion decryption key
+	// THREAT MODEL: Prevents unauthorized decryption of SAML assertions
+	// COMPLIANCE: Required for SOC2, PCI-DSS (restrict key access)
+	SAMLExchangeKeyPerm = 0600
+
+	// RATIONALE: Security config files are system configs, admin-writable only
+	// SECURITY: Prevents unauthorized modification of security policies
+	// THREAT MODEL: Mitigates privilege escalation via config tampering
+	SecurityConfigPerm = 0644
+
+	// RATIONALE: Backup directory needs admin write, group read for restore ops
+	// SECURITY: Allows backup operations by admin, read by operators
+	BackupDirPerm = 0755
+)
+
+// Service operation timeouts
+// RATIONALE: Empirically determined safe wait times for service operations
+const (
+	// RATIONALE: Wait time for wazuh-indexer to be ready after restart
+	// SECURITY: Prevents race condition where config is applied before indexer is ready
+	// EMPIRICAL: 10 seconds sufficient for indexer startup on modern hardware
+	// THREAT MODEL: Too short = config fails; too long = unnecessary wait
+	WazuhIndexerStartupWait = 10 * time.Second
+
+	// RATIONALE: Retry delay for indexer health check
+	// THREAT MODEL: Prevents tight loop CPU exhaustion if indexer is slow
+	// EMPIRICAL: 2 seconds balances responsiveness with resource usage
+	WazuhIndexerHealthCheckRetryDelay = 2 * time.Second
+
+	// RATIONALE: Wait time for wazuh-dashboard to be ready after restart
+	// EMPIRICAL: 5 seconds sufficient for dashboard startup
+	WazuhDashboardStartupWait = 5 * time.Second
+)
+
+// SAML attribute names
+const (
+	// RATIONALE: SAML role attribute name for OpenSearch Security role mapping
+	// CRITICAL: Must be capital "Roles" (not "roles") for Wazuh to recognize
+	// SECURITY: Case-sensitive - incorrect case prevents role mapping (authorization bypass)
+	// REFERENCE: Wazuh OpenSearch Security SAML configuration docs
+	SAMLRolesAttributeName = "Roles"
 )
 
 // PlatformConfig represents the overall Wazuh platform configuration

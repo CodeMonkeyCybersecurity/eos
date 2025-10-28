@@ -253,6 +253,7 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      - "127.0.0.1:2019:2019"  # Admin API (localhost-only for security)
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./logs/caddy:/var/log/caddy:rw

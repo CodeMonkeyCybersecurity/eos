@@ -151,7 +151,23 @@ Secrets Management?
 └─ Never hardcode → Store via secretManager.StoreSecret()
 
 Command Structure?
-└─ VERB-FIRST only: create, read, list, update (includes --fix), delete (+ self, backup, build, deploy, promote, env)
+└─ VERB-FIRST with FLAG-BASED operations:
+
+   Format: eos [verb] [noun] --[operation] [target] [--flags...]
+
+   Examples:
+     eos update hecate --add bionicgpt --dns X --upstream Y
+     eos update kvm --add --guest-agent --name vm1
+     eos update vault --fix --dry-run
+     eos update wazuh --add authentik --wazuh-url X
+
+   EXCEPTION: Standard CRUD verbs (start, stop, restart) use positional args:
+     eos update services start nginx   # OK - 'start' is a verb, not an operation
+     eos update services stop apache2  # OK - 'stop' is a verb, not an operation
+
+   DEPRECATED (remove in v2.0):
+     eos update [noun] [operation] [target]  # Old subcommand pattern
+     eos update hecate add bionicgpt         # Legacy syntax, use --add instead
 
 Configuration Drift Correction (P0 - NEW PATTERN)?
 ├─ Service has drifted from canonical state (permissions, config values)?
@@ -777,6 +793,10 @@ Before completing any task, verify:
 | `eos fix vault` | `eos update vault --fix` (fix is deprecated) |
 | `eos fix consul` | `eos update consul --fix` |
 | `eos fix mattermost` | `eos update mattermost --fix` |
+| `eos update hecate add bionicgpt` | `eos update hecate --add bionicgpt` (subcommand is deprecated) |
+| `eos update wazuh add authentik` | `eos update wazuh --add authentik` (subcommand is deprecated) |
+| Subcommand for operations | Flag for operations (e.g., --add, --enable, --fix) |
+| `cmd.AddCommand(addCmd)` for operations | `cmd.Flags().Bool("add")` for operations |
 | `if flag == "" { return error }` | Use `interaction.GetRequiredString()` (P0 - human-centric) |
 | Ad-hoc flag prompting in cmd/ | Use unified `pkg/interaction/required_flag.go` pattern |
 | Prompt without help text | Always include HelpText (WHY needed, HOW to get) |

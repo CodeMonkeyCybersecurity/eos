@@ -5,6 +5,104 @@
 
 ---
 
+## 📅 Release Schedule
+
+### Eos v0.5 - EOFY 2026 (Target: June 30, 2026)
+**Focus**: Command structure standardization, secret manager refactoring, stability improvements
+
+**Key Deliverables**:
+- ✅ Flag-based command operations (Phase 1 complete - 2025-10-28)
+- 🔄 Secret manager architecture refactoring (Phases 1-3 complete, 4-6 in progress)
+- 🔄 Command structure migration (Phase 1 complete, Phase 2-3 in progress)
+- ⏳ Integration testing and documentation updates
+
+### Eos v2.0 - Q3 2026 (Target: ~December 2026)
+**Focus**: Breaking changes, deprecated pattern removal, major version bump
+
+**Key Deliverables**:
+- Remove deprecated subcommand syntax (`eos update [service] add` → `eos update [service] --add`)
+- Remove deprecated secret manager functions (`GetOrGenerateServiceSecrets` → `EnsureServiceSecrets`)
+- Shell completion updates (flag-based only)
+- Migration guide for v0.5 → v2.0
+
+---
+
+## 🚀 Command Structure Standardization (2025-10-28)
+
+### **Status**: Phase 1 Complete, Phase 2-3 In Progress
+
+**Goal**: Standardize all `eos update` commands to use flag-based operations instead of subcommands
+
+**Why**: Shorter syntax, better discoverability, consistency across all services (KVM, Vault already use this pattern)
+
+### Phase 1: Documentation & Soft Deprecation ✅ COMPLETE (2025-10-28)
+
+**Completed Work**:
+- ✅ Updated [CLAUDE.md](CLAUDE.md#L153-L170) with canonical command structure pattern
+- ✅ Added flag-based format: `eos [verb] [noun] --[operation] [target] [--flags...]`
+- ✅ Documented exception: CRUD verbs (start/stop/restart) stay positional
+- ✅ Added to anti-patterns table with clear examples
+- ✅ Deprecated `eos update hecate add [service]` subcommand ([cmd/update/hecate_add.go](cmd/update/hecate_add.go))
+- ✅ Deprecated `eos update wazuh add [service]` subcommand ([cmd/update/wazuh.go](cmd/update/wazuh.go))
+- ✅ Implemented hybrid pattern for Wazuh (both flag and subcommand work)
+- ✅ Added runtime deprecation warnings with clear migration guidance
+- ✅ Updated command help text with preferred syntax
+
+**User Impact**: None (both patterns work, users see warnings with migration path)
+
+**Examples**:
+```bash
+# PREFERRED (flag-based)
+eos update hecate --add bionicgpt --dns chat.example.com --upstream 100.64.0.1:8080
+eos update wazuh --add authentik --wazuh-url https://wazuh.example.com
+
+# DEPRECATED (subcommand - warns but works)
+eos update hecate add bionicgpt --dns chat.example.com --upstream 100.64.0.1:8080
+eos update wazuh add authentik --wazuh-url https://wazuh.example.com
+```
+
+### Phase 2: Hard Deprecation (Target: ~August 2026 - 1 month after v0.5)
+
+**Planned Work**:
+- ⏳ Convert deprecation warnings to errors
+- ⏳ Update shell completion to only suggest flag-based syntax
+- ⏳ Add prominent notices in `eos --help` output
+- ⏳ Update all documentation (README, wiki, blog posts)
+
+**User Impact**: Subcommand syntax stops working, users forced to migrate
+
+### Phase 3: Removal (Target: v2.0 - Q3 2026, ~6 months after Phase 1)
+
+**Planned Work**:
+- ⏳ Delete `cmd/update/hecate_add.go` (118 lines)
+- ⏳ Delete `cmd/update/wazuh_add_authentik.go` (170 lines)
+- ⏳ Remove subcommand registration from parent commands
+- ⏳ Clean up telemetry tracking (`InvocationMethod` field no longer needed)
+- ⏳ Remove deprecated command aliases
+- ⏳ Update tests to only use flag-based syntax
+
+**User Impact**: Subcommand files removed, codebase simplified
+
+**Migration Support**:
+- 8-month deprecation timeline (soft warnings → hard errors → removal)
+- Clear error messages with remediation steps
+- Migration guide published at https://wiki.cybermonkey.net.au/eos-v2-migration
+- Both patterns work during entire v0.5 lifecycle (through June 2026)
+
+**Rationale for Flag-Based Pattern**:
+1. **Shorter**: `--add` vs `add [service]` saves 4 characters, clearer intent
+2. **Discoverable**: `--help` immediately shows available operations
+3. **Consistent**: Aligns with KVM (`--add`, `--enable`), Vault (`--fix`, `--unseal`)
+4. **Human-centric**: Reduces barriers to entry (CLAUDE.md philosophy)
+5. **Evidence-based**: Telemetry shows flag-based preference in existing commands
+
+**Affected Commands**:
+- `eos update hecate add [service]` → `eos update hecate --add [service]`
+- `eos update wazuh add [service]` → `eos update wazuh --add [service]`
+- Exception: `eos update services start/stop` (these are verbs, not operations)
+
+---
+
 ## 🎯 Current Focus: Secret Manager Architecture Refactoring
 
 ### **Status**: Phase 1 Complete, Phase 2-3 In Progress
@@ -1110,6 +1208,82 @@ If critical issues found:
 
 ## Future Work (Deferred)
 
+### Hecate Auto-Migration Command
+
+**Status**: 📅 PLANNED
+**Priority**: P2 (Quality-of-life improvement)
+**Effort**: 3-4 hours
+**Added**: 2025-10-28
+
+**Goal**: Auto-detect and fix outdated Hecate installations (missing port 2019 exposure in docker-compose.yml)
+
+**Background**:
+- Eos v1.X Hecate installations did not expose Caddy Admin API port 2019
+- Eos v2.0+ exposes port 2019 for zero-downtime config reloads via `eos update hecate --add`
+- Current fallback: docker exec validation (zero-downtime, works on all installations)
+- Future improvement: Automated migration for existing installations
+
+**Current Workaround**:
+Users can manually update `/opt/hecate/docker-compose.yml`:
+```yaml
+services:
+  caddy:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "127.0.0.1:2019:2019"  # Add this line
+```
+Then restart: `cd /opt/hecate && docker-compose up -d`
+
+**Planned Command**:
+```bash
+# Auto-detect and fix outdated Hecate installation
+eos update hecate --fix-installation
+
+# What it does:
+1. Detect if port 2019 is exposed in docker-compose.yml
+2. If not exposed:
+   - Backup current docker-compose.yml
+   - Update with new template (adds port 2019)
+   - Restart Hecate: docker-compose up -d
+   - Verify Admin API is accessible
+3. If already exposed: report "already up-to-date"
+```
+
+**Implementation Tasks**:
+1. Create `pkg/hecate/migration.go`:
+   - `DetectPortExposure()` - Parse docker-compose.yml, check for "2019:2019"
+   - `BackupDockerCompose()` - Copy to `/opt/hecate/backups/docker-compose.yml.backup.TIMESTAMP`
+   - `UpdateDockerCompose()` - Inject port exposure using YAML parser (not string replacement)
+   - `RestartHecate()` - `docker-compose up -d` in `/opt/hecate`
+   - `VerifyAdminAPI()` - Check `http://localhost:2019/` responds
+
+2. Add flag to `cmd/update/hecate.go`:
+   ```go
+   SecureHecateCmd.Flags().Bool("fix-installation", false, "Auto-migrate outdated Hecate installation")
+   ```
+
+3. Integration with existing validation:
+   - Preflight check detects missing port 2019
+   - Suggests: `eos update hecate --fix-installation`
+   - Falls back to docker exec validation (current behavior)
+
+**Benefits**:
+- Zero-downtime migrations for existing installations
+- Users get Admin API benefits without manual YAML editing
+- Automated testing of installation state
+
+**Risks**:
+- YAML parsing complexity (use `gopkg.in/yaml.v3`)
+- User-modified docker-compose.yml (detect with comment markers)
+- Concurrent `docker-compose` operations (use file locking)
+
+**Target Date**: TBD (after Phase 2 validation in production)
+**Reference**: See [pkg/hecate/add/caddy.go](pkg/hecate/add/caddy.go) for current validation fallback logic
+
+---
+
 ### BionicGPT Vault Integration
 
 **Status**: 📅 DEFERRED - Current .env approach working
@@ -1160,4 +1334,4 @@ Code: 403. Errors:
 ---
 
 **Last Updated**: 2025-10-28 by Henry
-**Next Review**: 2025-11-10 (Phase 5 completion)
+**Next Review**: 2025-11-10 (Phase 5 completion, Command Structure Phase 2 planning)

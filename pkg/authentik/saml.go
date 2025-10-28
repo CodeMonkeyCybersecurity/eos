@@ -443,3 +443,28 @@ func (c *SAMLClient) updateApplication(ctx context.Context, config ApplicationCo
 
 	return config.PK, nil
 }
+
+// DeleteSAMLProvider deletes a SAML provider by PK
+func (c *SAMLClient) DeleteSAMLProvider(ctx context.Context, pk string) error {
+	url := fmt.Sprintf("%s/api/v3/providers/saml/%s/", c.BaseURL, pk)
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("delete request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete SAML provider: %d - %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

@@ -37,7 +37,12 @@ const (
 
 	// CaddyAdminAPIPort is the port where Caddy Admin API listens
 	// RATIONALE: Port 2019 is Caddy's default Admin API port
+	// SECURITY: Must be exposed as "127.0.0.1:2019:2019" in docker-compose.yml for host access
+	//           Binding to 127.0.0.1 ensures Admin API is ONLY accessible from localhost, not network
+	// USAGE: Used for zero-downtime config reloads via `eos update hecate --add`
+	//        If port not exposed, Eos falls back to container restart (brief downtime)
 	// REFERENCE: https://caddyserver.com/docs/api
+	// TEMPLATE: pkg/hecate/yaml_generator.go line ~256 exposes this port in docker-compose.yml
 	CaddyAdminAPIPort = 2019
 
 	// AuthentikHost is the hostname where Authentik SSO service is accessible
@@ -231,10 +236,25 @@ const (
 	// REFERENCE: https://github.com/bionic-gpt/bionic-gpt
 	BionicGPTDefaultPort = shared.PortBionicGPT // 8513
 
-	// BionicGPTHealthEndpoint is the health check endpoint for BionicGPT
-	// RATIONALE: Standard health endpoint for container orchestration
-	// USAGE: Caddy health checks, Nomad health monitoring
-	BionicGPTHealthEndpoint = "/health"
+	// BionicGPTHealthEndpoint - DEPRECATED - This endpoint does NOT exist in BionicGPT
+	// VENDOR RESEARCH: Verified via source code analysis - NO /health, /healthz, /ready endpoints
+	// SOURCE: https://github.com/bionic-gpt/bionic-gpt (crates/web-server/main.rs)
+	// ACTUAL BEHAVIOR: Root path "/" requires JWT authentication, returns 401 without token
+	// VALIDATION STRATEGY: Check root path, accept 401/403 as proof service is running
+	// TODO: Remove this constant in future refactor (currently unused)
+	BionicGPTHealthEndpoint = "" // Empty string - no health endpoint exists
+)
+
+// ============================================================================
+// WAZUH SERVICE-SPECIFIC CONSTANTS
+// ============================================================================
+
+const (
+	// WazuhDefaultPort is the port where Wazuh Dashboard listens
+	// RATIONALE: Wazuh Dashboard typically runs on HTTPS port 443
+	// REFERENCE: https://documentation.wazuh.com/current/installation-guide/
+	// NOTE: This is for the dashboard, not the manager ports (1514, 1515, 55000)
+	WazuhDefaultPort = 443
 )
 
 // ============================================================================

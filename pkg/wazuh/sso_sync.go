@@ -29,7 +29,7 @@ func GenerateExchangeKey() (string, error) {
 // UpdateSecurityConfig updates the OpenSearch Security config.yml with SAML configuration
 func UpdateSecurityConfig(rc *eos_io.RuntimeContext, entityID, exchangeKey, wazuhURL string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	configPath := "/etc/wazuh-indexer/opensearch-security/config.yml"
+	configPath := OpenSearchConfig
 
 	logger.Debug("Reading current config.yml")
 
@@ -58,7 +58,7 @@ func UpdateSecurityConfig(rc *eos_io.RuntimeContext, entityID, exchangeKey, wazu
 	}
 
 	// Write back to file
-	if err := os.WriteFile(configPath, newData, 0644); err != nil {
+	if err := os.WriteFile(configPath, newData, SecurityConfigPerm); err != nil {
 		return fmt.Errorf("failed to write updated config: %w", err)
 	}
 
@@ -71,7 +71,7 @@ func UpdateSecurityConfig(rc *eos_io.RuntimeContext, entityID, exchangeKey, wazu
 // UpdateRolesMapping updates the roles_mapping.yml with SAML role mappings
 func UpdateRolesMapping(rc *eos_io.RuntimeContext, roleMappings map[string]string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	rolesMappingPath := "/etc/wazuh-indexer/opensearch-security/roles_mapping.yml"
+	rolesMappingPath := OpenSearchRoleMappings
 
 	logger.Debug("Reading current roles_mapping.yml")
 
@@ -103,7 +103,7 @@ func UpdateRolesMapping(rc *eos_io.RuntimeContext, roleMappings map[string]strin
 	}
 
 	// Write back to file
-	if err := os.WriteFile(rolesMappingPath, newData, 0644); err != nil {
+	if err := os.WriteFile(rolesMappingPath, newData, SecurityConfigPerm); err != nil {
 		return fmt.Errorf("failed to write updated mapping: %w", err)
 	}
 
@@ -117,7 +117,7 @@ func UpdateRolesMapping(rc *eos_io.RuntimeContext, roleMappings map[string]strin
 // UpdateDashboardConfig updates the opensearch_dashboards.yml for SAML auth
 func UpdateDashboardConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	dashboardConfigPath := "/etc/wazuh-dashboard/opensearch_dashboards.yml"
+	dashboardConfigPath := OpenSearchDashboardYml
 
 	logger.Debug("Reading current opensearch_dashboards.yml")
 
@@ -168,7 +168,7 @@ func UpdateDashboardConfig(rc *eos_io.RuntimeContext) error {
 
 	newData := []byte(strings.Join(lines, "\n"))
 
-	if err := os.WriteFile(dashboardConfigPath, newData, 0644); err != nil {
+	if err := os.WriteFile(dashboardConfigPath, newData, SecurityConfigPerm); err != nil {
 		return fmt.Errorf("failed to write updated dashboard config: %w", err)
 	}
 
@@ -184,13 +184,13 @@ func ApplySecurityConfig(rc *eos_io.RuntimeContext) error {
 	logger.Info("Applying OpenSearch security configuration")
 
 	// Run securityadmin.sh to apply changes
-	cmd := "/usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh"
+	cmd := SecurityAdminTool
 	args := []string{
-		"-cd", "/etc/wazuh-indexer/opensearch-security",
+		"-cd", OpenSearchIndexerDir,
 		"-icl", "-nhnv",
-		"-cacert", "/etc/wazuh-indexer/certs/root-ca.pem",
-		"-cert", "/etc/wazuh-indexer/certs/admin.pem",
-		"-key", "/etc/wazuh-indexer/certs/admin-key.pem",
+		"-cacert", OpenSearchRootCA,
+		"-cert", OpenSearchAdminCert,
+		"-key", OpenSearchAdminKey,
 	}
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -234,7 +234,7 @@ func RestartSSOServices(rc *eos_io.RuntimeContext) error {
 
 	// Wait for indexer to be ready
 	logger.Debug("Waiting for wazuh-indexer to be ready")
-	time.Sleep(10 * time.Second)
+	time.Sleep(WazuhIndexerStartupWait)
 
 	// Check if indexer is responsive
 	for i := 0; i < 30; i++ {
@@ -246,7 +246,7 @@ func RestartSSOServices(rc *eos_io.RuntimeContext) error {
 		if err == nil {
 			break
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(WazuhIndexerHealthCheckRetryDelay)
 	}
 
 	// Restart dashboard
@@ -260,7 +260,7 @@ func RestartSSOServices(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to restart wazuh-dashboard: %w", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	time.Sleep(WazuhDashboardStartupWait)
 
 	logger.Info("Services restarted successfully")
 	return nil
@@ -316,7 +316,7 @@ func updateSAMLAuthDomain(config map[string]interface{}, entityID, exchangeKey, 
 	}
 
 	// Create SAML auth domain
-	metadataPath := "/etc/wazuh-indexer/opensearch-security/authentik-metadata.xml"
+	metadataPath := OpenSearchSAMLMetadataFile
 
 	samlDomain := map[string]interface{}{
 		"http_enabled":      true,
@@ -335,7 +335,7 @@ func updateSAMLAuthDomain(config map[string]interface{}, entityID, exchangeKey, 
 					"forceAuthn": false,
 				},
 				"kibana_url":   wazuhURL,
-				"roles_key":    "Roles", // CRITICAL: Capital R for Wazuh role mapping
+				"roles_key":    SAMLRolesAttributeName,
 				"exchange_key": exchangeKey,
 			},
 		},

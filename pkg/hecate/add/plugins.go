@@ -37,25 +37,37 @@ type ServiceIntegrator interface {
 	Rollback(rc *eos_io.RuntimeContext) error
 }
 
-// serviceIntegrators is the global registry of service-specific integrators
-// Services register themselves in their init() functions
-var serviceIntegrators = map[string]ServiceIntegrator{}
+// IntegratorConstructor is a function that creates a new integrator instance
+// This pattern ensures each invocation gets a fresh instance with isolated state
+type IntegratorConstructor func() ServiceIntegrator
 
-// RegisterServiceIntegrator registers a service-specific integrator
+// serviceIntegratorConstructors is the global registry of service integrator constructors
+// Services register constructors in their init() functions
+// RATIONALE: Constructor pattern prevents resource leaks from shared state
+// SECURITY: Each invocation gets isolated resources for proper rollback
+var serviceIntegratorConstructors = map[string]IntegratorConstructor{}
+
+// RegisterServiceIntegrator registers a service-specific integrator constructor
 // This should be called from the init() function of service plugin files
-func RegisterServiceIntegrator(serviceName string, integrator ServiceIntegrator) {
-	serviceIntegrators[serviceName] = integrator
+// CRITICAL: Pass a constructor function, NOT a concrete instance
+// Example: RegisterServiceIntegrator("wazuh", func() ServiceIntegrator { return &WazuhIntegrator{...} })
+func RegisterServiceIntegrator(serviceName string, constructor IntegratorConstructor) {
+	serviceIntegratorConstructors[serviceName] = constructor
 }
 
-// GetServiceIntegrator retrieves a registered service integrator
-// Returns the integrator and true if found, nil and false if not registered
+// GetServiceIntegrator retrieves a NEW integrator instance for the service
+// Returns a fresh integrator instance and true if found, nil and false if not registered
+// IMPORTANT: Each call creates a new instance to prevent state sharing between invocations
 func GetServiceIntegrator(serviceName string) (ServiceIntegrator, bool) {
-	integrator, exists := serviceIntegrators[serviceName]
-	return integrator, exists
+	constructor, exists := serviceIntegratorConstructors[serviceName]
+	if !exists {
+		return nil, false
+	}
+	return constructor(), true // Call constructor to create fresh instance
 }
 
 // HasServiceIntegrator checks if a service has a registered integrator
 func HasServiceIntegrator(serviceName string) bool {
-	_, exists := serviceIntegrators[serviceName]
+	_, exists := serviceIntegratorConstructors[serviceName]
 	return exists
 }
