@@ -79,9 +79,24 @@ Examples:
 		removeService, _ := cmd.Flags().GetString("remove")
 		removeWasSet := cmd.Flags().Changed("remove")
 
+		// Check if --fix flag is explicitly set
+		fixService, _ := cmd.Flags().GetString("fix")
+		fixWasSet := cmd.Flags().Changed("fix")
+
 		// Validate mutually exclusive flags
-		if addWasSet && removeWasSet {
-			return fmt.Errorf("cannot use --add and --remove together\nUse one at a time")
+		exclusiveFlagsCount := 0
+		if addWasSet {
+			exclusiveFlagsCount++
+		}
+		if removeWasSet {
+			exclusiveFlagsCount++
+		}
+		if fixWasSet {
+			exclusiveFlagsCount++
+		}
+
+		if exclusiveFlagsCount > 1 {
+			return fmt.Errorf("cannot use --add, --remove, and --fix together\nUse one at a time")
 		}
 
 		if addWasSet {
@@ -98,6 +113,14 @@ Examples:
 			}
 			// Delegate to remove service flow
 			return runRemoveServiceFromFlag(rc, cmd, removeService)
+		}
+
+		if fixWasSet {
+			if fixService == "" {
+				return fmt.Errorf("--fix requires a service name\nExample: eos update hecate --fix bionicgpt")
+			}
+			// Delegate to fix service flow
+			return runFixServiceFromFlag(rc, cmd, fixService)
 		}
 
 		logger.Info("Regenerating Hecate deployment from Consul KV configuration")
@@ -120,6 +143,7 @@ func init() {
 	// Add service management flags
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
 	updateHecateCmd.Flags().String("remove", "", "Remove a service from Hecate (service name)")
+	updateHecateCmd.Flags().String("fix", "", "Fix drift/misconfigurations for a service (service name)")
 	updateHecateCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for the service (required with --add)")
 	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
 
@@ -205,6 +229,27 @@ func runRemoveServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, ser
 		"Then reload Caddy: docker exec hecate-caddy caddy reload --config /etc/caddy/Caddyfile\n\n" +
 		"Service to remove: %s\n" +
 		"Look for: # Service: %s", service, service)
+}
+
+// runFixServiceFromFlag handles fixing drift/misconfigurations when --fix flag is used
+func runFixServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, service string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Get dry-run flag
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	logger.Info("Fixing service configuration drift",
+		zap.String("service", service),
+		zap.Bool("dry_run", dryRun))
+
+	// Build fix options
+	opts := &add.FixOptions{
+		Service: service,
+		DryRun:  dryRun,
+	}
+
+	// Execute the fix operation
+	return add.FixService(rc, opts)
 }
 
 // runK3sCmd updates the k3s deployment configuration.

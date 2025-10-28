@@ -46,6 +46,15 @@ func init() {
 	})
 }
 
+// IsConfigured checks if Wazuh SSO integration is already configured
+// P1 #4: Plugin-based idempotency check instead of hardcoded service checks
+// Wazuh currently doesn't require SSO integration, so always returns false
+func (w *WazuhIntegrator) IsConfigured(rc *eos_io.RuntimeContext, opts *ServiceOptions) (bool, error) {
+	// Wazuh integration doesn't configure SSO, so it's never "configured" in that sense
+	// This allows normal duplicate detection to handle idempotency
+	return false, nil
+}
+
 // ValidateService checks if Wazuh is running at the backend address
 func (w *WazuhIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)

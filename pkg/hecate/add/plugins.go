@@ -20,6 +20,12 @@ type IntegrationResources struct {
 // Services can implement this interface to provide custom validation,
 // authentication setup, and health checks
 type ServiceIntegrator interface {
+	// IsConfigured checks if the service integration is already configured
+	// Returns true if SSO/auth is already set up for this specific DNS, false otherwise
+	// Used for idempotency - avoids re-configuring already-configured services
+	// P1 #4: Plugin-based idempotency check instead of hardcoded service checks
+	IsConfigured(rc *eos_io.RuntimeContext, opts *ServiceOptions) (bool, error)
+
 	// ValidateService checks if the backend service is running correctly
 	// This is called before adding the route to verify the upstream is healthy
 	ValidateService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error

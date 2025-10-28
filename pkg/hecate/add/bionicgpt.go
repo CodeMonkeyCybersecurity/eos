@@ -38,6 +38,42 @@ func init() {
 	})
 }
 
+// IsConfigured checks if BionicGPT SSO integration is already configured
+// P1 #4: Plugin-based idempotency check instead of hardcoded service checks
+func (b *BionicGPTIntegrator) IsConfigured(rc *eos_io.RuntimeContext, opts *ServiceOptions) (bool, error) {
+	// Use credential discovery logic to get Authentik API access
+	authentikToken, authentikURL, err := b.getAuthentikCredentials(rc.Ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get Authentik credentials: %w", err)
+	}
+
+	// Connect to Authentik API
+	authentikClient := authentik.NewClient(authentikURL, authentikToken)
+
+	// Check if BionicGPT application exists for THIS SPECIFIC DNS
+	apps, err := authentikClient.ListApplications(rc.Ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to list Authentik applications: %w", err)
+	}
+
+	expectedLaunchURL := fmt.Sprintf("https://%s", opts.DNS)
+	logger := otelzap.Ctx(rc.Ctx)
+
+	for _, app := range apps {
+		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
+			logger.Debug("BionicGPT application found in Authentik for this DNS",
+				zap.String("slug", app.Slug),
+				zap.String("name", app.Name),
+				zap.String("launch_url", app.MetaLaunchURL))
+			return true, nil
+		}
+	}
+
+	logger.Debug("BionicGPT application not found in Authentik for this DNS",
+		zap.String("expected_launch_url", expectedLaunchURL))
+	return false, nil
+}
+
 // ValidateService checks if BionicGPT is running at the backend address
 // Based on vendor research: BionicGPT has NO /health endpoint
 // Source: https://github.com/bionic-gpt/bionic-gpt (verified via source code analysis)

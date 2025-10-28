@@ -3,10 +3,10 @@
 package add
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
@@ -16,6 +16,10 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// errServiceAlreadyConfigured is a sentinel error indicating the service is already configured
+// and no further processing is needed (success, but stop pipeline)
+var errServiceAlreadyConfigured = errors.New("service already configured")
 
 // AddService adds a new service to Hecate
 // This is the main entry point that orchestrates all operations
@@ -68,6 +72,10 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 
 	// Phase 2: Pre-flight checks
 	if err := runPreflightChecks(rc, opts); err != nil {
+		// Check for sentinel error indicating service is already configured
+		if errors.Is(err, errServiceAlreadyConfigured) {
+			return nil // Success - service already configured, nothing more to do
+		}
 		return err
 	}
 
@@ -236,10 +244,9 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 
 			// Check if Authentik application exists for this service
 			authentikConfigured, checkErr := isBionicGPTAuthentikConfigured(rc, opts.DNS)
-			if checkErr != nil {
-				logger.Warn("Could not verify Authentik configuration, will attempt integration", zap.Error(checkErr))
-				// Continue to integration phase
-			} else if authentikConfigured {
+
+			// If fully configured (route + SSO), exit gracefully
+			if checkErr == nil && authentikConfigured {
 				logger.Info("✓ BionicGPT route AND Authentik SSO already configured",
 					zap.String("service", opts.Service),
 					zap.String("dns", opts.DNS))
@@ -250,26 +257,32 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 				logger.Info("terminal prompt: DNS: " + opts.DNS)
 				logger.Info("terminal prompt: SSO: Enabled via Authentik")
 				logger.Info("terminal prompt: ")
-				return nil // Exit gracefully - fully configured
+				return errServiceAlreadyConfigured // Sentinel: fully configured, stop processing
+			}
+
+			// If not configured OR verification failed, configure SSO
+			if checkErr != nil {
+				logger.Warn("Could not verify Authentik configuration, will attempt integration", zap.Error(checkErr))
 			} else {
 				logger.Info("BionicGPT route exists but Authentik SSO not configured - will configure SSO only")
-				// Skip to Phase 4 (service integration) - don't re-add Caddyfile route
-				logger.Info("Phase 2/6: Skipping pre-flight checks (route exists)")
-				logger.Info("Phase 3/6: Skipping backup (no Caddyfile changes)")
-
-				// Run service integration directly
-				if err := runServiceIntegration(rc, opts); err != nil {
-					return fmt.Errorf("SSO integration failed: %w", err)
-				}
-
-				logger.Info("✓ Authentik SSO configured for existing BionicGPT route")
-				logger.Info("")
-				logger.Info("BionicGPT is now accessible with Authentik authentication:")
-				logger.Info(fmt.Sprintf("  URL: https://%s", opts.DNS))
-				logger.Info("  SSO: Enabled via Authentik forward auth")
-				logger.Info("")
-				return nil // Exit after SSO integration
 			}
+
+			// Skip to Phase 4 (service integration) - don't re-add Caddyfile route
+			logger.Info("Phase 2/6: Skipping pre-flight checks (route exists)")
+			logger.Info("Phase 3/6: Skipping backup (no Caddyfile changes)")
+
+			// Run service integration directly
+			if err := runServiceIntegration(rc, opts); err != nil {
+				return fmt.Errorf("SSO integration failed: %w", err)
+			}
+
+			logger.Info("✓ Authentik SSO configured for existing BionicGPT route")
+			logger.Info("")
+			logger.Info("BionicGPT is now accessible with Authentik authentication:")
+			logger.Info(fmt.Sprintf("  URL: https://%s", opts.DNS))
+			logger.Info("  SSO: Enabled via Authentik forward auth")
+			logger.Info("")
+			return errServiceAlreadyConfigured // Sentinel: SSO configured, Caddyfile route exists, stop processing
 		}
 
 		// Standard duplicate handling for non-BionicGPT or non-SSO cases
@@ -287,7 +300,7 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 			logger.Info("terminal prompt:   2. Re-add: eos update hecate --add " + opts.Service + " --dns <domain> --upstream <backend>")
 			logger.Info("terminal prompt: ")
 			logger.Info("terminal prompt: To avoid accidental changes, 'eos update hecate --add' will not modify existing services.")
-			return nil // Exit gracefully
+			return errServiceAlreadyConfigured // Sentinel: service already configured, stop processing
 		}
 
 		if duplicateResult.DuplicateType == "dns" {
@@ -307,7 +320,7 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 			logger.Info("terminal prompt:   3. Re-add: eos update hecate --add <service> --dns " + opts.DNS + " --upstream <backend>")
 			logger.Info("terminal prompt: ")
 			logger.Info("terminal prompt: To avoid accidental changes, 'eos update hecate --add' will not modify existing routes.")
-			return nil // Exit gracefully
+			return errServiceAlreadyConfigured // Sentinel: DNS already configured, stop processing
 		}
 	}
 
@@ -591,50 +604,37 @@ func runServiceIntegration(rc *eos_io.RuntimeContext, opts *ServiceOptions) erro
 func isBionicGPTAuthentikConfigured(rc *eos_io.RuntimeContext, dns string) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Read Authentik credentials from .env
-	envFile := "/opt/hecate/.env"
-	content, err := os.ReadFile(envFile)
+	// Use BionicGPT integrator's credential discovery logic (P0 #1 fix: reuse existing helper)
+	integrator := &BionicGPTIntegrator{resources: &IntegrationResources{}}
+	authentikToken, authentikURL, err := integrator.getAuthentikCredentials(rc.Ctx)
 	if err != nil {
-		return false, fmt.Errorf("failed to read .env: %w", err)
+		return false, fmt.Errorf("failed to get Authentik credentials: %w", err)
 	}
 
-	envContent := string(content)
-
-	// Extract AUTHENTIK_BOOTSTRAP_TOKEN from .env (used as API key)
-	var authentikToken string
-	for _, line := range strings.Split(envContent, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "AUTHENTIK_BOOTSTRAP_TOKEN=") {
-			authentikToken = strings.TrimPrefix(line, "AUTHENTIK_BOOTSTRAP_TOKEN=")
-			authentikToken = strings.Trim(authentikToken, "\"'") // Remove quotes
-			break
-		}
-	}
-
-	if authentikToken == "" {
-		return false, fmt.Errorf("AUTHENTIK_BOOTSTRAP_TOKEN not found in .env")
-	}
-
-	// Connect to Authentik API (use APIClient which has ListApplications)
-	authentikURL := fmt.Sprintf("http://%s:%d", hecate.AuthentikHost, hecate.AuthentikPort)
+	// Connect to Authentik API
 	authentikClient := authentik.NewClient(authentikURL, authentikToken)
 
-	// Check if BionicGPT application exists
+	// Check if BionicGPT application exists for THIS SPECIFIC DNS
+	// P1 #5 FIX: Check DNS-specific app configuration, not just "any bionicgpt app exists"
 	apps, err := authentikClient.ListApplications(rc.Ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to list Authentik applications: %w", err)
 	}
 
+	expectedLaunchURL := fmt.Sprintf("https://%s", dns)
+
 	for _, app := range apps {
-		if app.Slug == "bionicgpt" {
-			logger.Debug("BionicGPT application found in Authentik",
+		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
+			logger.Debug("BionicGPT application found in Authentik for this DNS",
 				zap.String("slug", app.Slug),
-				zap.String("name", app.Name))
+				zap.String("name", app.Name),
+				zap.String("launch_url", app.MetaLaunchURL))
 			return true, nil
 		}
 	}
 
-	logger.Debug("BionicGPT application not found in Authentik")
+	logger.Debug("BionicGPT application not found in Authentik for this DNS",
+		zap.String("expected_launch_url", expectedLaunchURL))
 	return false, nil
 }
 
