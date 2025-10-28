@@ -10,8 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/environment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -34,6 +34,85 @@ type HecateSecrets struct {
 }
 
 // generateYAMLHecateSecrets generates or retrieves all required secrets for Hecate YAML mode
+// generateSimpleSecrets generates secrets locally without Vault storage
+// TEMPORARY (2025-10-28): Simple secret generation for 6-month deferral period
+// See ROADMAP.md "Hecate Consul KV + Vault Integration" for migration plan
+func generateSimpleSecrets(rc *eos_io.RuntimeContext, config *YAMLHecateConfig) (*HecateSecrets, *string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Fetch latest Authentik version
+	authentikVersion, err := GetLatestAuthentikVersion(rc)
+	if err != nil {
+		logger.Warn("Failed to fetch latest Authentik version, using default",
+			zap.Error(err),
+			zap.String("default", DefaultAuthentikVersion))
+		authentikVersion = DefaultAuthentikVersion
+	}
+
+	logger.Info("Using Authentik version",
+		zap.String("version", authentikVersion),
+		zap.String("image", fmt.Sprintf("%s:%s", AuthentikImage, authentikVersion)))
+
+	// Populate HecateSecrets with generated secrets
+	hecateSecrets := &HecateSecrets{
+		PGUser:                 "authentik",
+		PGDatabase:             "authentik",
+		AuthentikTag:           authentikVersion,
+		ComposePortHTTP:        "9000",
+		ComposePortHTTPS:       "9443",
+		AuthentikWorkerThreads: "4",
+	}
+
+	if config.HasAuthentik {
+		// Generate secrets using crypto package (same as Vault would do)
+		pgPass, err := crypto.GeneratePassword(32)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate postgres password: %w", err)
+		}
+		hecateSecrets.PGPass = pgPass
+
+		authKey, err := crypto.GeneratePassword(64)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate authentik secret key: %w", err)
+		}
+		hecateSecrets.AuthentikSecretKey = authKey
+
+		bootstrapPass, err := crypto.GeneratePassword(32)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate bootstrap password: %w", err)
+		}
+		hecateSecrets.AuthentikBootstrapPassword = bootstrapPass
+
+		bootstrapToken, err := crypto.GenerateToken(32)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate bootstrap token: %w", err)
+		}
+		hecateSecrets.AuthentikBootstrapToken = bootstrapToken
+		hecateSecrets.AuthentikBootstrapEmail = "admin@localhost"
+
+		logger.Info("Generated Authentik secrets locally",
+			zap.String("postgres_user", hecateSecrets.PGUser),
+			zap.String("postgres_db", hecateSecrets.PGDatabase),
+			zap.String("storage", ".env files"))
+	}
+
+	var coturnSecret *string
+	if config.NeedsCoturn {
+		secret, err := crypto.GeneratePassword(32)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to generate coturn secret: %w", err)
+		}
+		coturnSecret = &secret
+		logger.Info("Generated Coturn static auth secret")
+	}
+
+	logger.Info("All Hecate secrets generated successfully (stored in .env files)",
+		zap.Bool("has_authentik", config.HasAuthentik),
+		zap.Bool("has_coturn", config.NeedsCoturn))
+
+	return hecateSecrets, coturnSecret, nil
+}
+
 func generateYAMLHecateSecrets(rc *eos_io.RuntimeContext, secretManager *secrets.SecretManager, config *YAMLHecateConfig) (*HecateSecrets, *string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -468,32 +547,25 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
-	// Initialize secret manager if we need secrets (Authentik or Coturn)
-	var secretManager *secrets.SecretManager
+	// Initialize secrets if we need them (Authentik or Coturn)
+	// DEFERRED (2025-10-28): Vault integration deferred to April-May 2026
 	var hecateSecrets *HecateSecrets
 	var coturnSecret *string
 
 	if config.HasAuthentik || config.NeedsCoturn {
-		// Type assert envConfig to the correct type
-		envConf, ok := envConfig.(*environment.EnvironmentConfig)
-		if !ok {
-			return fmt.Errorf("invalid environment config type")
-		}
+		// DEFERRED (2025-10-28): Vault/Consul integration deferred to April-May 2026
+		// See ROADMAP.md "Hecate Consul KV + Vault Integration" section
+		// For now, generate secrets directly without Vault storage
+		logger.Info("Generating secrets locally (Vault integration deferred to 2026)")
 
-		logger.Info("Initializing secret manager for Hecate infrastructure")
+		// Simple secret generation without Vault
 		var err error
-		secretManager, err = secrets.NewSecretManager(rc, envConf)
-		if err != nil {
-			return fmt.Errorf("failed to initialize secret manager: %w", err)
-		}
-
-		// Generate or retrieve all required secrets
-		hecateSecrets, coturnSecret, err = generateYAMLHecateSecrets(rc, secretManager, config)
+		hecateSecrets, coturnSecret, err = generateSimpleSecrets(rc, config)
 		if err != nil {
 			return fmt.Errorf("failed to generate secrets: %w", err)
 		}
 
-		logger.Info("Secrets generated successfully")
+		logger.Info("Secrets generated successfully (stored in .env files)")
 	}
 
 	// INTERVENE - Generate docker-compose.yml
@@ -725,12 +797,9 @@ AUTHENTIK_WORKER__THREADS=%s
 # Authentik Bootstrap Credentials - ADMIN LOGIN CREDENTIALS
 # Use these to login to Authentik admin UI: https://hera.your-domain/if/admin/
 #
-# Login Email: %s
-# Login Password: %s
-#
-# NOTE: If these values are missing from this file, they may be stored in Consul KV.
-# Retrieve with: consul kv get hecate/secrets/authentik/bootstrap_email
-#                consul kv get hecate/secrets/authentik/bootstrap_password
+# NOTE: If these values are missing, retrieve from Consul KV:
+#   consul kv get hecate/secrets/authentik/bootstrap_email
+#   consul kv get hecate/secrets/authentik/bootstrap_password
 #
 AUTHENTIK_BOOTSTRAP_EMAIL=%s
 AUTHENTIK_BOOTSTRAP_PASSWORD=%s

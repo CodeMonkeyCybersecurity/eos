@@ -153,12 +153,9 @@ AUTHENTIK_WORKER__THREADS=%s
 # Authentik Bootstrap Credentials - ADMIN LOGIN CREDENTIALS
 # Use these to login to Authentik admin UI: https://hera.your-domain/if/admin/
 #
-# Login Email: %s
-# Login Password: %s
-#
-# NOTE: If these values are missing from this file, they may be stored in Consul KV.
-# Retrieve with: consul kv get hecate/secrets/authentik/bootstrap_email
-#                consul kv get hecate/secrets/authentik/bootstrap_password
+# NOTE: If these values are missing, retrieve from Consul KV:
+#   consul kv get hecate/secrets/authentik/bootstrap_email
+#   consul kv get hecate/secrets/authentik/bootstrap_password
 #
 AUTHENTIK_BOOTSTRAP_EMAIL=%s
 AUTHENTIK_BOOTSTRAP_PASSWORD=%s

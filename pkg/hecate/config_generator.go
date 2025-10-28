@@ -73,17 +73,21 @@ func GenerateConfigFile(rc *eos_io.RuntimeContext, outputPath string, interactiv
 		config = generateExampleConfig()
 	}
 
-	// Store configuration in Consul KV (if available)
-	if configStorage != nil {
-		if err := configStorage.StoreConfig(rc, config); err != nil {
-			logger.Warn("Failed to store configuration in Consul KV",
-				zap.Error(err))
-			// Continue even if Consul storage fails
-		} else {
-			logger.Info("Configuration stored in Consul KV",
-				zap.Int("apps", len(config.Apps)))
-		}
-	}
+	// DEFERRED (2025-10-28): Consul KV storage deferred to April-May 2026
+	// See ROADMAP.md "Hecate Consul KV + Vault Integration" section
+	// For now, configuration only stored in YAML file
+	//
+	// // Store configuration in Consul KV (if available)
+	// if configStorage != nil {
+	// 	if err := configStorage.StoreConfig(rc, config); err != nil {
+	// 		logger.Warn("Failed to store configuration in Consul KV",
+	// 			zap.Error(err))
+	// 		// Continue even if Consul storage fails
+	// 	} else {
+	// 		logger.Info("Configuration stored in Consul KV",
+	// 			zap.Int("apps", len(config.Apps)))
+	// 	}
+	// }
 
 	// Write YAML file
 	if err := writeYAMLConfig(config, outputPath); err != nil {
@@ -382,39 +386,37 @@ func gatherApps(rc *eos_io.RuntimeContext, previousConfig *RawYAMLConfig) (map[s
 
 		// Loop until valid Authentik domain is provided
 		for {
-			logger.Info("terminal prompt: Authentik domain (e.g., auth.example.com): ")
+			logger.Info("terminal prompt: Authentik domain (default: hera.*, press Enter to accept): ")
 			fmt.Print("Domain: ")
 			authentikDomain := strings.TrimSpace(mustReadLine(reader))
 
+			// Default to hera.* if no domain provided
 			if authentikDomain == "" {
-				logger.Info("terminal prompt: ")
-				logger.Info("terminal prompt: ❌ Domain is required for SSO to work.")
-				logger.Info("terminal prompt: ")
-				logger.Info("terminal prompt: Options:")
-				logger.Info("terminal prompt:   1. Enter a domain (e.g., auth.cybermonkey.net.au)")
-				logger.Info("terminal prompt:   2. Exit and manually disable SSO in your config file")
-				logger.Info("terminal prompt: ")
-				continue // Keep looping until they provide a domain
+				authentikDomain = "hera.*"
+				logger.Info("terminal prompt: ✓ Using default domain: hera.*")
 			}
 
 			// Validate domain format
-			sanitizedDomain := shared.SanitizeURL(authentikDomain)
-			if err := validateDomain(sanitizedDomain); err != nil {
-				logger.Info("terminal prompt: ")
-				logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid domain: %v", err))
-				logger.Info("terminal prompt: ")
-				continue // Keep looping until valid domain
-			}
+			if authentikDomain != "" {
+				// Validate domain format
+				sanitizedDomain := shared.SanitizeURL(authentikDomain)
+				if err := validateDomain(sanitizedDomain); err != nil {
+					logger.Info("terminal prompt: ")
+					logger.Info(fmt.Sprintf("terminal prompt: ❌ Invalid domain: %v", err))
+					logger.Info("terminal prompt: ")
+					continue // Keep looping until valid domain
+				}
 
-			// Valid domain provided - add Authentik
-			apps["authentik"] = RawAppConfig{
-				Domain: sanitizedDomain,
+				// Valid domain provided - add Authentik
+				apps["authentik"] = RawAppConfig{
+					Domain: sanitizedDomain,
+				}
+				logger.Info("terminal prompt: ")
+				logger.Info("terminal prompt: ✓ Added Authentik SSO")
+				logger.Info("terminal prompt:   Domain: " + apps["authentik"].Domain)
+				logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
+				break // Exit the loop
 			}
-			logger.Info("terminal prompt: ")
-			logger.Info("terminal prompt: ✓ Added Authentik SSO")
-			logger.Info("terminal prompt:   Domain: " + apps["authentik"].Domain)
-			logger.Info("terminal prompt:   Backend: hecate-server-1:9000 (automatic)")
-			break // Exit the loop
 		}
 	}
 

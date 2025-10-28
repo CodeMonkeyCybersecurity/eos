@@ -15,6 +15,7 @@
 - 🔄 Secret manager architecture refactoring (Phases 1-3 complete, 4-6 in progress)
 - 🔄 Command structure migration (Phase 1 complete, Phase 2-3 in progress)
 - ⏳ Integration testing and documentation updates
+- ⏳ **Hecate Consul KV + Vault integration** (Target: April-May 2026, ~6 months from 2025-10-28)
 
 ### Eos v2.0 - Q3 2026 (Target: ~December 2026)
 **Focus**: Breaking changes, deprecated pattern removal, major version bump
@@ -2118,6 +2119,100 @@ Code: 403. Errors:
 - BionicGPT Vault Agent integration (see "BionicGPT Vault Integration" section above)
 - Automatic debug output capture (already implemented in `pkg/debug/capture.go`)
 - Evidence collection for remote debug (already implemented in `pkg/remotedebug/evidence.go`)
+
+---
+
+## 🔐 Hecate Consul KV + Vault Integration (Target: April-May 2026)
+
+### Status: Deferred (~6 months from 2025-10-28)
+
+**Context**: Original implementation (2025-10-28) integrated Consul KV for config storage and Vault for secret management in Hecate wizard. User feedback identified this as over-engineering for initial release - reverted to simple `.env` file approach.
+
+**Decision Rationale** (2025-10-28):
+- **User Experience**: Wizard prompts for Vault authentication create friction during initial setup
+- **Dependency Complexity**: Requires Vault Agent + AppRole configured before Hecate deployment
+- **YAGNI Principle**: Simple `.env` file meets 95% of use cases for initial release
+- **Iterative Philosophy**: Build on what exists, solve complex problems once, encode in Eos
+
+**Deferred Features**:
+1. Consul KV storage for wizard-generated configurations
+2. Vault integration for secret management (Authentik tokens, passwords)
+3. Consul Template for dynamic config rendering
+4. Automatic secret rotation via Vault Agent
+
+**Current Approach** (Simple `.env` files):
+- Wizard generates YAML config → creates `.env` files in `/opt/hecate/`
+- Secrets stored directly in `.env` (permissions: 0640, owner: root)
+- No Consul KV dependency for configuration
+- No Vault dependency for secret storage
+- Manual secret rotation (user edits `.env`, restarts services)
+
+**Target Implementation** (April-May 2026):
+1. **Phase 1: Opt-in Vault Integration** (2 weeks)
+   - Add `--vault` flag to wizard (default: disabled)
+   - If enabled, store secrets in Vault at `secret/hecate/{service}/{key}`
+   - Keep `.env` as fallback if Vault unavailable
+   - Document migration path: `.env` → Vault
+
+2. **Phase 2: Consul KV Configuration Storage** (1 week)
+   - Add `--consul-kv` flag to wizard (default: disabled)
+   - Store wizard config at `hecate/config` key
+   - Show retrieval command: `consul kv get hecate/config > hecate-config.yaml`
+   - Keep local YAML file as primary source of truth
+
+3. **Phase 3: Consul Template Rendering** (2 weeks)
+   - Create Consul Template service for Hecate
+   - Render `.env` files from Vault (secrets) + Consul KV (config)
+   - Watch for changes, auto-restart services on update
+   - Document template syntax for custom configs
+
+4. **Phase 4: Automatic Secret Rotation** (1 week)
+   - Vault Agent templates for sensitive credentials
+   - Automatic reload on secret rotation
+   - Graceful rollback on template errors
+   - Telemetry for rotation events
+
+**Success Criteria** (April-May 2026):
+- [ ] `.env` file approach remains default (no breaking changes)
+- [ ] Vault integration opt-in via `--vault` flag
+- [ ] Consul KV integration opt-in via `--consul-kv` flag
+- [ ] Migration guide: Simple → Integrated (documented at wiki)
+- [ ] TTY detection prevents wizard hang in CI/CD
+- [ ] Vault Agent failure gracefully falls back to `.env`
+- [ ] Build succeeds: `go build -o /tmp/eos-build ./cmd/`
+
+**Migration Path** (For users on simple `.env` approach):
+```bash
+# Current (simple .env)
+sudo eos create hecate  # Generates /opt/hecate/.env
+
+# Future (opt-in Vault + Consul KV)
+sudo eos create hecate --vault --consul-kv  # Stores secrets in Vault, config in Consul
+
+# Migration helper (future)
+sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
+```
+
+**Code Changes Required** (Estimated):
+- Uncomment Consul KV storage in `pkg/hecate/config_generator.go`
+- Uncomment Vault integration in `pkg/hecate/yaml_generator.go`
+- Add `--vault` and `--consul-kv` flags to `cmd/create/hecate.go`
+- Update wizard prompts to show storage location (Vault vs `.env`)
+- Add migration command: `eos update hecate --migrate-to-vault`
+
+**Reference Implementation** (Currently commented out):
+- [pkg/hecate/config_generator.go](pkg/hecate/config_generator.go) - Consul KV storage logic (commented 2025-10-28)
+- [pkg/hecate/yaml_generator.go](pkg/hecate/yaml_generator.go) - Vault secret manager integration (commented 2025-10-28)
+- [cmd/create/hecate.go](cmd/create/hecate.go) - Wizard orchestration (simplified 2025-10-28)
+
+**Why Wait 6 Months?**:
+1. Let simple approach prove itself in production
+2. Gather user feedback on pain points (secret rotation frequency, config drift)
+3. Complete secret manager refactoring (Phases 4-6) first
+4. Validate Consul Template patterns in other services (Wazuh, BionicGPT)
+5. Avoid premature optimization (YAGNI)
+
+**Revisit Date**: April 1, 2026 (review user feedback, decide if still needed)
 
 ---
 

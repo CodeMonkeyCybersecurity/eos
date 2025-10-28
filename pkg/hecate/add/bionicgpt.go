@@ -306,6 +306,8 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 	// NOTE: AUTHENTIK_BOOTSTRAP_TOKEN (from .env) is for initial admin user creation,
 	// NOT for API access. We need a separate API token created via UI.
 
+	logger := otelzap.Ctx(ctx)
+
 	hecateEnv, err := readEnvFile("/opt/hecate/.env")
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read /opt/hecate/.env: %w\n"+
@@ -319,6 +321,35 @@ func (b *BionicGPTIntegrator) getAuthentikCredentials(ctx context.Context) (stri
 	}
 	if apiKey == "" {
 		apiKey = hecateEnv["AUTHENTIK_API_KEY"]
+	}
+
+	// P1 FIX #2: Check legacy location for migration path
+	// MIGRATION PATH: Older versions of Eos incorrectly read from /opt/bionicgpt/.env
+	// Check there if not found in correct location
+	if apiKey == "" {
+		logger.Debug("API token not found in /opt/hecate/.env, checking legacy location")
+		bionicEnv, legacyErr := readEnvFile("/opt/bionicgpt/.env")
+		if legacyErr == nil {
+			// Try to find token in legacy location
+			legacyToken := bionicEnv["AUTHENTIK_API_TOKEN"]
+			if legacyToken == "" {
+				legacyToken = bionicEnv["AUTHENTIK_TOKEN"]
+			}
+			if legacyToken == "" {
+				legacyToken = bionicEnv["AUTHENTIK_API_KEY"]
+			}
+
+			if legacyToken != "" {
+				logger.Warn("⚠️  Found API token in LEGACY location: /opt/bionicgpt/.env")
+				logger.Warn("This location is deprecated and will not be checked in future versions.")
+				logger.Warn("")
+				logger.Warn("ACTION REQUIRED: Please migrate the token to the correct location:")
+				logger.Warn("  grep AUTHENTIK_API_TOKEN /opt/bionicgpt/.env | sudo tee -a /opt/hecate/.env")
+				logger.Warn("")
+				logger.Warn("For now, using the legacy token to avoid breaking your setup...")
+				apiKey = legacyToken
+			}
+		}
 	}
 
 	// NOTE: We do NOT fallback to AUTHENTIK_BOOTSTRAP_TOKEN - that's for initial setup,

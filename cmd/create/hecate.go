@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/services/service_installation"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -114,14 +115,38 @@ Examples:
 				return fmt.Errorf("failed to load YAML config: %w", err)
 			}
 		} else {
-			// No YAML file provided - run interactive wizard
-			log.Info("No config file provided, starting interactive wizard")
+			// No YAML file provided - check if we can run interactive wizard
+			log.Info("No config file provided, checking if interactive mode is available")
+
+			// P0 FIX: Detect non-interactive environment (CI/CD, piped input, etc.)
+			if !interaction.IsTTY() {
+				log.Error("Cannot run interactive wizard in non-interactive environment")
+				return eos_err.NewUserError(
+					"No configuration file provided and running in non-interactive mode\n\n" +
+						"Eos requires a configuration to deploy Hecate. You have two options:\n\n" +
+						"OPTION 1: Provide a YAML configuration file\n" +
+						"  eos create hecate --config hecate-config.yaml\n\n" +
+						"OPTION 2: Generate configuration interactively (requires a TTY)\n" +
+						"  Run from an interactive terminal:\n" +
+						"  eos create hecate\n\n" +
+						"For CI/CD pipelines, use OPTION 1 with a pre-generated config file.\n" +
+						"To generate a config file without deploying:\n" +
+						"  eos create config --hecate --output hecate-config.yaml")
+			}
+
+			// We have a TTY - run interactive wizard
+			log.Info("Terminal detected, starting interactive wizard")
 
 			// Generate temporary config file path
 			tempConfigPath = "/tmp/hecate-config-wizard.yaml"
 			defer func() {
-				if tempConfigPath != "" {
+				// P2 FIX: Only remove temp file on success, preserve for debugging on failure
+				if tempConfigPath != "" && err == nil {
 					_ = os.Remove(tempConfigPath)
+				} else if tempConfigPath != "" && err != nil {
+					log.Warn("Temp config file preserved for debugging",
+						zap.String("path", tempConfigPath),
+						zap.Error(err))
 				}
 			}()
 
@@ -141,8 +166,10 @@ Examples:
 				return fmt.Errorf("failed to load generated config: %w", err)
 			}
 
+			// DEFERRED (2025-10-28): Consul KV storage deferred to April-May 2026
+			// See ROADMAP.md "Hecate Consul KV + Vault Integration" section
 			log.Info("terminal prompt: ")
-			log.Info("terminal prompt: Configuration complete! Proceeding with deployment...")
+			log.Info("terminal prompt: ✓ Configuration complete! Proceeding with deployment...")
 			log.Info("terminal prompt: ")
 		}
 

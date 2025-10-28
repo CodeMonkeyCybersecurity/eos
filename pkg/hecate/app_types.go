@@ -34,6 +34,15 @@ var AppTypes = map[string]AppTypeDefaults{
 		LogLevel:        "INFO",
 	},
 
+	"bionicgpt": {
+		Name:            "bionicgpt",
+		BackendProtocol: "http",
+		BackendPort:     shared.PortBionicGPT, // 8513
+		HealthCheck:     "/health",
+		LogLevel:        "INFO",
+		WebSocket:       true, // BionicGPT uses WebSockets for real-time chat
+	},
+
 	"wazuh": {
 		Name:            "wazuh",
 		BackendProtocol: "https",
@@ -154,6 +163,10 @@ func DetectAppType(appName string, explicitType string) string {
 	nameLower := strings.ToLower(appName)
 
 	// Check for known service names
+	// NOTE: Order matters - more specific checks first
+	if strings.Contains(nameLower, "bionicgpt") || strings.Contains(nameLower, "bionic") || nameLower == "chat" {
+		return "bionicgpt"
+	}
 	if strings.Contains(nameLower, "wazuh") || strings.Contains(nameLower, "delphi") {
 		return "wazuh"
 	}
