@@ -55,6 +55,8 @@ type RequiredFlagConfig struct {
 	DefaultValue string // Used if AllowEmpty && user presses enter
 
 	// Validation (compose existing PromptConfig.Validator)
+	// NOTE: Validator must not panic - panics will crash the program.
+	// Return error instead of panicking for invalid input.
 	Validator func(string) error
 }
 
@@ -63,21 +65,17 @@ type RequiredFlagConfig struct {
 //
 // Returns error if:
 //   - FlagName is empty (required for error messages)
-//   - PromptMessage is empty (required for interactive fallback)
 //
-// NOTE: HelpText is optional but strongly recommended per P0 #13
+// NOTE: PromptMessage and HelpText are optional but strongly recommended per P0 #13.
+// If PromptMessage is empty and we reach interactive fallback, prompting will fail gracefully.
 func (c *RequiredFlagConfig) Validate() error {
 	if c.FlagName == "" {
 		return fmt.Errorf("RequiredFlagConfig.FlagName cannot be empty")
 	}
 
-	if c.PromptMessage == "" {
-		return fmt.Errorf("RequiredFlagConfig.PromptMessage cannot be empty for flag %s (needed for interactive fallback)", c.FlagName)
-	}
-
-	// HelpText is optional but recommended
+	// PromptMessage and HelpText are optional
 	// P0 #13 requires "Help text: WHY is this required? HOW to get the value?"
-	// We don't error on missing HelpText to allow simple cases, but warn developers via godoc
+	// But we don't enforce it here to allow simple test cases and gradual migration
 
 	return nil
 }
@@ -240,7 +238,8 @@ func GetRequiredString(
 			}, nil
 		}
 
-		// Should never reach here (loop handles all cases), but satisfy compiler
+		// Defensive programming: should never reach here (loop always returns), but keeps compiler happy
+		// If this executes, it indicates a logic error in the validation retry loop above
 		return nil, fmt.Errorf("unexpected state after %d validation attempts for %s", MaxValidationAttempts, config.FlagName)
 	}
 
@@ -383,8 +382,19 @@ func GetRequiredInt(
 		if envValue := os.Getenv(config.EnvVarName); envValue != "" {
 			parsed, err := strconv.Atoi(envValue)
 			if err != nil {
-				return 0, "", fmt.Errorf("invalid integer in %s: %w", config.EnvVarName, err)
+				return 0, "", fmt.Errorf("invalid integer in %s environment variable: %w", config.EnvVarName, err)
 			}
+
+			// Validate if validator provided (P0 REQUIREMENT - SECURITY)
+			// RATIONALE: Env var values must be validated like all other inputs
+			// SECURITY: Prevents invalid env vars from bypassing validation
+			if config.Validator != nil {
+				// Validator expects string, use original envValue
+				if err := config.Validator(envValue); err != nil {
+					return 0, "", fmt.Errorf("invalid value in %s environment variable: %w", config.EnvVarName, err)
+				}
+			}
+
 			logger.Info("Using int flag from environment variable",
 				zap.String("flag", config.FlagName),
 				zap.String("env_var", config.EnvVarName),

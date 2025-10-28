@@ -393,12 +393,18 @@ func PromptSecret(args ...interface{}) (string, error) {
 		}
 	}
 
-	// Print prompt without newline
+	// P0 EXCEPTION: fmt.Printf required for password prompting UX
+	// JUSTIFICATION: Password input requires unbuffered terminal I/O for term.ReadPassword()
+	// Cannot use logger.Info() because:
+	//   1. Logger adds timestamps/prefixes that break the password prompt UX
+	//   2. Logger adds newlines that prevent inline prompting
+	//   3. term.ReadPassword() requires raw fmt.Print* for proper terminal control
+	// This is the ONLY acceptable use of fmt.Print* in this file.
 	fmt.Printf("%s: ", label)
 
 	// Read password without echoing
 	secretBytes, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println() // Add newline after hidden input
+	fmt.Println() // Add newline after hidden input (pairs with Printf above)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to read secret: %w", err)

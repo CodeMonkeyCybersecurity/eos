@@ -22,7 +22,7 @@ func PromptForMissingConfig(rc *eos_io.RuntimeContext, config *EnterpriseConfig)
 	}
 
 	logger.Info("Starting interactive configuration")
-	printHeader()
+	printHeader(rc)
 
 	// Prompt for each missing field
 	if config.Domain == "" {
@@ -67,23 +67,29 @@ func PromptForMissingConfig(rc *eos_io.RuntimeContext, config *EnterpriseConfig)
 }
 
 // printHeader displays the interactive mode header
-func printHeader() {
+func printHeader(rc *eos_io.RuntimeContext) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// P0 COMPLIANCE: Use structured logging instead of fmt.Print*
 	// Use ASCII art instead of emojis for compatibility
-	fmt.Println()
-	fmt.Println("┌────────────────────────────────────────┐")
-	fmt.Println("│  BionicGPT Configuration               │")
-	fmt.Println("└────────────────────────────────────────┘")
-	fmt.Println()
-	fmt.Println("Missing required configuration. Let's set it up!")
-	fmt.Println()
+	logger.Info("")
+	logger.Info("┌────────────────────────────────────────┐")
+	logger.Info("│  BionicGPT Configuration               │")
+	logger.Info("└────────────────────────────────────────┘")
+	logger.Info("")
+	logger.Info("Missing required configuration. Let's set it up!")
+	logger.Info("")
 }
 
 // promptForDomain prompts for the public domain
 func promptForDomain(rc *eos_io.RuntimeContext) (string, error) {
-	fmt.Println("=== Public Domain ===")
-	fmt.Println("Where users will access BionicGPT")
-	fmt.Println("Example: chat.example.com")
-	fmt.Println()
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// P0 COMPLIANCE: Use structured logging instead of fmt.Print*
+	logger.Info("=== Public Domain ===")
+	logger.Info("Where users will access BionicGPT")
+	logger.Info("Example: chat.example.com")
+	logger.Info("")
 
 	result, err := interaction.PromptString(rc, &interaction.PromptConfig{
 		Message:   "Domain",
@@ -99,21 +105,24 @@ func promptForDomain(rc *eos_io.RuntimeContext) (string, error) {
 		return "", fmt.Errorf("domain prompt cancelled")
 	}
 
-	fmt.Println()
+	logger.Info("")
 	return result.Value, nil
 }
 
 // promptForCloudNode prompts for the cloud node hostname
 func promptForCloudNode(rc *eos_io.RuntimeContext) (string, error) {
-	fmt.Println("=== Cloud Node ===")
-	fmt.Println("Tailscale hostname where Hecate/Authentik run")
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// P0 COMPLIANCE: Use structured logging instead of fmt.Print*
+	logger.Info("=== Cloud Node ===")
+	logger.Info("Tailscale hostname where Hecate/Authentik run")
 
 	// Try to get current hostname as suggestion (NOT default)
 	currentHostname, _ := os.Hostname()
 	if currentHostname != "" {
-		fmt.Printf("Current hostname: %s (suggestion, not auto-selected)\n", currentHostname)
+		logger.Info(fmt.Sprintf("Current hostname: %s (suggestion, not auto-selected)", currentHostname))
 	}
-	fmt.Println()
+	logger.Info("")
 
 	// NOTE: Do NOT use currentHostname as default - user must explicitly choose
 	result, err := interaction.PromptString(rc, &interaction.PromptConfig{
@@ -130,16 +139,19 @@ func promptForCloudNode(rc *eos_io.RuntimeContext) (string, error) {
 		return "", fmt.Errorf("cloud node prompt cancelled")
 	}
 
-	fmt.Println()
+	logger.Info("")
 	return result.Value, nil
 }
 
 // promptForAuthURL prompts for the Authentik URL
 func promptForAuthURL(rc *eos_io.RuntimeContext) (string, error) {
-	fmt.Println("=== Authentik URL ===")
-	fmt.Println("Your SSO authentication server")
-	fmt.Println("Example: https://auth.example.com")
-	fmt.Println()
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// P0 COMPLIANCE: Use structured logging instead of fmt.Print*
+	logger.Info("=== Authentik URL ===")
+	logger.Info("Your SSO authentication server")
+	logger.Info("Example: https://auth.example.com")
+	logger.Info("")
 
 	result, err := interaction.PromptString(rc, &interaction.PromptConfig{
 		Message:   "Authentik URL",
@@ -155,7 +167,7 @@ func promptForAuthURL(rc *eos_io.RuntimeContext) (string, error) {
 		return "", fmt.Errorf("auth URL prompt cancelled")
 	}
 
-	fmt.Println()
+	logger.Info("")
 	return result.Value, nil
 }
 

@@ -50,8 +50,8 @@ var UpdateAgentsCmd = &cobra.Command{
 		version := interaction.PromptInput(rc.Ctx, "Enter version (e.g., v4.6.0)", "")
 		repo := interaction.PromptInput(rc.Ctx, "Enter WPK repo", "packages.wazuh.com/wpk/")
 		packageType := interaction.PromptInput(rc.Ctx, "Enter package type (rpm/deb)", "rpm")
-		force, _ := interaction.Resolve("Force upgrade?")
-		useHTTP, _ := interaction.Resolve("Use HTTP (instead of HTTPS)?")
+		force, _ := interaction.Resolve(rc, "Force upgrade?")
+		useHTTP, _ := interaction.Resolve(rc, "Use HTTP (instead of HTTPS)?")
 
 		payload := map[string]interface{}{
 			"origin":  map[string]string{"module": "api"},

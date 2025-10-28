@@ -327,9 +327,12 @@ func PromptYesNo(args ...interface{}) bool
 - `PromptSelect(ctx, prompt, options)` - Multiple choice selection
 
 All prompts:
-- Log to structured logging (never `fmt.Print*`)
+- Log to structured logging (use `logger.Info()` for observability)
+- **Exception**: Password/secret prompts and interactive survey prompts use `fmt.Printf` for unbuffered terminal I/O (required for `term.ReadPassword()` and inline prompting UX - see PromptSecret in input.go and displayPrompt in prompt_string.go)
 - Retry logic with helpful error messages
 - Clear visual indicators
+
+**P0 Compliance**: Most prompts must use structured logging (`otelzap.Ctx(rc.Ctx)`). Only password prompts and interactive survey prompts may use `fmt.Print*` when necessary for terminal control. See [input.go:396-407](input.go#L396-L407) and [prompt_string.go:131-148](prompt_string.go#L131-L148) for documented exceptions.
 
 ### Dependency Checking (`dependency.go`)
 
@@ -525,6 +528,51 @@ See `fuzz_test.go` for fuzzing tests of input validation.
 4. **Graceful Degradation**: Handle declined actions respectfully
 5. **Logging All Actions**: Structured logging for audit trail
 6. **Respect Automation**: Use stderr for prompts, stdout for data
+
+## Architecture Decisions
+
+### fmt.Print* Usage Policy (P0 Compliance)
+
+**RULE**: Use `logger.Info()` for all output. Exceptions require justification.
+
+**When fmt.Print* is FORBIDDEN**:
+- ✗ Informational messages (use `logger.Info()`)
+- ✗ Error messages (use `logger.Error()`)
+- ✗ Debug output (use `logger.Debug()`)
+- ✗ User confirmations (use `logger.Info()` before prompting)
+- ✗ Progress updates (use `logger.Info()`)
+
+**When fmt.Print* is ACCEPTABLE** (with `// P0 EXCEPTION:` comment):
+- ✓ Password prompts requiring unbuffered I/O (PromptSecret)
+- ✓ Interactive survey-style prompts with inline input (PromptString displayPrompt)
+- ✓ Progress bars / spinners requiring cursor control
+- ✓ Raw terminal manipulation (cursor positioning, colors)
+
+**Justification Required**: Every `fmt.Print*` call must have a comment explaining:
+1. WHY structured logging cannot be used
+2. WHAT technical requirement necessitates fmt.Print*
+3. REFERENCE to relevant code/library requiring it
+
+**Example Exception**:
+```go
+// P0 EXCEPTION: fmt.Printf required for password prompting UX
+// JUSTIFICATION: term.ReadPassword() requires unbuffered terminal I/O
+// Cannot use logger.Info() - it adds timestamps/newlines that break the UX
+// REFERENCE: golang.org/x/term ReadPassword documentation
+fmt.Printf("%s: ", label)
+```
+
+**Audit Command**:
+```bash
+# Find all fmt.Print* usage (should only be documented exceptions)
+grep -rn "fmt.Print" pkg/interaction/ --include="*.go" | grep -v "// P0 EXCEPTION" | grep -v "README.md"
+```
+
+**Current Exceptions** (all documented with rationale):
+- `input.go:403` - PromptSecret password prompting (term.ReadPassword requirement)
+- `prompt_string.go:126` - Newline after ^C signal (terminal cleanup)
+- `prompt_string.go:138-146` - displayPrompt inline survey prompts (interactive UX)
+- `prompt_string.go:199` - Retry error message (inline feedback)
 
 ## Related Documentation
 

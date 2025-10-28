@@ -938,6 +938,49 @@ If critical issues found:
 
 ---
 
+## Future Work (Deferred)
+
+### BionicGPT Vault Integration
+
+**Status**: 📅 DEFERRED - Current .env approach working
+**Priority**: P2 (Nice-to-have)
+**Effort**: 2-4 hours
+**Added**: 2025-10-28
+
+**Current State**:
+- Secrets stored in `/opt/bionicgpt/.env` and `/opt/bionicgpt/.env.litellm` files (working)
+- Vault diagnostics showing 403 Forbidden errors (Vault Agent token lacks read permissions)
+- Services functioning correctly with file-based secrets
+
+**Issue**:
+Vault Agent AppRole policy doesn't grant read access to `services/production/bionicgpt/*` path. Diagnostics show:
+```
+Code: 403. Errors:
+* preflight capability check returned 403, please ensure client's policies grant access to path "services/production/bionicgpt/postgres_password/"
+```
+
+**Blockers**:
+1. Vault Agent AppRole needs read access to KVv2 secrets at `services/production/bionicgpt/*`
+2. Required policy update:
+   ```hcl
+   path "services/data/production/bionicgpt/*" {
+     capabilities = ["read"]
+   }
+   ```
+   Note: KVv2 requires `services/data/` prefix (not `services/`)
+
+**Implementation Tasks**:
+1. Update Vault Agent AppRole policy to include BionicGPT secret read access
+2. Restart Vault Agent: `sudo systemctl restart vault-agent-eos`
+3. Verify diagnostics pass: `sudo eos debug bionicgpt` (should show ✓ for Vault secrets)
+4. Consider migrating to Vault Agent template rendering for automatic secret rotation
+
+**Complexity**: Low (policy update only)
+**Target Date**: TBD (when Vault-backed secret delivery required for compliance/rotation)
+**Reference**: See diagnostic output showing 403 errors for all 4 secrets (postgres_password, jwt_secret, litellm_master_key, azure_api_key)
+
+---
+
 ## Questions & Feedback
 
 **Contact**: @henry
@@ -946,5 +989,5 @@ If critical issues found:
 
 ---
 
-**Last Updated**: 2025-10-27 by Henry
+**Last Updated**: 2025-10-28 by Henry
 **Next Review**: 2025-11-10 (Phase 5 completion)

@@ -903,17 +903,18 @@ services:
       - bionicgpt-network
     restart: unless-stopped
     healthcheck:
-      # P0 FIX: Use /health/liveliness for Docker health check (passive, fast)
-      # RATIONALE: /health endpoint makes actual Azure API calls (slow, expensive, rate-limited)
-      #            /health/liveliness just checks if web server is responding (fast, local)
-      # SHIFT-LEFT: Separate concerns - Docker checks container health, Eos checks Azure connectivity
-      # SECURITY: Prevents Azure rate limiting from false-negative health checks
-      # REFERENCE: Adversarial Analysis ADVERSARIAL_ANALYSIS_BIONICGPT_PHASE6_FAILURE.md P0 Fix #1
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
-      interval: 15s       # More frequent checks (was 60s) - faster failure detection
-      timeout: 5s         # Shorter timeout (was 10s) - local check is fast
-      retries: 3          # Fewer retries (was 5) - fail fast on real issues
-      start_period: 30s   # Shorter grace (was 90s) - server starts quickly
+      # P0 FIX: Use Python urllib for health check (curl not available in litellm container)
+      # RATIONALE: LiteLLM is a Python app, so Python interpreter is guaranteed to exist
+      #            Tests actual HTTP endpoint, not just port connectivity
+      # ROOT CAUSE: curl executable not found in ghcr.io/berriai/litellm:main-latest image
+      # SHIFT-LEFT: Use tools guaranteed in container, don't assume curl availability
+      # SECURITY: Prevents false-negative health checks from blocking dependent services
+      # REFERENCE: Fixed 2025-10-28 - vhost2 litellm health check failure
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health').read()"]
+      interval: 60s       # Standard interval - balance check frequency with load
+      timeout: 10s        # Allow time for HTTP request completion
+      retries: 5          # Multiple retries for transient failures
+      start_period: 90s   # Grace period for LiteLLM to connect to Azure OpenAI
     logging:
       driver: "json-file"
       options:
@@ -948,7 +949,10 @@ services:
       migrations:
         condition: service_completed_successfully
       litellm-proxy:
-        condition: service_healthy
+        condition: service_started  # RESILIENCE FIX: Changed from service_healthy to service_started
+                                     # RATIONALE: App will retry LiteLLM connections internally
+                                     # Prevents health check issues from completely blocking startup
+                                     # REFERENCE: Fixed 2025-10-28 - more resilient dependency handling
     restart: unless-stopped
     logging:
       driver: "json-file"

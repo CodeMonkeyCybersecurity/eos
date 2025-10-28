@@ -26,7 +26,7 @@ func ResolveConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	// 3. Prompt interactively
 	cfg = PromptWazuhConfig(rc)
 
-	ok, err := interaction.ResolveObject(cfg)
+	ok, err := interaction.ResolveObject(rc, cfg)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Confirmation failed", zap.Error(err))
 		return nil, err

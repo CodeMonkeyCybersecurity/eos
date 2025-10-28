@@ -878,7 +878,7 @@ func ContainerDependencyBlockedDiagnostic() *debug.Diagnostic {
 				result.Status = debug.StatusError
 				result.Message = fmt.Sprintf("❌ CRITICAL: %d container(s) blocked by unhealthy dependencies", len(blocked))
 				result.Remediation = "Fix the dependency health issues first. For app container: ensure litellm-proxy becomes healthy. " +
-					"Check: docker logs bionicgpt-litellm for errors. Test health: docker exec bionicgpt-litellm curl -v http://localhost:4000/health"
+					"Check: docker logs bionicgpt-litellm for errors. Test health: docker exec bionicgpt-litellm python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health').read().decode())\""
 				logger.Error("Containers blocked by dependencies",
 					zap.Int("count", len(blocked)),
 					zap.Strings("containers", blocked))
@@ -1439,42 +1439,31 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 			result.Metadata["running"] = containerInfo.State.Running
 			result.Metadata["health_status"] = healthStatus
 
-			// 2. Check LiteLLM /health endpoint via HTTP (exec curl inside container)
+			// 2. Check LiteLLM /health endpoint via HTTP (exec python inside container)
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 			outputParts = append(outputParts, "LITELLM /health ENDPOINT")
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 
-			// Use curl with -w to show HTTP code, -v for verbose output on failure
+			// FIXED 2025-10-28: Use Python urllib instead of curl (curl not in litellm container)
+			// LiteLLM is a Python app, so Python is guaranteed to exist
 			healthCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"curl", "-m", "5", "-w", "\\nHTTP_CODE:%{http_code}", "http://localhost:4000/health")
+				"python", "-c", "import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health', timeout=5).read().decode())")
 			healthOutput, healthErr := healthCmd.CombinedOutput()
 
 			outputStr := string(healthOutput)
 			if healthErr != nil {
 				outputParts = append(outputParts, "✗ /health endpoint failed")
-				outputParts = append(outputParts, "Full output (with HTTP code):")
+				outputParts = append(outputParts, "Full output:")
 				outputParts = append(outputParts, outputStr)
 				result.Metadata["health_endpoint"] = "failed"
-
-				// Parse HTTP code from output
-				if strings.Contains(outputStr, "HTTP_CODE:") {
-					httpCodeStr := strings.Split(outputStr, "HTTP_CODE:")[1]
-					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
-					result.Metadata["health_http_code"] = httpCodeStr
-					outputParts = append(outputParts, fmt.Sprintf("HTTP Status Code: %s", httpCodeStr))
-				}
+				// Note: Python urllib raises exception on HTTP errors (4xx, 5xx)
+				// Error message will contain status code if it's an HTTP error
 			} else {
 				outputParts = append(outputParts, "✓ /health endpoint responding")
 				outputParts = append(outputParts, "Response:")
 				outputParts = append(outputParts, outputStr)
 				result.Metadata["health_endpoint"] = "ok"
-
-				// Extract HTTP code
-				if strings.Contains(outputStr, "HTTP_CODE:") {
-					httpCodeStr := strings.Split(outputStr, "HTTP_CODE:")[1]
-					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
-					result.Metadata["health_http_code"] = httpCodeStr
-				}
+				result.Metadata["health_http_code"] = "200" // urllib.urlopen succeeds = HTTP 200
 			}
 			outputParts = append(outputParts, "")
 
@@ -1483,36 +1472,25 @@ func LiteLLMComprehensiveDiagnostic() *debug.Diagnostic {
 			outputParts = append(outputParts, "LITELLM /health/liveliness ENDPOINT")
 			outputParts = append(outputParts, "═══════════════════════════════════════════════════════════════")
 
+			// FIXED 2025-10-28: Use Python urllib instead of curl (curl not in litellm container)
 			livelinessCmd := exec.CommandContext(ctx, "docker", "exec", bionicgpt.ContainerLiteLLM,
-				"curl", "-m", "5", "-w", "\\nHTTP_CODE:%{http_code}", "http://localhost:4000/health/liveliness")
+				"python", "-c", "import urllib.request; print(urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=5).read().decode())")
 			livelinessOutput, livelinessErr := livelinessCmd.CombinedOutput()
 
 			livelinessStr := string(livelinessOutput)
 			if livelinessErr != nil {
 				outputParts = append(outputParts, "✗ /health/liveliness endpoint failed (or not supported)")
-				outputParts = append(outputParts, "Full output (with HTTP code):")
+				outputParts = append(outputParts, "Full output:")
 				outputParts = append(outputParts, livelinessStr)
 				result.Metadata["liveliness_endpoint"] = "failed"
-
-				// Parse HTTP code
-				if strings.Contains(livelinessStr, "HTTP_CODE:") {
-					httpCodeStr := strings.Split(livelinessStr, "HTTP_CODE:")[1]
-					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
-					result.Metadata["liveliness_http_code"] = httpCodeStr
-					outputParts = append(outputParts, fmt.Sprintf("HTTP Status Code: %s", httpCodeStr))
-				}
+				// Note: Python urllib raises exception on HTTP errors (4xx, 5xx)
+				// Error message will contain status code if it's an HTTP error
 			} else {
 				outputParts = append(outputParts, "✓ /health/liveliness endpoint responding")
 				outputParts = append(outputParts, "Response:")
 				outputParts = append(outputParts, livelinessStr)
 				result.Metadata["liveliness_endpoint"] = "ok"
-
-				// Extract HTTP code
-				if strings.Contains(livelinessStr, "HTTP_CODE:") {
-					httpCodeStr := strings.Split(livelinessStr, "HTTP_CODE:")[1]
-					httpCodeStr = strings.TrimSpace(strings.Split(httpCodeStr, "\n")[0])
-					result.Metadata["liveliness_http_code"] = httpCodeStr
-				}
+				result.Metadata["liveliness_http_code"] = "200" // urllib.urlopen succeeds = HTTP 200
 			}
 			outputParts = append(outputParts, "")
 

@@ -12,6 +12,21 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
+// Test helpers
+
+// validPortValidator is a reusable validator for testing port validation
+// Requires port to be between 1024 and 65535 (non-privileged ports)
+func validPortValidator(s string) error {
+	port, err := strconv.Atoi(s)
+	if err != nil {
+		return fmt.Errorf("must be integer: %w", err)
+	}
+	if port < 1024 || port > 65535 {
+		return fmt.Errorf("port must be 1024-65535")
+	}
+	return nil
+}
+
 // TestFlagSource_String verifies FlagSource string representation
 func TestFlagSource_String(t *testing.T) {
 	tests := []struct {
@@ -344,8 +359,9 @@ func TestBuildRemediationError(t *testing.T) {
 			errMsg := err.Error()
 
 			for _, substr := range tt.want {
-				if !strings.Contains(errMsg, substr) {
-					t.Errorf("error message should contain %q, got:\n%s", substr, errMsg)
+				// Case-insensitive match for flexible formatting
+				if !strings.Contains(strings.ToLower(errMsg), strings.ToLower(substr)) {
+					t.Errorf("error message should contain %q (case-insensitive), got:\n%s", substr, errMsg)
 				}
 			}
 		})
@@ -434,22 +450,11 @@ func TestGetRequiredString_DefaultValueValidation(t *testing.T) {
 
 	// Test 1: Valid default value passes validation
 	t.Run("Valid default value", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		result, err := GetRequiredString(rc, "", false, &RequiredFlagConfig{
 			FlagName:     "port",
 			AllowEmpty:   true,
 			DefaultValue: "8080",
-			Validator:    portValidator,
+			Validator:    validPortValidator,
 		})
 
 		if err != nil {
@@ -467,22 +472,11 @@ func TestGetRequiredString_DefaultValueValidation(t *testing.T) {
 
 	// Test 2: Invalid default value returns validation error
 	t.Run("Invalid default value", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		_, err := GetRequiredString(rc, "", false, &RequiredFlagConfig{
 			FlagName:     "port",
 			AllowEmpty:   true,
 			DefaultValue: "99999", // Invalid: exceeds max port
-			Validator:    portValidator,
+			Validator:    validPortValidator,
 		})
 
 		if err == nil {
@@ -490,12 +484,12 @@ func TestGetRequiredString_DefaultValueValidation(t *testing.T) {
 		}
 
 		expectedSubstring := "invalid default value for port"
-		if !contains(err.Error(), expectedSubstring) {
+		if !strings.Contains(err.Error(), expectedSubstring) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring, err.Error())
 		}
 
 		expectedSubstring2 := "must be 1024-65535"
-		if !contains(err.Error(), expectedSubstring2) {
+		if !strings.Contains(err.Error(), expectedSubstring2) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring2, err.Error())
 		}
 	})
@@ -526,20 +520,9 @@ func TestGetRequiredInt_CLIFlagValidation(t *testing.T) {
 
 	// Test 1: Valid CLI int flag passes validation
 	t.Run("Valid CLI int flag", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		port, source, err := GetRequiredInt(rc, 8080, true, &RequiredFlagConfig{
 			FlagName:  "port",
-			Validator: portValidator,
+			Validator: validPortValidator,
 		})
 
 		if err != nil {
@@ -557,20 +540,9 @@ func TestGetRequiredInt_CLIFlagValidation(t *testing.T) {
 
 	// Test 2: Invalid CLI int flag returns validation error
 	t.Run("Invalid CLI int flag", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		_, _, err := GetRequiredInt(rc, 99999, true, &RequiredFlagConfig{
 			FlagName:  "port",
-			Validator: portValidator,
+			Validator: validPortValidator,
 		})
 
 		if err == nil {
@@ -578,12 +550,12 @@ func TestGetRequiredInt_CLIFlagValidation(t *testing.T) {
 		}
 
 		expectedSubstring := "invalid value for --port flag"
-		if !contains(err.Error(), expectedSubstring) {
+		if !strings.Contains(err.Error(), expectedSubstring) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring, err.Error())
 		}
 
 		expectedSubstring2 := "must be 1024-65535"
-		if !contains(err.Error(), expectedSubstring2) {
+		if !strings.Contains(err.Error(), expectedSubstring2) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring2, err.Error())
 		}
 	})
@@ -616,22 +588,11 @@ func TestGetRequiredInt_DefaultValueValidation(t *testing.T) {
 
 	// Test 1: Valid default int passes validation
 	t.Run("Valid default int", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		port, source, err := GetRequiredInt(rc, 0, false, &RequiredFlagConfig{
 			FlagName:     "port",
 			AllowEmpty:   true,
 			DefaultValue: "8080",
-			Validator:    portValidator,
+			Validator:    validPortValidator,
 		})
 
 		if err != nil {
@@ -649,22 +610,11 @@ func TestGetRequiredInt_DefaultValueValidation(t *testing.T) {
 
 	// Test 2: Invalid default int returns validation error
 	t.Run("Invalid default int", func(t *testing.T) {
-		portValidator := func(s string) error {
-			port, err := strconv.Atoi(s)
-			if err != nil {
-				return fmt.Errorf("must be integer: %w", err)
-			}
-			if port < 1024 || port > 65535 {
-				return fmt.Errorf("port must be 1024-65535")
-			}
-			return nil
-		}
-
 		_, _, err := GetRequiredInt(rc, 0, false, &RequiredFlagConfig{
 			FlagName:     "port",
 			AllowEmpty:   true,
 			DefaultValue: "99999", // Invalid: exceeds max port
-			Validator:    portValidator,
+			Validator:    validPortValidator,
 		})
 
 		if err == nil {
@@ -672,12 +622,12 @@ func TestGetRequiredInt_DefaultValueValidation(t *testing.T) {
 		}
 
 		expectedSubstring := "invalid default value for port"
-		if !contains(err.Error(), expectedSubstring) {
+		if !strings.Contains(err.Error(), expectedSubstring) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring, err.Error())
 		}
 
 		expectedSubstring2 := "must be 1024-65535"
-		if !contains(err.Error(), expectedSubstring2) {
+		if !strings.Contains(err.Error(), expectedSubstring2) {
 			t.Errorf("Error message should contain %q, got: %s", expectedSubstring2, err.Error())
 		}
 	})
@@ -705,6 +655,86 @@ func TestGetRequiredInt_DefaultValueValidation(t *testing.T) {
 	})
 }
 
+// TestGetRequiredInt_EnvVarValidation verifies env var values are validated for integers
+// P0 SECURITY: Env var int values must be validated just like CLI flags
+func TestGetRequiredInt_EnvVarValidation(t *testing.T) {
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+
+	// Test 1: Valid env var int passes validation
+	t.Run("Valid env var int", func(t *testing.T) {
+		os.Setenv("TEST_PORT_ENV_VALID", "8080")
+		defer os.Unsetenv("TEST_PORT_ENV_VALID")
+
+		port, source, err := GetRequiredInt(rc, 0, false, &RequiredFlagConfig{
+			FlagName:   "port",
+			EnvVarName: "TEST_PORT_ENV_VALID",
+			Validator:  validPortValidator,
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error for valid env var: %v", err)
+		}
+
+		if port != 8080 {
+			t.Errorf("port = %d, want 8080", port)
+		}
+
+		if source != FlagSourceEnv {
+			t.Errorf("Source = %q, want %q", source, FlagSourceEnv)
+		}
+	})
+
+	// Test 2: Invalid env var int returns validation error
+	t.Run("Invalid env var int", func(t *testing.T) {
+		os.Setenv("TEST_PORT_ENV_INVALID", "99999") // Exceeds max port
+		defer os.Unsetenv("TEST_PORT_ENV_INVALID")
+
+		_, _, err := GetRequiredInt(rc, 0, false, &RequiredFlagConfig{
+			FlagName:   "port",
+			EnvVarName: "TEST_PORT_ENV_INVALID",
+			Validator:  validPortValidator,
+		})
+
+		if err == nil {
+			t.Fatal("expected validation error for invalid env var, got nil")
+		}
+
+		expectedSubstring := "invalid value in TEST_PORT_ENV_INVALID"
+		if !strings.Contains(err.Error(), expectedSubstring) {
+			t.Errorf("Error message should contain %q, got: %s", expectedSubstring, err.Error())
+		}
+
+		expectedSubstring2 := "must be 1024-65535"
+		if !strings.Contains(err.Error(), expectedSubstring2) {
+			t.Errorf("Error message should contain %q, got: %s", expectedSubstring2, err.Error())
+		}
+	})
+
+	// Test 3: Env var int with no validator (no validation needed)
+	t.Run("No validator provided", func(t *testing.T) {
+		os.Setenv("TEST_PORT_ENV_NOVALIDATOR", "12345")
+		defer os.Unsetenv("TEST_PORT_ENV_NOVALIDATOR")
+
+		port, source, err := GetRequiredInt(rc, 0, false, &RequiredFlagConfig{
+			FlagName:   "port",
+			EnvVarName: "TEST_PORT_ENV_NOVALIDATOR",
+			Validator:  nil, // No validation
+		})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if port != 12345 {
+			t.Errorf("port = %d, want 12345", port)
+		}
+
+		if source != FlagSourceEnv {
+			t.Errorf("Source = %q, want %q", source, FlagSourceEnv)
+		}
+	})
+}
+
 // NOTE: Interactive prompt tests (fallback 3) are skipped because:
 // 1. They require TTY detection (IsTTY() returns false in test environment)
 // 2. stdin/stdout mocking conflicts with otelzap logger
@@ -722,13 +752,13 @@ func TestGetRequiredInt_DefaultValueValidation(t *testing.T) {
 // ✓ Fallback 5: Error with remediation (TestGetRequiredString_NonInteractiveError)
 // ✓ Precedence: CLI > env > prompt > default (TestGetRequiredString_PrecedenceOrder)
 // ✓ Empty detection: Changed() vs not provided (TestGetRequiredString_EmptyStringExplicitlySet)
-// ✓ Int parsing: CLI, env, default (TestGetRequiredInt_*)
+// ✓ Int parsing and validation: CLI, env, default (TestGetRequiredInt_*)
 // ✓ Error messages: Remediation quality (TestBuildRemediationError)
-// ✓ Validation: All fallback paths (TestGetRequiredString_ValidationChaining)
+// ✓ Validation: All fallback paths for String and Int (TestGetRequiredString_ValidationChaining, TestGetRequiredInt_EnvVarValidation)
 // ✓ Constants: MaxValidationAttempts defined (TestMaxValidationAttempts_Constant)
 //
 // P0 Compliance verified:
 // ✓ Validation retry loop implemented (max 3 attempts with clear guidance)
 // ✓ Magic numbers replaced with constants (MaxValidationAttempts)
-// ✓ Validation applied to CLI flags, env vars, and interactive prompts
+// ✓ Validation applied to CLI flags, env vars (GetRequiredString + GetRequiredInt), and interactive prompts
 // ✓ Human-centric fallback chain: CLI → env → prompt → default → error

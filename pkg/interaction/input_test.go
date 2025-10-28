@@ -87,9 +87,73 @@ func TestPromptSecrets_ArgumentParsing_Errors(t *testing.T) {
 
 // Keeping stdin mocking infrastructure for future use when logger can be properly mocked
 
+// TestValidateYesNoResponse verifies the strict yes/no validation helper.
+// This helper is used by both PromptYesNo and PromptYesNoSafe to ensure
+// consistent validation behavior.
+//
+// NOTE: The helper expects lowercase input - callers must call strings.ToLower() first.
+// See PromptYesNo line 158 and PromptYesNoSafe line 265 for ToLower() calls.
+func TestValidateYesNoResponse(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantResult bool
+		wantValid  bool
+	}{
+		// Valid YES responses (lowercase - callers ToLower() first)
+		{"lowercase y", "y", true, true},
+		{"lowercase yes", "yes", true, true},
+
+		// Valid NO responses (lowercase - callers ToLower() first)
+		{"lowercase n", "n", false, true},
+		{"lowercase no", "no", false, true},
+
+		// Invalid - empty (caller handles separately with default value)
+		{"empty string", "", false, false},
+
+		// Invalid - previously accepted but now rejected (strict validation)
+		{"yeah rejected", "yeah", false, false},
+		{"yep rejected", "yep", false, false},
+		{"sure rejected", "sure", false, false},
+		{"ok rejected", "ok", false, false},
+		{"true rejected", "true", false, false},
+		{"1 rejected", "1", false, false},
+		{"nope rejected", "nope", false, false},
+		{"nah rejected", "nah", false, false},
+		{"false rejected", "false", false, false},
+		{"0 rejected", "0", false, false},
+
+		// Invalid - random strings
+		{"random string", "maybe", false, false},
+		{"number", "42", false, false},
+		{"whitespace", "  ", false, false},
+		{"mixed case not lowercased", "Yes", false, false}, // Caller should ToLower() first
+		{"mixed case not lowercased no", "No", false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, valid := validateYesNoResponse(tt.input)
+
+			if valid != tt.wantValid {
+				t.Errorf("validateYesNoResponse(%q) valid = %v, want %v",
+					tt.input, valid, tt.wantValid)
+			}
+
+			if valid && result != tt.wantResult {
+				t.Errorf("validateYesNoResponse(%q) result = %v, want %v",
+					tt.input, result, tt.wantResult)
+			}
+		})
+	}
+}
+
 // TestStrictInputValidation_Documentation documents the strict input acceptance policy.
-// This is a documentation test - it logs the behavior but doesn't assert anything.
-// Renamed from TestStrictInputValidation to make it clear this is documentation, not validation.
+// This is a documentation test that logs the policy for developers.
+//
+// NOTE: This test does NOT verify behavior - see TestValidateYesNoResponse for that.
+// Actual yes/no prompting behavior (with retry logic and logger interaction) is tested
+// manually due to otelzap stdio interactions. See manual testing instructions at top of file.
 func TestStrictInputValidation_Documentation(t *testing.T) {
 	// This test documents expected behavior but cannot run with otelzap logger
 	// See manual testing instructions above

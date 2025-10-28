@@ -12,6 +12,7 @@ package vault
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -75,23 +76,34 @@ func GetVaultClientWithToken(rc *eos_io.RuntimeContext, token string) (*api.Clie
 }
 
 // sanitizeTokenForLogging returns a safe version of token for logging.
-// Shows first 4 chars + "..." to help identify which token without exposing value.
+// Shows ONLY the token type prefix (hvs., s., b.) without exposing any token data.
 //
 // SECURITY: NEVER log raw token values - use this function for all token logging.
+// SECURITY: Does NOT show token characters beyond type prefix to prevent entropy leakage.
 //
 // Examples:
-//   "hvs.CAES..." → "hvs.***"
-//   "s.1234567890abcdef" → "s.12***"
+//   "hvs.CAESIJlU02LQZq..." → "hvs.***"
+//   "s.1234567890abcdef" → "s.***"
+//   "s.12abc..." → "s.***" (NOT "s.12***" - would expose token data)
+//   "b.AAAAAQKr..." → "b.***"
+//   "unknown" → "***"
 func sanitizeTokenForLogging(token string) string {
-	if len(token) <= 4 {
-		return "***" // Token too short, hide completely
+	if len(token) == 0 {
+		return "***" // Empty token
 	}
-	// Show prefix to help identify token type (hvs., s., etc.) but hide rest
-	prefix := token[:4]
-	if prefix == "hvs." || prefix == "s.12" {
-		return prefix + "***"
+
+	// Identify token type WITHOUT exposing any token value characters
+	if strings.HasPrefix(token, "hvs.") {
+		return "hvs.***" // HVAC token (Vault 1.10+)
 	}
-	// For other formats, just show "***"
+	if strings.HasPrefix(token, "s.") {
+		return "s.***" // Service token / root token
+	}
+	if strings.HasPrefix(token, "b.") {
+		return "b.***" // Batch token
+	}
+
+	// Unknown format - hide completely
 	return "***"
 }
 
@@ -169,28 +181,94 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 		return fmt.Errorf("token lookup returned no data (token may be expired)")
 	}
 
-	// Check token TTL (Time To Live)
+	// Check 1b: Token must not be orphaned or in revocation queue
+	// Orphan tokens have no parent - if parent was revoked, orphan token persists but may be risky
+	orphan := false
+	if orphanRaw, ok := secret.Data["orphan"].(bool); ok {
+		orphan = orphanRaw
+	}
+
+	if orphan {
+		logger.Warn("⚠️  Token is orphaned (parent token was revoked)",
+			zap.Bool("orphan", true))
+		// Don't reject orphan tokens (they're valid) but warn user for awareness
+		// Orphan tokens can be legitimate (created with -orphan flag or from root)
+	}
+
+	// Check for explicit_max_ttl=0 which indicates token in revocation queue
+	// This is a Vault internal marker that token is marked for deletion
+	if explicitMaxTTL, ok := secret.Data["explicit_max_ttl"].(json.Number); ok {
+		maxTTLSeconds, err := explicitMaxTTL.Int64()
+		if err == nil && maxTTLSeconds == 0 {
+			// Check if this is a periodic token (which legitimately has explicit_max_ttl=0)
+			isPeriodic := false
+			if periodRaw, ok := secret.Data["period"].(json.Number); ok {
+				periodSeconds, _ := periodRaw.Int64()
+				isPeriodic = periodSeconds > 0
+			}
+
+			if !isPeriodic {
+				// Non-periodic token with explicit_max_ttl=0 is suspicious
+				logger.Warn("⚠️  Token has explicit_max_ttl=0 (may be in revocation queue)",
+					zap.Int64("explicit_max_ttl", maxTTLSeconds))
+				// Don't reject yet - might be legitimate, but warn
+			}
+		}
+	}
+
+	// Check token TTL (Time To Live) and renewal properties
+	// CRITICAL: Periodic tokens auto-renew - don't reject based on low TTL
 	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
 		ttlSeconds, err := ttlRaw.Int64()
 		if err == nil {
 			ttlDuration := time.Duration(ttlSeconds) * time.Second
 
-			// Warn if token expires soon (less than 5 minutes)
-			if ttlSeconds < 300 {
-				logger.Warn("⚠️  Token expires soon",
-					zap.Int64("ttl_seconds", ttlSeconds),
-					zap.String("ttl_human", formatTTLDuration(ttlSeconds)))
-
-				// Reject if token expires too soon (less than 1 minute)
-				if ttlSeconds < 60 {
-					return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
-						"Get a longer-lived token:\n"+
-						"  vault token create -policy=%s -ttl=1h\n"+
-						"  Or use Vault Agent (automatic token renewal)", ttlSeconds, shared.EosAdminPolicyName)
+			// Check if token is periodic (auto-renewable, never expires)
+			isPeriodic := false
+			if periodRaw, ok := secret.Data["period"].(json.Number); ok {
+				periodSeconds, err := periodRaw.Int64()
+				if err == nil && periodSeconds > 0 {
+					isPeriodic = true
+					logger.Debug("✓ Token is periodic (auto-renewable)",
+						zap.Int64("current_ttl_seconds", ttlSeconds),
+						zap.Int64("period_seconds", periodSeconds),
+						zap.String("period_human", formatTTLDuration(periodSeconds)))
 				}
+			}
+
+			// Check if token is renewable (can be manually renewed)
+			isRenewable := false
+			if renewableRaw, ok := secret.Data["renewable"].(bool); ok {
+				isRenewable = renewableRaw
+			}
+
+			// Periodic tokens: Don't check TTL (they auto-renew)
+			// Examples: Vault Agent tokens (period=4h), AppRole tokens with period
+			if isPeriodic {
+				logger.Debug("Token is periodic - TTL check skipped (auto-renews)",
+					zap.Int64("current_ttl", ttlSeconds),
+					zap.Bool("periodic", true))
+				// Don't reject periodic tokens regardless of TTL
 			} else {
-				logger.Debug("Token TTL acceptable",
-					zap.Duration("ttl", ttlDuration))
+				// Non-periodic tokens: Check TTL and warn/reject
+				if ttlSeconds < 300 {
+					logger.Warn("⚠️  Token expires soon",
+						zap.Int64("ttl_seconds", ttlSeconds),
+						zap.String("ttl_human", formatTTLDuration(ttlSeconds)),
+						zap.Bool("renewable", isRenewable))
+
+					// Reject if token expires too soon (less than 1 minute)
+					if ttlSeconds < 60 {
+						return fmt.Errorf("token expires in %d seconds (too short for cluster operations)\n\n"+
+							"Get a longer-lived token:\n"+
+							"  vault token create -policy=%s -ttl=1h\n"+
+							"  Or use Vault Agent (automatic token renewal)", ttlSeconds, shared.EosAdminPolicyName)
+					}
+				} else {
+					logger.Debug("Token TTL acceptable",
+						zap.Duration("ttl", ttlDuration),
+						zap.Bool("renewable", isRenewable))
+				}
 			}
 		}
 	}
@@ -223,40 +301,107 @@ func verifyClusterOperationCapabilities(rc *eos_io.RuntimeContext, client *api.C
 			"Required: %s or root", policyNames, shared.EosAdminPolicyName)
 	}
 
-	// Check 3: Verify specific capabilities for cluster operations
-	// Raft cluster operations require access to sys/storage/raft/*
-	logger.Debug("Checking sys/storage/raft/configuration capabilities")
-	capabilities, err := client.Sys().CapabilitiesSelf("sys/storage/raft/configuration")
-	if err != nil {
-		logger.Debug("Capabilities check failed", zap.Error(err))
-		// If we can't check capabilities but token has root/admin policy, assume OK
-		if hasRequiredPolicy {
-			logger.Warn("Cannot verify capabilities, but token has required policy - proceeding")
-			return nil
+	// Check 3: Verify specific capabilities for ALL required cluster operation paths
+	// Raft cluster operations require access to multiple sys/storage/raft/* endpoints
+	requiredPaths := []string{
+		"sys/storage/raft/configuration",          // Raft peer configuration
+		"sys/storage/raft/snapshot",               // Snapshot backup/restore
+		"sys/storage/raft/autopilot/configuration", // Autopilot config
+		"sys/storage/raft/autopilot/state",        // Autopilot state query
+	}
+
+	logger.Debug("Checking capabilities for all cluster operation paths",
+		zap.Int("path_count", len(requiredPaths)))
+
+	for _, path := range requiredPaths {
+		logger.Debug("Checking capabilities", zap.String("path", path))
+		capabilities, err := client.Sys().CapabilitiesSelf(path)
+		if err != nil {
+			logger.Debug("Capabilities check failed",
+				zap.String("path", path),
+				zap.Error(err))
+			// If we can't check capabilities but token has root/admin policy, assume OK
+			if hasRequiredPolicy {
+				logger.Warn("Cannot verify capabilities but token has required policy - proceeding",
+					zap.String("path", path))
+				continue // Try next path
+			}
+			return fmt.Errorf("cannot verify cluster operation capabilities for %s: %w", path, err)
 		}
-		return fmt.Errorf("cannot verify cluster operation capabilities: %w", err)
-	}
 
-	// Token needs read capability for Raft configuration
-	hasCapability := false
-	for _, cap := range capabilities {
-		if cap == "root" || cap == "sudo" || cap == "read" {
-			hasCapability = true
-			logger.Debug("✓ Token has required capability",
-				zap.String("capability", cap),
-				zap.String("path", "sys/storage/raft/configuration"))
-			break
+		// Token needs read capability (or root/sudo which implies read)
+		hasCapability := false
+		for _, cap := range capabilities {
+			if cap == "root" || cap == "sudo" || cap == "read" {
+				hasCapability = true
+				logger.Debug("✓ Token has required capability",
+					zap.String("capability", cap),
+					zap.String("path", path))
+				break
+			}
+		}
+
+		if !hasCapability {
+			return fmt.Errorf("token cannot access %s\n"+
+				"Token capabilities: %v\n"+
+				"Required: root, sudo, or read\n\n"+
+				"Ensure token has one of:\n"+
+				"  • eos-admin-policy (full cluster access)\n"+
+				"  • root policy (full access)", path, capabilities)
 		}
 	}
 
-	if !hasCapability {
-		return fmt.Errorf("token cannot access sys/storage/raft/configuration\n"+
-			"Token capabilities: %v\n"+
-			"Required: root, sudo, or read", capabilities)
-	}
+	logger.Debug("✓ Token verified for ALL cluster operations",
+		zap.Strings("policies", policyNames),
+		zap.Int("paths_checked", len(requiredPaths)))
 
-	logger.Debug("✓ Token verified for cluster operations",
-		zap.Strings("policies", policyNames))
+	// Check 4: Race condition mitigation - Re-check TTL for non-periodic tokens
+	// Validation took time (~1-2 seconds for 4 capability checks). For non-periodic tokens,
+	// verify TTL didn't drop below threshold during validation.
+	// Periodic tokens skip this (they auto-renew).
+	if ttlRaw, ok := secret.Data["ttl"].(json.Number); ok {
+		ttlSeconds, _ := ttlRaw.Int64()
+
+		// Check if token is periodic
+		isPeriodic := false
+		if periodRaw, ok := secret.Data["period"].(json.Number); ok {
+			periodSeconds, _ := periodRaw.Int64()
+			isPeriodic = periodSeconds > 0
+		}
+
+		// Only re-check for non-periodic tokens (periodic tokens auto-renew)
+		if !isPeriodic && ttlSeconds < 120 {
+			logger.Debug("Token TTL is low, re-checking after validation delay",
+				zap.Int64("initial_ttl", ttlSeconds))
+
+			// Re-check TTL to account for validation time
+			secretRefresh, err := client.Auth().Token().LookupSelf()
+			if err != nil {
+				logger.Warn("Could not re-check TTL after validation",
+					zap.Error(err))
+				// Don't fail - original TTL was acceptable
+			} else if secretRefresh != nil && secretRefresh.Data != nil {
+				if ttlRefreshRaw, ok := secretRefresh.Data["ttl"].(json.Number); ok {
+					ttlRefresh, _ := ttlRefreshRaw.Int64()
+
+					logger.Debug("TTL after validation",
+						zap.Int64("initial_ttl", ttlSeconds),
+						zap.Int64("current_ttl", ttlRefresh),
+						zap.Int64("ttl_dropped_by", ttlSeconds-ttlRefresh))
+
+					// If TTL dropped below threshold during validation, reject
+					if ttlRefresh < 60 {
+						return fmt.Errorf("token expired during validation (TTL now %d seconds, was %d)\n\n"+
+							"Validation took time and token TTL was too low.\n"+
+							"Get a longer-lived token:\n"+
+							"  vault token create -policy=%s -ttl=1h\n"+
+							"  Or use Vault Agent (automatic token renewal)",
+							ttlRefresh, ttlSeconds, shared.EosAdminPolicyName)
+					}
+				}
+			}
+		}
+	}
 
 	return nil
 }

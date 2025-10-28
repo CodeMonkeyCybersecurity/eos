@@ -122,12 +122,19 @@ func PromptString(rc *eos_io.RuntimeContext, config *PromptConfig) (*PromptResul
 
 	case sig := <-sigChan:
 		logger.Info("Received signal, cancelling prompt", zap.String("signal", sig.String()))
+		// P0 EXCEPTION: fmt.Println needed to add newline after ^C for clean terminal output
 		fmt.Println() // New line after ^C
 		return &PromptResult{Cancelled: true}, fmt.Errorf("cancelled by signal: %s", sig)
 	}
 }
 
 // displayPrompt shows the prompt to the user
+// P0 EXCEPTION: fmt.Printf required for interactive prompting UX
+// JUSTIFICATION: Interactive survey-style prompts require unbuffered terminal I/O
+// Cannot use logger.Info() because:
+//   1. Logger adds timestamps/prefixes that break the interactive prompt UX
+//   2. Logger adds newlines that prevent inline prompting (we need "? Message: " on same line as input)
+//   3. Survey-style prompts expect clean "? Message [default]: " format without log metadata
 func displayPrompt(config *PromptConfig) {
 	if config.HelpText != "" {
 		fmt.Printf("   %s\n", config.HelpText)
@@ -188,6 +195,7 @@ func retryPrompt(rc *eos_io.RuntimeContext, config *PromptConfig, attempt int) (
 		return &PromptResult{Cancelled: true}, fmt.Errorf("exceeded maximum retry attempts (%d)", maxAttempts)
 	}
 
+	// P0 EXCEPTION: fmt.Printf needed for inline error message during interactive prompt retry
 	fmt.Printf("Invalid input. Please try again (%d/%d)\n", attempt+1, maxAttempts)
 	return PromptString(rc, config)
 }

@@ -958,6 +958,210 @@ logger.Info("Using secret from backend", zap.String("backend", serviceSecrets.Ba
 - `SecretTypeAPIKey`: Auto-generated API key
 - Custom generation via `crypto.GeneratePassword(length)`
 
+## Vault Cluster Authentication (P1 - CRITICAL)
+
+**RULE**: Vault cluster operations require admin-level tokens. Use hierarchical authentication with clear security boundaries.
+
+### Architecture Pattern
+
+Vault cluster operations (Raft, Autopilot, snapshots) use **shell commands** (`vault operator raft ...`) rather than SDK clients. This creates a unique authentication pattern:
+
+1. **Token-only return**: Functions return `token string`, not `*api.Client`
+2. **Environment variable usage**: Token set via `VAULT_TOKEN` env var for shell commands
+3. **Validation before use**: Token validated via SDK, then used in shell commands
+
+### Authentication Hierarchy
+
+Authentication attempts in order (fail-fast on deterministic errors):
+
+```go
+// 1. --token flag (highest priority - explicit user input)
+if token, _ := cmd.Flags().GetString("token"); token != "" {
+    // Validate token has required capabilities
+    _, err := vault.GetVaultClientWithToken(rc, token)
+    if err != nil {
+        return "", fmt.Errorf("invalid token: %w", err)
+    }
+    return token, nil
+}
+
+// 2. VAULT_TOKEN environment variable (CI/CD, scripted usage)
+if token := os.Getenv("VAULT_TOKEN"); token != "" {
+    _, err := vault.GetVaultClientWithToken(rc, token)
+    if err != nil {
+        return "", fmt.Errorf("invalid token: %w", err)
+    }
+    return token, nil
+}
+
+// 3. Admin authentication (Vault Agent → AppRole → Root with consent)
+adminClient, err := vault.GetAdminClient(rc)
+if err != nil {
+    return "", fmt.Errorf("admin authentication failed: %w", err)
+}
+return adminClient.Token(), nil
+```
+
+### Token Validation Sequence
+
+Validation order matters - fail fast on infrastructure issues:
+
+```go
+// Check 0: Vault seal status (BEFORE token validation)
+sealStatus, err := client.Sys().SealStatus()
+if err != nil {
+    return fmt.Errorf("cannot connect to Vault: %w", err)
+}
+if sealStatus.Sealed {
+    return fmt.Errorf("Vault is sealed - unseal first")
+}
+
+// Check 1: Token validity
+secret, err := client.Auth().Token().LookupSelf()
+if err != nil {
+    return fmt.Errorf("token invalid or expired: %w", err)
+}
+
+// Check 2: Token TTL (Time To Live)
+ttlSeconds := secret.Data["ttl"].(json.Number).Int64()
+if ttlSeconds < 60 {
+    return fmt.Errorf("token expires in %ds - too short for cluster operations", ttlSeconds)
+}
+if ttlSeconds < 300 {
+    logger.Warn("Token expires soon", zap.Int64("ttl_seconds", ttlSeconds))
+}
+
+// Check 3: Required policies
+hasAdminPolicy := false
+for _, policy := range secret.Data["policies"].([]interface{}) {
+    if policy == "root" || policy == shared.EosAdminPolicyName {
+        hasAdminPolicy = true
+        break
+    }
+}
+if !hasAdminPolicy {
+    return fmt.Errorf("token lacks eos-admin-policy or root")
+}
+
+// Check 4: Specific capabilities
+capabilities, err := client.Sys().CapabilitiesSelf("sys/storage/raft/configuration")
+if err != nil {
+    return fmt.Errorf("cannot verify capabilities: %w", err)
+}
+hasCapability := false
+for _, cap := range capabilities {
+    if cap == "root" || cap == "sudo" || cap == "read" {
+        hasCapability = true
+        break
+    }
+}
+if !hasCapability {
+    return fmt.Errorf("token lacks required Raft capabilities")
+}
+```
+
+### Token Security
+
+**CRITICAL**: Tokens are secrets and MUST NOT be logged.
+
+```go
+// GOOD: Never log token values
+logger.Info("Using token from --token flag")  // ✓ No token value
+
+// BAD: Logging token exposes secrets
+logger.Info("Token", zap.String("value", token))  // ✗ NEVER DO THIS
+
+// GOOD: Use sanitization helper if you need to reference token
+logger.Debug("Token type", zap.String("token", sanitizeTokenForLogging(token)))
+// Output: "Token type: hvs.***"
+```
+
+**Token sanitization helper** (in `pkg/vault/auth_cluster.go`):
+```go
+// sanitizeTokenForLogging returns safe version for logging
+func sanitizeTokenForLogging(token string) string {
+    if len(token) <= 4 {
+        return "***"
+    }
+    prefix := token[:4]
+    if prefix == "hvs." || prefix == "s.12" {
+        return prefix + "***"
+    }
+    return "***"
+}
+```
+
+### Error Messages
+
+Errors must be **actionable** with clear remediation steps:
+
+```go
+// GOOD: Clear remediation
+return fmt.Errorf("Vault is sealed - cannot perform cluster operations\n\n"+
+    "Unseal Vault first:\n"+
+    "  vault operator unseal\n"+
+    "  Or: eos update vault unseal\n\n"+
+    "Seal status:\n"+
+    "  Sealed: %t\n"+
+    "  Progress: %d/%d keys provided",
+    sealStatus.Sealed, sealStatus.Progress, sealStatus.T)
+
+// BAD: Vague error
+return fmt.Errorf("operation failed")  // ✗ Not actionable
+```
+
+### Implementation Files
+
+- **Orchestration**: [cmd/update/vault_cluster.go](cmd/update/vault_cluster.go) - Command handlers, flag parsing
+- **Business Logic**: [pkg/vault/auth_cluster.go](pkg/vault/auth_cluster.go) - Authentication, validation
+- **Cluster Operations**: [pkg/vault/raft_*.go](pkg/vault/) - Raft, Autopilot, snapshot functions
+
+### Common Pitfalls
+
+1. **✗ Returning unused client**: Cluster ops use shell commands, not SDK client
+   ```go
+   // BAD: Returns client that's never used
+   func getAuth(rc *RC, cmd *cobra.Command) (*api.Client, string, error)
+
+   // GOOD: Returns only token
+   func getAuth(rc *RC, cmd *cobra.Command) (string, error)
+   ```
+
+2. **✗ Validating token before seal check**: Sealed Vault fails token lookup
+   ```go
+   // BAD: Token validation fails on sealed Vault with confusing error
+   secret, err := client.Auth().Token().LookupSelf()  // ✗ Fails if sealed
+
+   // GOOD: Check seal status FIRST
+   sealStatus, err := client.Sys().SealStatus()  // ✓ Check seal first
+   if sealStatus.Sealed { return fmt.Errorf("vault sealed") }
+   secret, err := client.Auth().Token().LookupSelf()  // Then validate token
+   ```
+
+3. **✗ Ignoring token TTL**: Long operations fail mid-execution
+   ```go
+   // BAD: No TTL check, cluster snapshot may take 10+ minutes
+   err := vault.TakeRaftSnapshot(rc, token, outputPath)  // ✗ May fail if token expires
+
+   // GOOD: Reject short-lived tokens upfront
+   if ttlSeconds < 60 {
+       return fmt.Errorf("token expires in %ds - get longer-lived token", ttlSeconds)
+   }
+   ```
+
+4. **✗ Logging token values**: Exposes secrets in logs/telemetry
+   ```go
+   // BAD: Token in logs
+   logger.Info("Token", zap.String("value", token))  // ✗ SECURITY VIOLATION
+
+   // GOOD: Never log tokens
+   logger.Info("Using token from --token flag")  // ✓ No value logged
+   ```
+
+### Reference Implementation
+
+See complete working example: [cmd/update/vault_cluster.go:272-324](cmd/update/vault_cluster.go#L272-L324)
+
 ## Debug Verbosity (P2 - IMPORTANT)
 
 ### Diagnostic Logging Strategy

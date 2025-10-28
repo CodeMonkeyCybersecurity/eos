@@ -59,7 +59,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 		}
 
 		if strings.EqualFold(username, "wazuh-wui") {
-			confirm, err := interaction.Resolve("You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?")
+			confirm, err := interaction.Resolve(rc, "You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?")
 			if err != nil || !confirm {
 				return errors.New("aborted by user")
 			}
