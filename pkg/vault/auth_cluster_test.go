@@ -392,6 +392,47 @@ func TestSanitizeForLogging(t *testing.T) {
 			input:    "malicious_value\n2025-01-28 INFO [vault] User admin authenticated successfully",
 			expected: "malicious_value 2025-01-28 INFO [vault] User admin authenticated successfully",
 		},
+		// P2 Issue #48 & #50 Fix: Unicode control character tests
+		{
+			name:     "Unicode Line Separator U+2028 (P2 #48 - CRITICAL)",
+			input:    "innocent\u2028FAKE LOG ENTRY",
+			expected: "innocent FAKE LOG ENTRY", // U+2028 replaced with space
+		},
+		{
+			name:     "Unicode Paragraph Separator U+2029",
+			input:    "line1\u2029line2",
+			expected: "line1 line2", // U+2029 replaced with space
+		},
+		{
+			name:     "Unicode Zero-Width Space U+200B (invisible char)",
+			input:    "hello\u200Bworld",
+			expected: "hello world", // U+200B replaced with space
+		},
+		{
+			name:     "Unicode Right-to-Left Override U+202E (bidi attack)",
+			input:    "user\u202Eadmin",
+			expected: "user admin", // U+202E replaced with space
+		},
+		{
+			name:     "Unicode C1 Control U+0080",
+			input:    "text\u0080here",
+			expected: "text here", // U+0080 replaced with space
+		},
+		{
+			name:     "Unicode BOM U+FEFF",
+			input:    "\uFEFFBOM at start",
+			expected: " BOM at start", // U+FEFF replaced with space
+		},
+		{
+			name:     "Mixed ASCII and Unicode controls",
+			input:    "a\nb\u2028c\td\u200Be",
+			expected: "a b c d e", // All controls replaced with spaces
+		},
+		{
+			name:     "Unicode non-breaking space U+00A0",
+			input:    "word\u00A0word",
+			expected: "word word", // U+00A0 normalized to regular space
+		},
 	}
 
 	for _, tt := range tests {

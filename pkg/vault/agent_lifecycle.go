@@ -273,22 +273,24 @@ func writeAppRoleCredentialsToDisk(rc *eos_io.RuntimeContext, roleID, secretID s
 		return cerr.Wrap(err, "failed to create secrets directory")
 	}
 
-	// Write role ID
-	log.Info(" Writing RoleID to disk", zap.String("path", shared.AppRolePaths.RoleID))
-	if err := os.WriteFile(shared.AppRolePaths.RoleID, []byte(roleID), shared.OwnerReadOnly); err != nil {
-		log.Error(" Failed to write role ID",
+	// SECURITY FIX (Phase 2): Use SecureWriteCredentialOrOverwrite to prevent TOCTOU
+	// OLD VULNERABILITY: Direct os.WriteFile() - no protection against file replacement attacks
+	// NEW: O_EXCL + flock + write + fsync + verify - atomic and race-free
+	log.Info(" Writing RoleID to disk (secure FD-based)", zap.String("path", shared.AppRolePaths.RoleID))
+	if err := SecureWriteCredentialOrOverwrite(rc, shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly, "role_id"); err != nil {
+		log.Error(" Failed to securely write role ID",
 			zap.String("path", shared.AppRolePaths.RoleID),
 			zap.Error(err))
-		return cerr.Wrap(err, "failed to write role ID")
+		return cerr.Wrap(err, "failed to securely write role ID")
 	}
 
 	// Write secret ID
-	log.Info(" Writing SecretID to disk", zap.String("path", shared.AppRolePaths.SecretID))
-	if err := os.WriteFile(shared.AppRolePaths.SecretID, []byte(secretID), shared.OwnerReadOnly); err != nil {
-		log.Error(" Failed to write secret ID",
+	log.Info(" Writing SecretID to disk (secure FD-based)", zap.String("path", shared.AppRolePaths.SecretID))
+	if err := SecureWriteCredentialOrOverwrite(rc, shared.AppRolePaths.SecretID, secretID, shared.OwnerReadOnly, "secret_id"); err != nil {
+		log.Error(" Failed to securely write secret ID",
 			zap.String("path", shared.AppRolePaths.SecretID),
 			zap.Error(err))
-		return cerr.Wrap(err, "failed to write secret ID")
+		return cerr.Wrap(err, "failed to securely write secret ID")
 	}
 
 	// Set proper ownership

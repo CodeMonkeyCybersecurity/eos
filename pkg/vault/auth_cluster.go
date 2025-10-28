@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -618,28 +620,37 @@ func sanitizeForLogging(raw string) string {
 	const maxLength = 100
 
 	// P2 Issue #43 Fix: Remove ALL control characters including newlines
-	// SECURITY: Newlines allow log injection attacks (fake log entries)
-	// Original code kept tab/newline/CR - WRONG for log safety
-	// Remove control characters (ASCII 0-31, ASCII 127)
-	// Keep ONLY: printable ASCII (32-126) and UTF-8 (128+)
+	// P2 Issue #48 Fix: Also remove Unicode control characters (not just ASCII)
+	// SECURITY: Control characters allow log injection attacks
+	//
+	// Vulnerable Unicode control characters:
+	//   - U+2028 (Line Separator) - creates new log lines in JSON/structured logs
+	//   - U+2029 (Paragraph Separator) - multi-line injection
+	//   - U+0080-U+009F (C1 Controls) - legacy terminal manipulation
+	//   - U+200B-U+200D (Zero-Width chars) - invisible content
+	//   - U+202A-U+202E (Bidi controls) - text direction attacks
+	//   - U+FEFF (BOM) - encoding confusion
+	//
+	// Use unicode.IsControl() to catch ALL control characters (ASCII + Unicode)
 	sanitized := strings.Map(func(r rune) rune {
-		// ALL control characters (0-31) - including tab, newline, CR
-		if r < 32 {
+		// Remove ALL control characters (ASCII 0-31, 127, and Unicode controls)
+		if unicode.IsControl(r) {
 			return ' ' // Replace with space for readability
 		}
-		// DEL character (127)
-		if r == 127 {
-			return -1 // Remove
+		// Also remove non-standard Unicode spaces that could be used for attacks
+		// Keep only regular space (U+0020), remove all other Unicode spaces
+		if unicode.IsSpace(r) && r != ' ' {
+			return ' ' // Normalize to regular space
 		}
-		// ANSI escape sequences start with ESC (27) - already caught above
 		return r
 	}, raw)
 
 	// P3 Issue #44 Fix: Truncate on rune boundaries (UTF-8 safe)
+	// P3 Issue #49 Fix: Only allocate rune slice if truncation needed (performance)
 	// Using len() checks byte length, but UTF-8 chars can be 2-4 bytes
 	// Truncating at byte boundary could split a multi-byte character
-	runes := []rune(sanitized)
-	if len(runes) > maxLength {
+	if utf8.RuneCountInString(sanitized) > maxLength {
+		runes := []rune(sanitized)
 		return string(runes[:maxLength]) + "...[truncated]"
 	}
 

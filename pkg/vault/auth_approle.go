@@ -64,15 +64,18 @@ func LoginAppRole(rc *eos_io.RuntimeContext) (*api.Client, error) {
 func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info(" Reading RoleID from disk", zap.String("path", shared.AppRolePaths.RoleID))
-	roleIDBytes, err := os.ReadFile(shared.AppRolePaths.RoleID)
+	// SECURITY FIX (Phase 2): Use SecureReadCredential to prevent TOCTOU
+	// OLD VULNERABILITY: os.Stat() then os.ReadFile() - attacker could swap file between checks
+	// NEW: Single open + flock + read from FD - no race window
+	log.Info(" Reading RoleID from disk (secure FD-based)", zap.String("path", shared.AppRolePaths.RoleID))
+	roleIDRaw, err := SecureReadCredential(rc, shared.AppRolePaths.RoleID, "role_id")
 	if err != nil {
-		log.Error(" Failed to read first credential from disk",
+		log.Error(" Failed to securely read role_id credential",
 			zap.String("path", shared.AppRolePaths.RoleID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read credential from disk")
+		return "", "", cerr.Wrap(err, "secure read role_id credential")
 	}
-	roleID := strings.TrimSpace(string(roleIDBytes))
+	roleID := strings.TrimSpace(roleIDRaw)
 
 	// VALIDATE: Ensure role_id is not empty and has valid format
 	if roleID == "" {
@@ -92,15 +95,15 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 	log.Info(" RoleID read and validated successfully",
 		zap.Int("length", len(roleID)))
 
-	log.Info(" Reading SecretID from disk", zap.String("path", shared.AppRolePaths.SecretID))
-	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
+	log.Info(" Reading SecretID from disk (secure FD-based)", zap.String("path", shared.AppRolePaths.SecretID))
+	secretIDRaw, err := SecureReadCredential(rc, shared.AppRolePaths.SecretID, "secret_id")
 	if err != nil {
-		log.Error(" Failed to read second credential from disk",
+		log.Error(" Failed to securely read secret_id credential",
 			zap.String("path", shared.AppRolePaths.SecretID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read credential from disk")
+		return "", "", cerr.Wrap(err, "secure read secret_id credential")
 	}
-	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
+	secretIDRaw = strings.TrimSpace(secretIDRaw)
 
 	// VALIDATE: Ensure secret_id is not empty
 	if secretIDRaw == "" {

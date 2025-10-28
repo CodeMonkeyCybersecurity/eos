@@ -175,25 +175,30 @@ func WriteAdminAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) 
 		return cerr.Wrap(err, "ensure secrets directory")
 	}
 
-	// Write role_id file
-	if err := os.WriteFile(shared.AdminAppRolePaths.RoleID, []byte(roleID), shared.FilePermOwnerReadWrite); err != nil {
-		log.Error("Failed to write admin role_id file",
+	// SECURITY FIX (Phase 2): Use SecureWriteCredentialOrOverwrite to prevent TOCTOU
+	// Admin credentials are even more sensitive than agent credentials
+	log.Info("Writing admin role_id file (secure FD-based)",
+		zap.String("path", shared.AdminAppRolePaths.RoleID))
+	if err := SecureWriteCredentialOrOverwrite(rc, shared.AdminAppRolePaths.RoleID, roleID, shared.FilePermOwnerReadWrite, "admin_role_id"); err != nil {
+		log.Error("Failed to securely write admin role_id file",
 			zap.String("path", shared.AdminAppRolePaths.RoleID),
 			zap.Error(err))
-		return cerr.Wrap(err, "write admin role_id file")
+		return cerr.Wrap(err, "securely write admin role_id file")
 	}
-	log.Info("Admin role_id file written",
+	log.Info("Admin role_id file written and verified",
 		zap.String("path", shared.AdminAppRolePaths.RoleID),
 		zap.String("perm", fmt.Sprintf("%#o", shared.FilePermOwnerReadWrite)))
 
 	// Write secret_id file
-	if err := os.WriteFile(shared.AdminAppRolePaths.SecretID, []byte(secretID), shared.FilePermOwnerReadWrite); err != nil {
-		log.Error("Failed to write admin secret_id file",
+	log.Info("Writing admin secret_id file (secure FD-based)",
+		zap.String("path", shared.AdminAppRolePaths.SecretID))
+	if err := SecureWriteCredentialOrOverwrite(rc, shared.AdminAppRolePaths.SecretID, secretID, shared.FilePermOwnerReadWrite, "admin_secret_id"); err != nil {
+		log.Error("Failed to securely write admin secret_id file",
 			zap.String("path", shared.AdminAppRolePaths.SecretID),
 			zap.Error(err))
-		return cerr.Wrap(err, "write admin secret_id file")
+		return cerr.Wrap(err, "securely write admin secret_id file")
 	}
-	log.Info("Admin secret_id file written",
+	log.Info("Admin secret_id file written and verified",
 		zap.String("path", shared.AdminAppRolePaths.SecretID),
 		zap.String("perm", fmt.Sprintf("%#o", shared.FilePermOwnerReadWrite)))
 
