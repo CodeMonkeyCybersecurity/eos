@@ -124,19 +124,20 @@ func AddService(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	}
 
 	// Phase 7: Verify route
-	if err := runVerificationPhase(rc, opts); err != nil {
-		// Non-fatal warning
-		logger.Warn("Route verification had issues", zap.Error(err))
+	verificationErr := runVerificationPhase(rc, opts)
+	if verificationErr != nil {
+		// Non-fatal warning - config is applied, verification timing issue
+		logger.Warn("Route verification had issues", zap.Error(verificationErr))
 	}
 
-	// Phase 7: Cleanup old backups
+	// Phase 8: Cleanup old backups
 	if err := CleanupOldBackups(rc, opts.BackupRetentionDays); err != nil {
 		// Non-fatal warning
 		logger.Warn("Failed to cleanup old backups", zap.Error(err))
 	}
 
-	// Success!
-	printSuccessMessage(logger, opts)
+	// Success! (pass verification status to message)
+	printSuccessMessage(logger, opts, verificationErr)
 
 	return nil
 }
@@ -244,9 +245,9 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		logger.Warn("Caddy Admin API not accessible from host",
 			zap.String("url", fmt.Sprintf("http://%s:%d", hecate.CaddyAdminAPIHost, hecate.CaddyAdminAPIPort)))
 		logger.Warn("This is expected if port 2019 is not exposed in docker-compose.yml")
-		logger.Warn("Validation will use container restart method (brief downtime)")
+		logger.Warn("Validation will use docker exec reload method (minimal downtime: ~50ms)")
 		logger.Warn("")
-		logger.Warn("To enable zero-downtime reloads:")
+		logger.Warn("To enable even faster reloads (Admin API - ~35μs):")
 		logger.Warn("  1. Edit /opt/hecate/docker-compose.yml")
 		logger.Warn("  2. Add to caddy ports: - \"127.0.0.1:2019:2019\"")
 		logger.Warn("  3. Restart: cd /opt/hecate && docker-compose up -d")
@@ -295,6 +296,19 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 		} else {
 			logger.Info("✓ Backend is reachable",
 				zap.Duration("latency", backendResult.Latency))
+
+			// Warn about high latency (>200ms suggests poor UX)
+			// Typical causes: Cross-region backends, VPN overhead, network congestion
+			if backendResult.Latency > 200*time.Millisecond {
+				logger.Warn("⚠️  High backend latency detected",
+					zap.Duration("latency", backendResult.Latency),
+					zap.String("threshold", "200ms"))
+				logger.Warn("Users may experience slow response times")
+				logger.Warn("Consider:")
+				logger.Warn("  • Deploying backend closer to proxy server (reduce network hops)")
+				logger.Warn("  • Checking for network congestion or VPN overhead")
+				logger.Warn("  • Using CDN or edge caching if backend is remote")
+			}
 		}
 	}
 
@@ -486,15 +500,37 @@ func runServiceIntegration(rc *eos_io.RuntimeContext, opts *ServiceOptions) erro
 }
 
 // printSuccessMessage prints the final success message
-func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions) {
+// verificationErr indicates if route verification failed (non-fatal, but affects message)
+func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions, verificationErr error) {
 	logger.Info("")
-	logger.Info("✅ Service added successfully!")
-	logger.Info("")
+
+	// Distinguish between config success and route accessibility
+	if verificationErr != nil {
+		logger.Info("✅ Configuration updated successfully!")
+		logger.Info("⚠️  Route verification failed - this is usually a timing issue")
+		logger.Info("")
+		logger.Info("Common causes:")
+		logger.Info("  • TLS certificate still provisioning (Let's Encrypt ACME challenge in progress)")
+		logger.Info("  • DNS propagation delay (if you just updated DNS)")
+		logger.Info("  • Backend service starting up")
+		logger.Info("")
+		logger.Info("What to do:")
+		logger.Info("  1. Wait 2-3 minutes for TLS certificate provisioning to complete")
+		logger.Info(fmt.Sprintf("  2. Test manually: curl -v https://%s/", opts.DNS))
+		logger.Info("  3. Check Caddy logs: docker logs hecate-caddy")
+		logger.Info(fmt.Sprintf("  4. Run diagnostics: eos debug hecate --bionicgpt"))
+		logger.Info("")
+	} else {
+		logger.Info("✅ Service added successfully!")
+		logger.Info("✅ Route verification passed - service is accessible")
+		logger.Info("")
+	}
+
 	logger.Info(fmt.Sprintf("Service: %s", opts.Service))
 	logger.Info(fmt.Sprintf("Domain: https://%s", opts.DNS))
 	logger.Info(fmt.Sprintf("Backend: %s", opts.Backend))
-	if opts.SSO {
-		logger.Info(fmt.Sprintf("SSO: Enabled (%s)", opts.SSOProvider))
+	if opts.SSO || opts.Service == "bionicgpt" {
+		logger.Info(fmt.Sprintf("SSO: Enabled (Authentik forward auth)"))
 	}
 	logger.Info("")
 

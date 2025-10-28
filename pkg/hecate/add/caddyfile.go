@@ -131,12 +131,22 @@ func GenerateRouteConfig(opts *ServiceOptions) (string, error) {
 
 	// Choose template based on service type and SSO
 	var tmplStr string
-	if sanitizedService == "bionicgpt" && opts.SSO {
-		// BionicGPT requires special forward auth configuration
+	if sanitizedService == "bionicgpt" {
+		// BionicGPT ALWAYS uses forward auth configuration (sane default for this service)
+		// ARCHITECTURE NOTE: BionicGPT is a "default module" with automatic Authentik integration.
+		// This aligns with the service integration logic (pkg/hecate/add/bionicgpt.go) which
+		// ALWAYS attempts Authentik setup regardless of --sso flag.
+		//
+		// Rationale:
+		// 1. BionicGPT requires authentication (no public access mode)
+		// 2. Authentik forward auth is the production-ready pattern
+		// 3. Graceful degradation if Authentik unavailable (warns but proceeds)
+		// 4. Reduces operator cognitive load (one way to deploy BionicGPT)
+		//
 		// CRITICAL: Must include /outpost.goauthentik.io/* proxy for forward auth to work
 		tmplStr = bionicgptForwardAuthTemplate
 	} else if opts.SSO {
-		// Generic SSO template for other services
+		// Generic SSO template for other services (when --sso flag provided)
 		tmplStr = ssoRouteTemplate
 	} else {
 		// Basic reverse proxy without authentication

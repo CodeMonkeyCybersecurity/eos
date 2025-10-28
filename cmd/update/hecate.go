@@ -100,7 +100,7 @@ func init() {
 	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
 
 	// Optional flags for --add
-	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route")
+	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route (NOTE: BionicGPT always uses Authentik forward auth regardless of this flag)")
 	updateHecateCmd.Flags().String("sso-provider", "authentik", "SSO provider to use (default: authentik)")
 	updateHecateCmd.Flags().StringSlice("custom-directive", []string{}, "Custom Caddy directives (can specify multiple times)")
 	updateHecateCmd.Flags().Bool("dry-run", false, "Show what would be changed without applying")

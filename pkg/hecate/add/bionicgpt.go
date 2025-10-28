@@ -103,6 +103,34 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 }
 
 // ConfigureAuthentication sets up Authentik proxy provider for BionicGPT (forward auth mode)
+//
+// ARCHITECTURE NOTE: "Default Module" Pattern - Always Runs Regardless of --sso Flag
+//
+// This function ALWAYS attempts Authentik forward auth setup for BionicGPT, implementing
+// the "default module" pattern: sane defaults that "just work" with minimal operator input.
+//
+// DESIGN PHILOSOPHY:
+// 1. **Human-Centric**: Technology serves humans - reduce cognitive load and barrier to entry
+// 2. **Sane Defaults**: BionicGPT requires authentication (no public mode), so configure it by default
+// 3. **Graceful Degradation**: If Authentik unavailable, warns but proceeds (generic reverse proxy still works)
+// 4. **Single Path to Production**: One way to deploy BionicGPT reduces errors and maintenance burden
+//
+// SSO ARCHITECTURE CONVENTIONS:
+// - **hera.* subdomain**: All SSO/auth portals (e.g., hera.codemonkey.net.au for Authentik admin UI)
+// - **Service-specific subdomains**: Individual services (e.g., chat.codemonkey.net.au for BionicGPT)
+// - **Forward auth flow**: Browser → Caddy → Authentik → Caddy → BionicGPT
+//
+// WHY THIS MATTERS:
+//   - Operators frequently deploy services behind Authentik proxy
+//   - Encoding best-practice configuration as default reduces setup time
+//   - Failed integration is non-fatal: generic reverse proxy fallback still works
+//   - Aligns with Caddyfile template selection (pkg/hecate/add/caddyfile.go:134)
+//     which ALWAYS uses bionicgptForwardAuthTemplate regardless of --sso flag
+//
+// RELATED CODE:
+// - Caddyfile template: pkg/hecate/add/caddyfile.go:74-110 (bionicgptForwardAuthTemplate)
+// - Template selection: pkg/hecate/add/caddyfile.go:134-147 (always uses forward auth for bionicgpt)
+// - Debug diagnostics: pkg/hecate/debug_bionicgpt.go (validates Authentik-Caddy-BionicGPT triangle)
 func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("  [2/3] Configuring Authentik proxy provider (forward auth mode)")

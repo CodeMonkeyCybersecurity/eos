@@ -317,7 +317,22 @@ func checkCaddyConfiguration(rc *eos_io.RuntimeContext, config *BionicGPTDebugCo
 	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "exec", "hecate-caddy-1", "caddy", "validate", "--config", "/etc/caddy/Caddyfile")
+	// Try to get actual Caddy container name (handles both hecate-caddy and hecate-caddy-1)
+	caddyContainerName := detectCaddyContainerName(rc.Ctx)
+	if caddyContainerName == "" {
+		check.Passed = false
+		check.Error = fmt.Errorf("Caddy container not found")
+		check.Details = "Cannot validate without running Caddy container"
+		check.Remediation = []string{
+			"Verify Caddy is running: docker ps | grep caddy",
+			"Start Caddy: cd /opt/hecate && docker compose up -d caddy",
+		}
+		checks = append(checks, check)
+		displayCheck(check)
+		return checks
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", "exec", caddyContainerName, "caddy", "validate", "--config", "/etc/caddy/Caddyfile")
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -760,12 +775,26 @@ func checkHeaderFlow(rc *eos_io.RuntimeContext, config *BionicGPTDebugConfig) []
 		}
 	} else {
 		defer resp.Body.Close()
-		check.Passed = true
-		check.Details = fmt.Sprintf("Endpoint reachable (status: %d)", resp.StatusCode)
 
-		if resp.StatusCode != 401 && resp.StatusCode != 200 {
-			check.Warning = true
-			check.Details += fmt.Sprintf(" - Warning: Expected 401 (no session) or 200 (valid session), got %d", resp.StatusCode)
+		// Forward auth endpoint should return 200 (authenticated) or 401 (not authenticated)
+		// Any other status code indicates misconfiguration
+		if resp.StatusCode == 200 || resp.StatusCode == 401 {
+			check.Passed = true
+			statusMeaning := "authenticated session"
+			if resp.StatusCode == 401 {
+				statusMeaning = "no session (expected when not logged in)"
+			}
+			check.Details = fmt.Sprintf("Endpoint reachable (status: %d - %s)", resp.StatusCode, statusMeaning)
+		} else {
+			check.Passed = false
+			check.Error = fmt.Errorf("Unexpected status code: %d", resp.StatusCode)
+			check.Details = fmt.Sprintf("Forward auth endpoint returned %d, expected 200 or 401", resp.StatusCode)
+			check.Remediation = []string{
+				"Check Authentik outpost configuration in admin UI",
+				"Verify embedded outpost is running and healthy",
+				"Check Authentik logs: docker logs hecate-authentik-server-1",
+				"Ensure forward auth application is assigned to outpost",
+			}
 		}
 	}
 	checks = append(checks, check)
@@ -921,6 +950,39 @@ func readEnvFile(filepath string) (map[string]string, error) {
 	return env, nil
 }
 
+// extractBionicGPTDomain finds the BionicGPT service domain from Caddyfile
+//
+// ARCHITECTURE NOTE: SSO Domain Conventions
+//
+// This function extracts the SERVICE domain (e.g., chat.codemonkey.net.au), NOT the SSO domain.
+// The SSO/auth portal and service domains follow distinct naming conventions:
+//
+// DOMAIN CONVENTIONS:
+// - **hera.* subdomain**: SSO/auth portals (Authentik admin UI, forward auth endpoint)
+//   - Example: hera.codemonkey.net.au
+//   - Purpose: Centralized authentication portal for all services
+//   - Hosts: Authentik admin UI, login flows, forward auth endpoints
+//
+// - **Service-specific subdomains**: Individual services proxied through forward auth
+//   - Example: chat.codemonkey.net.au (BionicGPT)
+//   - Purpose: Service-specific access points
+//   - Flow: User → chat.* → Caddy forward_auth → hera.* (Authentik) → chat.* (BionicGPT)
+//
+// WHY SEPARATE DOMAINS:
+// - **Security**: Clear separation between auth portal and protected services
+// - **UX**: Consistent auth experience across all services (always login at hera.*)
+// - **Operations**: Single place to manage auth (hera.*), many service endpoints
+// - **DNS**: Wildcard DNS simplifies setup (*.codemonkey.net.au → same server)
+//
+// DEBUG WORKFLOW:
+// 1. This function extracts service domain from Caddyfile (chat.codemonkey.net.au)
+// 2. Debug checks validate Authentik SSO portal separately (hera.codemonkey.net.au)
+// 3. End-to-end test verifies triangle: Service → Caddy forward_auth → Authentik SSO
+//
+// RELATED CODE:
+// - BionicGPT integration: pkg/hecate/add/bionicgpt.go (configures forward auth)
+// - Caddyfile template: pkg/hecate/add/caddyfile.go:74-110 (includes outpost proxy)
+// - Authentik checks: checkAuthentikIntegration() (validates SSO portal health)
 func extractBionicGPTDomain(caddyfilePath string) string {
 	content, err := os.ReadFile(caddyfilePath)
 	if err != nil {
@@ -967,6 +1029,25 @@ func displayCheck(check BionicGPTIntegrationCheck) {
 		}
 	}
 	fmt.Println()
+}
+
+// detectCaddyContainerName finds the actual Caddy container name
+// Handles both hecate-caddy (legacy) and hecate-caddy-1 (docker compose v2)
+func detectCaddyContainerName(ctx context.Context) string {
+	// Try docker compose v2 naming first (hecate-caddy-1)
+	cmd := exec.CommandContext(ctx, "docker", "ps", "--filter", "name=hecate-caddy", "--format", "{{.Names}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil || len(output) == 0 {
+		return ""
+	}
+
+	// Return first match (should only be one Caddy container)
+	containerNames := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(containerNames) > 0 && containerNames[0] != "" {
+		return containerNames[0]
+	}
+
+	return ""
 }
 
 func displayBionicGPTResults(checks []BionicGPTIntegrationCheck) {
