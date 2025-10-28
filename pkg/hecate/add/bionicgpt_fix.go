@@ -89,6 +89,7 @@ type DriftAssessment struct {
 	OutpostNotAssigned      bool
 	CaddyfileDuplicates     int  // Number of duplicate entries in Caddyfile
 	CaddyfileMissingHeaders bool // True if header_up mappings are missing
+	CaddyfileWrongImport    bool // True if using "import common" instead of "import cybermonkey_common"
 }
 
 // dryRun shows what would be fixed
@@ -150,7 +151,12 @@ func (f *BionicGPTFixer) dryRun(rc *eos_io.RuntimeContext) error {
 		issuesFound++
 	}
 
-	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders {
+	if assessment.CaddyfileWrongImport {
+		logger.Info("Would fix: Change 'import common' to 'import cybermonkey_common' in Caddyfile")
+		issuesFound++
+	}
+
+	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders && !assessment.CaddyfileWrongImport {
 		logger.Info("✓ Caddyfile configuration is correct")
 	}
 
@@ -355,8 +361,8 @@ func (f *BionicGPTFixer) intervene(rc *eos_io.RuntimeContext, assessment *DriftA
 		}
 	}
 
-	// Fix Caddyfile duplicates and missing headers
-	if assessment.CaddyfileDuplicates > 1 || assessment.CaddyfileMissingHeaders {
+	// Fix Caddyfile duplicates, missing headers, or wrong import
+	if assessment.CaddyfileDuplicates > 1 || assessment.CaddyfileMissingHeaders || assessment.CaddyfileWrongImport {
 		if err := f.fixCaddyfileDuplicates(rc, assessment); err != nil {
 			return fixedCount, fmt.Errorf("failed to fix Caddyfile: %w", err)
 		}
@@ -473,20 +479,31 @@ func (f *BionicGPTFixer) assessCaddyfile(rc *eos_io.RuntimeContext, assessment *
 	}
 	assessment.CaddyfileMissingHeaders = missingHeaders
 
+	// Check for wrong import directive
+	// P1 - CRITICAL: "import common" will cause "File to import not found" error
+	// Must use "import cybermonkey_common" which is defined in Caddyfile global block
+	if strings.Contains(caddyfileContent, "import common\n") || strings.Contains(caddyfileContent, "import common ") {
+		assessment.CaddyfileWrongImport = true
+		logger.Debug("Found incorrect import directive",
+			zap.String("found", "import common"),
+			zap.String("expected", "import cybermonkey_common"))
+	}
+
 	return nil
 }
 
-// fixCaddyfileDuplicates removes duplicate entries and ensures correct headers
+// fixCaddyfileDuplicates removes duplicate entries and ensures correct headers and import
 func (f *BionicGPTFixer) fixCaddyfileDuplicates(rc *eos_io.RuntimeContext, assessment *DriftAssessment) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders {
+	if assessment.CaddyfileDuplicates <= 1 && !assessment.CaddyfileMissingHeaders && !assessment.CaddyfileWrongImport {
 		return nil // Nothing to fix
 	}
 
 	logger.Info("Fixing Caddyfile configuration",
 		zap.Int("duplicates", assessment.CaddyfileDuplicates),
-		zap.Bool("missing_headers", assessment.CaddyfileMissingHeaders))
+		zap.Bool("missing_headers", assessment.CaddyfileMissingHeaders),
+		zap.Bool("wrong_import", assessment.CaddyfileWrongImport))
 
 	content, err := os.ReadFile(hecate.CaddyfilePath)
 	if err != nil {

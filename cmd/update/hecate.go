@@ -28,6 +28,12 @@ Default behavior (no flags):
   3. Regenerates docker-compose.yml and .env with latest templates
   4. Restarts containers to apply changes
 
+With --refresh flag:
+  1. Gracefully reloads Caddy configuration (zero downtime)
+  2. Preserves TLS certificates in memory (no renewal)
+  3. Uses Admin API (preferred) → docker exec → restart (fallback)
+  4. Safe for repeated use during debugging (no rate limits)
+
 With --add flag:
   1. Validates input (DNS, backend, SSO configuration)
   2. Checks DNS resolution and backend connectivity
@@ -41,9 +47,11 @@ Use this when:
   - You need to apply configuration changes
   - Files were manually deleted or corrupted
   - You want to add a new service to Hecate
+  - You manually edited Caddyfile and need to reload
 
 Examples:
   eos update hecate                              # Regenerate from Consul KV
+  eos update hecate --refresh                    # Gracefully reload Caddy (preserves TLS certs)
   eos update hecate certs                        # Only renew certificates
   eos update hecate k3s                          # Update k3s deployment
 
@@ -71,6 +79,9 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
+		// Check if --refresh flag is explicitly set
+		refreshWasSet := cmd.Flags().Changed("refresh")
+
 		// Check if --add flag is explicitly set
 		addService, _ := cmd.Flags().GetString("add")
 		addWasSet := cmd.Flags().Changed("add")
@@ -85,6 +96,9 @@ Examples:
 
 		// Validate mutually exclusive flags
 		exclusiveFlagsCount := 0
+		if refreshWasSet {
+			exclusiveFlagsCount++
+		}
 		if addWasSet {
 			exclusiveFlagsCount++
 		}
@@ -96,7 +110,12 @@ Examples:
 		}
 
 		if exclusiveFlagsCount > 1 {
-			return fmt.Errorf("cannot use --add, --remove, and --fix together\nUse one at a time")
+			return fmt.Errorf("cannot use --refresh, --add, --remove, and --fix together\nUse one at a time")
+		}
+
+		if refreshWasSet {
+			// Delegate to refresh flow (graceful Caddy reload)
+			return runRefreshCaddy(rc, cmd)
 		}
 
 		if addWasSet {
@@ -141,6 +160,7 @@ func init() {
 	updateHecateCmd.AddCommand(runK3sCmd)
 
 	// Add service management flags
+	updateHecateCmd.Flags().Bool("refresh", false, "Gracefully reload Caddy configuration (zero-downtime, preserves TLS certificates)")
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
 	updateHecateCmd.Flags().String("remove", "", "Remove a service from Hecate (service name)")
 	updateHecateCmd.Flags().String("fix", "", "Fix drift/misconfigurations for a service (service name)")
@@ -250,6 +270,32 @@ func runFixServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 
 	// Execute the fix operation
 	return add.FixService(rc, opts)
+}
+
+// runRefreshCaddy gracefully reloads Caddy configuration without restarting
+// P1 - CRITICAL: Uses graceful reload strategies that preserve TLS certificates
+// RATIONALE: Prevents Let's Encrypt rate limiting during debugging/development
+// STRATEGY: Admin API (preferred) → Docker exec → Container restart (fallback only)
+func runRefreshCaddy(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Refreshing Caddy configuration (zero-downtime graceful reload)")
+	logger.Info("Strategy: Admin API (preserves TLS certs) → Docker exec → Container restart (last resort)")
+
+	// Use the shared ReloadCaddy function which implements strategy fallback
+	// This will try Admin API first (zero-downtime, preserves certs), then docker exec, then restart
+	if err := add.ReloadCaddy(rc, hecate.CaddyfilePath); err != nil {
+		return fmt.Errorf("failed to refresh Caddy: %w\n\n"+
+			"Troubleshooting:\n"+
+			"  1. Check Caddy is running: docker ps | grep caddy\n"+
+			"  2. Check Caddy logs: docker logs hecate-caddy\n"+
+			"  3. Validate Caddyfile: docker exec hecate-caddy caddy validate --config /etc/caddy/Caddyfile", err)
+	}
+
+	logger.Info("✓ Caddy configuration reloaded successfully")
+	logger.Info("TLS certificates preserved (no renewal triggered)")
+
+	return nil
 }
 
 // runK3sCmd updates the k3s deployment configuration.
