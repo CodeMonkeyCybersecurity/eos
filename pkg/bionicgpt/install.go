@@ -745,6 +745,14 @@ ENABLE_MULTI_TENANT=%t
 EMBEDDINGS_API_BASE=http://litellm-proxy:4000
 EMBEDDINGS_API_KEY=%s
 EMBEDDINGS_MODEL=text-embedding-ada-002
+
+# Reverse Proxy Authentication (Caddy + Authentik)
+# BionicGPT trusts authentication headers from Caddy reverse proxy
+# Caddy validates via Authentik forward auth and adds these headers
+TRUST_PROXY=true
+AUTH_HEADER_EMAIL=X-Auth-Request-Email
+AUTH_HEADER_NAME=X-Auth-Request-User
+AUTH_HEADER_GROUPS=X-Auth-Request-Groups
 `,
 		bgi.config.PostgresUser,
 		bgi.config.PostgresPassword,

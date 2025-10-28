@@ -89,6 +89,14 @@ const (
         copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid
     }
 
+    # Map Authentik headers → BionicGPT expected headers
+    # BionicGPT expects X-Auth-Request-* (oauth2-proxy format)
+    # Authentik sends X-Authentik-*
+    # Caddy maps between them here
+    header_up X-Auth-Request-Email {http.request.header.X-Authentik-Email}
+    header_up X-Auth-Request-User {http.request.header.X-Authentik-Username}
+    header_up X-Auth-Request-Groups {http.request.header.X-Authentik-Groups}
+
     # Additional logging for this service
     log {
         output file {{.LogFile}}
@@ -99,7 +107,7 @@ const (
     {{.}}
 {{end}}
     # Reverse proxy to BionicGPT backend
-    # Headers from forward_auth are automatically passed to backend
+    # Backend receives X-Auth-Request-* headers and trusts them for authentication
     reverse_proxy http://{{.Backend}}
 }
 `

@@ -14,6 +14,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	// vaultapi "github.com/hashicorp/vault/api" // Commented - Vault code is commented out for .env migration
@@ -108,13 +109,17 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 			zap.Int("status_code", resp.StatusCode),
 			zap.String("status", resp.Status))
 
-		// Accept all 2xx (success) and 3xx (redirect) status codes
-		// BionicGPT may redirect to login, return 404 for /health, etc. - all indicate service is running
-		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			logger.Info("    ✓ BionicGPT is responding correctly",
+		// Accept all 2xx, 3xx, and 4xx status codes (anything < 500)
+		// During validation, we hit the backend WITHOUT auth headers from Authentik proxy
+		// BionicGPT expects X-Auth-Request-* headers (added by Caddy after Authentik validates)
+		// Without headers: 401 Unauthorized, 403 Forbidden, 404 Not Found are all EXPECTED
+		// These responses prove the service IS running - authentication will work once proxy is configured
+		if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+			logger.Info("    ✓ BionicGPT backend is responding",
 				zap.String("endpoint", endpoint),
 				zap.String("protocol", "HTTP"),
-				zap.Int("status_code", resp.StatusCode))
+				zap.Int("status_code", resp.StatusCode),
+				zap.String("note", "401/404 expected without auth headers - will work via Authentik proxy"))
 			return nil
 		}
 
@@ -160,12 +165,13 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 			zap.Int("status_code", resp.StatusCode),
 			zap.String("status", resp.Status))
 
-		// Accept all 2xx (success) and 3xx (redirect) status codes
-		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			logger.Info("    ✓ BionicGPT is responding correctly",
+		// Accept all 2xx, 3xx, and 4xx status codes (anything < 500)
+		if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+			logger.Info("    ✓ BionicGPT backend is responding",
 				zap.String("endpoint", endpoint),
 				zap.String("protocol", "HTTPS"),
-				zap.Int("status_code", resp.StatusCode))
+				zap.Int("status_code", resp.StatusCode),
+				zap.String("note", "401/404 expected without auth headers - will work via Authentik proxy"))
 			return nil
 		}
 
@@ -224,14 +230,19 @@ func (b *BionicGPTIntegrator) buildValidationError(backend string, attempts []en
 		errorMsg.WriteString("  (none attempted)\n")
 	}
 
-	errorMsg.WriteString("\nEnsure BionicGPT is running at the backend address.\n")
+	errorMsg.WriteString("\n⚠️  Note: 401/403/404 responses during validation are EXPECTED.\n")
+	errorMsg.WriteString("    BionicGPT requires authentication headers from Authentik proxy.\n")
+	errorMsg.WriteString("    These headers (X-Auth-Request-*) are added by Caddy after deployment.\n")
+	errorMsg.WriteString("    If you're seeing 401/404, the service IS running - auth will work once configured.\n\n")
+	errorMsg.WriteString("Ensure BionicGPT is running at the backend address.\n")
 	errorMsg.WriteString(fmt.Sprintf("Expected: BionicGPT service listening on port %d (HTTP or HTTPS)\n", hecate.BionicGPTDefaultPort))
 	errorMsg.WriteString("\nTroubleshooting:\n")
-	errorMsg.WriteString("  1. Verify service is running: docker ps | grep bionicgpt\n")
-	errorMsg.WriteString("  2. Check service logs: docker logs bionicgpt\n")
+	errorMsg.WriteString("  1. Verify service is running: docker ps -a | grep -i bionic\n")
+	errorMsg.WriteString("  2. Check service logs: docker logs <container_name_from_step_1>\n")
 	errorMsg.WriteString(fmt.Sprintf("  3. Test connectivity: curl -v http://%s/\n", backend))
+	errorMsg.WriteString("  4. Skip this validation (if you know service is running): --skip-backend-check\n")
 
-	return fmt.Errorf("%s", errorMsg.String())
+	return eos_err.NewUserError(errorMsg.String())
 }
 
 // ConfigureAuthentication sets up Authentik proxy provider for BionicGPT (forward auth mode)
