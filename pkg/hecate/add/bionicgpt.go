@@ -3,7 +3,6 @@
 package add
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	// vaultapi "github.com/hashicorp/vault/api" // Commented - Vault code is commented out for .env migration
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -806,43 +806,7 @@ BIONICGPT_ADMIN_EMAIL=%s
 }
 
 // readEnvFile reads a .env file and returns key-value pairs
-// Simple parser that handles KEY=VALUE format (no quotes, no multiline, no exports)
+// Delegates to shared.ParseEnvFile() to avoid code duplication
 func readEnvFile(filepath string) (map[string]string, error) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	env := make(map[string]string)
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse KEY=VALUE
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue // Skip malformed lines
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		// Remove surrounding quotes if present
-		value = strings.Trim(value, `"'`)
-
-		env[key] = value
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading file: %w", err)
-	}
-
-	return env, nil
+	return shared.ParseEnvFile(filepath)
 }

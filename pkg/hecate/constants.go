@@ -116,6 +116,11 @@ const (
 	// DockerComposeFilePath is the path to the docker-compose.yml file
 	// RATIONALE: Defines Hecate service stack (Caddy, Authentik, Redis, PostgreSQL)
 	DockerComposeFilePath = "/opt/hecate/docker-compose.yml"
+
+	// ExportsDir is where Authentik configuration exports are stored
+	// RATIONALE: Centralized location for configuration backups and exports
+	// SECURITY: Must be root-owned with 0755 permissions
+	ExportsDir = "/opt/hecate/exports"
 )
 
 // ============================================================================

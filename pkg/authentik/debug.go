@@ -1,5 +1,5 @@
 // pkg/authentik/debug.go
-// *Last Updated: 2025-10-21*
+// *Last Updated: 2025-10-28*
 
 package authentik
 
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -97,6 +98,12 @@ func RunAuthentikDebug(rc *eos_io.RuntimeContext, config *DebugConfig) error {
 
 	// 11. API connectivity check
 	allResults = append(allResults, checkAuthentikAPI(rc, config.HecatePath)...)
+
+	// 12. Embedded outpost diagnostics (process, ports, environment, health)
+	allResults = append(allResults, checkEmbeddedOutpostDiagnostics(rc, config.HecatePath)...)
+
+	// 13. Proxy provider configuration check
+	allResults = append(allResults, checkAuthentikProxyConfiguration(rc, config.HecatePath)...)
 
 	// EVALUATE: Display results and provide summary
 	displayResults(allResults)
@@ -691,56 +698,908 @@ func checkBackupStatus(_ *eos_io.RuntimeContext, hecatePath string) []AuthentikC
 	return results
 }
 
-// checkAuthentikAPI checks API connectivity (bonus check using authentik_client.go)
+// checkAuthentikAPI checks API connectivity using the bootstrap token
+// This validates that the AUTHENTIK_BOOTSTRAP_TOKEN in .env file is valid
+// and can be used for API authentication (required for eos update hecate --add)
 func checkAuthentikAPI(rc *eos_io.RuntimeContext, hecatePath string) []AuthentikCheckResult {
 	logger := otelzap.Ctx(rc.Ctx)
 	var results []AuthentikCheckResult
 
-	// Check if we can reach the Authentik server container
+	// Step 1: Parse .env file to get AUTHENTIK_BOOTSTRAP_TOKEN
+	envPath := filepath.Join(hecatePath, ".env")
+	envVars, err := shared.ParseEnvFile(envPath)
+	if err != nil {
+		logger.Error("Failed to parse .env file",
+			zap.Error(err),
+			zap.String("path", envPath))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Token Configuration",
+			Category:  "Pre-Upgrade",
+			Passed:    false,
+			Error:     fmt.Errorf(".env file not readable: %w", err),
+			Remediation: []string{
+				"Ensure .env file exists at " + envPath,
+				"Check file permissions: sudo ls -la " + envPath,
+			},
+		})
+		return results
+	}
+
+	// Step 2: Check for AUTHENTIK_BOOTSTRAP_TOKEN
+	bootstrapToken := envVars["AUTHENTIK_BOOTSTRAP_TOKEN"]
+	if bootstrapToken == "" {
+		logger.Error("AUTHENTIK_BOOTSTRAP_TOKEN not found or empty in .env file")
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Token Configuration",
+			Category:  "Pre-Upgrade",
+			Passed:    false,
+			Error:     fmt.Errorf("AUTHENTIK_BOOTSTRAP_TOKEN not found in .env"),
+			Details:   "Bootstrap token is required for API authentication",
+			Remediation: []string{
+				"Bootstrap token should be auto-generated during Hecate installation",
+				"Check .env file: sudo cat " + envPath + " | grep BOOTSTRAP_TOKEN",
+				"If missing, regenerate with: eos create hecate",
+			},
+		})
+		return results
+	}
+
+	logger.Debug("Found AUTHENTIK_BOOTSTRAP_TOKEN in .env file",
+		zap.String("token_prefix", bootstrapToken[:min(4, len(bootstrapToken))]+"***"))
+
+	// Step 3: Check basic API health (unauthenticated endpoint)
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
-	cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "server", "wget", "-q", "-O", "-", "http://localhost:9000/-/health/live/")
+	cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-", "http://localhost:9000/-/health/live/")
 	cmd.Dir = hecatePath
 	output, err := cmd.Output()
 	cancel()
 
 	if err != nil {
-		logger.Warn("Authentik API health check failed",
-			zap.Error(err),
-			zap.String("remediation", "check if Authentik server is running"))
+		logger.Warn("Authentik API health endpoint not responding",
+			zap.Error(err))
 
 		results = append(results, AuthentikCheckResult{
-			CheckName: "API Health",
+			CheckName: "API Health Endpoint",
 			Category:  "Pre-Upgrade",
 			Passed:    false,
 			Warning:   true,
 			Error:     fmt.Errorf("API health check failed"),
 			Remediation: []string{
 				"Ensure Authentik server container is running",
-				"Check logs: cd /opt/hecate && docker compose logs server",
+				"Check container status: cd " + hecatePath + " && docker compose ps",
+				"Check logs: cd " + hecatePath + " && docker compose logs server",
 			},
 		})
 		return results
 	}
 
-	if strings.Contains(string(output), "ok") || strings.Contains(string(output), "live") {
-		logger.Debug("Authentik API health check passed")
+	if !strings.Contains(string(output), "ok") && !strings.Contains(string(output), "live") {
+		logger.Warn("Unexpected API health response",
+			zap.String("response", string(output)))
+
 		results = append(results, AuthentikCheckResult{
-			CheckName: "API Health",
-			Category:  "Pre-Upgrade",
-			Passed:    true,
-			Details:   "Authentik API is responding to health checks",
-		})
-	} else {
-		results = append(results, AuthentikCheckResult{
-			CheckName: "API Health",
+			CheckName: "API Health Endpoint",
 			Category:  "Pre-Upgrade",
 			Passed:    false,
 			Warning:   true,
-			Details:   "Unexpected API health response",
+			Details:   "API health endpoint returned unexpected response",
+		})
+		return results
+	}
+
+	logger.Debug("API health endpoint responding correctly")
+
+	results = append(results, AuthentikCheckResult{
+		CheckName: "API Health Endpoint",
+		Category:  "Pre-Upgrade",
+		Passed:    true,
+		Details:   "Authentik API health endpoint is responding",
+	})
+
+	// Step 4: Test authenticated API call using bootstrap token
+	// Use the /api/v3/core/users/ endpoint (requires authentication)
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	authCmd := exec.CommandContext(ctx2, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+bootstrapToken,
+		"http://localhost:9000/api/v3/core/users/")
+	authCmd.Dir = hecatePath
+	authOutput, authErr := authCmd.Output()
+	cancel2()
+
+	if authErr != nil {
+		logger.Error("API authentication test failed",
+			zap.Error(authErr),
+			zap.String("endpoint", "/api/v3/core/users/"))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Authentication",
+			Category:  "Pre-Upgrade",
+			Passed:    false,
+			Error:     fmt.Errorf("bootstrap token authentication failed"),
+			Details:   "Could not authenticate to Authentik API using AUTHENTIK_BOOTSTRAP_TOKEN",
+			Remediation: []string{
+				"Bootstrap token may be invalid or expired",
+				"Token is auto-generated during installation with 'intent: API access'",
+				"Verify token in .env: sudo cat " + envPath + " | grep BOOTSTRAP_TOKEN",
+				"If using manual token, ensure it was created with 'Intent: API' in Authentik admin UI",
+			},
+		})
+		return results
+	}
+
+	// Check if response looks like valid JSON (users list)
+	authResponse := string(authOutput)
+	if !strings.Contains(authResponse, "results") && !strings.Contains(authResponse, "\"username\"") {
+		logger.Warn("API authentication succeeded but unexpected response format",
+			zap.String("response_preview", authResponse[:min(100, len(authResponse))]))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Authentication",
+			Category:  "Pre-Upgrade",
+			Passed:    true,
+			Warning:   true,
+			Details:   "API authentication succeeded but response format unexpected (may indicate API version mismatch)",
+		})
+		return results
+	}
+
+	logger.Info("API authentication test passed using AUTHENTIK_BOOTSTRAP_TOKEN")
+
+	results = append(results, AuthentikCheckResult{
+		CheckName: "API Authentication",
+		Category:  "Pre-Upgrade",
+		Passed:    true,
+		Details:   "Successfully authenticated to Authentik API using AUTHENTIK_BOOTSTRAP_TOKEN",
+	})
+
+	// Step 5: Provide informational message about API token usage
+	apiToken := envVars["AUTHENTIK_API_TOKEN"]
+	if apiToken == "" {
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Token (Optional)",
+			Category:  "Pre-Upgrade",
+			Passed:    true,
+			Warning:   true,
+			Details:   "AUTHENTIK_API_TOKEN not set (using AUTHENTIK_BOOTSTRAP_TOKEN as fallback for automated operations)",
+			Remediation: []string{
+				"This is OK - bootstrap token works for API access",
+				"Optional: Create dedicated API token in Authentik admin UI for better security",
+				"Navigate to: Directory → Tokens → Create (Intent: API, Expiry: Never)",
+			},
+		})
+	} else {
+		results = append(results, AuthentikCheckResult{
+			CheckName: "API Token (Optional)",
+			Category:  "Pre-Upgrade",
+			Passed:    true,
+			Details:   "AUTHENTIK_API_TOKEN is configured (will be used instead of bootstrap token)",
 		})
 	}
 
 	return results
+}
+
+// checkEmbeddedOutpostDiagnostics performs low-level diagnostics of the embedded outpost
+// Checks: process running, ports listening, environment variables, health endpoint
+// CRITICAL: These checks identify WHY the outpost might not be responding
+func checkEmbeddedOutpostDiagnostics(rc *eos_io.RuntimeContext, hecatePath string) []AuthentikCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []AuthentikCheckResult
+
+	// Step 1: Check if embedded outpost process is running
+	ctx1, cancel1 := context.WithTimeout(rc.Ctx, 5*time.Second)
+	psCmd := exec.CommandContext(ctx1, "docker", "compose", "exec", "-T", "server",
+		"ps", "aux")
+	psCmd.Dir = hecatePath
+	psOutput, psErr := psCmd.Output()
+	cancel1()
+
+	if psErr != nil {
+		logger.Error("Failed to check server container processes",
+			zap.Error(psErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Embedded Outpost Process",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Error:     fmt.Errorf("failed to list processes: %w", psErr),
+			Remediation: []string{
+				"Ensure Authentik server container is running",
+				"Check container status: cd " + hecatePath + " && docker compose ps",
+			},
+		})
+		return results
+	}
+
+	psResponse := string(psOutput)
+	logger.Debug("Server container processes",
+		zap.String("output_preview", psResponse[:min(300, len(psResponse))]))
+
+	// Look for embedded outpost processes
+	// Authentik 2024.x and newer run embedded outpost as part of server process
+	hasServerProcess := strings.Contains(psResponse, "authentik server") ||
+		strings.Contains(psResponse, "/lifecycle/ak server") ||
+		strings.Contains(psResponse, "python -m authentik")
+
+	if !hasServerProcess {
+		logger.Warn("No Authentik server process found")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Embedded Outpost Process",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Authentik server process not detected in container",
+			Remediation: []string{
+				"Check server container logs: docker compose -f " + hecatePath + "/docker-compose.yml logs server",
+				"Server process should be: 'authentik server' or '/lifecycle/ak server'",
+			},
+		})
+	} else {
+		logger.Info("Authentik server process detected")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Embedded Outpost Process",
+			Category:  "Infrastructure",
+			Passed:    true,
+			Details:   "Authentik server process is running (embedded outpost runs within server process)",
+		})
+	}
+
+	// Step 2: Check what ports are listening inside the container
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 5*time.Second)
+	netstatCmd := exec.CommandContext(ctx2, "docker", "compose", "exec", "-T", "server",
+		"sh", "-c", "netstat -tlnp 2>/dev/null || ss -tlnp")
+	netstatCmd.Dir = hecatePath
+	netstatOutput, netstatErr := netstatCmd.Output()
+	cancel2()
+
+	if netstatErr != nil {
+		logger.Warn("Failed to check listening ports",
+			zap.Error(netstatErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Listening Ports",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Could not verify which ports are listening",
+			Remediation: []string{
+				"Manual check: docker exec hecate-server-1 ss -tlnp",
+			},
+		})
+	} else {
+		netstatResponse := string(netstatOutput)
+		logger.Debug("Listening ports in server container",
+			zap.String("output_preview", netstatResponse[:min(400, len(netstatResponse))]))
+
+		// Check for expected ports
+		has9000 := strings.Contains(netstatResponse, ":9000") || strings.Contains(netstatResponse, "0.0.0.0:9000")
+		has9443 := strings.Contains(netstatResponse, ":9443") || strings.Contains(netstatResponse, "0.0.0.0:9443")
+
+		if has9000 {
+			logger.Info("Port 9000 is listening (main Authentik HTTP API)")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Port 9000 (HTTP)",
+				Category:  "Infrastructure",
+				Passed:    true,
+				Details:   "Port 9000 is listening - main Authentik API endpoint",
+			})
+		} else {
+			logger.Warn("Port 9000 not detected in listening ports")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Port 9000 (HTTP)",
+				Category:  "Infrastructure",
+				Passed:    false,
+				Warning:   true,
+				Details:   "Port 9000 not listening - Authentik API may not be accessible",
+				Remediation: []string{
+					"Check server logs: docker compose -f " + hecatePath + "/docker-compose.yml logs server",
+					"Verify AUTHENTIK_LISTEN__HTTP environment variable",
+				},
+			})
+		}
+
+		if has9443 {
+			logger.Info("Port 9443 is listening (embedded outpost HTTPS)")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Port 9443 (HTTPS/Metrics)",
+				Category:  "Infrastructure",
+				Passed:    true,
+				Details:   "Port 9443 is listening - embedded outpost HTTPS endpoint",
+			})
+		} else {
+			logger.Debug("Port 9443 not detected (may be expected - metrics endpoint is optional)")
+		}
+	}
+
+	// Step 3: Check environment variables for outpost configuration
+	ctx3, cancel3 := context.WithTimeout(rc.Ctx, 5*time.Second)
+	envCmd := exec.CommandContext(ctx3, "docker", "compose", "exec", "-T", "server",
+		"env")
+	envCmd.Dir = hecatePath
+	envOutput, envErr := envCmd.Output()
+	cancel3()
+
+	if envErr != nil {
+		logger.Warn("Failed to check environment variables",
+			zap.Error(envErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Environment Variables",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Could not verify outpost environment configuration",
+		})
+	} else {
+		envResponse := string(envOutput)
+		logger.Debug("Environment variables in server container",
+			zap.Int("env_count", strings.Count(envResponse, "\n")))
+
+		// Filter for AUTHENTIK_OUTPOSTS_* or AUTHENTIK_* variables
+		authentikVars := []string{}
+		for _, line := range strings.Split(envResponse, "\n") {
+			if strings.HasPrefix(line, "AUTHENTIK_") {
+				// Redact sensitive values
+				if strings.Contains(line, "SECRET") || strings.Contains(line, "KEY") || strings.Contains(line, "TOKEN") {
+					parts := strings.SplitN(line, "=", 2)
+					if len(parts) == 2 {
+						authentikVars = append(authentikVars, parts[0]+"=***REDACTED***")
+					}
+				} else {
+					authentikVars = append(authentikVars, line)
+				}
+			}
+		}
+
+		if len(authentikVars) > 0 {
+			logger.Info("Found Authentik environment variables",
+				zap.Int("count", len(authentikVars)))
+
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Environment Variables",
+				Category:  "Configuration",
+				Passed:    true,
+				Details:   fmt.Sprintf("Found %d Authentik environment variables configured", len(authentikVars)),
+			})
+		} else {
+			logger.Warn("No AUTHENTIK_* environment variables found")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Environment Variables",
+				Category:  "Configuration",
+				Passed:    false,
+				Warning:   true,
+				Details:   "No AUTHENTIK_* environment variables detected",
+				Remediation: []string{
+					"Check .env file: cat " + hecatePath + "/.env | grep AUTHENTIK_",
+					"Verify docker-compose.yml loads .env file correctly",
+				},
+			})
+		}
+	}
+
+	// Step 4: Get authentication token for health check
+	envPath := filepath.Join(hecatePath, ".env")
+	envVars, err := shared.ParseEnvFile(envPath)
+	if err != nil {
+		logger.Warn("Could not parse .env file for health check",
+			zap.Error(err))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Skipped - could not read API token from .env",
+		})
+		return results
+	}
+
+	// Get token (prefer API token, fallback to bootstrap token)
+	token := envVars["AUTHENTIK_API_TOKEN"]
+	if token == "" {
+		token = envVars["AUTHENTIK_BOOTSTRAP_TOKEN"]
+	}
+
+	if token == "" {
+		logger.Warn("No API token available for outpost health check")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Skipped - no API token configured",
+		})
+		return results
+	}
+
+	// Step 5: Check outpost instance health via API
+	// First, get the outpost ID (usually the embedded outpost)
+	ctx4, cancel4 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	outpostsCmd := exec.CommandContext(ctx4, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+token,
+		"http://localhost:9000/api/v3/outposts/instances/")
+	outpostsCmd.Dir = hecatePath
+	outpostsOutput, outpostsErr := outpostsCmd.Output()
+	cancel4()
+
+	if outpostsErr != nil {
+		logger.Warn("Failed to list outposts for health check",
+			zap.Error(outpostsErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Could not query outpost instances",
+		})
+		return results
+	}
+
+	outpostsResponse := string(outpostsOutput)
+
+	// Extract outpost UUID (look for embedded outpost)
+	// Format: "pk": "uuid-here"
+	var outpostID string
+	for _, line := range strings.Split(outpostsResponse, "\n") {
+		if strings.Contains(line, "\"pk\":") && strings.Contains(outpostsResponse[strings.Index(outpostsResponse, line):], "\"type\":\"embedded\"") {
+			// Extract UUID from "pk": "uuid"
+			pkStart := strings.Index(line, "\"pk\":") + 6
+			pkEnd := strings.Index(line[pkStart:], "\"")
+			if pkEnd > 0 {
+				outpostID = strings.TrimSpace(line[pkStart : pkStart+pkEnd])
+				break
+			}
+		}
+	}
+
+	// Fallback: try to find any UUID pattern in the response
+	if outpostID == "" {
+		for _, line := range strings.Split(outpostsResponse, "\n") {
+			if strings.Contains(line, "\"pk\":") {
+				pkStart := strings.Index(line, "\"pk\":\"") + 6
+				remaining := line[pkStart:]
+				pkEnd := strings.Index(remaining, "\"")
+				if pkEnd > 0 {
+					potentialID := remaining[:pkEnd]
+					// Basic UUID format check (has dashes)
+					if strings.Count(potentialID, "-") >= 4 {
+						outpostID = potentialID
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if outpostID == "" {
+		logger.Warn("Could not extract outpost ID from API response")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Could not identify embedded outpost UUID",
+			Remediation: []string{
+				"Manual check: docker exec hecate-caddy wget -qO- --header='Authorization: Bearer TOKEN' http://hecate-server-1:9000/api/v3/outposts/instances/ | jq '.'",
+			},
+		})
+		return results
+	}
+
+	logger.Info("Found outpost ID for health check",
+		zap.String("outpost_id", outpostID))
+
+	// Query the health endpoint for this specific outpost
+	ctx5, cancel5 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	healthCmd := exec.CommandContext(ctx5, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+token,
+		"http://localhost:9000/api/v3/outposts/instances/"+outpostID+"/health/")
+	healthCmd.Dir = hecatePath
+	healthOutput, healthErr := healthCmd.Output()
+	cancel5()
+
+	if healthErr != nil {
+		logger.Warn("Outpost health endpoint returned error",
+			zap.Error(healthErr),
+			zap.String("outpost_id", outpostID))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Outpost health endpoint query failed",
+			Remediation: []string{
+				fmt.Sprintf("Manual check: docker exec hecate-caddy wget -qO- --header='Authorization: Bearer TOKEN' http://hecate-server-1:9000/api/v3/outposts/instances/%s/health/", outpostID),
+			},
+		})
+		return results
+	}
+
+	healthResponse := string(healthOutput)
+	logger.Debug("Outpost health response",
+		zap.String("response", healthResponse))
+
+	// Check if health response indicates the outpost is healthy
+	// Healthy response should contain: "uid", "last_seen", "version"
+	hasUID := strings.Contains(healthResponse, "\"uid\":")
+	hasLastSeen := strings.Contains(healthResponse, "\"last_seen\":")
+	hasVersion := strings.Contains(healthResponse, "\"version\":")
+
+	if hasUID && hasLastSeen && hasVersion {
+		logger.Info("Embedded outpost is healthy")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    true,
+			Details:   "Embedded outpost is healthy and reporting status correctly",
+		})
+	} else {
+		logger.Warn("Outpost health response missing expected fields",
+			zap.String("response", healthResponse[:min(200, len(healthResponse))]))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Health Endpoint",
+			Category:  "Infrastructure",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Outpost health endpoint returned unexpected response format",
+			Remediation: []string{
+				"Check server logs: docker compose -f " + hecatePath + "/docker-compose.yml logs server",
+				"Verify outpost is running: Admin → Outposts in Authentik UI",
+			},
+		})
+	}
+
+	return results
+}
+
+// checkAuthentikProxyConfiguration checks proxy provider, outpost, and application configuration
+// This diagnoses issues with forward auth integration (e.g., 404 errors on /outpost.goauthentik.io/auth/caddy)
+// CRITICAL: Required for services using Authentik forward auth (BionicGPT, Wazuh, etc.)
+func checkAuthentikProxyConfiguration(rc *eos_io.RuntimeContext, hecatePath string) []AuthentikCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
+	var results []AuthentikCheckResult
+
+	// Step 1: Get authentication token (bootstrap or API token)
+	envPath := filepath.Join(hecatePath, ".env")
+	envVars, err := shared.ParseEnvFile(envPath)
+	if err != nil {
+		logger.Error("Failed to parse .env file for proxy config check",
+			zap.Error(err),
+			zap.String("path", envPath))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Proxy Configuration - Token",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("cannot read .env file: %w", err),
+			Remediation: []string{
+				"Ensure .env file exists at " + envPath,
+			},
+		})
+		return results
+	}
+
+	// Prefer AUTHENTIK_API_TOKEN, fallback to AUTHENTIK_BOOTSTRAP_TOKEN
+	token := envVars["AUTHENTIK_API_TOKEN"]
+	tokenSource := "AUTHENTIK_API_TOKEN"
+	if token == "" {
+		token = envVars["AUTHENTIK_BOOTSTRAP_TOKEN"]
+		tokenSource = "AUTHENTIK_BOOTSTRAP_TOKEN"
+	}
+
+	if token == "" {
+		logger.Error("No API token available for proxy configuration check")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Proxy Configuration - Token",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("no API token found in .env"),
+			Remediation: []string{
+				"Ensure AUTHENTIK_BOOTSTRAP_TOKEN or AUTHENTIK_API_TOKEN is set in " + envPath,
+			},
+		})
+		return results
+	}
+
+	logger.Debug("Using token for proxy configuration check",
+		zap.String("source", tokenSource),
+		zap.String("token_prefix", token[:min(4, len(token))]+"***"))
+
+	// Step 2: List all proxy providers
+	ctx1, cancel1 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	providersCmd := exec.CommandContext(ctx1, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+token,
+		"http://localhost:9000/api/v3/providers/proxy/")
+	providersCmd.Dir = hecatePath
+	providersOutput, providersErr := providersCmd.Output()
+	cancel1()
+
+	if providersErr != nil {
+		logger.Error("Failed to list proxy providers",
+			zap.Error(providersErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Proxy Providers",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("failed to query proxy providers: %w", providersErr),
+			Remediation: []string{
+				"Ensure Authentik server container is running",
+				"Check API token has correct permissions",
+				"Manual check: docker exec hecate-server-1 wget -qO- --header='Authorization: Bearer TOKEN' http://localhost:9000/api/v3/providers/proxy/",
+			},
+		})
+		return results
+	}
+
+	providersResponse := string(providersOutput)
+	logger.Debug("Proxy providers API response",
+		zap.String("response_preview", providersResponse[:min(200, len(providersResponse))]))
+
+	// Check if any providers exist
+	hasProviders := strings.Contains(providersResponse, "\"results\"") &&
+		!strings.Contains(providersResponse, "\"results\":[]") &&
+		!strings.Contains(providersResponse, "\"results\": []")
+
+	if !hasProviders {
+		logger.Warn("No proxy providers configured")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Proxy Providers",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No proxy providers found - this is why forward auth returns 404",
+			Remediation: []string{
+				"Proxy providers are required for forward auth integration",
+				"Create provider via Authentik UI: Admin → Applications → Providers → Create",
+				"Or use: eos update hecate --add <service> to auto-configure",
+				"Provider mode should be: 'Forward auth (single application)'",
+				"See: https://docs.goauthentik.io/docs/providers/proxy/forward_auth",
+			},
+		})
+	} else {
+		// Count providers (rough estimate by counting "pk": occurrences)
+		providerCount := strings.Count(providersResponse, "\"pk\":")
+		logger.Info("Found proxy providers",
+			zap.Int("count", providerCount))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Proxy Providers",
+			Category:  "Configuration",
+			Passed:    true,
+			Details:   fmt.Sprintf("Found %d proxy provider(s) configured", providerCount),
+		})
+	}
+
+	// Step 3: List all outposts
+	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	outpostsCmd := exec.CommandContext(ctx2, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+token,
+		"http://localhost:9000/api/v3/outposts/instances/")
+	outpostsCmd.Dir = hecatePath
+	outpostsOutput, outpostsErr := outpostsCmd.Output()
+	cancel2()
+
+	if outpostsErr != nil {
+		logger.Error("Failed to list outposts",
+			zap.Error(outpostsErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outposts",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("failed to query outposts: %w", outpostsErr),
+			Remediation: []string{
+				"Ensure Authentik server container is running",
+				"Manual check: docker exec hecate-server-1 wget -qO- --header='Authorization: Bearer TOKEN' http://localhost:9000/api/v3/outposts/instances/",
+			},
+		})
+		return results
+	}
+
+	outpostsResponse := string(outpostsOutput)
+	logger.Debug("Outposts API response",
+		zap.String("response_preview", outpostsResponse[:min(200, len(outpostsResponse))]))
+
+	// Check for embedded outpost
+	hasEmbeddedOutpost := strings.Contains(outpostsResponse, "\"type\":\"embedded\"") ||
+		strings.Contains(outpostsResponse, "\"type\": \"embedded\"")
+
+	if hasEmbeddedOutpost {
+		logger.Info("Found embedded outpost")
+
+		// Check if outpost has providers assigned
+		// Look for "providers": [] pattern (empty array means no providers assigned)
+		hasEmptyProviders := strings.Contains(outpostsResponse, "\"providers\":[]") ||
+			strings.Contains(outpostsResponse, "\"providers\": []")
+
+		if hasEmptyProviders {
+			logger.Warn("Embedded outpost has no providers assigned")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Outpost Configuration",
+				Category:  "Configuration",
+				Passed:    false,
+				Warning:   true,
+				Details:   "Embedded outpost found but has no providers assigned - forward auth will not work",
+				Remediation: []string{
+					"Outpost must be linked to proxy provider(s)",
+					"Navigate to: Admin → Outposts → authentik Embedded Outpost → Edit",
+					"Add your proxy provider(s) to the outpost",
+					"Or use: eos update hecate --add <service> to auto-configure",
+				},
+			})
+		} else {
+			logger.Info("Embedded outpost has providers assigned")
+			results = append(results, AuthentikCheckResult{
+				CheckName: "Outpost Configuration",
+				Category:  "Configuration",
+				Passed:    true,
+				Details:   "Embedded outpost is configured with provider(s)",
+			})
+		}
+	} else {
+		logger.Warn("No embedded outpost found")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Outpost Configuration",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No embedded outpost found - forward auth requires embedded outpost",
+			Remediation: []string{
+				"Embedded outpost should be created automatically by Authentik",
+				"Check Authentik version (embedded outpost added in 2021.12+)",
+				"Navigate to: Admin → Outposts to verify",
+			},
+		})
+	}
+
+	// Step 4: List all applications
+	ctx3, cancel3 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	appsCmd := exec.CommandContext(ctx3, "docker", "compose", "exec", "-T", "server",
+		"wget", "-q", "-O", "-",
+		"--header", "Authorization: Bearer "+token,
+		"http://localhost:9000/api/v3/core/applications/")
+	appsCmd.Dir = hecatePath
+	appsOutput, appsErr := appsCmd.Output()
+	cancel3()
+
+	if appsErr != nil {
+		logger.Error("Failed to list applications",
+			zap.Error(appsErr))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Applications",
+			Category:  "Configuration",
+			Passed:    false,
+			Error:     fmt.Errorf("failed to query applications: %w", appsErr),
+			Remediation: []string{
+				"Ensure Authentik server container is running",
+				"Manual check: docker exec hecate-server-1 wget -qO- --header='Authorization: Bearer TOKEN' http://localhost:9000/api/v3/core/applications/",
+			},
+		})
+		return results
+	}
+
+	appsResponse := string(appsOutput)
+	logger.Debug("Applications API response",
+		zap.String("response_preview", appsResponse[:min(200, len(appsResponse))]))
+
+	// Check if any applications exist
+	hasApplications := strings.Contains(appsResponse, "\"results\"") &&
+		!strings.Contains(appsResponse, "\"results\":[]") &&
+		!strings.Contains(appsResponse, "\"results\": []")
+
+	if !hasApplications {
+		logger.Warn("No applications configured")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Applications",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No applications found - users won't see any services in their portal",
+			Remediation: []string{
+				"Applications link users to providers",
+				"Create application via Authentik UI: Admin → Applications → Create",
+				"Or use: eos update hecate --add <service> to auto-configure",
+				"Each application should be linked to a proxy provider",
+			},
+		})
+	} else {
+		// Count applications
+		appCount := strings.Count(appsResponse, "\"pk\":")
+		logger.Info("Found applications",
+			zap.Int("count", appCount))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Applications",
+			Category:  "Configuration",
+			Passed:    true,
+			Details:   fmt.Sprintf("Found %d application(s) configured", appCount),
+		})
+	}
+
+	// Step 5: Test forward auth endpoint
+	ctx4, cancel4 := context.WithTimeout(rc.Ctx, 5*time.Second)
+	forwardAuthCmd := exec.CommandContext(ctx4, "docker", "compose", "exec", "-T", "caddy",
+		"wget", "-S", "-O", "-",
+		"http://hecate-server-1:9000/outpost.goauthentik.io/auth/caddy")
+	forwardAuthCmd.Dir = hecatePath
+	forwardAuthOutput, forwardAuthErr := forwardAuthCmd.CombinedOutput()
+	cancel4()
+
+	forwardAuthResponse := string(forwardAuthOutput)
+	logger.Debug("Forward auth endpoint test",
+		zap.Error(forwardAuthErr),
+		zap.String("response_preview", forwardAuthResponse[:min(300, len(forwardAuthResponse))]))
+
+	// 404 indicates no providers configured for embedded outpost
+	if strings.Contains(forwardAuthResponse, "404 Not Found") {
+		logger.Warn("Forward auth endpoint returns 404")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Forward Auth Endpoint",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Forward auth endpoint returns 404 - this is the root cause of authentication failures",
+			Remediation: []string{
+				"404 means: No proxy provider is assigned to the embedded outpost",
+				"Fix: Create proxy provider AND assign it to embedded outpost",
+				"Or use: eos update hecate --add <service> to auto-configure everything",
+				"See diagnostic output above for provider/outpost/application status",
+			},
+		})
+	} else if strings.Contains(forwardAuthResponse, "302 Found") || strings.Contains(forwardAuthResponse, "302") {
+		logger.Info("Forward auth endpoint working correctly (302 redirect to login)")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Forward Auth Endpoint",
+			Category:  "Configuration",
+			Passed:    true,
+			Details:   "Forward auth endpoint returns 302 redirect (expected behavior when not authenticated)",
+		})
+	} else if strings.Contains(forwardAuthResponse, "200 OK") || strings.Contains(forwardAuthResponse, "200") {
+		logger.Info("Forward auth endpoint returns 200 (user may already be authenticated)")
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Forward Auth Endpoint",
+			Category:  "Configuration",
+			Passed:    true,
+			Details:   "Forward auth endpoint returns 200 OK (user already authenticated or no auth required)",
+		})
+	} else {
+		logger.Warn("Forward auth endpoint returned unexpected response",
+			zap.String("response", forwardAuthResponse[:min(100, len(forwardAuthResponse))]))
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Forward Auth Endpoint",
+			Category:  "Configuration",
+			Passed:    false,
+			Warning:   true,
+			Details:   "Forward auth endpoint returned unexpected response (check logs for details)",
+			Remediation: []string{
+				"Check Authentik server logs: docker compose -f /opt/hecate/docker-compose.yml logs server",
+				"Check embedded outpost logs in server container",
+			},
+		})
+	}
+
+	return results
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Helper functions for result counting
