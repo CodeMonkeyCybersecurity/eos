@@ -10,7 +10,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -45,34 +47,79 @@ func NewAuthentikClient(baseURL, token string) *AuthentikClient {
 	}
 }
 
-// doRequest performs an HTTP request with authentication
+// doRequest performs an HTTP request with authentication and retry logic
+// ENHANCED: Added exponential backoff retry for transient failures
 func (c *AuthentikClient) doRequest(ctx context.Context, method, path string) ([]byte, error) {
-	url := fmt.Sprintf("%s%s", c.BaseURL, path)
-	
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	var lastErr error
+	maxRetries := 3
+	baseDelay := time.Second
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s
+			delay := baseDelay * time.Duration(1<<uint(attempt-1))
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		url := fmt.Sprintf("%s%s", c.BaseURL, path)
+		
+		req, err := http.NewRequestWithContext(ctx, method, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+		req.Header.Set("Accept", "application/json")
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("request failed: %w", err)
+			// Retry on network errors
+			if isTransientError(err) && attempt < maxRetries {
+				continue
+			}
+			return nil, lastErr
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response: %w", err)
+		}
+
+		// Check for transient HTTP errors
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			lastErr = fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+			if attempt < maxRetries {
+				continue
+			}
+			return nil, lastErr
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		}
+
+		return body, nil
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
-	req.Header.Set("Accept", "application/json")
+	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+}
 
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+// isTransientError checks if an error is transient and should be retried
+func isTransientError(err error) bool {
+	if err == nil {
+		return false
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	errStr := err.Error()
+	return strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "temporary failure") ||
+		strings.Contains(errStr, "EOF")
 }
 
 // ExportAuthentikConfig exports the complete Authentik configuration
@@ -394,10 +441,9 @@ func filterPoliciesByTarget(target string) func([]byte) ([]byte, error) {
 }
 
 // contains checks if a string contains a substring
+// FIXED: Replaced broken implementation with standard library
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			len(s) > len(substr)*2 && s[len(s)/2-len(substr)/2:len(s)/2+len(substr)/2+len(substr)%2] == substr))
+	return strings.Contains(s, substr)
 }
 
 // exportOutpostHealth exports outpost health information
@@ -515,20 +561,26 @@ Command: eos update authentik --export
 }
 
 // createArchive creates a compressed tar.gz archive of the export
+// FIXED: Implemented proper archive creation with exec.Command
 func createArchive(outputDir string) (string, error) {
 	timestamp := time.Now().Format("20060102_150405")
 	archiveName := fmt.Sprintf("authentik_config_backup_%s.tar.gz", timestamp)
 	archivePath := filepath.Join(filepath.Dir(outputDir), archiveName)
 
-	// Use tar command to create archive
-	cmd := fmt.Sprintf("cd %s && tar -czf %s %s",
-		filepath.Dir(outputDir),
+	// Use exec.Command for proper error handling and security
+	cmd := exec.Command(
+		"tar",
+		"-czf",
 		archivePath,
+		"-C", filepath.Dir(outputDir),
 		filepath.Base(outputDir),
 	)
 
-	// This is a simplified version - in production you'd want to use exec.Command properly
-	_ = cmd // Placeholder for actual implementation
+	// Capture both stdout and stderr for debugging
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to create archive: %w (output: %s)", err, string(output))
+	}
 
 	return archivePath, nil
 }
