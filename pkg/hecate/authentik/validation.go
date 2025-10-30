@@ -63,9 +63,12 @@ func GetExpectedExportFiles() []ExpectedExportFile {
 		{Filename: "20_docker-compose.disk.yml", Description: "Disk docker-compose.yml", Critical: true, MinSize: 500},
 		{Filename: "20_docker-compose.runtime.json", Description: "Runtime container state", Critical: true, MinSize: 1000},
 
+		// Database backup
+		{Filename: "22_postgresql_backup.sql", Description: "PostgreSQL database dump", Critical: true, MinSize: 1000},
+
 		// Reports and metadata
 		{Filename: "21_DRIFT_REPORT.md", Description: "Configuration drift analysis", Critical: true, MinSize: 100},
-		{Filename: "README.md", Description: "Export documentation", Critical: true, MinSize: 500},
+		{Filename: "00_README.md", Description: "Export documentation", Critical: true, MinSize: 500},
 	}
 }
 

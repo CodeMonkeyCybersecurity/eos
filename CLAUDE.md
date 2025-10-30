@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-28*
+*Last Updated: 2025-10-30*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -21,6 +21,8 @@ AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration 
 **Iterative Philosophy**: Eos is built iteratively. We build on what exists, solve complex problems once, encode them in Eos, and never solve them again. Each improvement makes the next one easier.
 
 **Code Integration Philosophy**: When writing new code, ALWAYS iterate on existing functions rather than creating new ones. Check for existing functionality in the codebase first. If similar functionality exists, enhance it rather than duplicate it. Only deprecate functions if absolutely necessary - prefer evolution over replacement. Ensure all new code is properly wired into existing systems and follows established patterns.
+
+**HTTP Client Consolidation Rule**: NEVER create separate HTTP clients for the same service. When adding new API endpoints, check for existing HTTP clients first. If a client exists, add methods to it. If multiple clients exist (technical debt), create a unified client and deprecate the old ones. Example: Authentik had THREE separate HTTP clients (pkg/authentik/types.go, pkg/hecate/authentik/client.go, pkg/hecate/authentik/export.go) that should have been ONE unified client with shared TLS config, timeouts, and retry logic. See [ROADMAP.md](ROADMAP.md) section "Authentik Client Consolidation" for the consolidation pattern.
 
 ##  CRITICAL RULES (P0 - Breaking)
 
@@ -815,6 +817,9 @@ Before completing any task, verify:
 | Prompt without help text | Always include HelpText (WHY needed, HOW to get) |
 | Silent env var fallback | Always log which source provided value (observability) |
 | Can't detect `--flag=""` vs missing | Use `cmd.Flags().Changed()` to distinguish |
+| Create multiple HTTP clients for same service | Consolidate into ONE unified client (see HTTP Client Consolidation Rule) |
+| Add new endpoint as separate client | Add method to existing client instead |
+| Duplicate TLS config, timeouts, retry logic | Share infrastructure via unified client |
 
 ## Priority Levels
 

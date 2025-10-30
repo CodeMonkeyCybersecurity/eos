@@ -241,10 +241,10 @@ func runImport(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	for _, resourceType := range importOrder {
 		// Skip if not in only-types or in skip-types
-		if len(options.OnlyTypes) > 0 && !contains(options.OnlyTypes, resourceType) {
+		if len(options.OnlyTypes) > 0 && !containsString(options.OnlyTypes, resourceType) {
 			continue
 		}
-		if contains(options.SkipTypes, resourceType) {
+		if containsString(options.SkipTypes, resourceType) {
 			continue
 		}
 
@@ -1176,7 +1176,7 @@ func getFlag(cmd *cobra.Command, name string) interface{} {
 	}
 }
 
-func contains(slice []string, item string) bool {
+func containsString(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
 			return true

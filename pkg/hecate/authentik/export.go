@@ -213,7 +213,30 @@ func ExportAuthentikConfig(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
-	// Step 10: Validate export completeness
+	// Step 10: Export Authentik Blueprint (vendor-recommended approach)
+	logger.Info("Exporting Authentik Blueprint (vendor-recommended format)")
+	blueprintPath, err := exportAuthentikBlueprint(rc, outputDir)
+	if err != nil {
+		logger.Warn("Failed to export Blueprint - falling back to REST API export only",
+			zap.Error(err),
+			zap.String("note", "Blueprint export is recommended but optional"))
+	} else {
+		logger.Info("✓ Blueprint export successful",
+			zap.String("file", "23_authentik_blueprint.yaml"))
+		_ = blueprintPath // Will be used in restoration automation
+	}
+
+	// Step 11: Backup PostgreSQL database
+	logger.Info("Backing up PostgreSQL database")
+	if err := backupPostgreSQLDatabase(rc, outputDir); err != nil {
+		logger.Warn("Failed to backup database - restore will be incomplete without this",
+			zap.Error(err),
+			zap.String("remediation", "Database contains password hashes and secrets required for complete restoration"))
+	} else {
+		logger.Info("PostgreSQL backup completed successfully")
+	}
+
+	// Step 11: Validate export completeness
 	logger.Info("Validating export completeness")
 	validationReport, err := ValidateExport(rc, outputDir)
 	if err != nil {
@@ -247,7 +270,7 @@ func ExportAuthentikConfig(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
-	// Step 11: Create compressed archive
+	// Step 12: Create compressed archive
 	archivePath, err := createArchive(outputDir)
 	if err != nil {
 		logger.Warn("Failed to create archive", zap.Error(err))
@@ -726,6 +749,11 @@ func exportDockerComposeFromRuntime(rc *eos_io.RuntimeContext, outputDir string)
 		inspectedContainers = append(inspectedContainers, inspected)
 	}
 
+	// SECURITY: Sanitize secrets from container environment variables
+	// RATIONALE: Export archives may be stored insecurely, shared, or committed to git
+	// THREAT MODEL: Prevents credential leakage via backup artifacts
+	inspectedContainers = sanitizeContainerSecrets(inspectedContainers)
+
 	// Marshal container details to JSON
 	containersJSON, err := json.MarshalIndent(inspectedContainers, "", "  ")
 	if err != nil {
@@ -988,6 +1016,167 @@ Website: https://cybermonkey.net.au/
 `, time.Now().Format(time.RFC3339), baseURL)
 
 	return os.WriteFile(filepath.Join(outputDir, "00_README.md"), []byte(readme), 0644)
+}
+
+// exportAuthentikBlueprint exports Authentik configuration as Blueprint YAML
+// P1 #3: Vendor-recommended approach for configuration export/import
+// RATIONALE: Blueprints handle UUID remapping and dependencies automatically
+func exportAuthentikBlueprint(rc *eos_io.RuntimeContext, outputDir string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	blueprintPath := filepath.Join(outputDir, "23_authentik_blueprint.yaml")
+
+	// Run ak export_blueprint command in worker container
+	cmd := exec.CommandContext(rc.Ctx,
+		"docker", "exec",
+		"hecate-server-1",
+		"ak", "export_blueprint",
+		"--output", "/tmp/blueprint.yaml",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if container exists
+		checkCmd := exec.CommandContext(rc.Ctx, "docker", "ps", "-a", "--filter", "name=hecate-server-1", "--format", "{{.Names}}")
+		checkOutput, _ := checkCmd.Output()
+		if len(checkOutput) == 0 {
+			return "", fmt.Errorf("Authentik server container not found (hecate-server-1) - is docker-compose running?")
+		}
+
+		return "", fmt.Errorf("blueprint export failed: %w (output: %s)", err, string(output))
+	}
+
+	// Copy blueprint from container to host
+	copyCmd := exec.CommandContext(rc.Ctx,
+		"docker", "cp",
+		"hecate-server-1:/tmp/blueprint.yaml",
+		blueprintPath,
+	)
+
+	if err := copyCmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to copy blueprint from container: %w", err)
+	}
+
+	// Verify file was created
+	info, err := os.Stat(blueprintPath)
+	if err != nil {
+		return "", fmt.Errorf("blueprint file not created: %w", err)
+	}
+
+	logger.Info("Blueprint exported successfully",
+		zap.Int64("size_bytes", info.Size()))
+
+	return blueprintPath, nil
+}
+
+// backupPostgreSQLDatabase creates a backup of the Authentik PostgreSQL database
+// P1 #5: Database backup is REQUIRED for complete restoration per Authentik vendor docs
+// RATIONALE: Database contains password hashes, secrets, audit logs required for restoration
+func backupPostgreSQLDatabase(rc *eos_io.RuntimeContext, outputDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Get database credentials from .env file
+	dbPass, found, err := shared.GetEnvVar(hecate.EnvFilePath, "PG_PASS")
+	if err != nil || !found {
+		return fmt.Errorf("PG_PASS not found in .env: %w", err)
+	}
+
+	dbUser, _, _ := shared.GetEnvVar(hecate.EnvFilePath, "PG_USER")
+	if dbUser == "" {
+		dbUser = "authentik"
+	}
+
+	dbName, _, _ := shared.GetEnvVar(hecate.EnvFilePath, "PG_DB")
+	if dbName == "" {
+		dbName = "authentik"
+	}
+
+	logger.Info("Starting PostgreSQL database dump",
+		zap.String("database", dbName),
+		zap.String("user", dbUser))
+
+	// Dump database via docker exec pg_dump
+	// NOTE: Uses plain SQL format for maximum compatibility and human readability
+	dumpFile := filepath.Join(outputDir, "22_postgresql_backup.sql")
+	cmd := exec.CommandContext(rc.Ctx,
+		"docker", "exec",
+		"-e", fmt.Sprintf("PGPASSWORD=%s", dbPass), // Pass password via env var (secure)
+		"hecate-postgresql-1", // Container name
+		"pg_dump",
+		"-U", dbUser,
+		"-d", dbName,
+		"-F", "p", // Plain SQL format
+		"--no-owner", // Don't dump ownership commands
+		"--no-acl", // Don't dump access privileges
+	)
+
+	// Capture output
+	output, err := cmd.Output()
+	if err != nil {
+		// Check if container exists
+		checkCmd := exec.CommandContext(rc.Ctx, "docker", "ps", "-a", "--filter", "name=hecate-postgresql-1", "--format", "{{.Names}}")
+		checkOutput, _ := checkCmd.Output()
+		if len(checkOutput) == 0 {
+			return fmt.Errorf("PostgreSQL container not found (hecate-postgresql-1) - is docker-compose running?")
+		}
+
+		return fmt.Errorf("pg_dump failed: %w", err)
+	}
+
+	// Write SQL dump to file
+	if err := os.WriteFile(dumpFile, output, 0600); err != nil {
+		return fmt.Errorf("failed to write SQL dump: %w", err)
+	}
+
+	logger.Info("Database backup saved",
+		zap.String("file", "22_postgresql_backup.sql"),
+		zap.Int("size_bytes", len(output)),
+		zap.String("format", "plain SQL"))
+
+	return nil
+}
+
+// sanitizeContainerSecrets redacts sensitive environment variables from container inspection output
+// SECURITY P0: Prevents secret leakage in export archives
+// RATIONALE: Export archives may be stored insecurely, sent to support, or accidentally committed to git
+// THREAT MODEL: Prevents credential leakage while preserving structural information for debugging
+func sanitizeContainerSecrets(containers []types.ContainerJSON) []types.ContainerJSON {
+	// List of sensitive keywords in environment variable names
+	sensitiveKeys := []string{
+		"PASSWORD", "SECRET", "TOKEN", "KEY", "PASS",
+		"CREDENTIAL", "AUTH", "API_KEY", "PRIVATE",
+	}
+
+	for i := range containers {
+		if containers[i].Config == nil {
+			continue
+		}
+
+		// Sanitize environment variables
+		for j, envVar := range containers[i].Config.Env {
+			// Skip empty env vars
+			if envVar == "" {
+				continue
+			}
+
+			// Check if env var name contains sensitive keywords
+			envUpper := strings.ToUpper(envVar)
+			for _, sensitiveKey := range sensitiveKeys {
+				if strings.Contains(envUpper, sensitiveKey) {
+					// Split on first '=' to separate key from value
+					parts := strings.SplitN(envVar, "=", 2)
+					if len(parts) == 2 {
+						// Redact value but show structure
+						valueLen := len(parts[1])
+						containers[i].Config.Env[j] = fmt.Sprintf("%s=***REDACTED*** (original length: %d chars)", parts[0], valueLen)
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return containers
 }
 
 // createArchive creates a compressed tar.gz archive of the export

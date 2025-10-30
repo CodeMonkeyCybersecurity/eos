@@ -13,13 +13,13 @@ import (
 
 // FlowResponse represents an Authentik flow
 type FlowResponse struct {
-	PK              string `json:"pk"`
-	Slug            string `json:"slug"`
-	Name            string `json:"name"`
-	Title           string `json:"title"`
-	Designation     string `json:"designation"`
+	PK               string `json:"pk"`
+	Slug             string `json:"slug"`
+	Name             string `json:"name"`
+	Title            string `json:"title"`
+	Designation      string `json:"designation"`
 	PolicyEngineMode string `json:"policy_engine_mode"`
-	DeniedAction    string `json:"denied_action"`
+	DeniedAction     string `json:"denied_action"`
 }
 
 // ListFlows lists all flows, optionally filtered by designation
@@ -154,6 +154,78 @@ func (c *APIClient) UpdateFlow(ctx context.Context, pk string, updates map[strin
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("flow update failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// CreateEnrollmentFlow creates a new enrollment flow
+func (c *APIClient) CreateEnrollmentFlow(ctx context.Context, name, slug, title string) (*FlowResponse, error) {
+	reqBody := map[string]interface{}{
+		"name":               name,
+		"slug":               slug,
+		"title":              title,
+		"designation":        "enrollment",
+		"policy_engine_mode": "any",
+		"denied_action":      "message_continue",
+		"authentication":     "none",
+		"layout":             "stacked",
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/flows/instances/", c.BaseURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("enrollment flow creation request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("enrollment flow creation failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var flow FlowResponse
+	if err := json.Unmarshal(body, &flow); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &flow, nil
+}
+
+// DeleteFlow deletes a flow by PK
+func (c *APIClient) DeleteFlow(ctx context.Context, pk string) error {
+	url := fmt.Sprintf("%s/api/v3/flows/instances/%s/", c.BaseURL, pk)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("flow deletion request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("flow deletion failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
