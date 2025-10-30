@@ -14,11 +14,19 @@ import (
 
 // Global flags
 var (
-	resizeFilesystem bool
-	lvPath           string
-	devicePath       string
-	mountpoint       string
-	fsType           string
+	resizeFilesystem         bool
+	lvPath                   string
+	devicePath               string
+	mountpoint               string
+	fsType                   string
+	expandTarget             string
+	expandAll                bool
+	expandAllowPartitionGrow bool
+	expandForceLUKS          bool
+	expandDryRun             bool
+	expandAssumeYes          bool
+	expandSkipAptInstall     bool
+	expandLogJSON            bool
 )
 
 // updateStorageCmd handles updating storage information
@@ -35,9 +43,31 @@ Examples:
   eos update storage --lv-path /dev/vg/lv       # Extend specific LV
   eos update storage --device /dev/mapper/lv    # Resize specific filesystem`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		if expandTarget == "" && (expandAll || expandAllowPartitionGrow || expandForceLUKS || expandDryRun || expandAssumeYes || expandSkipAptInstall || expandLogJSON) {
+			return fmt.Errorf("expansion flags require --expand root")
+		}
+
 		logger := otelzap.Ctx(rc.Ctx)
 
 		logger.Info("Starting storage update operation")
+
+		if expandTarget != "" {
+			if expandTarget != "root" {
+				return fmt.Errorf("unsupported expand target: %s", expandTarget)
+			}
+
+			opts := storage.RootExpandOptions{
+				AllowPartitionGrow: expandAllowPartitionGrow,
+				ForceLUKS:          expandForceLUKS,
+				DryRun:             expandDryRun,
+				AssumeYes:          expandAssumeYes,
+				SkipAptInstall:     expandSkipAptInstall,
+				LogJSON:            expandLogJSON,
+				UseAllFreeSpace:    expandAll,
+			}
+
+			return storage.ExpandRoot(rc, opts)
+		}
 
 		if resizeFilesystem {
 			logger.Info("Auto-resizing Ubuntu LVM")
@@ -98,4 +128,12 @@ func init() {
 	UpdateStorageCmd.Flags().StringVar(&devicePath, "device", "", "Device path for filesystem resize (e.g., /dev/mapper/ubuntu--vg-ubuntu--lv)")
 	UpdateStorageCmd.Flags().StringVar(&mountpoint, "mountpoint", "", "Mountpoint for XFS filesystem resize")
 	UpdateStorageCmd.Flags().StringVar(&fsType, "fs-type", "ext4", "Filesystem type (ext4 or xfs)")
+	UpdateStorageCmd.Flags().StringVar(&expandTarget, "expand", "", "Expand a storage target (supported: root)")
+	UpdateStorageCmd.Flags().BoolVar(&expandAll, "all", false, "Consume all remaining free space during expansion")
+	UpdateStorageCmd.Flags().BoolVar(&expandAllowPartitionGrow, "allow-partition-grow", false, "Allow partition growth when expanding")
+	UpdateStorageCmd.Flags().BoolVar(&expandForceLUKS, "luks", false, "Force LUKS workflow (error if root PV not backed by LUKS)")
+	UpdateStorageCmd.Flags().BoolVar(&expandDryRun, "dry-run", false, "Show planned commands without executing them")
+	UpdateStorageCmd.Flags().BoolVar(&expandAssumeYes, "yes", false, "Automatically confirm prompts")
+	UpdateStorageCmd.Flags().BoolVar(&expandSkipAptInstall, "skip-apt-install", false, "Do not attempt to install missing dependencies")
+	UpdateStorageCmd.Flags().BoolVar(&expandLogJSON, "log-json", false, "Emit JSON summary of expansion results")
 }
