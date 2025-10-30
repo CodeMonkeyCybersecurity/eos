@@ -61,14 +61,22 @@ const DockerCaddyService = `
   caddy:
     image: caddy:latest
     container_name: hecate-caddy
+    environment:
+      # P0.3: Use Unix socket for Admin API (immune to SSRF)
+      # RATIONALE: localhost:2019 vulnerable to SSRF from compromised containers
+      # SECURITY: Unix sockets not reachable via HTTP, only filesystem access
+      # THREAT MODEL: Prevents SSRF-based config tampering via Admin API
+      CADDY_ADMIN: unix//var/run/caddy/admin.sock
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./certs:/data/caddy/certs
       - ./assets/error_pages:/usr/share/caddy:ro
       - ./logs/caddy:/var/log/caddy
+      - caddy-admin-sock:/var/run/caddy:rw
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
     restart: always
     networks:
       - hecate-net
@@ -142,6 +150,11 @@ const DockerAuthentikService = `
       POSTGRES_PASSWORD: {{ .AuthentikDBPassword }}
     volumes:
       - authentik-postgres-data:/var/lib/postgresql/data
+    # P0.1: Increase max_connections to prevent exhaustion
+    # RATIONALE: Authentik 2025.10+ uses ~50% more connections (no Redis)
+    # SECURITY: Prevents database lockout during high authentication load
+    # THREAT MODEL: Default 100 connections insufficient for production traffic
+    command: postgres -c max_connections=200 -c shared_buffers=256MB
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       start_period: 20s
@@ -157,6 +170,7 @@ const DockerAuthentikService = `
     restart: unless-stopped
     command: server
     environment:
+      AUTHENTIK_HOST: https://{{ .AuthentikDomain }}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
       AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
       AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
@@ -168,8 +182,15 @@ const DockerAuthentikService = `
     volumes:
       - ./authentik/media:/media
       - ./authentik/custom-templates:/templates
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/-/health/live/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
-      - authentik-postgres
+      authentik-postgres:
+        condition: service_healthy
     networks:
       - hecate-net
 
@@ -179,6 +200,7 @@ const DockerAuthentikService = `
     restart: unless-stopped
     command: worker
     environment:
+      AUTHENTIK_HOST: https://{{ .AuthentikDomain }}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
       AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
       AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
@@ -191,14 +213,48 @@ const DockerAuthentikService = `
       AUTHENTIK_PROXY__USE_X_FORWARDED_HOST: "true"
       AUTHENTIK_PROXY__USE_X_FORWARDED_PORT: "true"
       AUTHENTIK_PROXY__USE_X_FORWARDED_PROTO: "true"
-    user: root
+    # P0.2: Security hardening - removed Docker socket access
+    # RATIONALE: Docker socket = root access to host, major security risk
+    # SECURITY: Prevents privilege escalation if worker container compromised
+    # THREAT MODEL: Attacker with code exec in worker could spawn privileged container
+    # IMPACT: "Managed outposts" feature disabled (rarely used, can create manually)
+    # NOTE: If you need managed outposts, implement docker-socket-proxy instead
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./authentik/media:/media
       - ./authentik/certs:/certs
       - ./authentik/custom-templates:/templates
     depends_on:
-      - authentik-postgres
+      authentik-postgres:
+        condition: service_healthy
+      authentik-server:
+        condition: service_healthy
+    networks:
+      - hecate-net
+
+  authentik-postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: hecate-authentik-postgres-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: authentik-postgres
+      POSTGRES_DB: {{ .AuthentikDBName }}
+      POSTGRES_USER: {{ .AuthentikDBUser }}
+      POSTGRES_PASSWORD: {{ .AuthentikDBPassword }}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+      HEALTHCHECK_PORT: 8080
+    # P1.1: Automated PostgreSQL backups
+    # RATIONALE: Protects against data loss from corruption, bad migrations, operator error
+    # SECURITY: Backups stored on host filesystem with restricted permissions
+    # THREAT MODEL: Volume corruption, accidental deletion, ransomware encryption
+    # RETENTION: 7 daily + 4 weekly + 6 monthly backups (~10 restore points)
+    volumes:
+      - ./backups/postgres:/backups
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
     networks:
       - hecate-net
 `
@@ -207,6 +263,7 @@ const DockerAuthentikService = `
 const (
 	DockerNetworkName                 = "hecate-net"
 	DockerVolumeAuthentikPostgresName = "authentik-postgres-data"
+	DockerVolumeCaddyAdminSockName    = "caddy-admin-sock"
 	// Deprecated in Authentik 2025.10+: Redis fully removed
 	DockerVolumeAuthentikRedisName = "authentik-redis-data"
 	// Deprecated: Use Authentik volumes instead
@@ -222,6 +279,7 @@ networks:
 
 volumes:
   ` + DockerVolumeAuthentikPostgresName + `:
+  ` + DockerVolumeCaddyAdminSockName + `:
 `
 )
 

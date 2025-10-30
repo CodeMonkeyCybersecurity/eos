@@ -28,6 +28,72 @@
 
 ---
 
+## 🛡️ CI/CD Environment Promotion & Safety Automation (2025-2026)
+
+### Status: Discovery in progress (Target kickoff: 2025-11-15)
+
+**Purpose**: Encode environment-specific controls, safe promotion workflows, and service sustainability guardrails directly into `eos promote` and the underlying Nomad/Consul/Vault toolchain.
+
+**Environment Definitions**:
+- `development`: Ephemeral, developer-controlled. Non-federated Authentik (no self-registration). Debug logging enabled. Data persistence disabled (ephemeral volumes only). Services stop every 24h.
+- `testing`: CI-driven verification. Authentik self-service disabled. Debug logging enabled. Data persistence disabled; fixtures regenerated per promote. Auto-shutdown every 24h with override flag for extended soak tests.
+- `staging`: Production-parity rehearsal. Authentik self-service enabled behind approval gates. Info-level logging enforced. Data persistence disabled (config-only snapshots promoted). Auto-shutdown every 24h unless an active release/test window is scheduled.
+- `production`: Always-on, approval-only promotions. Authentik self-service enabled by default with audit hooks. Standard logging (warning/error) by default. Persistent state managed through replicated volumes.
+- `administration`: Restricted management plane running control services (Consul, Vault, build tools) with break-glass workflows. Standard logging with audit overlays. Persistent metadata retained per compliance policy.
+
+### Environment Guardrail Baseline (HashiCorp Nomad/Consul/Vault 2024.5 guidance; Authentik 2024.10 docs)
+- Encode defaults in Consul KV under `environments/<name>/defaults` and hydrate Nomad task templates during `eos promote`.
+- Use Vault namespaces or templated paths (`env/<name>/` prefixes) for secrets separation per HashiCorp Vault hardening guide (2024-06).
+- Apply Authentik policy engines (`Outpost`, `PromptFlow`) to toggle self-registration per environment as outlined in Authentik v2024.10 configuration reference.
+- Enforce promotion provenance via existing `eos promote` approval hooks; map to Git commit SHAs and artifact digests stored in artifact registry metadata.
+- Programmatic DNS: generate `service.<env>.<tld>` records using Consul service discovery + external-dns controller pattern (Consul v1.16 catalog-sync).
+- Standardize Consul node metadata (`role=core|worker|edge`, `env=<name>`) and Nomad scheduling constraints so worker/edge placements are deterministic across environments.
+- Manage log-level defaults per environment from Consul KV (`logging.level=<debug|info|standard>`) and bake into Nomad templates to prevent noisy prod logs while preserving dev/test verbosity.
+- Enforce non-prod data ephemerality by defaulting Nomad jobs to `ephemeral_disk` allocations, disabling stateful volume mounts, and wiring automated data scrubbing during environment teardown.
+- Schedule 24h stop via Nomad periodic jobs with Vault-issued short-lived tokens to avoid lingering workloads.
+
+### Phase 0: Threat Modeling & Policy Catalog (2025-11-15 → 2025-12-15)
+- Deliverables: Abuse-case catalog, environment policy matrix, RFC for promotion prerequisites, audit log schema updates.
+- Risks & Mitigations: Ensure administration environment segregation (Consul ACL bootstrap rotation) before automation rollout.
+- Inventory current Consul catalog; document gaps in worker/edge node assignments and service tags ahead of enforcement.
+
+### Phase 1: Development → Testing Automation (2025-12-15 → 2026-01-31)
+- Implement `eos promote --to testing` profile loader (Consul-backed defaults, Vault path rewrites).
+- Enforce Authentik self-registration disabled via API policy push before Nomad job submission.
+- Introduce Nomad periodic job `eos-gc-dev-testing` to stop workloads every 24h with Slack/webhook notification.
+- Acceptance: CI pipeline promotes latest green build from dev to testing with deterministic defaults; rollback verified.
+- Roll out Consul/Nomad edge vs worker metadata enforcement in development/testing; update job templates to use `constraint { attribute = node.meta.role ... }`.
+- Implement non-prod storage policy pack: prohibit persistent volumes in development/testing namespaces; add validation in `eos promote` to block stateful job groups.
+
+### Phase 2: Testing → Staging Safety Gates (2026-02-01 → 2026-03-15)
+- Add automated evidence collection (integration test artifacts, vulnerability scans) as promotion prerequisites.
+- Require dual approval (SRE + Product) leveraging `eos promote approve --require-role` alignment with CLAUDE.md governance.
+- Enable Authentik self-service flows in staging via workflow templates; populate staging DNS zone through Consul catalog sync job.
+- Extend 24h shutdown scheduler to staging with calendar exceptions configurable in Consul KV.
+- Extend worker/edge metadata constraints to staging; add health-check dashboards that highlight drift between Consul node tags and actual workloads.
+- Apply ephemeral data policy to staging by segregating config snapshots (Consul KV/Vault) from runtime storage; document manual opt-in for temporary persistence with approval.
+
+### Phase 3: Staging → Production Release Controls (2026-03-16 → 2026-04-30)
+- Integrate change window enforcement (production maintenance calendar + PagerDuty API) before promotions.
+- Implement canary + automatic halt rules (Nomad `progress_deadline`, telemetry hooks) prior to full rollout.
+- Configure Vault dynamic secrets rotation during promote with backout script committed in git.
+- DNS automation: atomically swap traffic by promoting service records from staging sub-zone to production via signed transactions.
+
+### Phase 4: Administration Environment Hardening & Runbooks (2026-05-01 → 2026-06-15)
+- Stand up dedicated administration Nomad namespace with mandatory mTLS and short-lived tokens.
+- Publish runbooks for break-glass promotions, stalled auto-shutdown jobs, and DNS inconsistencies.
+- Add observability dashboards (Prometheus/Grafana) for promotion success rate, auto-stop coverage, and Authentik policy drift.
+- Complete documentation pack: CI/CD SOP, environment defaults catalogue, DR rehearsal notes.
+
+**Success Criteria (measured by 2026-06-30)**:
+- 100% of promotions traverse codified environment profiles with automated diffs recorded.
+- Development/testing/staging environments demonstrate <6h mean exposed-runtime without approval.
+- Authentik self-service toggles are policy-driven with audit evidence retained ≥90 days.
+- Programmatic DNS updates reach production in <5 minutes with rollback path tested quarterly.
+- Administration environment isolated with quarterly access reviews and automated credential rotation.
+
+---
+
 ## 🚀 Command Structure Standardization (2025-10-28)
 
 ### **Status**: Phase 1 Complete, Phase 2-3 In Progress
@@ -2507,6 +2573,545 @@ sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
 
 ---
 
+## 🔄 Hecate Configuration Management & Authentik Integration (2025-11 → 2026-02)
+
+### **Status**: Phase A Complete (Drift Detection), Phase B Planned, Phase C Deferred
+
+**Context**: Adversarial analysis (2025-10-30) identified configuration drift between disk templates, live Caddy API state, and Docker runtime. Three-phased approach implements detection → reconciliation → precipitation.
+
+---
+
+### Phase A: Option B - Full Reconciliation & Drift Detection ✅ COMPLETE (2025-10-30)
+
+**Goal**: Automatically detect and quantify configuration drift during exports
+
+**Deliverables**:
+- ✅ [pkg/hecate/authentik/drift.go](pkg/hecate/authentik/drift.go) (570 lines) - Drift analysis engine
+- ✅ [pkg/hecate/authentik/validation.go](pkg/hecate/authentik/validation.go) (259 lines) - Export completeness validation
+- ✅ Integration into export workflow - Generates `21_DRIFT_REPORT.md` automatically
+- ✅ Caddy drift detection (disk Caddyfile vs live API routes)
+- ✅ Docker drift detection (docker-compose.yml vs runtime containers)
+- ✅ Environment variable drift tracking (critical vars only)
+- ✅ Completeness scoring (0-100%, weighted by criticality)
+
+**Output Files** (added to exports):
+- `19_Caddyfile.disk` - Static file from /opt/hecate/Caddyfile
+- `19_Caddyfile.live.json` - Live config from Caddy Admin API
+- `20_docker-compose.disk.yml` - Static file from /opt/hecate/docker-compose.yml
+- `20_docker-compose.runtime.json` - Live container state from Docker inspect
+- `21_DRIFT_REPORT.md` - Human-readable drift analysis + validation report
+
+**Drift Metrics**:
+- Routes added via API (not in disk) → Risk: Lost on reload
+- Routes removed from live (in disk but not running)
+- Containers added manually (not in compose) → Risk: Won't restart on reboot
+- Environment variable changes (AUTHENTIK_PROXY__TRUSTED_IPS, AUTHENTIK_HOST, etc.)
+- Drift percentage (0-100%, each issue = 10% drift)
+
+**Success Criteria** ✅:
+- [x] Build succeeds
+- [x] go vet passes
+- [x] Drift detection runs on every `eos update hecate --export`
+- [x] Report includes actionable remediation commands
+- [x] Export completeness score calculated (70% critical + 30% non-critical)
+
+**Limitations** (known, documented):
+- ⚠️ Caddy JSON → Caddyfile conversion is lossy/impossible (Issue #11)
+- ⚠️ Docker inspect output not human-readable (5000+ lines of metadata)
+- ⚠️ Simple line-based Caddyfile parsing (doesn't handle all edge cases)
+
+---
+
+### Phase B: Hecate Template Fixes & Self-Service Endpoints 📅 PLANNED (2025-11-01 → 2025-11-15)
+
+**Goal**: Fix critical template issues identified in adversarial analysis and implement universal self-service endpoints
+
+**Priority**: P0 (Critical) - Required before next `eos create hecate` deployment
+
+#### B.1: Critical Template Fixes (Week 1: 2025-11-01 → 2025-11-08)
+
+**Immediate Actions** (P0 - Breaking):
+
+1. **Container Name Mismatch** ([Issue #1](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
+   - **File**: [pkg/hecate/add/caddyfile.go:87-88](pkg/hecate/add/caddyfile.go#L87-L88)
+   - **Change**: `hecate-server-1` → `authentik-server` (use service name, not container_name)
+   - **Rationale**: Docker DNS resolution on same network, immune to container_name changes
+   - **Effort**: 15 minutes
+   - **Testing**: Verify forward auth still works after change
+
+2. **Missing AUTHENTIK_HOST** ([Issue #3](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
+   - **File**: [pkg/hecate/types_docker.go:159-167](pkg/hecate/types_docker.go#L159-L167)
+   - **Change**: Add `AUTHENTIK_HOST: https://{{ .AuthentikDomain }}` to authentik-server env
+   - **Impact**: Fixes OAuth2 redirects and post-logout redirect failures
+   - **Effort**: 10 minutes
+   - **Testing**: Verify OAuth2 login flow works correctly
+
+3. **Missing Caddy Admin API Port** ([Issue #7](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
+   - **File**: [pkg/hecate/types_docker.go:70-71](pkg/hecate/types_docker.go#L70-L71)
+   - **Change**: Add `127.0.0.1:2019:2019` to Caddy ports
+   - **Impact**: Enables Option B drift detection, Option C precipitate, oauth2-signout injection
+   - **Effort**: 5 minutes
+   - **Testing**: Verify `curl http://localhost:2019/config/` works from host
+
+4. **Missing HTTP/3 UDP Port** ([Issue #8](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
+   - **File**: [pkg/hecate/types_docker.go:70-71](pkg/hecate/types_docker.go#L70-L71)
+   - **Change**: Add `443:443/udp` to Caddy ports
+   - **Impact**: Enables HTTP/3 (QUIC) for performance improvement
+   - **Effort**: 5 minutes
+   - **Testing**: Verify QUIC working with `curl --http3 https://example.com`
+
+5. **Missing authentik-server Healthcheck** ([Issue #11](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
+   - **File**: [pkg/hecate/types_docker.go:154-174](pkg/hecate/types_docker.go#L154-L174)
+   - **Change**: Add healthcheck with `wget http://localhost:9000/-/health/live/`
+   - **Change**: Update depends_on to wait for `service_healthy` condition
+   - **Impact**: Prevents startup race condition (server starts before DB ready)
+   - **Effort**: 20 minutes
+   - **Testing**: Verify containers start in correct order on fresh install
+
+**Deliverables**:
+- [x] All 5 template fixes implemented ✅ (2025-10-30)
+- [x] Build succeeds (`go build -o /tmp/eos-build ./cmd/`) ✅
+- [x] go vet passes ✅
+- [ ] Manual test: `eos create hecate` on fresh VM
+
+**Additional Security & Reliability Fixes** (2025-10-30 Adversarial Analysis):
+- [x] **P0.1**: PostgreSQL max_connections increased to 200 ([types_docker.go:151](pkg/hecate/types_docker.go#L151))
+  - Prevents connection exhaustion from Authentik 2025.10 (50% more connections)
+- [x] **P0.2**: Removed Docker socket from authentik-worker ([types_docker.go:210-215](pkg/hecate/types_docker.go#L210-L215))
+  - Eliminates privilege escalation risk (Docker socket = root on host)
+  - Disables "managed outposts" feature (can create manually if needed)
+- [x] **P0.3**: Caddy Admin API migrated to Unix socket ([types_docker.go:64-69](pkg/hecate/types_docker.go#L64-L69), [caddy_admin_api.go:21-49](pkg/hecate/caddy_admin_api.go#L21-L49))
+  - Eliminates SSRF vulnerability (Unix sockets immune to HTTP-based attacks)
+  - Socket path: `/var/run/caddy/admin.sock` (filesystem access required)
+  - All existing Admin API calls transparently migrated (no code changes needed)
+- [x] **P1.1**: Added PostgreSQL backup container ([types_docker.go:228-253](pkg/hecate/types_docker.go#L228-L253))
+  - Daily automated backups with 7d/4w/6m retention
+  - Stored in `/opt/hecate/backups/postgres/`
+- [x] **P1.2**: Optional GitHub token support for version detection ([version_resolver.go:641-653](pkg/platform/version_resolver.go#L641-L653))
+  - Authenticated: 5000 req/hr, Unauthenticated: 60 req/hr
+  - Set `GITHUB_TOKEN` env var for CI/CD deployments
+- [x] **P2.2**: Synchronized fallback version constants ([version_resolver.go:694-698](pkg/platform/version_resolver.go#L694-L698))
+  - Updated platform fallback from 2024.8.3 → 2025.10.0
+  - Documented duplication to avoid circular import
+
+---
+
+#### B.2: Universal Self-Service Endpoints (Week 2: 2025-11-08 → 2025-11-15)
+
+**Goal**: Add self-service endpoints (`/signup`, `/reset-password`, `/profile`, `/oauth2/sign_out`) to ALL SSO-protected services, not just BionicGPT
+
+**User Requirement**: *"are these self service endpoints enabled by default regardless of the service authentik is in front of?"*
+
+**Answer**: Currently NO (only BionicGPT has them) → Make YES (all SSO services get them)
+
+**Pre-Implementation: Authentik Version Detection Review** (30 minutes)
+
+**Q**: How is the most recent version of Authentik detected and is this wired into `eos create hecate`?
+
+**A**: ✅ **Already implemented and working**
+
+**Architecture**:
+1. **Version Resolver**: [pkg/platform/version_resolver.go:623-674](pkg/platform/version_resolver.go#L623-L674)
+   - Queries GitHub API: `https://api.github.com/repos/goauthentik/authentik/releases/latest`
+   - Filters out pre-releases and drafts
+   - 10-second timeout with fallback
+   - 24-hour cache
+
+2. **Authentik Wrapper**: [pkg/hecate/version.go:31-51](pkg/hecate/version.go#L31-L51)
+   - `GetLatestAuthentikVersion()` - Calls version resolver
+   - Falls back to `DefaultAuthentikVersion = "2024.8.3"` if API fails
+
+3. **Integration**: [pkg/hecate/yaml_generator.go:45-56](pkg/hecate/yaml_generator.go#L45-L56)
+   - ✅ Called during `eos create hecate` wizard
+   - ✅ Used in both v1 and v2 yaml generators
+
+**Issues Found** (RESOLVED 2025-10-30):
+1. ✅ **Fallback version outdated**: Updated from "2024.8.3" → "2025.10.0" (Redis-free)
+2. ✅ **No test coverage**: Created comprehensive test suite (4 tests, all passing)
+3. ✅ **No version validation**: Added `IsRedisFreVersion()` helper for Redis deprecation check
+
+**Tasks** ✅ COMPLETE:
+- [x] Update `DefaultAuthentikVersion` to `2025.10.0` ([version.go:16](pkg/hecate/version.go#L16))
+- [x] Create test: `pkg/hecate/version_test.go` to verify GitHub API returns ≥ 2025.10 ([version_test.go](pkg/hecate/version_test.go))
+- [x] Add helper: `IsRedisFreVersion(version string) bool` ([version.go:28-51](pkg/hecate/version.go#L28-L51))
+- [ ] Add warning if version < 2025.8 detected (Redis required)
+
+**Implementation**:
+
+0. **Update Authentik Version Detection** (30 minutes)
+   - **File**: [pkg/hecate/version.go:17](pkg/hecate/version.go#L17)
+   - **Change**: Update `DefaultAuthentikVersion` from `"2024.8.3"` to `"2025.10.0"`
+   - **File**: Create `pkg/hecate/version_test.go`
+   - **Test**: Verify GitHub API returns valid version ≥ 2025.10
+   - **Helper**: `IsRedisFreVersion(version string) bool` - returns true if ≥ 2025.8
+
+1. **Create Universal Self-Service Snippet** (1 hour)
+   - **File**: Create `pkg/hecate/add/self_service_snippet.go`
+   - **Function**: `GenerateSelfServiceHandlers(authentikDomain, applicationSlug, serviceDomain string) string`
+   - **Returns**: Caddyfile snippet with 4 handlers:
+     ```caddyfile
+     # Self-service endpoints
+     handle /signup {
+         redir https://{{ .AuthentikDomain }}/if/flow/{{ .EnrollmentFlowSlug }}/ 302
+     }
+
+     handle /reset-password {
+         redir https://{{ .AuthentikDomain }}/if/flow/{{ .RecoveryFlowSlug }}/ 302
+     }
+
+     handle /profile {
+         redir https://{{ .AuthentikDomain }}/if/user/ 302
+     }
+
+     handle /oauth2/sign_out {
+         header Set-Cookie "authentik_session=; Path=/; Domain={{ .AuthentikDomain }}; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+         header Set-Cookie "authentik_proxy=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"
+         redir https://{{ .AuthentikDomain }}/application/o/{{ .ApplicationSlug }}/end-session/?post_logout_redirect_uri=https://{{ .ServiceDomain }}/ 302
+     }
+     ```
+
+2. **Auto-Discover Flow Slugs via Authentik API** ([Issue #6](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (1.5 hours)
+   - **Function**: `fetchAuthentikFlowSlugs(rc, authentikHost, token) (enrollmentSlug, recoverySlug string, err error)`
+   - **API Call**: `GET /api/v3/flows/instances/?designation=enrollment` (get default enrollment flow)
+   - **API Call**: `GET /api/v3/flows/instances/?designation=recovery` (get default recovery flow)
+   - **Fallback**: If API unavailable, use `default-enrollment-flow` and `default-recovery-flow`
+   - **Pagination**: Handle pagination (max 100/page)
+   - **Rate Limiting**: Use rate limiter (50 req/min, burst 10)
+
+3. **Extend ServiceOptions Struct** ([Issue #12](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (30 minutes)
+   - **File**: [pkg/hecate/add/types.go](pkg/hecate/add/types.go)
+   - **Changes**:
+     ```go
+     type ServiceOptions struct {
+         // ... existing fields ...
+         AuthentikDomain    string // e.g., "hera.codemonkey.net.au"
+         ApplicationSlug    string // e.g., "bionicgpt", auto-discovered or user-provided
+         EnrollmentFlowSlug string // e.g., "default-enrollment-flow", auto-discovered
+         RecoveryFlowSlug   string // e.g., "default-recovery-flow", auto-discovered
+     }
+     ```
+
+4. **Inject Self-Service Handlers into ALL SSO Templates** (1 hour)
+   - **File**: [pkg/hecate/add/caddyfile.go:74-114](pkg/hecate/add/caddyfile.go#L74-L114)
+   - **Change**: Inject snippet into `bionicgptForwardAuthTemplate` AND `ssoRouteTemplate`
+   - **Before**:
+     ```go
+     if sanitizedService == "bionicgpt" {
+         tmplStr = bionicgptForwardAuthTemplate  // Only BionicGPT has self-service
+     } else if opts.SSO {
+         tmplStr = ssoRouteTemplate  // Generic SSO, NO self-service ❌
+     }
+     ```
+   - **After**:
+     ```go
+     if sanitizedService == "bionicgpt" {
+         tmplStr = bionicgptForwardAuthTemplate
+     } else if opts.SSO {
+         tmplStr = ssoRouteTemplate
+     }
+
+     // Inject self-service handlers if SSO enabled
+     if opts.SSO && opts.AuthentikDomain != "" {
+         selfServiceSnippet := GenerateSelfServiceHandlers(
+             opts.AuthentikDomain,
+             opts.ApplicationSlug,
+             opts.DNS,
+         )
+         tmplStr = injectSelfServiceHandlers(tmplStr, selfServiceSnippet)
+     }
+     ```
+
+5. **Fix Logout URL Templating** ([Issue #5](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (30 minutes)
+   - **Remove**: All hardcoded `hera.codemonkey.net.au`, `bionicgpt` references
+   - **Replace**: With template variables `{{ .AuthentikDomain }}`, `{{ .ApplicationSlug }}`, `{{ .DNS }}`
+   - **Clear**: Both cookies (`authentik_session` + `authentik_proxy`) for complete logout
+
+**Deliverables**:
+- [ ] Self-service snippet generator created
+- [ ] Flow slug auto-discovery implemented with pagination + rate limiting
+- [ ] ServiceOptions struct extended
+- [ ] Self-service handlers injected into ALL SSO templates
+- [ ] Logout URL templating fixed (no hardcoded values)
+- [ ] Build succeeds
+- [ ] go vet passes
+- [ ] Manual test: `eos update hecate --add myapp --sso` includes all 4 self-service endpoints
+
+**Success Criteria**:
+- [x] ANY service added with `--sso` flag gets self-service endpoints
+- [x] Flow slugs auto-discovered from Authentik API (fallback to defaults)
+- [x] Logout URL uses correct domain + application slug (no hardcoded values)
+- [x] Both session cookies cleared on logout
+- [x] Works with custom Authentik flow names (not just `default-*-flow`)
+
+---
+
+#### B.3: High-Priority Fixes (Parallel to B.2)
+
+**Pagination for Application Discovery** ([Issue #10](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (1 hour)
+- **File**: [pkg/hecate/oauth2_signout.go:200](pkg/hecate/oauth2_signout.go#L200)
+- **Problem**: Only fetches first 10 applications (breaks for apps 11+)
+- **Fix**: Add pagination loop with `?page=X&page_size=100`
+- **Impact**: `eos update hecate enable oauth2-signout` works for >10 applications
+
+**Rate Limiting on Authentik API Calls** ([Issue #14](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (45 minutes)
+- **File**: [pkg/hecate/oauth2_signout.go](pkg/hecate/oauth2_signout.go)
+- **Problem**: Exceeds Authentik's 100 req/min limit, gets 429 errors
+- **Fix**: Add `golang.org/x/time/rate` limiter (50 req/min, burst 10)
+- **Impact**: API calls succeed reliably without hitting rate limits
+
+**Snippet Name Validation Fix** ([Issue #13](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)) (20 minutes)
+- **File**: [pkg/hecate/add/caddyfile.go:318-326](pkg/hecate/add/caddyfile.go#L318-L326)
+- **Problem**: Validation checks for `(common)` but template uses `(cybermonkey_common)`
+- **Fix**: Check for both snippet names in validation
+- **Impact**: Caddyfile validation doesn't incorrectly reject valid files
+
+**Deliverables**:
+- [ ] Pagination implemented
+- [ ] Rate limiting implemented
+- [ ] Snippet validation fixed
+- [ ] All fixes tested with `eos update hecate enable oauth2-signout`
+
+---
+
+#### B.4: Deferred Security & Operational Improvements 📅 FUTURE
+
+**From 2025-10-30 Adversarial Analysis - Lower Priority Issues**
+
+**P2.1: Template AUTHENTIK_PROXY__TRUSTED_IPS Network CIDR** 📅 FUTURE
+- **Current**: Hardcoded `172.21.0.0/16` ([types_docker.go:206](pkg/hecate/types_docker.go#L206))
+- **Target**: Auto-detect Docker network CIDR at install time
+- **Effort**: 1 hour (make templatable + add detection)
+- **Impact**: Prevents IP spoofing if non-default Docker network used
+- **Priority**: P2 (Medium) - Works correctly for default Docker networks
+
+**P3.1: Prometheus Metrics Export** 📅 FUTURE
+- **Missing**: Authentication success/failure rates, login times, session counts
+- **Implementation**: Add `AUTHENTIK_PROMETHEUS__ENABLED: "true"` + port 9300
+- **Effort**: 30 minutes
+- **Priority**: P3 (Low) - Nice to have for observability
+
+**P3.3: Make Log Level Configurable** 📅 FUTURE
+- **Current**: Hardcoded `AUTHENTIK_LOG_LEVEL: info` ([types_docker.go:170,205](pkg/hecate/types_docker.go#L170))
+- **Target**: Template variable `{{ .LogLevel | default "info" }}`
+- **Effort**: 10 minutes
+- **Priority**: P3 (Low) - Can manually edit if needed
+
+---
+
+### Phase C: Option C - Precipitate Pattern (Runtime → Disk Sync) 📅 DEFERRED (2026-01 → 2026-02)
+
+**Goal**: Automatically sync live Caddy API state and Docker runtime back to disk files
+
+**Status**: ⚠️ DEFERRED - Blocked by technical challenges (see below)
+
+**Rationale for Deferral**:
+1. **Caddy JSON → Caddyfile conversion is lossy/impossible** (Issue #11 from Option B analysis)
+   - Caddy Admin API returns JSON format
+   - No official JSON → Caddyfile converter exists
+   - Manual conversion loses comments, formatting, and some directives
+   - Would require building custom AST parser (100+ hours effort)
+
+2. **Comment preservation is non-trivial**
+   - User's working Caddyfile has inline comments explaining config
+   - JSON format doesn't preserve comments
+   - Precipitating would destroy all documentation
+
+3. **Secret handling complexity**
+   - Environment variables in docker-compose.yml may contain secrets
+   - Precipitating runtime values could expose secrets in version control
+   - Need secret detection + Vault integration first
+
+4. **Option B (drift detection) solves 80% of the problem**
+   - Users get actionable drift reports with remediation commands
+   - Manual fixes are well-documented and low-risk
+   - Automatic precipitation adds complexity without proportional value
+
+**Alternative Approach** (if demand emerges):
+- **Manual Sync Workflow**: User reviews `21_DRIFT_REPORT.md` → manually applies changes
+- **Assisted Sync**: `eos update hecate --suggest-fixes` generates bash script with recommended changes (user reviews before executing)
+- **Partial Precipitation**: Sync ONLY routes (not env vars) using Caddy Admin API → Caddyfile template regeneration
+
+**Revisit Criteria**:
+- User feedback: 5+ requests for automatic precipitation
+- Caddy upstream: Official JSON → Caddyfile converter released
+- Secret manager: Phase 4-6 complete (Vault integration mature)
+
+**Revisit Date**: January 15, 2026 (after Phase B.2 complete, gather user feedback)
+
+---
+
+### Phase D: Redis Deprecation Cleanup 📅 PLANNED (2026-02 → 2026-04)
+
+**Goal**: Remove Redis legacy code from Hecate codebase per Authentik 2025.8+ deprecation
+
+**Context**: Authentik 2025.8+ removed Redis dependency (PostgreSQL-only). Current Hecate templates have Redis removed from `types_docker.go` but legacy code scattered across 50+ locations.
+
+**Problem** ([Issue #4](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)):
+- `DockerAuthentikService` template: ✅ Redis removed (2025-10-28)
+- Legacy code still exists in:
+  - `phase5_authentik.go` - Prompts for Redis password
+  - `lifecycle_compat.go` - Full Redis service definition
+  - `yaml_generator.go` - Redis service template
+  - `debug.go` - Redis diagnostics
+  - `services.go` - Redis service registration
+  - `consul_service_register.go` - Redis Consul service
+  - `removal.go` - Redis cleanup
+  - `secret_manager.go` - Redis secrets
+
+**Impact**:
+- Confusing for operators (is Redis required or not?)
+- `eos create hecate` may prompt for Redis password unnecessarily
+- Wasted secret manager slots
+- Debug commands try to ping non-existent Redis container
+
+**Deprecation Pathway** (staged approach, not immediate deletion):
+
+#### D.1: Phase 1 - Soft Deprecation (2026-02, 1 week)
+- [ ] Add deprecation warnings to Redis prompts
+- [ ] Make Redis optional (skip if Authentik 2025.8+ detected)
+- [ ] Update docs to state Redis deprecated
+- [ ] Add migration guide (Redis → PostgreSQL-only)
+- [ ] Files affected:
+  - `pkg/hecate/phase5_authentik.go` - Add warning, make optional
+  - `pkg/hecate/README.md` - Document deprecation
+  - `docs/migrations/hecate-redis-removal.md` - Create migration guide
+
+#### D.2: Phase 2 - Remove from Defaults (2026-03, 2 weeks)
+- [ ] Remove Redis from default templates (but keep legacy support)
+- [ ] Add `--legacy-redis` flag for migration scenarios
+- [ ] Create `eos update hecate --migrate-from-redis` command
+- [ ] Files affected:
+  - `pkg/hecate/lifecycle_compat.go` - Remove Redis, add legacy flag
+  - `pkg/hecate/yaml_generator.go` - Remove Redis template
+  - `cmd/update/hecate.go` - Add `--migrate-from-redis` flag
+
+#### D.3: Phase 3 - Full Removal (Eos v2.0.0, ~2026-06, breaking change)
+- [ ] Delete all Redis code
+- [ ] Remove Redis from secret manager
+- [ ] Remove Redis from Consul service registration
+- [ ] Remove Redis debug diagnostics
+- [ ] Remove Redis cleanup from removal workflow
+- [ ] Files to delete/modify:
+  - `pkg/hecate/debug.go:25, 166-423` - Delete Redis diagnostics
+  - `pkg/hecate/services.go:203-211` - Delete Redis service
+  - `pkg/hecate/consul_service_register.go:124-138, 210` - Delete Redis Consul service
+  - `pkg/hecate/removal.go:54, 91, 160, 298, 479` - Delete Redis cleanup
+  - `pkg/hecate/secret_manager.go:162-168, 299, 333` - Delete Redis secrets
+  - `pkg/hecate/stream_manager.go:136-137, 412` - Delete Redis stream config
+  - `pkg/hecate/preflight_checks.go:310` - Delete Redis port check
+  - `pkg/hecate/app_types.go:91` - Delete Redis from DockerDeps
+
+**Success Criteria**:
+- [ ] Zero Redis references in `pkg/hecate/` (except legacy compatibility layer)
+- [ ] `eos create hecate` never mentions Redis
+- [ ] Migration guide tested on production Hecate install
+- [ ] Breaking change documented in Eos v2.0.0 release notes
+
+---
+
+### Phase E: Worker Container Security Review 📅 PLANNED (2026-04, P1 - Security)
+
+**Goal**: Address security risk of authentik-worker running as root with Docker socket access
+
+**Problem** ([Issue #9](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD)):
+```yaml
+authentik-worker:
+  user: root  # ❌ SECURITY RISK
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock  # Full host access
+```
+
+**Security Impact**: **CRITICAL**
+- Root user + Docker socket = full host compromise
+- Worker container can escape to host via Docker API
+- Violates principle of least privilege
+- SOC2/PCI-DSS/HIPAA compliance failure
+
+**Rationale for root**: Authentik worker needs Docker socket for:
+- Outpost deployment (creating proxy containers)
+- Container lifecycle management
+- Dynamic configuration updates
+
+**Investigation Tasks** (2 weeks):
+1. **Research Authentik Docker requirements**
+   - Does Authentik worker actually need root?
+   - Can it run as non-root with Docker group membership?
+   - Are there rootless Docker alternatives?
+
+2. **Test Docker group approach**
+   ```yaml
+   authentik-worker:
+     user: "1000:999"  # user:docker-group
+     volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+   ```
+   - Verify outpost deployment still works
+   - Test on Ubuntu 22.04 LTS (production OS)
+
+3. **Evaluate rootless Docker**
+   ```yaml
+   authentik-worker:
+     user: authentik
+     volumes:
+       - /run/user/1000/docker.sock:/var/run/docker.sock
+   ```
+   - Requires host rootless Docker setup
+   - May not work with Hecate deployment model
+
+4. **Risk acceptance documentation**
+   - If no viable alternative exists, document risk clearly
+   - Require explicit user consent during `eos create hecate`
+   - Add to security audit checklist
+
+**Deliverables**:
+- [ ] Security analysis report
+- [ ] Tested mitigation (Docker group or rootless)
+- [ ] Updated template with secure defaults
+- [ ] User consent prompt if root required
+- [ ] Documentation in security section
+
+---
+
+## 📊 Priority Matrix - Hecate Configuration Management
+
+| Phase | Priority | Timeline | Effort | Blocker | Dependencies |
+|-------|----------|----------|--------|---------|--------------|
+| **A: Option B (Drift Detection)** | P0 | ✅ COMPLETE | 8 hours | None | None |
+| **B.1: Critical Template Fixes** | P0 | 2025-11-01 → 2025-11-08 | 4 hours | None | None |
+| **B.2: Self-Service Endpoints** | P0 | 2025-11-08 → 2025-11-15 | 8 hours | B.1 complete | Authentik API access |
+| **B.3: High-Priority Fixes** | P1 | Parallel to B.2 | 3 hours | None | None |
+| **C: Precipitate Pattern** | P2 | ⚠️ DEFERRED | 100+ hours | JSON→Caddyfile converter, comment preservation, secret handling | None |
+| **D: Redis Deprecation** | P2 | 2026-02 → 2026-06 | 12 hours | None | Eos v2.0.0 release |
+| **E: Worker Security Review** | P1 | 2026-04 | 16 hours | Authentik upstream research | None |
+
+---
+
+## 🎯 Immediate Next Steps (This Week: 2025-11-01 → 2025-11-08)
+
+### Monday-Tuesday (2025-11-01 → 2025-11-02): Critical Template Fixes
+1. ✅ Fix container name mismatch (`hecate-server-1` → `authentik-server`)
+2. ✅ Add `AUTHENTIK_HOST` environment variable
+3. ✅ Add Caddy Admin API port (`127.0.0.1:2019:2019`)
+4. ✅ Add HTTP/3 UDP port (`443:443/udp`)
+5. ✅ Add authentik-server healthcheck
+6. ✅ Test on fresh VM: `eos create hecate`
+
+### Wednesday-Friday (2025-11-03 → 2025-11-08): Self-Service Foundation
+1. ✅ Create self-service snippet generator
+2. ✅ Implement flow slug auto-discovery (with pagination + rate limiting)
+3. ✅ Extend ServiceOptions struct
+4. ✅ Fix logout URL templating (remove hardcoded values)
+5. ⏳ Integration testing
+
+### Following Week (2025-11-08 → 2025-11-15): Self-Service Integration
+1. ⏳ Inject self-service handlers into SSO templates
+2. ⏳ Test with multiple services (`eos update hecate --add app1 --sso`, `app2`, etc.)
+3. ⏳ Verify flow slug discovery with custom Authentik flows
+4. ⏳ End-to-end testing: signup, reset password, profile, logout
+5. ⏳ Documentation updates
+
+---
+
 ## Questions & Feedback
 
 **Contact**: @henry
@@ -2515,5 +3120,5 @@ sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
 
 ---
 
-**Last Updated**: 2025-10-28 by Henry
-**Next Review**: 2025-11-10 (Phase 5 completion, Command Structure Phase 2 planning)
+**Last Updated**: 2025-10-30 by Henry (Added Hecate Configuration Management section)
+**Next Review**: 2025-11-15 (After Phase B.2 self-service endpoints complete)

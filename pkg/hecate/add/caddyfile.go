@@ -84,12 +84,12 @@ const (
 
 
     handle /outpost.goauthentik.io/* {
-        reverse_proxy http://hecate-server-1:9000
+        reverse_proxy http://authentik-server:9000
     }
 
     handle {
         # 2. Forward authentication to Authentik
-        forward_auth http://hecate-server-1:9000 {
+        forward_auth http://authentik-server:9000 {
             uri /outpost.goauthentik.io/auth/caddy
 
             # Copy headers from Authentik response

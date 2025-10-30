@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -638,6 +639,20 @@ func (r *VersionResolver) getAuthentikVersionFromGitHub(resolver *VersionResolve
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 	req.Header.Set("User-Agent", "EOS-Authentik-Installer/1.0")
 
+	// P1.2: Optional authentication for higher rate limits (5000 req/hr vs 60 req/hr)
+	// RATIONALE: Unauthenticated requests limited to 60/hr, insufficient for CI/CD
+	// SECURITY: Token optional, graceful degradation if not provided
+	// THREAT MODEL: Rate limit exceeded → fallback to DefaultAuthentikVersion
+	if githubToken := os.Getenv("GITHUB_TOKEN"); githubToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+		logger.Debug("Using GitHub token for authenticated API requests",
+			zap.Int("rate_limit", 5000))
+	} else {
+		logger.Debug("No GitHub token found, using unauthenticated API",
+			zap.Int("rate_limit", 60),
+			zap.String("hint", "Set GITHUB_TOKEN env var for higher rate limits"))
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to query GitHub API: %w", err)
@@ -676,13 +691,16 @@ func (r *VersionResolver) getAuthentikVersionFromGitHub(resolver *VersionResolve
 
 // getAuthentikFallbackVersion returns a known stable Authentik version
 func (r *VersionResolver) getAuthentikFallbackVersion(resolver *VersionResolver) (string, error) {
-	// Fallback to a recent stable version (update periodically)
-	fallbackVersion := "2024.8.3"
+	// P2.2: Fallback version synchronized with pkg/hecate/version.go:DefaultAuthentikVersion
+	// NOTE: Duplicates hecate.DefaultAuthentikVersion to avoid circular import
+	// MAINTAINABILITY: When updating, also update pkg/hecate/version.go:DefaultAuthentikVersion
+	// LAST SYNC: 2025-10-30 (updated to 2025.10.0 for Redis-free deployment)
+	fallbackVersion := "2025.10.0"
 
 	logger := otelzap.Ctx(r.rc.Ctx)
 	logger.Info("Using fallback Authentik version",
 		zap.String("version", fallbackVersion),
-		zap.String("note", "Consider updating fallback version periodically"))
+		zap.String("note", "Synchronized with pkg/hecate/version.go"))
 
 	return fallbackVersion, nil
 }

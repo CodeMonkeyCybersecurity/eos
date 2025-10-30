@@ -35,10 +35,20 @@ const (
 	// VALUE: "localhost" refers to host's localhost (not container's localhost)
 	CaddyAdminAPIHost = "localhost"
 
+	// CaddyAdminSocketPath is the Unix socket path for Caddy Admin API
+	// P0.3: Migrated from TCP port to Unix socket for SSRF immunity
+	// RATIONALE: Unix sockets immune to SSRF attacks from compromised containers
+	// SECURITY: Only processes with filesystem access can use Admin API
+	// THREAT MODEL: Prevents config tampering via SSRF vulnerabilities
+	// LOCATION: Docker volume 'caddy-admin-sock' mounted at /var/run/caddy/
+	CaddyAdminSocketPath = "/var/run/caddy/admin.sock"
+
 	// CaddyAdminAPIPort is the port where Caddy Admin API listens
+	// DEPRECATED (2025-10-30): Migrated to Unix socket (CaddyAdminSocketPath)
 	// RATIONALE: Port 2019 is Caddy's default Admin API port
+	// MIGRATION: P0.3 replaced TCP with Unix socket for SSRF protection
 	//
-	// SECURITY MODEL (CRITICAL P0.9 - Read carefully):
+	// SECURITY MODEL (HISTORICAL - DEPRECATED):
 	// ┌─────────────────────────────────────────────────────────────────────────┐
 	// │ Admin API Security has THREE layers:                                    │
 	// │                                                                          │
