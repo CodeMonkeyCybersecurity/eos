@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/add"
+	hecateexport "github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/export"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -27,6 +28,13 @@ Default behavior (no flags):
   2. Loads configuration from Consul KV (service/hecate/config/apps/)
   3. Regenerates docker-compose.yml and .env with latest templates
   4. Restarts containers to apply changes
+
+With --export flag:
+  1. Exports complete Hecate infrastructure configuration
+  2. Includes Authentik SSO configuration via API
+  3. Includes docker-compose.yml, Caddyfile, .env
+  4. Creates timestamped backup in /opt/hecate/exports/
+  5. Generates compressed tar.gz archive
 
 With --refresh flag:
   1. Gracefully reloads Caddy configuration (zero downtime)
@@ -51,6 +59,7 @@ Use this when:
 
 Examples:
   eos update hecate                              # Regenerate from Consul KV
+  eos update hecate --export                     # Export complete configuration (Authentik + files)
   eos update hecate --refresh                    # Gracefully reload Caddy (preserves TLS certs)
   eos update hecate certs                        # Only renew certificates
   eos update hecate k3s                          # Update k3s deployment
@@ -79,6 +88,9 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
+		// Check if --export flag is explicitly set
+		exportWasSet := cmd.Flags().Changed("export")
+
 		// Check if --refresh flag is explicitly set
 		refreshWasSet := cmd.Flags().Changed("refresh")
 
@@ -96,6 +108,9 @@ Examples:
 
 		// Validate mutually exclusive flags
 		exclusiveFlagsCount := 0
+		if exportWasSet {
+			exclusiveFlagsCount++
+		}
 		if refreshWasSet {
 			exclusiveFlagsCount++
 		}
@@ -110,7 +125,12 @@ Examples:
 		}
 
 		if exclusiveFlagsCount > 1 {
-			return fmt.Errorf("cannot use --refresh, --add, --remove, and --fix together\nUse one at a time")
+			return fmt.Errorf("cannot use --export, --refresh, --add, --remove, and --fix together\nUse one at a time")
+		}
+
+		if exportWasSet {
+			// Delegate to export flow (backup all Hecate infrastructure)
+			return hecateexport.ExportHecateConfig(rc)
 		}
 
 		if refreshWasSet {
@@ -158,6 +178,9 @@ func init() {
 	updateHecateCmd.AddCommand(runEosCmd)
 	updateHecateCmd.AddCommand(runHttpCmd)
 	updateHecateCmd.AddCommand(runK3sCmd)
+
+	// Add export flag
+	updateHecateCmd.Flags().Bool("export", false, "Export complete Hecate infrastructure configuration (Authentik + docker-compose + Caddyfile + .env)")
 
 	// Add service management flags
 	updateHecateCmd.Flags().Bool("refresh", false, "Gracefully reload Caddy configuration (zero-downtime, preserves TLS certificates)")

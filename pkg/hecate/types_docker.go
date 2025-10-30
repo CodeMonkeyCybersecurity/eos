@@ -151,29 +151,12 @@ const DockerAuthentikService = `
     networks:
       - hecate-net
 
-  authentik-redis:
-    image: redis:alpine
-    container_name: hecate-authentik-redis
-    command: --save 60 1 --loglevel warning --requirepass {{ .AuthentikRedisPassword }}
-    volumes:
-      - authentik-redis-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a $${AUTHENTIK_REDIS_PASSWORD:-{{ .AuthentikRedisPassword }}} ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    networks:
-      - hecate-net
-
   authentik-server:
     image: ghcr.io/goauthentik/server:latest
     container_name: hecate-authentik-server
     restart: unless-stopped
     command: server
     environment:
-      AUTHENTIK_REDIS__HOST: authentik-redis
-      AUTHENTIK_REDIS__PASSWORD: {{ .AuthentikRedisPassword }}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
       AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
       AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
@@ -187,7 +170,6 @@ const DockerAuthentikService = `
       - ./authentik/custom-templates:/templates
     depends_on:
       - authentik-postgres
-      - authentik-redis
     networks:
       - hecate-net
 
@@ -197,8 +179,6 @@ const DockerAuthentikService = `
     restart: unless-stopped
     command: worker
     environment:
-      AUTHENTIK_REDIS__HOST: authentik-redis
-      AUTHENTIK_REDIS__PASSWORD: {{ .AuthentikRedisPassword }}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
       AUTHENTIK_POSTGRESQL__USER: {{ .AuthentikDBUser }}
       AUTHENTIK_POSTGRESQL__NAME: {{ .AuthentikDBName }}
@@ -207,6 +187,10 @@ const DockerAuthentikService = `
       AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
       AUTHENTIK_LOG_LEVEL: info
+      AUTHENTIK_PROXY__TRUSTED_IPS: 172.21.0.0/16,127.0.0.1/32,::1/128
+      AUTHENTIK_PROXY__USE_X_FORWARDED_HOST: "true"
+      AUTHENTIK_PROXY__USE_X_FORWARDED_PORT: "true"
+      AUTHENTIK_PROXY__USE_X_FORWARDED_PROTO: "true"
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -215,7 +199,6 @@ const DockerAuthentikService = `
       - ./authentik/custom-templates:/templates
     depends_on:
       - authentik-postgres
-      - authentik-redis
     networks:
       - hecate-net
 `
@@ -224,7 +207,8 @@ const DockerAuthentikService = `
 const (
 	DockerNetworkName                 = "hecate-net"
 	DockerVolumeAuthentikPostgresName = "authentik-postgres-data"
-	DockerVolumeAuthentikRedisName    = "authentik-redis-data"
+	// Deprecated in Authentik 2025.10+: Redis fully removed
+	DockerVolumeAuthentikRedisName = "authentik-redis-data"
 	// Deprecated: Use Authentik volumes instead
 	DockerVolumeKCDBName = "kc-db-data"
 
@@ -238,7 +222,6 @@ networks:
 
 volumes:
   ` + DockerVolumeAuthentikPostgresName + `:
-  ` + DockerVolumeAuthentikRedisName + `:
 `
 )
 

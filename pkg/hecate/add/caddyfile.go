@@ -76,40 +76,40 @@ const (
 {{.DNS}} {
     import cybermonkey_common
 
-    # CRITICAL: Proxy Authentik outpost paths for forward auth to work
-    # Without this, forward_auth validation will fail
-    handle /outpost.goauthentik.io/* {
-        reverse_proxy http://localhost:9000
-    }
-
-    # Forward auth to Authentik for authentication
-    # P1 - CRITICAL: copy_headers with rename syntax (X-Authentik-*>X-Auth-Request-*)
-    # BionicGPT expects oauth2-proxy format headers (X-Auth-Request-*)
-    # Authentik sends X-Authentik-* headers
-    # The ">" syntax renames headers: Before>After
-    forward_auth http://localhost:9000 {
-        uri /outpost.goauthentik.io/auth/caddy
-        copy_headers {
-            X-Authentik-Username>X-Auth-Request-User
-            X-Authentik-Email>X-Auth-Request-Email
-            X-Authentik-Groups>X-Auth-Request-Groups
-            X-Authentik-Name>X-Auth-Request-Name
-            X-Authentik-Uid>X-Auth-Request-Uid
-        }
-    }
-
-    # Additional logging for this service
     log {
         output file {{.LogFile}}
         format json
         level DEBUG
     }
-{{range .CustomDirectives}}
-    {{.}}
-{{end}}
-    # Reverse proxy to BionicGPT backend
-    # Backend receives X-Auth-Request-* headers and trusts them for authentication
-    reverse_proxy http://{{.Backend}}
+
+
+    handle /outpost.goauthentik.io/* {
+        reverse_proxy http://hecate-server-1:9000
+    }
+
+    handle {
+        # 2. Forward authentication to Authentik
+        forward_auth http://hecate-server-1:9000 {
+            uri /outpost.goauthentik.io/auth/caddy
+
+            # Copy headers from Authentik response
+            copy_headers X-Authentik-Email X-Authentik-Username X-Authentik-Groups X-Authentik-Name X-Authentik-Uid
+        }
+
+        # 3. Proxy to BionicGPT with explicit header mapping
+        reverse_proxy http://{{.Backend}} {
+            # Map Authentik headers to BionicGPT expected headers
+            header_up X-Auth-Request-Email {http.request.header.X-Authentik-Email}
+            header_up X-Auth-Request-User {http.request.header.X-Authentik-Username}
+            header_up X-Auth-Request-Groups {http.request.header.X-Authentik-Groups}
+            header_up X-Forwarded-User {http.request.header.X-Authentik-Username}
+            header_up X-Forwarded-Email {http.request.header.X-Authentik-Email}
+
+            # Ensure proper handling of redirects
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
+    }
 }
 `
 )

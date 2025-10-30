@@ -50,14 +50,6 @@ type URLProvider interface {
 	GetBaseURL(ctx context.Context) (string, error)
 }
 
-// Ensure AuthentikClient implements APIClient
-var _ APIClient = (*AuthentikClient)(nil)
-
-// DoRequest implements the APIClient interface
-func (c *AuthentikClient) DoRequest(ctx context.Context, method, path string) ([]byte, error) {
-	return c.doRequest(ctx, method, path)
-}
-
 // DefaultFileWriter implements FileWriter using standard library functions
 type DefaultFileWriter struct{}
 

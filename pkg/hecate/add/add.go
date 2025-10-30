@@ -221,12 +221,12 @@ func runValidationPhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	// Validate basic inputs
 	result := ValidateInput(rc, opts)
 	if !result.Valid {
-		return eos_err.NewUserError(result.Message)
+		return eos_err.NewUserError("%s", result.Message)
 	}
 
 	// Validate custom directives
 	if err := ValidateCustomDirectives(opts.CustomDirectives); err != nil {
-		return eos_err.NewUserError(fmt.Sprintf("invalid custom directive: %v", err))
+		return eos_err.NewUserError("invalid custom directive: %v", err)
 	}
 
 	logger.Info("✓ Input validation passed")
@@ -240,7 +240,7 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 
 	// Check Hecate installation
 	if err := CheckHecateInstallation(rc); err != nil {
-		return eos_err.NewUserError(err.Error())
+		return eos_err.NewUserError("%s", err.Error())
 	}
 	logger.Info("✓ Hecate installation verified")
 
@@ -375,7 +375,7 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 	// Check Authentik if SSO is enabled
 	if opts.SSO {
 		if err := CheckAuthentikInstallation(rc); err != nil {
-			return eos_err.NewUserError(err.Error())
+			return eos_err.NewUserError("%s", err.Error())
 		}
 		logger.Info("✓ Authentik installation verified")
 	}
@@ -435,7 +435,7 @@ func runPreflightChecks(rc *eos_io.RuntimeContext, opts *ServiceOptions) error {
 }
 
 // runBackupPhase creates a backup of the Caddyfile
-func runBackupPhase(rc *eos_io.RuntimeContext, opts *ServiceOptions) (string, error) {
+func runBackupPhase(rc *eos_io.RuntimeContext, _ *ServiceOptions) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Phase 3/6: Creating backup...")
 
@@ -682,9 +682,9 @@ func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions, ver
 		logger.Info("")
 		logger.Info("What to do:")
 		logger.Info("  1. Wait 2-3 minutes for TLS certificate provisioning to complete")
-		logger.Info(fmt.Sprintf("  2. Test manually: curl -v https://%s/", opts.DNS))
+		logger.Info("  2. Test manually: curl -v https://" + opts.DNS + "/")
 		logger.Info("  3. Check Caddy logs: docker logs hecate-caddy")
-		logger.Info(fmt.Sprintf("  4. Run diagnostics: eos debug hecate --bionicgpt"))
+		logger.Info("  4. Run diagnostics: eos debug hecate --bionicgpt")
 		logger.Info("")
 	} else {
 		logger.Info("✅ Service added successfully!")
@@ -696,7 +696,7 @@ func printSuccessMessage(logger otelzap.LoggerWithCtx, opts *ServiceOptions, ver
 	logger.Info(fmt.Sprintf("Domain: https://%s", opts.DNS))
 	logger.Info(fmt.Sprintf("Backend: %s", opts.Backend))
 	if opts.SSO || opts.Service == "bionicgpt" {
-		logger.Info(fmt.Sprintf("SSO: Enabled (Authentik forward auth)"))
+		logger.Info("SSO: Enabled (Authentik forward auth)")
 	}
 	logger.Info("")
 
