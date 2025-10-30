@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 )
 
@@ -19,28 +18,19 @@ type CaddyAdminClient struct {
 }
 
 // NewCaddyAdminClient creates a new Caddy Admin API client
-// P0.3: Uses Unix socket for Admin API (immune to SSRF attacks)
-// host parameter kept for backward compatibility but ignored - uses socket path instead
+// Connects to Caddy Admin API via HTTP on localhost:2019
+// RATIONALE: Unix sockets don't work for host-to-container communication with Docker
+// SECURITY: Port only exposed on localhost (127.0.0.1:2019), not accessible from network
+// ARCHITECTURE: Eos runs on host, Caddy runs in container - requires TCP, not Unix socket
 func NewCaddyAdminClient(host string) *CaddyAdminClient {
-	// P0.3: Connect via Unix socket instead of TCP port
-	// RATIONALE: Unix sockets immune to SSRF from compromised containers
-	// SECURITY: Only processes with filesystem access can use Admin API
-	// SOCKET PATH: Matches CADDY_ADMIN in docker-compose (caddy-admin-sock volume)
-	socketPath := CaddyAdminSocketPath
-
-	// Create HTTP client with Unix socket transport
+	// Use standard HTTP client (no custom transport needed)
 	httpClient := &http.Client{
 		Timeout: CaddyAdminAPITimeout,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
-			},
-		},
 	}
 
-	// BaseURL uses http://localhost for Unix socket (actual address ignored by custom dialer)
-	// This satisfies http.Request URL requirements while routing through socket
-	baseURL := "http://localhost"
+	// Connect to Admin API on localhost:2019
+	// SECURITY: Port only exposed as 127.0.0.1:2019 in docker-compose (not 0.0.0.0)
+	baseURL := fmt.Sprintf("http://%s:%d", host, CaddyAdminAPIPort)
 
 	return &CaddyAdminClient{
 		BaseURL:    baseURL,

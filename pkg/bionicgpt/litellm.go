@@ -94,7 +94,7 @@ func (bgi *BionicGPTInstaller) createLiteLLMConfig(ctx context.Context) error {
 			zap.String("endpoint", DefaultOllamaDockerEndpoint))
 
 		modelList = append(modelList, LiteLLMModel{
-			ModelName: "text-embedding-ada-002",
+			ModelName: bgi.config.LocalEmbeddingsModel,
 			LiteLLMParams: map[string]interface{}{
 				"model":    fmt.Sprintf("ollama/%s", bgi.config.LocalEmbeddingsModel),
 				"api_base": DefaultOllamaDockerEndpoint, // Docker host access

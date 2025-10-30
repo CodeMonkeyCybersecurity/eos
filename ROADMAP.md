@@ -2680,10 +2680,10 @@ sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
 - [x] **P0.2**: Removed Docker socket from authentik-worker ([types_docker.go:210-215](pkg/hecate/types_docker.go#L210-L215))
   - Eliminates privilege escalation risk (Docker socket = root on host)
   - Disables "managed outposts" feature (can create manually if needed)
-- [x] **P0.3**: Caddy Admin API migrated to Unix socket ([types_docker.go:64-69](pkg/hecate/types_docker.go#L64-L69), [caddy_admin_api.go:21-49](pkg/hecate/caddy_admin_api.go#L21-L49))
-  - Eliminates SSRF vulnerability (Unix sockets immune to HTTP-based attacks)
-  - Socket path: `/var/run/caddy/admin.sock` (filesystem access required)
-  - All existing Admin API calls transparently migrated (no code changes needed)
+- [x] **P0.3**: Caddy Admin API uses HTTP localhost:2019 ([types_docker.go:60-77](pkg/hecate/types_docker.go#L60-L77), [caddy_admin_api.go:21-40](pkg/hecate/caddy_admin_api.go#L21-L40))
+  - Port exposed only on localhost (127.0.0.1:2019), not accessible from network
+  - Unix sockets attempted but incompatible with Docker host-to-container architecture
+  - Fallback to `docker exec` when Admin API unavailable (zero-downtime)
 - [x] **P1.1**: Added PostgreSQL backup container ([types_docker.go:228-253](pkg/hecate/types_docker.go#L228-L253))
   - Daily automated backups with 7d/4w/6m retention
   - Stored in `/opt/hecate/backups/postgres/`

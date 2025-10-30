@@ -61,22 +61,16 @@ const DockerCaddyService = `
   caddy:
     image: caddy:latest
     container_name: hecate-caddy
-    environment:
-      # P0.3: Use Unix socket for Admin API (immune to SSRF)
-      # RATIONALE: localhost:2019 vulnerable to SSRF from compromised containers
-      # SECURITY: Unix sockets not reachable via HTTP, only filesystem access
-      # THREAT MODEL: Prevents SSRF-based config tampering via Admin API
-      CADDY_ADMIN: unix//var/run/caddy/admin.sock
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./certs:/data/caddy/certs
       - ./assets/error_pages:/usr/share/caddy:ro
       - ./logs/caddy:/var/log/caddy
-      - caddy-admin-sock:/var/run/caddy:rw
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+      - "127.0.0.1:2019:2019"  # Admin API (localhost-only for security)
     restart: always
     networks:
       - hecate-net
@@ -263,7 +257,6 @@ const DockerAuthentikService = `
 const (
 	DockerNetworkName                 = "hecate-net"
 	DockerVolumeAuthentikPostgresName = "authentik-postgres-data"
-	DockerVolumeCaddyAdminSockName    = "caddy-admin-sock"
 	// Deprecated in Authentik 2025.10+: Redis fully removed
 	DockerVolumeAuthentikRedisName = "authentik-redis-data"
 	// Deprecated: Use Authentik volumes instead
@@ -279,7 +272,6 @@ networks:
 
 volumes:
   ` + DockerVolumeAuthentikPostgresName + `:
-  ` + DockerVolumeCaddyAdminSockName + `:
 `
 )
 

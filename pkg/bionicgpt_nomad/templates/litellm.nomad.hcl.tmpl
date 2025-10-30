@@ -68,7 +68,7 @@ model_list:
 
 {{ if .UseLocalEmbeddings }}
   # Local Ollama for embeddings
-  - model_name: text-embedding-nomic
+  - model_name: {{.LocalEmbeddingsModel}}
     litellm_params:
       model: ollama/{{.LocalEmbeddingsModel}}
 {{ range service "ollama" }}

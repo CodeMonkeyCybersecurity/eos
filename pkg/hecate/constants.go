@@ -35,20 +35,11 @@ const (
 	// VALUE: "localhost" refers to host's localhost (not container's localhost)
 	CaddyAdminAPIHost = "localhost"
 
-	// CaddyAdminSocketPath is the Unix socket path for Caddy Admin API
-	// P0.3: Migrated from TCP port to Unix socket for SSRF immunity
-	// RATIONALE: Unix sockets immune to SSRF attacks from compromised containers
-	// SECURITY: Only processes with filesystem access can use Admin API
-	// THREAT MODEL: Prevents config tampering via SSRF vulnerabilities
-	// LOCATION: Docker volume 'caddy-admin-sock' mounted at /var/run/caddy/
-	CaddyAdminSocketPath = "/var/run/caddy/admin.sock"
-
 	// CaddyAdminAPIPort is the port where Caddy Admin API listens
-	// DEPRECATED (2025-10-30): Migrated to Unix socket (CaddyAdminSocketPath)
 	// RATIONALE: Port 2019 is Caddy's default Admin API port
-	// MIGRATION: P0.3 replaced TCP with Unix socket for SSRF protection
+	// ARCHITECTURE: Eos runs on host, Caddy in container - requires TCP (Unix sockets don't work)
 	//
-	// SECURITY MODEL (HISTORICAL - DEPRECATED):
+	// SECURITY MODEL:
 	// ┌─────────────────────────────────────────────────────────────────────────┐
 	// │ Admin API Security has THREE layers:                                    │
 	// │                                                                          │
@@ -75,16 +66,17 @@ const (
 	// │   ✗ Does NOT prevent: Malicious containers on same bridge network       │
 	// │   ✗ Does NOT prevent: Root user on host machine (intended behavior)     │
 	// │                                                                          │
-	// │ FUTURE ENHANCEMENT (ROADMAP):                                            │
-	// │   Add --admin-api flag to enable/disable Admin API port exposure        │
-	// │   Default: DISABLED (more secure, uses docker exec fallback)            │
-	// │   User enables: --admin-api=true (faster, requires port exposure)       │
+	// │ WHY NOT UNIX SOCKETS?                                                    │
+	// │   Unix sockets require filesystem access, but Docker named volumes      │
+	// │   store sockets in /var/lib/docker/volumes/, not accessible from host   │
+	// │   Bind mounts (/var/run/caddy) conflict with systemd socket units       │
+	// │   TCP on localhost is secure enough (see Layer 1 above)                 │
 	// └─────────────────────────────────────────────────────────────────────────┘
 	//
-	// USAGE: Used for zero-downtime config reloads via `eos update hecate --add`
+	// USAGE: Used for zero-downtime config reloads via `eos update hecate --refresh`
 	//        If port not exposed, Eos falls back to docker exec (also zero-downtime)
 	// REFERENCE: https://caddyserver.com/docs/api
-	// TEMPLATE: pkg/hecate/yaml_generator.go line ~256 exposes this port in docker-compose.yml
+	// TEMPLATE: pkg/hecate/types_docker.go DockerCaddyService exposes this port
 	CaddyAdminAPIPort = 2019
 
 	// AuthentikHost is the hostname where Authentik SSO service is accessible
