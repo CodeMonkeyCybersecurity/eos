@@ -169,6 +169,15 @@ func (c *CaddyAdminClient) LoadCaddyfile(ctx context.Context, caddyfile string) 
 		return fmt.Errorf("failed to adapt Caddyfile: %w", err)
 	}
 
+	if result, ok := config["result"]; ok {
+		resultMap, ok := result.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("adapted config result has unexpected type %T", result)
+		}
+		// Caddy /adapt wraps the real config under "result"; unwrap so /load sees the root apps/logging keys.
+		config = resultMap
+	}
+
 	// Step 2: Load the JSON config
 	if err := c.LoadConfig(ctx, config); err != nil {
 		return fmt.Errorf("failed to load adapted config: %w", err)
