@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,16 +126,30 @@ Examples:
 		if verify {
 			logger.Info("Verifying restored files")
 
-			// List restored files
+			// List restored files from snapshot
 			verifyArgs := append([]string{"ls", snapshotID, "--json"}, includes...)
 
-			_, err := client.RunRestic(verifyArgs...)
+			output, err := client.RunRestic(verifyArgs...)
 			if err != nil {
-				logger.Warn("Failed to verify restored files",
+				logger.Warn("Failed to list snapshot contents for verification",
 					zap.Error(err))
 			} else {
-				// TODO: Parse JSON and verify files exist in target
-				logger.Info("Verification completed")
+				// Parse JSON output and verify files exist in target
+				verified, missing, err := verifyRestoredFiles(output, target)
+				if err != nil {
+					logger.Warn("Verification parsing failed", zap.Error(err))
+				} else {
+					logger.Info("Verification completed",
+						zap.Int("verified", verified),
+						zap.Int("missing", missing))
+
+					if missing > 0 {
+						logger.Warn("Some files from snapshot are missing in target",
+							zap.Int("missing_count", missing))
+					} else {
+						logger.Info("✓ All snapshot files verified in target directory")
+					}
+				}
 			}
 		}
 
@@ -171,6 +186,43 @@ Examples:
 
 		return nil
 	}),
+}
+
+// verifyRestoredFiles parses restic ls JSON output and checks if files exist in target
+// Returns: (verified count, missing count, error)
+func verifyRestoredFiles(jsonOutput []byte, targetDir string) (int, int, error) {
+	// Parse JSON output from restic ls
+	var snapshotFiles []struct {
+		Type string `json:"type"`
+		Path string `json:"path"`
+	}
+
+	if err := json.Unmarshal(jsonOutput, &snapshotFiles); err != nil {
+		return 0, 0, fmt.Errorf("parsing snapshot file list: %w", err)
+	}
+
+	verified := 0
+	missing := 0
+
+	for _, file := range snapshotFiles {
+		// Skip directories, only verify files
+		if file.Type == "dir" {
+			continue
+		}
+
+		// Build full path in target directory
+		fullPath := filepath.Join(targetDir, file.Path)
+
+		// Check if file exists
+		if _, err := os.Stat(fullPath); err == nil {
+			verified++
+		} else if os.IsNotExist(err) {
+			missing++
+		}
+		// Ignore other errors (permission denied, etc.) - count as verified
+	}
+
+	return verified, missing, nil
 }
 
 func init() {

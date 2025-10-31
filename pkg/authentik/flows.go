@@ -60,6 +60,8 @@ func (c *APIClient) ListFlows(ctx context.Context, designation string) ([]FlowRe
 }
 
 // GetFlow retrieves a flow by slug
+// P1 FIX: Returns (nil, nil) if flow not found (distinguishes "not found" from API errors)
+// This enables idempotency checks: check if exists, create if not
 func (c *APIClient) GetFlow(ctx context.Context, slug string) (*FlowResponse, error) {
 	// List flows filtered by slug (API doesn't support direct slug lookup)
 	url := fmt.Sprintf("%s/api/v3/flows/instances/?slug=%s", c.BaseURL, slug)
@@ -92,7 +94,9 @@ func (c *APIClient) GetFlow(ctx context.Context, slug string) (*FlowResponse, er
 	}
 
 	if len(result.Results) == 0 {
-		return nil, fmt.Errorf("flow with slug '%s' not found", slug)
+		// P1 FIX: Not found is not an error - return nil, nil
+		// Caller can check: if flow != nil { exists } else { create }
+		return nil, nil
 	}
 
 	return &result.Results[0], nil

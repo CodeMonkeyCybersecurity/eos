@@ -27,12 +27,26 @@ type SelfEnrollmentConfig struct {
 }
 
 // enrollmentResources tracks all created Authentik resources for rollback
+// P0 FIX: Only track resources WE CREATED, not reused existing resources
 type enrollmentResources struct {
-	PromptFieldPKs []string                 // Created prompt fields (username, email)
-	StagePKs       []string                 // Created stages (prompt, password, user write, login, captcha)
-	FlowPK         string                   // Created enrollment flow
+	PromptFieldPKs []string                 // Created prompt fields (username, email) - NOT reused
+	StagePKs       []string                 // Created stages (prompt, password, user write, login, captcha) - NOT reused
+	FlowPK         string                   // Created enrollment flow - NOT reused
 	OriginalBrand  *authentik.BrandResponse // Original brand config for restoration
 	BrandPK        string                   // Brand that was modified
+}
+
+// enrollmentStats tracks what was reused vs created for transparency
+// P2 REC: Provide visibility into what actions were taken
+type enrollmentStats struct {
+	FlowsReused     int
+	FlowsCreated    int
+	StagesReused    int
+	StagesCreated   int
+	FieldsReused    int
+	FieldsCreated   int
+	BindingsReused  int
+	BindingsCreated int
 }
 
 // EnableSelfEnrollment enables self-enrollment for Hecate applications
@@ -112,6 +126,23 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 	logger.Info("✓ Authentik API is responding")
 
+	// P3 REC: Validate API token before operations (fail-fast)
+	// RATIONALE: Health check only verifies service is up, not that token is valid
+	// BENEFIT: Detect auth issues before attempting to create resources
+	logger.Debug("Validating API token")
+	_, err = authentikClient.ListBrands(rc.Ctx)
+	if err != nil {
+		return fmt.Errorf("Authentik API token invalid or expired: %w\n\n"+
+			"Check token in /opt/hecate/.env\n"+
+			"Looked for: AUTHENTIK_API_TOKEN, AUTHENTIK_TOKEN, AUTHENTIK_API_KEY, AUTHENTIK_BOOTSTRAP_TOKEN\n\n"+
+			"To fix:\n"+
+			"  1. Verify token exists: grep AUTHENTIK /opt/hecate/.env\n"+
+			"  2. Test token: curl -H 'Authorization: Bearer <token>' %s/api/v3/core/brands/\n"+
+			"  3. Create new token in Authentik UI: Admin → Tokens → Create\n"+
+			"  4. Update /opt/hecate/.env with new token", err, authentikURL)
+	}
+	logger.Info("✓ API token validated")
+
 	// Get current brand configuration
 	brands, err := authentikClient.ListBrands(rc.Ctx)
 	if err != nil {
@@ -174,11 +205,15 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		BrandPK:       brand.PK,
 	}
 
+	// P2: Initialize stats tracking for transparency
+	stats := &enrollmentStats{}
+
 	// P0: Defer rollback on failure (follows Hecate backup/restore pattern)
 	var enrollmentErr error
 	defer func() {
 		if enrollmentErr != nil {
-			rollbackEnrollmentSetup(rc, authentikClient, resources)
+			// P2 FIX: Include error context in rollback message
+			rollbackEnrollmentSetup(rc, authentikClient, resources, enrollmentErr)
 		}
 	}()
 
@@ -198,25 +233,44 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 
 	logger.Info("Phase 2: Creating enrollment flow and stages")
 
-	// Create enrollment flow
+	// P0 FIX: Check if enrollment flow already exists (idempotency)
 	flowSlug := "eos-self-registration"
 	flowName := "Self Registration (Eos)"
 	flowTitle := "Create your account"
 
-	logger.Info("Creating enrollment flow",
-		zap.String("slug", flowSlug),
-		zap.String("name", flowName))
-
-	enrollmentFlow, err := authentikClient.CreateEnrollmentFlow(rc.Ctx, flowName, flowSlug, flowTitle)
+	logger.Debug("Checking for existing enrollment flow", zap.String("slug", flowSlug))
+	var enrollmentFlow *authentik.FlowResponse
+	existingFlow, err := authentikClient.GetFlow(rc.Ctx, flowSlug)
 	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create enrollment flow: %w", err)
+		enrollmentErr = fmt.Errorf("failed to check for existing flow: %w", err)
 		return enrollmentErr
 	}
-	resources.FlowPK = enrollmentFlow.PK // Track for rollback
 
-	logger.Info("✓ Enrollment flow created",
-		zap.String("flow_pk", enrollmentFlow.PK),
-		zap.String("slug", enrollmentFlow.Slug))
+	if existingFlow != nil {
+		// Flow already exists, reuse it
+		logger.Info("✓ Enrollment flow already exists, reusing",
+			zap.String("flow_pk", existingFlow.PK),
+			zap.String("slug", existingFlow.Slug))
+		enrollmentFlow = existingFlow
+		stats.FlowsReused++
+		// P0 FIX: Do NOT track for rollback - we didn't create it
+	} else {
+		// Flow doesn't exist, create it
+		logger.Info("Creating enrollment flow",
+			zap.String("slug", flowSlug),
+			zap.String("name", flowName))
+
+		enrollmentFlow, err = authentikClient.CreateEnrollmentFlow(rc.Ctx, flowName, flowSlug, flowTitle)
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create enrollment flow: %w", err)
+			return enrollmentErr
+		}
+		resources.FlowPK = enrollmentFlow.PK // P0 FIX: Only track if WE created it
+		stats.FlowsCreated++
+		logger.Info("✓ Enrollment flow created",
+			zap.String("flow_pk", enrollmentFlow.PK),
+			zap.String("slug", enrollmentFlow.Slug))
+	}
 
 	// Create prompt fields for username and email collection
 	logger.Info("Creating prompt fields for user information")
@@ -247,6 +301,7 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			zap.String("field_pk", existing.PK),
 			zap.String("field_key", existing.FieldKey))
 		usernameField = existing
+		stats.FieldsReused++ // P2: Track reuse
 	} else {
 		usernameField, err = authentikClient.CreatePromptField(rc.Ctx,
 			"username",       // field_key
@@ -260,6 +315,7 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			return enrollmentErr
 		}
 		resources.PromptFieldPKs = append(resources.PromptFieldPKs, usernameField.PK) // Track for rollback
+		stats.FieldsCreated++                                                         // P2: Track creation
 		logger.Info("✓ Username field created", zap.String("field_pk", usernameField.PK))
 	}
 
@@ -270,6 +326,7 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			zap.String("field_pk", existing.PK),
 			zap.String("field_key", existing.FieldKey))
 		emailField = existing
+		stats.FieldsReused++ // P2: Track reuse
 	} else {
 		emailField, err = authentikClient.CreatePromptField(rc.Ctx,
 			"email",       // field_key
@@ -283,66 +340,131 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			return enrollmentErr
 		}
 		resources.PromptFieldPKs = append(resources.PromptFieldPKs, emailField.PK) // Track for rollback
+		stats.FieldsCreated++                                                      // P2: Track creation
 		logger.Info("✓ Email field created", zap.String("field_pk", emailField.PK))
 	}
 
-	// Optional: Create captcha stage for bot protection
+	// P0 FIX: Check for existing stages first (idempotency)
+	logger.Debug("Checking for existing stages")
+	existingStages, err := authentikClient.ListStages(rc.Ctx)
+	if err != nil {
+		logger.Warn("Failed to list existing stages, will attempt creation",
+			zap.Error(err))
+		existingStages = []authentik.StageResponse{} // Continue with empty list
+	}
+
+	// Helper to find existing stage by name
+	findStageByName := func(name string) *authentik.StageResponse {
+		for i := range existingStages {
+			if existingStages[i].Name == name {
+				return &existingStages[i]
+			}
+		}
+		return nil
+	}
+
+	// Optional: Create or reuse captcha stage for bot protection
 	var captchaStage *authentik.CaptchaStageResponse
 	if config.EnableCaptcha {
-		logger.Info("Creating captcha stage for bot protection")
-		captchaStage, err = authentikClient.CreateCaptchaStage(rc.Ctx, "eos-enrollment-captcha", "", "")
+		if existing := findStageByName("eos-enrollment-captcha"); existing != nil {
+			logger.Info("✓ Captcha stage already exists, reusing",
+				zap.String("stage_pk", existing.PK))
+			// Map to CaptchaStageResponse (we only need PK for binding)
+			captchaStage = &authentik.CaptchaStageResponse{PK: existing.PK, Name: existing.Name}
+			stats.StagesReused++
+		} else {
+			logger.Info("Creating captcha stage for bot protection")
+			captchaStage, err = authentikClient.CreateCaptchaStage(rc.Ctx, "eos-enrollment-captcha", "", "")
+			if err != nil {
+				enrollmentErr = fmt.Errorf("failed to create captcha stage: %w", err)
+				return enrollmentErr
+			}
+			resources.StagePKs = append(resources.StagePKs, captchaStage.PK) // Track for rollback ONLY if created
+			stats.StagesCreated++
+			logger.Info("✓ Captcha stage created (using test keys - configure production keys in Authentik UI)",
+				zap.String("stage_pk", captchaStage.PK))
+		}
+	}
+
+	// Create or reuse prompt stage with username and email fields
+	var promptStage *authentik.PromptStageResponse
+	if existing := findStageByName("eos-enrollment-prompts"); existing != nil {
+		logger.Info("✓ Prompt stage already exists, reusing",
+			zap.String("stage_pk", existing.PK))
+		promptStage = &authentik.PromptStageResponse{PK: existing.PK, Name: existing.Name}
+		stats.StagesReused++
+	} else {
+		logger.Info("Creating prompt stage for enrollment")
+		promptStage, err = authentikClient.CreatePromptStage(rc.Ctx,
+			"eos-enrollment-prompts",
+			[]string{usernameField.PK, emailField.PK})
 		if err != nil {
-			enrollmentErr = fmt.Errorf("failed to create captcha stage: %w", err)
+			enrollmentErr = fmt.Errorf("failed to create prompt stage: %w", err)
 			return enrollmentErr
 		}
-		resources.StagePKs = append(resources.StagePKs, captchaStage.PK) // Track for rollback
-		logger.Info("✓ Captcha stage created (using test keys - configure production keys in Authentik UI)",
-			zap.String("stage_pk", captchaStage.PK))
+		resources.StagePKs = append(resources.StagePKs, promptStage.PK) // Track for rollback
+		stats.StagesCreated++
+		logger.Info("✓ Prompt stage created", zap.String("stage_pk", promptStage.PK))
 	}
 
-	// Create prompt stage with username and email fields
-	logger.Info("Creating prompt stage for enrollment")
-	promptStage, err := authentikClient.CreatePromptStage(rc.Ctx,
-		"eos-enrollment-prompts",
-		[]string{usernameField.PK, emailField.PK})
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create prompt stage: %w", err)
-		return enrollmentErr
+	// Create or reuse password stage
+	var passwordStage *authentik.PasswordStageResponse
+	if existing := findStageByName("eos-enrollment-password"); existing != nil {
+		logger.Info("✓ Password stage already exists, reusing",
+			zap.String("stage_pk", existing.PK))
+		passwordStage = &authentik.PasswordStageResponse{PK: existing.PK, Name: existing.Name}
+		stats.StagesReused++
+	} else {
+		logger.Info("Creating password stage for enrollment")
+		passwordStage, err = authentikClient.CreatePasswordStage(rc.Ctx, "eos-enrollment-password")
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create password stage: %w", err)
+			return enrollmentErr
+		}
+		resources.StagePKs = append(resources.StagePKs, passwordStage.PK) // Track for rollback
+		stats.StagesCreated++
+		logger.Info("✓ Password stage created", zap.String("stage_pk", passwordStage.PK))
 	}
-	resources.StagePKs = append(resources.StagePKs, promptStage.PK) // Track for rollback
-	logger.Info("✓ Prompt stage created", zap.String("stage_pk", promptStage.PK))
 
-	// Create password stage
-	logger.Info("Creating password stage for enrollment")
-	passwordStage, err := authentikClient.CreatePasswordStage(rc.Ctx, "eos-enrollment-password")
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create password stage: %w", err)
-		return enrollmentErr
+	// Create or reuse user write stage
+	var userWriteStage *authentik.UserWriteStageResponse
+	if existing := findStageByName("eos-enrollment-user-write"); existing != nil {
+		logger.Info("✓ User write stage already exists, reusing",
+			zap.String("stage_pk", existing.PK))
+		userWriteStage = &authentik.UserWriteStageResponse{PK: existing.PK, Name: existing.Name}
+		stats.StagesReused++
+	} else {
+		logger.Info("Creating user write stage for enrollment")
+		userWriteStage, err = authentikClient.CreateUserWriteStage(rc.Ctx, "eos-enrollment-user-write", false, "")
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create user write stage: %w", err)
+			return enrollmentErr
+		}
+		resources.StagePKs = append(resources.StagePKs, userWriteStage.PK) // Track for rollback
+		stats.StagesCreated++
+		logger.Info("✓ User write stage created", zap.String("stage_pk", userWriteStage.PK))
 	}
-	resources.StagePKs = append(resources.StagePKs, passwordStage.PK) // Track for rollback
-	logger.Info("✓ Password stage created", zap.String("stage_pk", passwordStage.PK))
 
-	// Create user write stage
-	logger.Info("Creating user write stage for enrollment")
-	userWriteStage, err := authentikClient.CreateUserWriteStage(rc.Ctx, "eos-enrollment-user-write", false, "")
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create user write stage: %w", err)
-		return enrollmentErr
+	// Create or reuse user login stage (auto-login after signup)
+	var loginStage *authentik.UserLoginStageResponse
+	if existing := findStageByName("eos-enrollment-login"); existing != nil {
+		logger.Info("✓ User login stage already exists, reusing",
+			zap.String("stage_pk", existing.PK))
+		loginStage = &authentik.UserLoginStageResponse{PK: existing.PK, Name: existing.Name}
+		stats.StagesReused++
+	} else {
+		logger.Info("Creating user login stage for auto-login")
+		loginStage, err = authentikClient.CreateUserLoginStage(rc.Ctx, "eos-enrollment-login")
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create user login stage: %w", err)
+			return enrollmentErr
+		}
+		resources.StagePKs = append(resources.StagePKs, loginStage.PK) // Track for rollback
+		stats.StagesCreated++
+		logger.Info("✓ User login stage created", zap.String("stage_pk", loginStage.PK))
 	}
-	resources.StagePKs = append(resources.StagePKs, userWriteStage.PK) // Track for rollback
-	logger.Info("✓ User write stage created", zap.String("stage_pk", userWriteStage.PK))
 
-	// Create user login stage (auto-login after signup)
-	logger.Info("Creating user login stage for auto-login")
-	loginStage, err := authentikClient.CreateUserLoginStage(rc.Ctx, "eos-enrollment-login")
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create user login stage: %w", err)
-		return enrollmentErr
-	}
-	resources.StagePKs = append(resources.StagePKs, loginStage.PK) // Track for rollback
-	logger.Info("✓ User login stage created", zap.String("stage_pk", loginStage.PK))
-
-	// Bind stages to enrollment flow (order matters!)
+	// P0 FIX: Bind stages to enrollment flow with idempotency check
 	// Order 5: Captcha stage (if enabled - bot protection)
 	// Order 10: Prompt stage (collect username, email)
 	// Order 20: Password stage (user chooses password)
@@ -350,38 +472,86 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	// Order 40: User login stage (auto-login after signup)
 	logger.Info("Binding stages to enrollment flow")
 
+	// Check existing bindings first
+	existingBindings, err := authentikClient.ListFlowBindings(rc.Ctx, enrollmentFlow.PK)
+	if err != nil {
+		logger.Warn("Failed to list existing bindings, will attempt creation",
+			zap.Error(err))
+		existingBindings = []authentik.StageBindingResponse{}
+	}
+
+	// Helper to check if binding already exists
+	bindingExists := func(stagePK string) bool {
+		for _, binding := range existingBindings {
+			if binding.Stage == stagePK {
+				return true
+			}
+		}
+		return false
+	}
+
 	stageCount := 4
 	if config.EnableCaptcha && captchaStage != nil {
-		_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, captchaStage.PK, 5)
-		if err != nil {
-			enrollmentErr = fmt.Errorf("failed to bind captcha stage: %w", err)
-			return enrollmentErr
+		if bindingExists(captchaStage.PK) {
+			logger.Info("✓ Captcha stage binding already exists, skipping")
+			stats.BindingsReused++
+		} else {
+			_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, captchaStage.PK, 5)
+			if err != nil {
+				enrollmentErr = fmt.Errorf("failed to bind captcha stage: %w", err)
+				return enrollmentErr
+			}
+			stats.BindingsCreated++
 		}
 		stageCount++
 	}
 
-	_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, promptStage.PK, 10)
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to bind prompt stage: %w", err)
-		return enrollmentErr
+	if bindingExists(promptStage.PK) {
+		logger.Info("✓ Prompt stage binding already exists, skipping")
+		stats.BindingsReused++
+	} else {
+		_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, promptStage.PK, 10)
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to bind prompt stage: %w", err)
+			return enrollmentErr
+		}
+		stats.BindingsCreated++
 	}
 
-	_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, passwordStage.PK, 20)
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to bind password stage: %w", err)
-		return enrollmentErr
+	if bindingExists(passwordStage.PK) {
+		logger.Info("✓ Password stage binding already exists, skipping")
+		stats.BindingsReused++
+	} else {
+		_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, passwordStage.PK, 20)
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to bind password stage: %w", err)
+			return enrollmentErr
+		}
+		stats.BindingsCreated++
 	}
 
-	_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, userWriteStage.PK, 30)
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to bind user write stage: %w", err)
-		return enrollmentErr
+	if bindingExists(userWriteStage.PK) {
+		logger.Info("✓ User write stage binding already exists, skipping")
+		stats.BindingsReused++
+	} else {
+		_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, userWriteStage.PK, 30)
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to bind user write stage: %w", err)
+			return enrollmentErr
+		}
+		stats.BindingsCreated++
 	}
 
-	_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, loginStage.PK, 40)
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to bind user login stage: %w", err)
-		return enrollmentErr
+	if bindingExists(loginStage.PK) {
+		logger.Info("✓ User login stage binding already exists, skipping")
+		stats.BindingsReused++
+	} else {
+		_, err = authentikClient.CreateStageBinding(rc.Ctx, enrollmentFlow.PK, loginStage.PK, 40)
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to bind user login stage: %w", err)
+			return enrollmentErr
+		}
+		stats.BindingsCreated++
 	}
 
 	logger.Info("✓ Stages bound to enrollment flow",
@@ -432,10 +602,20 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		logger.Info("✓ Enrollment URL is accessible")
 	}
 
-	// Final report
+	// P2: Display stats summary (transparency)
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	logger.Info("✓ Self-enrollment enabled successfully")
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Resource Summary",
+		zap.Int("flows_created", stats.FlowsCreated),
+		zap.Int("flows_reused", stats.FlowsReused),
+		zap.Int("stages_created", stats.StagesCreated),
+		zap.Int("stages_reused", stats.StagesReused),
+		zap.Int("fields_created", stats.FieldsCreated),
+		zap.Int("fields_reused", stats.FieldsReused),
+		zap.Int("bindings_created", stats.BindingsCreated),
+		zap.Int("bindings_reused", stats.BindingsReused))
+	logger.Info("")
 	logger.Info("Enrollment URL", zap.String("url", enrollmentURL))
 	logger.Info("Flow Name", zap.String("name", enrollmentFlow.Name))
 	logger.Info("Flow Slug", zap.String("slug", enrollmentFlow.Slug))
@@ -621,19 +801,24 @@ func discoverAuthentikCredentials(rc *eos_io.RuntimeContext) (string, string, er
 }
 
 // rollbackEnrollmentSetup removes all created Authentik resources
+// P0 FIX: Only deletes resources WE CREATED (tracked in resources struct)
+// P2 FIX: Includes error context for debugging
 // ROLLBACK ORDER (reverse of creation):
 // 1. Restore brand to original state
 // 2. Delete flow (and its stage bindings)
 // 3. Delete stages
 // 4. Delete prompt fields
-func rollbackEnrollmentSetup(rc *eos_io.RuntimeContext, authentikClient *authentik.APIClient, resources *enrollmentResources) {
+func rollbackEnrollmentSetup(rc *eos_io.RuntimeContext, authentikClient *authentik.APIClient, resources *enrollmentResources, triggerError error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if resources == nil {
 		return
 	}
 
-	logger.Warn("Rolling back enrollment setup due to failure")
+	// P2 FIX: Include error context in rollback message
+	logger.Warn("Rolling back enrollment setup due to failure",
+		zap.Error(triggerError),
+		zap.String("reason", "See error above for root cause"))
 
 	// Step 1: Restore brand to original state (if modified)
 	if resources.OriginalBrand != nil && resources.BrandPK != "" {
