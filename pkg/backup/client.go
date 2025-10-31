@@ -17,7 +17,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -57,7 +56,7 @@ func NewClient(rc *eos_io.RuntimeContext, repoName string) (*Client, error) {
 func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
-	// Get password from Vault
+	// Get repository password
 	password, err := c.getRepositoryPassword()
 	if err != nil {
 		return nil, fmt.Errorf("getting repository password: %w", err)
@@ -139,54 +138,61 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	return output, nil
 }
 
-// getRepositoryPassword retrieves password from Vault
+// getRepositoryPassword retrieves the repository password using local secret stores
 func (c *Client) getRepositoryPassword() (string, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
-	vaultPath := fmt.Sprintf("eos/backup/repositories/%s", c.repository.Name)
-	logger.Info("Retrieving repository password from Vault",
-		zap.String("path", vaultPath))
-
-	vaultAddr := shared.GetVaultAddrWithEnv()
-
-	// Try to connect to Vault
-	vClient, err := vault.NewClient(vaultAddr, logger.Logger().Logger)
-	if err != nil {
-		// Fall back to local password file if Vault unavailable
-		logger.Warn("Vault unavailable, checking local password file",
+	// 1. Repository-local password file (created by quick backup generator)
+	localPasswordPath := filepath.Join(c.repository.URL, ".password")
+	if password, err := readPasswordFile(localPasswordPath); err == nil {
+		logger.Debug("Using repository-local password file",
+			zap.String("path", localPasswordPath))
+		return password, nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Warn("Failed to read repository-local password file",
+			zap.String("path", localPasswordPath),
 			zap.Error(err))
+	}
 
-		passwordFile := fmt.Sprintf("/var/lib/eos/secrets/backup/%s.password", c.repository.Name)
-		if data, err := os.ReadFile(passwordFile); err == nil {
-			return strings.TrimSpace(string(data)), nil
+	// 2. Global secrets directory fallback (used by managed repositories)
+	secretsPasswordPath := filepath.Join(SecretsDir, fmt.Sprintf("%s.password", c.repository.Name))
+	if password, err := readPasswordFile(secretsPasswordPath); err == nil {
+		logger.Debug("Using secrets directory password file",
+			zap.String("path", secretsPasswordPath))
+		return password, nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Warn("Failed to read secrets directory password file",
+			zap.String("path", secretsPasswordPath),
+			zap.Error(err))
+	}
+
+	// 3. Repository `.env` file (temporary secret storage during Vault testing)
+	envPath := filepath.Join(c.repository.URL, ".env")
+	if password, err := readPasswordFromEnvFile(envPath); err == nil {
+		logger.Debug("Using repository .env file for restic password",
+			zap.String("path", envPath))
+		return password, nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Warn("Failed to read repository .env file",
+			zap.String("path", envPath),
+			zap.Error(err))
+	}
+
+	// 4. Environment variable overrides (least preferred, but supported for manual ops)
+	if password := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD")); password != "" {
+		logger.Warn("Using RESTIC_PASSWORD environment variable; prefer password files for security")
+		return password, nil
+	}
+
+	if passwordFile := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD_FILE")); passwordFile != "" {
+		if password, err := readPasswordFile(passwordFile); err == nil {
+			logger.Warn("Using RESTIC_PASSWORD_FILE override; prefer managed password files",
+				zap.String("path", passwordFile))
+			return password, nil
 		}
-
-		// Fallback: repository-local password file (used by quick backups)
-		localPasswordFile := filepath.Join(c.repository.URL, ".password")
-		if data, err := os.ReadFile(localPasswordFile); err == nil {
-			logger.Info("Using repository-local password file",
-				zap.String("path", localPasswordFile))
-			return strings.TrimSpace(string(data)), nil
-		}
-
-		return "", fmt.Errorf("vault unavailable and no local password found")
 	}
 
-	secret, err := vClient.GetSecret(c.rc.Ctx, vaultPath)
-	if err != nil {
-		return "", fmt.Errorf("reading from vault: %w", err)
-	}
-
-	if secret == nil || secret.Data == nil {
-		return "", fmt.Errorf("no secret found at %s", vaultPath)
-	}
-
-	password, ok := secret.Data["password"].(string)
-	if !ok {
-		return "", fmt.Errorf("invalid password format in vault")
-	}
-
-	return password, nil
+	return "", fmt.Errorf("restic repository password not found; expected password file at %s or %s", localPasswordPath, secretsPasswordPath)
 }
 
 // InitRepository initializes a new restic repository
@@ -295,6 +301,45 @@ func (c *Client) Backup(profileName string) error {
 	return nil
 }
 
+// readPasswordFile reads and trims a password from the provided file path.
+func readPasswordFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	password := strings.TrimSpace(string(data))
+	if password == "" {
+		return "", fmt.Errorf("password file %s is empty", path)
+	}
+
+	return password, nil
+}
+
+// readPasswordFromEnvFile retrieves a restic password from a .env file if present.
+// The file may contain either RESTIC_PASSWORD or RESTIC_PASSWORD_FILE pointing to a
+// secondary password file.
+func readPasswordFromEnvFile(path string) (string, error) {
+	if _, err := os.Stat(path); err != nil {
+		return "", err
+	}
+
+	vars, err := shared.ParseEnvFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	if passwordFile, ok := vars["RESTIC_PASSWORD_FILE"]; ok && strings.TrimSpace(passwordFile) != "" {
+		return readPasswordFile(strings.TrimSpace(passwordFile))
+	}
+
+	if password, ok := vars["RESTIC_PASSWORD"]; ok && strings.TrimSpace(password) != "" {
+		return strings.TrimSpace(password), nil
+	}
+
+	return "", fmt.Errorf("restic password not found in %s", path)
+}
+
 // runBackupWithProgress executes backup with JSON progress parsing
 // SECURITY: Uses password file instead of environment variable to prevent
 // password exposure via 'ps auxe' (CVSS 7.5 vulnerability mitigation)
@@ -303,7 +348,7 @@ func (c *Client) runBackupWithProgress(args []string) error {
 
 	cmd := exec.CommandContext(c.rc.Ctx, "restic", args...)
 
-	// Get password from Vault
+	// Get repository password
 	password, err := c.getRepositoryPassword()
 	if err != nil {
 		return err
