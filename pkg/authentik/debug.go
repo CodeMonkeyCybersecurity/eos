@@ -115,6 +115,23 @@ func RunAuthentikDebug(rc *eos_io.RuntimeContext, config *DebugConfig) error {
 		zap.Int("failed", countFailed(allResults)),
 		zap.Int("warnings", countWarnings(allResults)))
 
+	// 14. Configuration Export - Show complete Authentik state
+	fmt.Println()
+	fmt.Println("=========================================")
+	fmt.Println("Authentik Configuration Export")
+	fmt.Println("=========================================")
+	fmt.Println()
+
+	if err := displayAuthentikConfiguration(rc, config.HecatePath); err != nil {
+		logger.Warn("Failed to export Authentik configuration",
+			zap.Error(err))
+		fmt.Printf("\n❌ Configuration export failed: %v\n", err)
+		fmt.Println("\nYou can manually check configuration in Authentik UI:")
+		fmt.Println("  • http://localhost:9000/if/admin/#/core/brands")
+		fmt.Println("  • http://localhost:9000/if/admin/#/flow/flows")
+		fmt.Println("  • http://localhost:9000/if/admin/#/identity/groups")
+	}
+
 	return nil
 }
 
@@ -1720,4 +1737,149 @@ func displayPreUpgradeSummary(results []AuthentikCheckResult) {
 	fmt.Println("To proceed with upgrade, run:")
 	fmt.Println("  eos update hecate --authentik")
 	fmt.Println()
+}
+
+// displayAuthentikConfiguration exports and displays complete Authentik configuration
+// Integrated into debug command to provide full observability
+func displayAuthentikConfiguration(rc *eos_io.RuntimeContext, hecatePath string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Read .env file to get API token
+	envPath := filepath.Join(hecatePath, ".env")
+	logger.Debug("Reading Authentik API token from .env",
+		zap.String("env_path", envPath))
+
+	envFile, err := os.ReadFile(envPath)
+	if err != nil {
+		return fmt.Errorf("failed to read .env file: %w\nPath: %s", err, envPath)
+	}
+
+	// Parse AUTHENTIK_TOKEN from .env
+	var apiToken string
+	for _, line := range strings.Split(string(envFile), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "AUTHENTIK_TOKEN=") {
+			apiToken = strings.TrimPrefix(line, "AUTHENTIK_TOKEN=")
+			apiToken = strings.Trim(apiToken, "\"'") // Remove quotes
+			break
+		}
+	}
+
+	if apiToken == "" {
+		return fmt.Errorf("AUTHENTIK_TOKEN not found in .env file\nPath: %s", envPath)
+	}
+
+	logger.Debug("✓ API token found in .env")
+
+	// Authentik URL (localhost:9000 for host access)
+	authentikURL := fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortAuthentik)
+
+	// Create Authentik API client
+	authentikClient := NewClient(authentikURL, apiToken)
+
+	// Fetch and display brands
+	logger.Debug("Fetching brands configuration")
+	brands, err := authentikClient.ListBrands(rc.Ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list brands: %w", err)
+	}
+
+	fmt.Printf("BRANDS (%d)\n", len(brands))
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	for _, brand := range brands {
+		fmt.Printf("  • %s\n", brand.BrandingTitle)
+		fmt.Printf("    Domain: %s\n", brand.Domain)
+		fmt.Printf("    Brand UUID: %s\n", brand.PK)
+		if brand.FlowEnrollment != "" {
+			fmt.Printf("    Enrollment Flow: %s ✓\n", brand.FlowEnrollment)
+		} else {
+			fmt.Printf("    Enrollment Flow: Not configured\n")
+		}
+		fmt.Println()
+	}
+
+	// Fetch and display flows
+	logger.Debug("Fetching flows configuration")
+	flows, err := authentikClient.ListFlows(rc.Ctx, "") // All designations
+	if err != nil {
+		return fmt.Errorf("failed to list flows: %w", err)
+	}
+
+	fmt.Printf("\nFLOWS (%d)\n", len(flows))
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Group flows by designation
+	flowsByDesignation := make(map[string][]FlowResponse)
+	for _, flow := range flows {
+		flowsByDesignation[flow.Designation] = append(flowsByDesignation[flow.Designation], flow)
+	}
+
+	for designation, flows := range flowsByDesignation {
+		fmt.Printf("\n  %s FLOWS:\n", strings.ToUpper(designation))
+		for _, flow := range flows {
+			fmt.Printf("    • %s (%s)\n", flow.Title, flow.Slug)
+			fmt.Printf("      Flow PK: %s\n", flow.PK)
+
+			// Show stages for this flow
+			bindings, err := authentikClient.GetFlowStages(rc.Ctx, flow.PK)
+			if err != nil {
+				logger.Debug("Failed to fetch stages for flow",
+					zap.String("flow_slug", flow.Slug),
+					zap.Error(err))
+			} else {
+				fmt.Printf("      Stages: %d\n", len(bindings))
+			}
+		}
+	}
+
+	// Fetch and display groups
+	logger.Debug("Fetching groups configuration")
+	groups, err := authentikClient.ListGroups(rc.Ctx, "") // All groups
+	if err != nil {
+		return fmt.Errorf("failed to list groups: %w", err)
+	}
+
+	fmt.Printf("\n\nGROUPS (%d)\n", len(groups))
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	for _, group := range groups {
+		fmt.Printf("  • %s\n", group.Name)
+		if group.IsSuperuser {
+			fmt.Println("    Role: Superuser")
+		} else {
+			fmt.Println("    Role: Standard user")
+		}
+		if attrs, ok := group.Attributes["eos_managed"].(bool); ok && attrs {
+			fmt.Println("    Managed by: Eos ✓")
+		}
+		fmt.Println()
+	}
+
+	// Fetch and display applications
+	logger.Debug("Fetching applications configuration")
+	applications, err := authentikClient.ListApplications(rc.Ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list applications: %w", err)
+	}
+
+	fmt.Printf("APPLICATIONS (%d)\n", len(applications))
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	for _, app := range applications {
+		fmt.Printf("  • %s (%s)\n", app.Name, app.Slug)
+		if app.Provider != 0 {
+			fmt.Printf("    Provider PK: %d", app.Provider)
+			if app.ProviderObj.Name != "" {
+				fmt.Printf(" (%s)", app.ProviderObj.Name)
+			}
+			fmt.Println()
+		}
+		if app.MetaLaunchURL != "" {
+			fmt.Printf("    Launch URL: %s\n", app.MetaLaunchURL)
+		}
+		fmt.Println()
+	}
+
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	logger.Debug("✓ Authentik configuration export complete")
+	return nil
 }

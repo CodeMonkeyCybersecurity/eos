@@ -96,34 +96,47 @@ func (c *APIClient) GetBrand(ctx context.Context, pk string) (*BrandResponse, er
 	return &brand, nil
 }
 
-// UpdateBrand updates a brand's configuration
+// UpdateBrand updates a brand's configuration and returns the updated brand
 // Only non-empty fields in updates will be modified
-func (c *APIClient) UpdateBrand(ctx context.Context, pk string, updates map[string]interface{}) error {
+// Returns the updated brand object from API response for verification
+func (c *APIClient) UpdateBrand(ctx context.Context, pk string, updates map[string]interface{}) (*BrandResponse, error) {
 	jsonBody, err := json.Marshal(updates)
 	if err != nil {
-		return fmt.Errorf("failed to marshal update request: %w", err)
+		return nil, fmt.Errorf("failed to marshal update request: %w", err)
 	}
 
 	// P0 FIX: Correct API endpoint path
 	url := fmt.Sprintf("%s/api/v3/core/brands/%s/", c.BaseURL, pk)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json") // Request JSON response
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("brand update request failed: %w", err)
+		return nil, fmt.Errorf("brand update request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("brand update failed with status %d: %s", resp.StatusCode, string(body))
+	// Read response body for both success and error cases
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return nil
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("brand update failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response body to get updated brand
+	var updatedBrand BrandResponse
+	if err := json.Unmarshal(body, &updatedBrand); err != nil {
+		return nil, fmt.Errorf("failed to parse brand update response: %w\nResponse body: %s", err, string(body))
+	}
+
+	return &updatedBrand, nil
 }

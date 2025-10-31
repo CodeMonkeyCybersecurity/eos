@@ -616,9 +616,11 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		zap.Int("stage_count", stageCount))
 
 	// Link enrollment flow to brand
-	logger.Info("Linking enrollment flow to brand", zap.String("brand_pk", brand.PK))
+	logger.Info("Linking enrollment flow to brand",
+		zap.String("brand_pk", brand.PK),
+		zap.String("flow_pk", enrollmentFlow.PK))
 
-	err = authentikClient.UpdateBrand(rc.Ctx, brand.PK, map[string]interface{}{
+	updatedBrand, err := authentikClient.UpdateBrand(rc.Ctx, brand.PK, map[string]interface{}{
 		"flow_enrollment": enrollmentFlow.PK,
 	})
 	if err != nil {
@@ -626,23 +628,25 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		return enrollmentErr
 	}
 
-	logger.Info("✓ Enrollment flow linked to brand")
-
 	// PHASE 3: EVALUATE - Verify and report results
 
 	logger.Info("Phase 3: Verifying enrollment configuration")
 
-	// Verify brand was updated
-	updatedBrand, err := authentikClient.GetBrand(rc.Ctx, brand.PK)
-	if err != nil {
-		logger.Warn("Failed to verify brand update", zap.Error(err))
-	} else if updatedBrand.FlowEnrollment != enrollmentFlow.PK {
-		logger.Warn("Brand enrollment flow mismatch",
-			zap.String("expected", enrollmentFlow.PK),
-			zap.String("actual", updatedBrand.FlowEnrollment))
-	} else {
-		logger.Info("✓ Brand enrollment flow verified")
+	// Verify brand was actually updated (immediate verification from API response)
+	if updatedBrand.FlowEnrollment != enrollmentFlow.PK {
+		logger.Error("Brand enrollment flow update FAILED - API returned success but flow not set",
+			zap.String("expected_flow_pk", enrollmentFlow.PK),
+			zap.String("actual_flow_enrollment", updatedBrand.FlowEnrollment),
+			zap.String("brand_pk", brand.PK),
+			zap.String("api_response_brand_pk", updatedBrand.PK))
+		enrollmentErr = fmt.Errorf("brand update failed verification: API returned brand with flow_enrollment=%q, expected %q",
+			updatedBrand.FlowEnrollment, enrollmentFlow.PK)
+		return enrollmentErr
 	}
+
+	logger.Info("✓ Brand enrollment flow linked and verified",
+		zap.String("brand_pk", brand.PK),
+		zap.String("flow_enrollment", updatedBrand.FlowEnrollment))
 
 	// Generate enrollment URL
 	enrollmentURL := fmt.Sprintf("%s/if/flow/%s/", authentikURL, enrollmentFlow.Slug)
@@ -903,7 +907,7 @@ func rollbackEnrollmentSetup(rc *eos_io.RuntimeContext, authentikClient *authent
 	// Step 1: Restore brand to original state (if modified)
 	if resources.OriginalBrand != nil && resources.BrandPK != "" {
 		logger.Info("Restoring brand to original state", zap.String("brand_pk", resources.BrandPK))
-		err := authentikClient.UpdateBrand(rc.Ctx, resources.BrandPK, map[string]interface{}{
+		_, err := authentikClient.UpdateBrand(rc.Ctx, resources.BrandPK, map[string]interface{}{
 			"flow_enrollment": resources.OriginalBrand.FlowEnrollment,
 		})
 		if err != nil {
