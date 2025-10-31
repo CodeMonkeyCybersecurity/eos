@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -51,9 +52,12 @@ func NewCaddyAdminClient(host string) *CaddyAdminClient {
 
 	// Determine which host to use (three-tier fallback)
 	var targetHost string
+	var strategyUsed string
+
 	if host != "" && host != "localhost" {
 		// Tier 1: Explicit host provided (e.g., from env var CADDY_ADMIN_HOST)
 		targetHost = host
+		strategyUsed = "explicit_host"
 	} else {
 		// Tier 2: Auto-detect container IP via Docker SDK (best approach)
 		// RATIONALE: Bypasses localhost IPv4/IPv6 resolution issues
@@ -61,14 +65,29 @@ func NewCaddyAdminClient(host string) *CaddyAdminClient {
 		ctx := context.Background()
 		if containerIP, err := GetCaddyContainerIP(ctx); err == nil {
 			targetHost = containerIP
+			strategyUsed = "docker_sdk"
 		} else {
 			// Tier 3: Fall back to localhost (legacy behavior)
 			// WARNING: May fail with IPv6 resolution issues
+
+			// CRITICAL: Log why Docker SDK failed (P0 finding from adversarial analysis)
+			// RATIONALE: Silent failures are impossible to debug
+			// NOTE: Can't use structured logger here (no RuntimeContext in constructor)
+			//       Using fmt.Fprintf to stderr as diagnostic output
+			fmt.Fprintf(os.Stderr, "WARN: Caddy Admin API - Docker SDK container IP detection failed: %v\n", err)
+			fmt.Fprintf(os.Stderr, "WARN: Caddy Admin API - Falling back to localhost:2019 (may fail with IPv6 issues)\n")
+			fmt.Fprintf(os.Stderr, "INFO: Caddy Admin API - Run 'eos debug hecate --caddy' to diagnose Docker SDK issues\n")
+
 			targetHost = "localhost"
+			strategyUsed = "localhost_fallback"
 		}
 	}
 
 	baseURL := fmt.Sprintf("http://%s:%d", targetHost, CaddyAdminAPIPort)
+
+	// Log which strategy was used for observability (P2 finding from adversarial analysis)
+	// NOTE: This goes to stderr so it doesn't pollute stdout but is visible to user
+	fmt.Fprintf(os.Stderr, "INFO: Caddy Admin API client created - strategy=%s, url=%s\n", strategyUsed, baseURL)
 
 	return &CaddyAdminClient{
 		BaseURL:    baseURL,
