@@ -28,7 +28,9 @@ type BrandResponse struct {
 
 // ListBrands lists all brands in Authentik
 func (c *APIClient) ListBrands(ctx context.Context) ([]BrandResponse, error) {
-	url := fmt.Sprintf("%s/api/v3/brands/instances/", c.BaseURL)
+	// P0 FIX: Correct API endpoint path based on Authentik OpenAPI schema
+	// The schema shows /core/brands/ not /brands/instances/
+	url := fmt.Sprintf("%s/api/v3/core/brands/", c.BaseURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -62,7 +64,8 @@ func (c *APIClient) ListBrands(ctx context.Context) ([]BrandResponse, error) {
 
 // GetBrand retrieves a brand by PK
 func (c *APIClient) GetBrand(ctx context.Context, pk string) (*BrandResponse, error) {
-	url := fmt.Sprintf("%s/api/v3/brands/instances/%s/", c.BaseURL, pk)
+	// P0 FIX: Correct API endpoint path
+	url := fmt.Sprintf("%s/api/v3/core/brands/%s/", c.BaseURL, pk)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -99,7 +102,8 @@ func (c *APIClient) UpdateBrand(ctx context.Context, pk string, updates map[stri
 		return fmt.Errorf("failed to marshal update request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v3/brands/instances/%s/", c.BaseURL, pk)
+	// P0 FIX: Correct API endpoint path
+	url := fmt.Sprintf("%s/api/v3/core/brands/%s/", c.BaseURL, pk)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

@@ -22,6 +22,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/nuke"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/restore"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -97,6 +98,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		unsync.UnsyncCmd,     // VERB-FIRST ARCHITECTURE (reverse synchronization)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
 		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)
+		restore.RestoreCmd,   // VERB-FIRST ARCHITECTURE (restore from backups)
 		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)
 
 		// Top-level aliases for convenience

@@ -81,8 +81,10 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			"  3. Verify Authentik is running: docker ps | grep authentik", err)
 	}
 
-	logger.Debug("Authentik credentials discovered",
-		zap.String("url", authentikURL))
+	// P0 FIX: Log connection details at INFO level for visibility
+	logger.Info("Connecting to Authentik API",
+		zap.String("url", authentikURL),
+		zap.String("source", "credential discovery"))
 
 	// Connect to Authentik API
 	authentikClient := authentik.NewClient(authentikURL, authentikToken)
@@ -90,7 +92,14 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	// Get current brand configuration
 	brands, err := authentikClient.ListBrands(rc.Ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list Authentik brands: %w", err)
+		// P0 FIX: Include URL in error message for debugging
+		return fmt.Errorf("failed to list Authentik brands at %s: %w\n\n"+
+			"Troubleshooting:\n"+
+			"  1. Verify Authentik is running: docker ps | grep authentik\n"+
+			"  2. Test API endpoint: curl -H 'Authorization: Bearer <token>' %s/api/v3/core/brands/\n"+
+			"  3. Check API token in /opt/hecate/.env\n"+
+			"  4. Verify URL is correct (currently using: %s)",
+			authentikURL, err, authentikURL, authentikURL)
 	}
 
 	if len(brands) == 0 {
@@ -483,7 +492,12 @@ func discoverAuthentikCredentials(rc *eos_io.RuntimeContext) (string, string, er
 	// Get base URL
 	baseURL := hecateEnv["AUTHENTIK_BASE_URL"]
 	if baseURL == "" {
-		baseURL = "http://localhost:9000" // Default
+		// P0 FIX: Use container name instead of localhost for Docker network communication
+		// RATIONALE: "localhost" refers to Eos host, not Authentik container
+		// Container name resolves via Docker's internal DNS
+		baseURL = fmt.Sprintf("http://%s:%d", AuthentikContainerName, AuthentikPort)
+		logger.Debug("AUTHENTIK_BASE_URL not set, using default container name",
+			zap.String("default_url", baseURL))
 	}
 
 	if apiKey == "" {

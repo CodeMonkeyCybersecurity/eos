@@ -3926,3 +3926,170 @@ authentik-worker:
 
 **Last Updated**: 2025-10-30 by Henry (Added Hecate Configuration Management section)
 **Next Review**: 2025-11-15 (After Phase B.2 self-service endpoints complete)
+
+---
+
+## 💾 Backup & Restore Infrastructure (2025-Q4 → 2026-Q3)
+
+### **Status**: 70% Complete - Production-Ready Core, Enhancement Needed
+### **Priority**: P1 (Critical for DR) / P2 (Advanced Features)
+### **Target**: Core by 2025-12-31, Full Features by 2026-06-30
+
+---
+
+### 📋 Current State (2025-10-31)
+
+**What's Working** ✅:
+- Restic integration with progress monitoring
+- Multi-backend support (S3, B2, SFTP, local)
+- Vault-first secret management + local fallback
+- Retention policies (7d/4w/12m defaults)
+- Service-specific backups (Authentik, Hecate, KVM)
+
+**What Needs Work** ❌:
+- CRUD operations incomplete (30+ TODOs)
+- Restore verification incomplete (cmd/backup/restore.go:136)
+- Backup hooks not implemented (config exists, no execution)
+- No automated restore testing
+
+**Rollback vs Restore Clarification**:
+- `eos backup restore`: Manual recovery from restic snapshots
+- `eos rollback disk-operation`: Automatic LVM/CephFS snapshot recovery
+- **NOT aliases** - different tools for different purposes
+
+---
+
+### 🎯 Phase 1: Complete Core (2025-11 → 2025-12)
+
+**P1 - CRITICAL** (60 hours)
+
+#### 1.1: P0 Fixes ✅ COMPLETE (2025-10-31)
+- [x] Fix fmt.Printf violations (4 files)
+- [x] Build validation passes
+
+#### 1.2: CRUD Operations (2025-11-08 → 2025-11-22)
+- [ ] Implement `createRepository()` - initialize restic, store password in Vault
+- [ ] Implement `createProfile()` - validate paths, add retention policy
+- [ ] Backend validation (S3 credentials, SFTP keys, B2 tokens)
+- [ ] Integration tests (all backends)
+
+#### 1.3: Restore Verification (2025-11-15 → 2025-11-29)
+- [ ] Parse JSON snapshot file list
+- [ ] Sample 10% of files for checksum comparison
+- [ ] Add `--verify` flag to restore command
+
+#### 1.4: Backup Hooks (2025-11-22 → 2025-12-06)
+- [ ] Pre-backup hooks (database dumps, app quiesce)
+- [ ] Post-backup hooks (cleanup, notifications)
+- [ ] Error hooks (rollback, alerts)
+- [ ] Timeout handling (5 min max per hook)
+
+#### 1.5: Dry-Run Retention (2025-12-06 → 2025-12-20)
+- [ ] Show which snapshots would be deleted
+- [ ] Display retention policy explanation
+- [ ] Calculate storage savings estimate
+
+---
+
+### 🧪 Phase 2: Automated Testing (2026-01 → 2026-03)
+
+**P1 - IMPORTANT** (80 hours)
+
+#### 2.1: Automated Restore Testing (2026-01)
+- [ ] Weekly systemd timer (Sundays 3 AM)
+- [ ] Restore to temp directory + verify checksums
+- [ ] Alert on failure (email/Slack)
+- [ ] RTO/RPO measurement
+
+#### 2.2: Automated Vault Snapshots (2026-02)
+- [ ] Daily Raft snapshots (2 AM)
+- [ ] Retention: 7d/4w/12m
+- [ ] Encrypted upload to S3/B2
+- [ ] Monthly restore testing
+
+#### 2.3: Integrity Monitoring (2026-03)
+- [ ] Track backup success rate
+- [ ] Monitor repository size growth
+- [ ] Grafana dashboard + Prometheus metrics
+
+---
+
+### 🔐 Phase 3: Secret Migration (2026-04 → 2026-09)
+
+**P2 - ENHANCEMENT** (160 hours)
+**Goal**: Migrate 528 .env files to Vault + Consul Template
+
+**Rationale**:
+- .env files: Fast setup, OK for dev/test
+- Vault: Production-grade, audit trail, rotation, compliance
+- Use restic with .env NOW, migrate to Vault in 6 months
+
+#### 3.1: Audit (2026-04)
+- [ ] Audit 528 .env occurrences across 82 files
+- [ ] Classify secrets vs config
+- [ ] Prioritize migration (Tier 3 → 2 → 1)
+
+#### 3.2: Pilot (2026-05 → 2026-06)
+- [ ] Migrate 2 test services (BionicGPT test, dev Hecate)
+- [ ] Create Consul Templates
+- [ ] Move secrets to Vault, config to Consul KV
+- [ ] Keep .env as backup (30 days)
+
+#### 3.3: Rollout (2026-07 → 2026-09)
+- [ ] Tier 3 services (2 weeks)
+- [ ] Tier 2 services (4 weeks)
+- [ ] Tier 1 services (6 weeks)
+- [ ] Remove static .env generation
+
+---
+
+### 📊 Best Practices (2024-2025 Industry Standards)
+
+**Restic** ✅ FOLLOWING GUIDANCE:
+- Shell execution (official method)
+- Repository v2 with compression
+- Multi-backend support
+
+**Secrets** ✅ EXCEEDS STANDARDS:
+- Vault (Tier 1) + file fallback (Tier 2)
+- Better than 90% of backup tools
+
+**Rotation** ✅ NIST 2024 COMPLIANT:
+- Rotate on breach, not mandatory 90-day
+- Static secrets OK until compromise detected
+
+**.env Timeline** ✅ REASONABLE:
+- 6-month migration aligns with industry (3-6 months)
+
+**Restore Testing** ❌ CRITICAL GAP:
+- AWS/Google: Weekly tests for critical systems
+- Eos: No automated testing yet
+
+---
+
+### 🎯 Next Steps (2025-11-01 → 2025-11-15)
+
+**This Week**:
+1. ✅ P0 logging fixed
+2. ⏳ Implement createRepository() - starts 2025-11-08
+3. ⏳ Implement createProfile()
+4. ⏳ Design restore verification
+
+**Next Week**:
+1. ⏳ Complete CRUD operations
+2. ⏳ Integration tests (S3/B2/SFTP)
+3. ⏳ Start restore verification
+
+---
+
+### ❓ Open Questions
+
+1. **cmd/restore/** - Remove empty directory or populate?
+   - Recommendation: Remove (restore as subcommand is clearer)
+
+2. **Migration Priority** - Which services first?
+   - Recommendation: BionicGPT test, dev Hecate (low risk)
+
+3. **Off-site Storage** - S3 or B2?
+   - Recommendation: B2 (cost-effective, good restic support)
+

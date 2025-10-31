@@ -58,7 +58,9 @@ Examples:
 }
 
 func init() {
-	// Add as subcommand to updateHecateCmd
+	// DEPRECATED: Subcommand pattern (eos update hecate enable self-enrollment)
+	// NEW: Flag pattern (eos update hecate --enable self-enrollment)
+	// Keep subcommand for backwards compatibility, will be removed in v2.0
 	updateHecateCmd.AddCommand(updateHecateEnableCmd)
 
 	// Add flags for oauth2-signout

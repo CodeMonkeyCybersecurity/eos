@@ -106,6 +106,10 @@ Examples:
 		fixService, _ := cmd.Flags().GetString("fix")
 		fixWasSet := cmd.Flags().Changed("fix")
 
+		// Check if --enable flag is explicitly set
+		enableFeature, _ := cmd.Flags().GetString("enable")
+		enableWasSet := cmd.Flags().Changed("enable")
+
 		// Validate mutually exclusive flags
 		exclusiveFlagsCount := 0
 		if exportWasSet {
@@ -123,9 +127,12 @@ Examples:
 		if fixWasSet {
 			exclusiveFlagsCount++
 		}
+		if enableWasSet {
+			exclusiveFlagsCount++
+		}
 
 		if exclusiveFlagsCount > 1 {
-			return fmt.Errorf("cannot use --export, --refresh, --add, --remove, and --fix together\nUse one at a time")
+			return fmt.Errorf("cannot use --export, --refresh, --add, --remove, --fix, and --enable together\nUse one at a time")
 		}
 
 		if exportWasSet {
@@ -162,6 +169,14 @@ Examples:
 			return runFixServiceFromFlag(rc, cmd, fixService)
 		}
 
+		if enableWasSet {
+			if enableFeature == "" {
+				return fmt.Errorf("--enable requires a feature name\nExample: eos update hecate --enable self-enrollment --app bionicgpt")
+			}
+			// Delegate to enable feature flow
+			return runEnableFeature(rc, cmd, enableFeature)
+		}
+
 		logger.Info("Regenerating Hecate deployment from Consul KV configuration")
 
 		// Regenerate from Consul KV with backup
@@ -187,8 +202,16 @@ func init() {
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
 	updateHecateCmd.Flags().String("remove", "", "Remove a service from Hecate (service name)")
 	updateHecateCmd.Flags().String("fix", "", "Fix drift/misconfigurations for a service (service name)")
+	updateHecateCmd.Flags().String("enable", "", "Enable a feature for Hecate (feature name: self-enrollment, oauth2-signout)")
 	updateHecateCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for the service (required with --add)")
 	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
+
+	// Feature flags (used with --enable)
+	updateHecateCmd.Flags().String("app", "", "Application name (used with --enable self-enrollment)")
+	updateHecateCmd.Flags().String("authentik-host", "hecate-server-1", "Authentik hostname (used with --enable)")
+	updateHecateCmd.Flags().Int("authentik-port", hecate.AuthentikPort, "Authentik port (used with --enable)")
+	updateHecateCmd.Flags().Bool("skip-caddyfile", false, "Skip Caddyfile updates (used with --enable, advanced usage)")
+	updateHecateCmd.Flags().Bool("enable-captcha", false, "Enable captcha for self-enrollment (used with --enable self-enrollment)")
 
 	// Optional flags for --add
 	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route (NOTE: BionicGPT always uses Authentik forward auth regardless of this flag)")
@@ -365,4 +388,17 @@ var runHttpCmd = &cobra.Command{
 		updater := hecate.NewHecateUpdater(rc, config)
 		return updater.UpdateHTTPConfig()
 	}),
+}
+
+// runEnableFeature handles enabling features when --enable flag is used
+// Delegates to functions defined in hecate_enable.go
+func runEnableFeature(rc *eos_io.RuntimeContext, cmd *cobra.Command, feature string) error {
+	switch feature {
+	case "oauth2-signout":
+		return runEnableOAuth2Signout(rc, cmd)
+	case "self-enrollment":
+		return runEnableSelfEnrollment(rc, cmd)
+	default:
+		return fmt.Errorf("unknown feature: %s\n\nAvailable features:\n  - oauth2-signout\n  - self-enrollment", feature)
+	}
 }

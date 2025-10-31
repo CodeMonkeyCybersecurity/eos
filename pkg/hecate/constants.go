@@ -21,6 +21,11 @@ const (
 	// SECURITY: Prevents container name confusion in multi-tenant environments
 	CaddyContainerName = "hecate-caddy"
 
+	// AuthentikContainerName is the name of the Authentik container in docker-compose
+	// RATIONALE: Used for internal Docker network communication (service discovery)
+	// USAGE: When Eos needs to connect to Authentik from within Docker network
+	AuthentikContainerName = "hecate-server-1"
+
 	// HecateServiceName is the canonical name for the Hecate service
 	HecateServiceName = "hecate"
 )
