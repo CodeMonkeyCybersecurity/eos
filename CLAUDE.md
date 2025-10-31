@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-30*
+*Last Updated: 2025-10-31*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -1577,11 +1577,63 @@ eos promote approve id --emergency-override
 
 - No emojis in code or documentation
 - Prefer editing existing files over creating new ones
-- Documentation files only for strategic changes
-- Use inline comments for tactical notes
-- **Inline notation is strongly preferred** - documentation should be available at the exact place in the code where it's needed
 - Build iteratively on existing patterns
 - Solve complex problems once, encode in Eos, never solve again
+
+## Documentation Policy (P0 - CRITICAL)
+
+**RULE**: Documentation MUST live in exactly ONE of these locations:
+
+1. **CLAUDE.md** - Development standards, patterns, critical rules
+2. **ROADMAP.md** - Project roadmap, technical debt tracking, future work
+3. **README.md** (per-directory) - Directory purpose and usage
+4. **Inline comments** - ALL other documentation (implementation details, rationale, examples)
+
+**FORBIDDEN**: Creating standalone documentation files (*.md) except the above. Examples of FORBIDDEN files:
+- ✗ `SECURITY_IMPROVEMENTS.md` - Put security patterns in CLAUDE.md, implementation in inline comments
+- ✗ `P0_SECURITY_FIXES_COMPLETE.md` - Put completion status in ROADMAP.md
+- ✗ `BACKUP_ADVERSARIAL_ANALYSIS.md` - Put analysis in inline comments in the code
+- ✗ `DEPLOYMENT_GUIDE.md` - Put deployment steps in README.md
+- ✗ `API_REFERENCE.md` - Use godoc comments in code
+
+**WHY**: Multiple documentation locations create:
+- **Maintenance burden**: Updates must be synchronized across files
+- **Stale documentation**: Standalone docs drift from code reality
+- **Discovery problems**: Developers don't know which file to check
+- **Duplication**: Same information in multiple places
+
+**CORRECT PATTERN**:
+```go
+// SECURITY: Password exposure mitigation (CVSS 7.5)
+// Changed from RESTIC_PASSWORD env var to temporary password file.
+// RATIONALE: Environment variables visible via 'ps auxe' and /proc/<pid>/environ
+// MITIGATION:
+//   1. Create temp file with os.CreateTemp() (unpredictable name)
+//   2. Set permissions to 0400 (owner read-only)
+//   3. Write password to file
+//   4. Pass file path via RESTIC_PASSWORD_FILE
+//   5. Delete file immediately after use (defer cleanup)
+// EVIDENCE: This pattern prevents password scraping attacks
+// COMPLIANCE: PCI-DSS 8.2.1, SOC2 CC6.1
+passwordFile, err := os.CreateTemp("", "restic-password-*")
+defer os.Remove(passwordFile.Name())
+defer passwordFile.Close()
+os.Chmod(passwordFile.Name(), TempPasswordFilePerm)
+```
+
+**WRONG PATTERN**:
+```go
+// See SECURITY_IMPROVEMENTS.md for password security pattern
+passwordFile, err := os.CreateTemp("", "restic-password-*")
+```
+
+**Migration**: If standalone documentation files exist, consolidate them:
+- Security patterns → CLAUDE.md or inline comments
+- Completion status → ROADMAP.md
+- Implementation details → Inline comments
+- Then DELETE the standalone file
+
+**Exception**: README.md files in directories are ALLOWED and ENCOURAGED for directory-level documentation
 
 ## External References
 

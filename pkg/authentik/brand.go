@@ -13,7 +13,9 @@ import (
 
 // BrandResponse represents an Authentik brand
 type BrandResponse struct {
-	PK                 string `json:"pk"`
+	// P0 FIX: Authentik brands API returns 'brand_uuid' not 'pk'
+	// Based on Authentik OpenAPI schema: /api/v3/core/brands/ returns brand_uuid as primary identifier
+	PK                 string `json:"brand_uuid"` // Primary identifier (was incorrectly 'pk')
 	BrandingTitle      string `json:"branding_title"`
 	BrandingLogo       string `json:"branding_logo"`
 	BrandingFavicon    string `json:"branding_favicon"`

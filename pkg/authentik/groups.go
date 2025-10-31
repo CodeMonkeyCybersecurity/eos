@@ -33,8 +33,9 @@ type GroupResponse struct {
 // CreateGroup creates a new group in Authentik
 func (c *APIClient) CreateGroup(ctx context.Context, name string, attributes map[string]interface{}) (*GroupResponse, error) {
 	reqBody := GroupRequest{
-		Name:       name,
-		Attributes: attributes,
+		Name:        name,
+		Attributes:  attributes,
+		IsSuperuser: false, // Default: NOT superuser (secure default)
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

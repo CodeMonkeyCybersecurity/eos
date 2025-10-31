@@ -17,10 +17,11 @@ import (
 
 // SelfEnrollmentConfig holds configuration for enabling self-enrollment
 type SelfEnrollmentConfig struct {
-	AppName       string // Application name (e.g., "bionicgpt")
-	DryRun        bool   // If true, show what would be done without applying changes
-	SkipCaddyfile bool   // If true, don't update Caddyfile (advanced usage)
-	EnableCaptcha bool   // If true, add captcha stage to prevent spam
+	AppName         string // Application name (e.g., "bionicgpt")
+	DryRun          bool   // If true, show what would be done without applying changes
+	SkipCaddyfile   bool   // If true, don't update Caddyfile (advanced usage)
+	EnableCaptcha   bool   // If true, add captcha stage to prevent spam
+	RequireApproval bool   // If true, new users inactive until admin approves (default: active immediately)
 	// EmailVerification bool   // TODO: Enable when SMTP is configured
 	// CaptchaPublicKey  string // TODO: Production captcha keys from Vault
 	// CaptchaPrivateKey string // TODO: Production captcha keys from Vault
@@ -126,13 +127,13 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 	logger.Info("✓ Authentik API is responding")
 
-	// P3 REC: Validate API token before operations (fail-fast)
+	// P3 FIX: Validate API token AND get brand configuration in single call
 	// RATIONALE: Health check only verifies service is up, not that token is valid
-	// BENEFIT: Detect auth issues before attempting to create resources
-	logger.Debug("Validating API token")
-	_, err = authentikClient.ListBrands(rc.Ctx)
+	// BENEFIT: Detect auth issues before attempting to create resources + eliminate double API call
+	logger.Info("Validating API token and fetching brand configuration")
+	brands, err := authentikClient.ListBrands(rc.Ctx)
 	if err != nil {
-		return fmt.Errorf("Authentik API token invalid or expired: %w\n\n"+
+		return fmt.Errorf("Authentik API token invalid or failed to fetch brands: %w\n\n"+
 			"Check token in /opt/hecate/.env\n"+
 			"Looked for: AUTHENTIK_API_TOKEN, AUTHENTIK_TOKEN, AUTHENTIK_API_KEY, AUTHENTIK_BOOTSTRAP_TOKEN\n\n"+
 			"To fix:\n"+
@@ -141,20 +142,7 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			"  3. Create new token in Authentik UI: Admin → Tokens → Create\n"+
 			"  4. Update /opt/hecate/.env with new token", err, authentikURL)
 	}
-	logger.Info("✓ API token validated")
-
-	// Get current brand configuration
-	brands, err := authentikClient.ListBrands(rc.Ctx)
-	if err != nil {
-		// P0 FIX: Include URL in error message for debugging
-		return fmt.Errorf("failed to list Authentik brands at %s: %w\n\n"+
-			"Troubleshooting:\n"+
-			"  1. Verify Authentik is running: docker ps | grep authentik\n"+
-			"  2. Test API endpoint: curl -H 'Authorization: Bearer <token>' %s/api/v3/core/brands/\n"+
-			"  3. Check API token in /opt/hecate/.env\n"+
-			"  4. Verify URL is correct (currently using: %s)",
-			authentikURL, err, authentikURL, authentikURL)
-	}
+	logger.Info("✓ API token validated and brand configuration fetched")
 
 	if len(brands) == 0 {
 		return fmt.Errorf("no Authentik brands found - this should not happen\n\n" +
@@ -233,6 +221,47 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 
 	logger.Info("Phase 2: Creating enrollment flow and stages")
 
+	// P0 SECURITY FIX: Create or get default group for self-enrolled users
+	// RATIONALE: Self-enrolled users must be assigned to a group for proper access control
+	// WITHOUT THIS: Users may get unpredictable access or no access at all
+	logger.Info("Ensuring default group exists for self-enrolled users")
+	groupName := "eos-self-enrolled-users"
+	var selfEnrolledGroup *authentik.GroupResponse
+
+	// Check if group already exists
+	existingGroup, err := authentikClient.GetGroupByName(rc.Ctx, groupName)
+	if err != nil && err.Error() != fmt.Sprintf("group not found: %s", groupName) {
+		enrollmentErr = fmt.Errorf("failed to check for existing group: %w", err)
+		return enrollmentErr
+	}
+
+	if existingGroup != nil {
+		// Group exists, reuse it
+		logger.Info("✓ Self-enrolled users group already exists",
+			zap.String("group_pk", existingGroup.PK),
+			zap.String("group_name", existingGroup.Name))
+		selfEnrolledGroup = existingGroup
+	} else {
+		// Group doesn't exist, create it
+		logger.Info("Creating default group for self-enrolled users",
+			zap.String("group_name", groupName))
+
+		selfEnrolledGroup, err = authentikClient.CreateGroup(rc.Ctx, groupName, map[string]interface{}{
+			"eos_managed":  true,
+			"description":  "Users who self-registered via Eos enrollment flow",
+			"created_by":   "eos",
+			"created_date": time.Now().Format(time.RFC3339),
+		})
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create self-enrolled users group: %w", err)
+			return enrollmentErr
+		}
+
+		logger.Info("✓ Self-enrolled users group created",
+			zap.String("group_pk", selfEnrolledGroup.PK),
+			zap.String("group_name", selfEnrolledGroup.Name))
+	}
+
 	// P0 FIX: Check if enrollment flow already exists (idempotency)
 	flowSlug := "eos-self-registration"
 	flowName := "Self Registration (Eos)"
@@ -247,10 +276,31 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 
 	if existingFlow != nil {
-		// Flow already exists, reuse it
+		// P2 FIX: Validate flow has correct designation before reusing
+		// RATIONALE: Authentik flows can have different designations (authentication, enrollment, invalidation, recovery, etc.)
+		// RISK: If someone creates flow with same slug but wrong designation, enrollment will fail mysteriously
+		// BENEFIT: Fail-fast with clear error message instead of cryptic runtime failures
+		if existingFlow.Designation != "enrollment" {
+			enrollmentErr = fmt.Errorf("existing flow '%s' has wrong designation: %s (expected: enrollment)\n\n"+
+				"A flow with slug '%s' already exists but is not an enrollment flow.\n"+
+				"Either:\n"+
+				"  1. Delete the conflicting flow: visit Authentik UI → Flows → '%s' → Delete\n"+
+				"  2. Use a different slug by modifying the code (not recommended)\n\n"+
+				"Flow details:\n"+
+				"  PK: %s\n"+
+				"  Name: %s\n"+
+				"  Designation: %s",
+				existingFlow.Slug, existingFlow.Designation,
+				flowSlug, existingFlow.Name,
+				existingFlow.PK, existingFlow.Name, existingFlow.Designation)
+			return enrollmentErr
+		}
+
+		// Flow already exists with correct designation, reuse it
 		logger.Info("✓ Enrollment flow already exists, reusing",
 			zap.String("flow_pk", existingFlow.PK),
-			zap.String("slug", existingFlow.Slug))
+			zap.String("slug", existingFlow.Slug),
+			zap.String("designation", existingFlow.Designation))
 		enrollmentFlow = existingFlow
 		stats.FlowsReused++
 		// P0 FIX: Do NOT track for rollback - we didn't create it
@@ -435,14 +485,22 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		stats.StagesReused++
 	} else {
 		logger.Info("Creating user write stage for enrollment")
-		userWriteStage, err = authentikClient.CreateUserWriteStage(rc.Ctx, "eos-enrollment-user-write", false, "")
+		// P0 SECURITY FIX: Assign new users to eos-self-enrolled-users group
+		// This ensures proper access control via group-based policies
+		// P1 SECURITY OPTION: Support --require-approval flag for admin vetting
+		userWriteStage, err = authentikClient.CreateUserWriteStage(rc.Ctx,
+			"eos-enrollment-user-write",
+			config.RequireApproval,   // If true, users inactive until admin approves
+			selfEnrolledGroup.PK)     // ✓ Assign to group!
 		if err != nil {
 			enrollmentErr = fmt.Errorf("failed to create user write stage: %w", err)
 			return enrollmentErr
 		}
 		resources.StagePKs = append(resources.StagePKs, userWriteStage.PK) // Track for rollback
 		stats.StagesCreated++
-		logger.Info("✓ User write stage created", zap.String("stage_pk", userWriteStage.PK))
+		logger.Info("✓ User write stage created (users assigned to group)",
+			zap.String("stage_pk", userWriteStage.PK),
+			zap.String("group", groupName))
 	}
 
 	// Create or reuse user login stage (auto-login after signup)
@@ -620,13 +678,35 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	logger.Info("Flow Name", zap.String("name", enrollmentFlow.Name))
 	logger.Info("Flow Slug", zap.String("slug", enrollmentFlow.Slug))
 	logger.Info("")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("User Permissions for Self-Enrolled Users")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("")
+	logger.Info("  Group: " + groupName)
+	if config.RequireApproval {
+		logger.Info("  Status: INACTIVE until admin approves")
+		logger.Info("  Admins must activate users in Authentik UI: Admin → Directory → Users")
+	} else {
+		logger.Info("  Status: ACTIVE immediately (can log in)")
+	}
+	logger.Info("  Application Access: Controlled by group policies")
+	logger.Info("")
+	logger.Info("IMPORTANT: Configure application access policies:")
+	logger.Info("  1. Visit: " + authentikURL + "/if/admin/#/policy/policies")
+	logger.Info("  2. Create policy binding for '" + groupName + "' group")
+	logger.Info("  3. Assign policy to your application (e.g., BionicGPT)")
+	logger.Info("  OR")
+	logger.Info("  Allow all authenticated users (less secure)")
+	logger.Info("")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	logger.Info("IMPORTANT: Forward auth operates at BRAND level")
 	logger.Info("This enables self-registration for ALL apps behind Authentik on this brand.")
 	logger.Info("")
 	logger.Info("Next steps:")
 	logger.Info("  1. Users can now register at: " + enrollmentURL)
-	logger.Info("  2. New users will be created with default permissions")
-	logger.Info("  3. Admins can manage users via Authentik admin interface")
+	logger.Info("  2. Configure application policies (see above)")
+	logger.Info("  3. Test signup with private browser window")
+	logger.Info("  4. Admins can manage users via: " + authentikURL + "/if/admin/#/directory/users")
 	logger.Info("")
 	logger.Info("To customize enrollment flow:")
 	logger.Info("  - Visit Authentik admin: " + authentikURL + "/if/admin/")

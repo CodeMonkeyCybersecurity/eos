@@ -234,3 +234,38 @@ func (c *APIClient) DeleteFlow(ctx context.Context, pk string) error {
 
 	return nil
 }
+
+// GetFlowStages retrieves all stage bindings for a flow (ordered by binding order)
+// Returns stages in execution order for the given flow
+func (c *APIClient) GetFlowStages(ctx context.Context, flowPK string) ([]StageBindingResponse, error) {
+	url := fmt.Sprintf("%s/api/v3/flows/bindings/?target=%s&ordering=order", c.BaseURL, flowPK)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("flow stages request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("flow stages fetch failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Results []StageBindingResponse `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode flow stages response: %w", err)
+	}
+
+	return result.Results, nil
+}

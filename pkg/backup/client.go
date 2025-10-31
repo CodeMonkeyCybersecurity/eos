@@ -4,6 +4,7 @@ package backup
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -203,6 +204,19 @@ func (c *Client) Backup(profileName string) error {
 		zap.String("repository", c.repository.Name),
 		zap.Strings("paths", profile.Paths))
 
+	// Execute pre-backup hooks
+	if profile.Hooks != nil && len(profile.Hooks.PreBackup) > 0 {
+		logger.Info("Executing pre-backup hooks",
+			zap.Int("count", len(profile.Hooks.PreBackup)))
+		if err := c.executeHooks(profile.Hooks.PreBackup, "pre-backup"); err != nil {
+			// Execute error hooks if pre-backup fails
+			if len(profile.Hooks.OnError) > 0 {
+				c.executeHooks(profile.Hooks.OnError, "error")
+			}
+			return fmt.Errorf("pre-backup hook failed: %w", err)
+		}
+	}
+
 	// Build backup command
 	args := []string{"backup"}
 
@@ -229,6 +243,14 @@ func (c *Client) Backup(profileName string) error {
 
 	// Run backup with progress monitoring
 	if err := c.runBackupWithProgress(args); err != nil {
+		// Execute error hooks on backup failure
+		if profile.Hooks != nil && len(profile.Hooks.OnError) > 0 {
+			logger.Info("Executing error hooks",
+				zap.Int("count", len(profile.Hooks.OnError)))
+			if hookErr := c.executeHooks(profile.Hooks.OnError, "error"); hookErr != nil {
+				logger.Error("Error hook failed", zap.Error(hookErr))
+			}
+		}
 		return fmt.Errorf("backup failed: %w", err)
 	}
 
@@ -240,24 +262,59 @@ func (c *Client) Backup(profileName string) error {
 		}
 	}
 
+	// Execute post-backup hooks
+	if profile.Hooks != nil && len(profile.Hooks.PostBackup) > 0 {
+		logger.Info("Executing post-backup hooks",
+			zap.Int("count", len(profile.Hooks.PostBackup)))
+		if err := c.executeHooks(profile.Hooks.PostBackup, "post-backup"); err != nil {
+			logger.Error("Post-backup hook failed", zap.Error(err))
+			// Don't fail the backup if post-backup hooks fail
+		}
+	}
+
 	return nil
 }
 
 // runBackupWithProgress executes backup with JSON progress parsing
+// SECURITY: Uses password file instead of environment variable to prevent
+// password exposure via 'ps auxe' (CVSS 7.5 vulnerability mitigation)
 func (c *Client) runBackupWithProgress(args []string) error {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
 	cmd := exec.CommandContext(c.rc.Ctx, "restic", args...)
 
-	// Set environment
+	// Get password from Vault
 	password, err := c.getRepositoryPassword()
 	if err != nil {
 		return err
 	}
 
+	// SECURITY FIX: Create temporary password file with restrictive permissions
+	// This prevents password exposure in process environment variables
+	passwordFile, err := os.CreateTemp("", "restic-password-*")
+	if err != nil {
+		return fmt.Errorf("creating temporary password file: %w", err)
+	}
+	defer os.Remove(passwordFile.Name()) // Clean up immediately after use
+	defer passwordFile.Close()
+
+	// Set restrictive permissions (owner read-only)
+	if err := os.Chmod(passwordFile.Name(), TempPasswordFilePerm); err != nil {
+		return fmt.Errorf("setting password file permissions: %w", err)
+	}
+
+	// Write password to file
+	if _, err := passwordFile.WriteString(password); err != nil {
+		return fmt.Errorf("writing password to temporary file: %w", err)
+	}
+	if err := passwordFile.Sync(); err != nil {
+		return fmt.Errorf("syncing password file: %w", err)
+	}
+
+	// Set environment (WITHOUT password)
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("RESTIC_REPOSITORY=%s", c.repository.URL))
-	env = append(env, fmt.Sprintf("RESTIC_PASSWORD=%s", password))
+	env = append(env, fmt.Sprintf("RESTIC_PASSWORD_FILE=%s", passwordFile.Name()))
 	for k, v := range c.repository.Environment {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -547,6 +604,79 @@ func (c *Client) GetStats() (*RepositoryStats, error) {
 		zap.Int("hosts", len(hostStats)))
 
 	return stats, nil
+}
+
+// executeHooks executes a list of hook commands with timeout
+// SECURITY: Hooks run with configured timeout (HookTimeout) to prevent hung backups
+func (c *Client) executeHooks(hooks []string, hookType string) error {
+	logger := otelzap.Ctx(c.rc.Ctx)
+
+	for i, hookCmd := range hooks {
+		logger.Info("Executing hook",
+			zap.String("type", hookType),
+			zap.Int("index", i+1),
+			zap.Int("total", len(hooks)),
+			zap.String("command", hookCmd))
+
+		// Create command with timeout context
+		ctx, cancel := context.WithTimeout(c.rc.Ctx, HookTimeout)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "sh", "-c", hookCmd)
+
+		// Capture output
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		// Execute hook
+		start := time.Now()
+		err := cmd.Run()
+		duration := time.Since(start)
+
+		// Check for timeout
+		if ctx.Err() == context.DeadlineExceeded {
+			logger.Error("Hook timed out",
+				zap.String("type", hookType),
+				zap.String("command", hookCmd),
+				zap.Duration("timeout", HookTimeout))
+			return fmt.Errorf("hook timed out after %s: %s", HookTimeout, hookCmd)
+		}
+
+		// Log output
+		if err != nil {
+			logger.Error("Hook failed",
+				zap.String("type", hookType),
+				zap.String("command", hookCmd),
+				zap.Duration("duration", duration),
+				zap.String("stdout", stdout.String()),
+				zap.String("stderr", stderr.String()),
+				zap.Error(err))
+			return fmt.Errorf("hook failed: %w\nstdout: %s\nstderr: %s",
+				err, stdout.String(), stderr.String())
+		}
+
+		logger.Info("Hook completed successfully",
+			zap.String("type", hookType),
+			zap.String("command", hookCmd),
+			zap.Duration("duration", duration),
+			zap.Int("stdout_bytes", stdout.Len()),
+			zap.Int("stderr_bytes", stderr.Len()))
+
+		// Log output if present (for debugging)
+		if stdout.Len() > 0 {
+			logger.Debug("Hook stdout", zap.String("output", stdout.String()))
+		}
+		if stderr.Len() > 0 {
+			logger.Debug("Hook stderr", zap.String("output", stderr.String()))
+		}
+	}
+
+	logger.Info("All hooks completed successfully",
+		zap.String("type", hookType),
+		zap.Int("count", len(hooks)))
+
+	return nil
 }
 
 // humanizeBytes converts bytes to human-readable format

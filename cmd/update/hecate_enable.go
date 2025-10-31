@@ -72,6 +72,7 @@ func init() {
 	updateHecateEnableCmd.Flags().String("app", "", "Application name (e.g., bionicgpt) - informational only, enrollment is brand-level")
 	updateHecateEnableCmd.Flags().Bool("skip-caddyfile", false, "Skip Caddyfile updates (advanced usage)")
 	updateHecateEnableCmd.Flags().Bool("enable-captcha", false, "Enable captcha stage for bot protection (uses test keys initially)")
+	updateHecateEnableCmd.Flags().Bool("require-approval", false, "New users inactive until admin approves (default: active immediately)")
 }
 
 // runEnableOAuth2Signout enables /oauth2/sign_out logout handlers
@@ -112,6 +113,7 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	skipCaddyfile, _ := cmd.Flags().GetBool("skip-caddyfile")
 	enableCaptcha, _ := cmd.Flags().GetBool("enable-captcha")
+	requireApproval, _ := cmd.Flags().GetBool("require-approval")
 
 	// Validate app flag
 	if appName == "" {
@@ -122,7 +124,8 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	logger.Info("Enabling self-enrollment for Hecate",
 		zap.String("app", appName),
 		zap.Bool("dry_run", dryRun),
-		zap.Bool("skip_caddyfile", skipCaddyfile))
+		zap.Bool("skip_caddyfile", skipCaddyfile),
+		zap.Bool("require_approval", requireApproval))
 
 	// Important note: Forward auth is brand-level, not app-level
 	if appName != "hecate" {
@@ -133,10 +136,11 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 
 	// Build config
 	config := &hecate.SelfEnrollmentConfig{
-		AppName:       appName,
-		DryRun:        dryRun,
-		SkipCaddyfile: skipCaddyfile,
-		EnableCaptcha: enableCaptcha,
+		AppName:         appName,
+		DryRun:          dryRun,
+		SkipCaddyfile:   skipCaddyfile,
+		EnableCaptcha:   enableCaptcha,
+		RequireApproval: requireApproval,
 	}
 
 	if enableCaptcha {

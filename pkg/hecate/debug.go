@@ -55,6 +55,7 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	// Get flags
 	component, _ := cmd.Flags().GetString("component")
 	authentikCheck, _ := cmd.Flags().GetBool("authentik")
+	authentikConfig, _ := cmd.Flags().GetBool("authentik-config")
 	bionicgptCheck, _ := cmd.Flags().GetBool("bionicgpt")
 	hecatePath, _ := cmd.Flags().GetString("path")
 	verbose, _ := cmd.Flags().GetBool("verbose")
@@ -63,6 +64,7 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		zap.String("component_filter", component),
 		zap.String("path", hecatePath),
 		zap.Bool("authentik_check", authentikCheck),
+		zap.Bool("authentik_config", authentikConfig),
 		zap.Bool("bionicgpt_check", bionicgptCheck))
 
 	// If --bionicgpt flag is set, run BionicGPT integration diagnostics
@@ -72,6 +74,11 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 			Verbose:    verbose,
 		}
 		return RunBionicGPTIntegrationDebug(rc, config)
+	}
+
+	// If --authentik-config flag is set, export Authentik configuration
+	if authentikConfig {
+		return runAuthentikConfigExport(rc, hecatePath)
 	}
 
 	// If --authentik flag is set, run comprehensive Authentik check
@@ -831,4 +838,64 @@ func displayContainerStatus(rc *eos_io.RuntimeContext, hecatePath string) []Heca
 	logger.Debug("Container status displayed")
 
 	return results
+}
+
+// runAuthentikConfigExport exports Authentik configuration for observability
+// P0 OBSERVABILITY: Shows users what self-enrollment has configured
+func runAuthentikConfigExport(rc *eos_io.RuntimeContext, hecatePath string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Authentik Configuration Export")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Read .env file to get API token
+	envPath := filepath.Join(hecatePath, ".env")
+	logger.Info("Reading Authentik API token from .env",
+		zap.String("env_path", envPath))
+
+	envFile, err := os.ReadFile(envPath)
+	if err != nil {
+		return fmt.Errorf("failed to read .env file: %w\nPath: %s\nEnsure Hecate is installed: eos create hecate", err, envPath)
+	}
+
+	// Parse AUTHENTIK_TOKEN from .env
+	var apiToken string
+	for _, line := range strings.Split(string(envFile), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "AUTHENTIK_TOKEN=") {
+			apiToken = strings.TrimPrefix(line, "AUTHENTIK_TOKEN=")
+			apiToken = strings.Trim(apiToken, "\"'") // Remove quotes
+			break
+		}
+	}
+
+	if apiToken == "" {
+		return fmt.Errorf("AUTHENTIK_TOKEN not found in .env file\nPath: %s\nEnsure self-enrollment is enabled: eos update hecate --enable self-enrollment", envPath)
+	}
+
+	logger.Info("✓ API token found in .env")
+
+	// Authentik URL (localhost:9000 for host access)
+	authentikURL := fmt.Sprintf("http://%s:%d", AuthentikHost, AuthentikPort)
+
+	// Export configuration
+	report, err := ExportAuthentikConfig(rc, authentikURL, apiToken)
+	if err != nil {
+		return fmt.Errorf("failed to export Authentik configuration: %w", err)
+	}
+
+	// Format and display report
+	formattedReport := FormatAuthentikReport(report)
+	fmt.Print(formattedReport)
+
+	logger.Info("✓ Authentik configuration export complete")
+	logger.Info("")
+	logger.Info("NEXT STEPS:")
+	logger.Info("  • Review brands configuration to verify enrollment flow is set")
+	logger.Info("  • Check groups to see self-enrolled user permissions")
+	logger.Info("  • Verify flows contain expected stages")
+	logger.Info("  • Configure application policies for group access")
+
+	return nil
 }

@@ -285,6 +285,30 @@ func (c *APIClient) ListFlowBindings(ctx context.Context, flowPK string) ([]Stag
 	return result.Results, nil
 }
 
+// DeleteStageBinding deletes a stage binding by PK
+func (c *APIClient) DeleteStageBinding(ctx context.Context, pk string) error {
+	url := fmt.Sprintf("%s/api/v3/flows/bindings/%s/", c.BaseURL, pk)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("stage binding deletion request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("stage binding deletion failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // ListPromptFields lists all existing prompt fields
 func (c *APIClient) ListPromptFields(ctx context.Context) ([]PromptFieldResponse, error) {
 	url := fmt.Sprintf("%s/api/v3/stages/prompt/prompts/", c.BaseURL)
