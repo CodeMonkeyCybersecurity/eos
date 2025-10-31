@@ -492,12 +492,14 @@ func discoverAuthentikCredentials(rc *eos_io.RuntimeContext) (string, string, er
 	// Get base URL
 	baseURL := hecateEnv["AUTHENTIK_BASE_URL"]
 	if baseURL == "" {
-		// P0 FIX: Use container name instead of localhost for Docker network communication
-		// RATIONALE: "localhost" refers to Eos host, not Authentik container
-		// Container name resolves via Docker's internal DNS
-		baseURL = fmt.Sprintf("http://%s:%d", AuthentikContainerName, AuthentikPort)
-		logger.Debug("AUTHENTIK_BASE_URL not set, using default container name",
-			zap.String("default_url", baseURL))
+		// P0 FIX: Use localhost for host-to-container communication
+		// ARCHITECTURE: Eos runs on HOST, Authentik in CONTAINER with published port 9000
+		// Container name (hecate-server-1) only works inside Docker network
+		// Host must use localhost + published port to reach container
+		baseURL = fmt.Sprintf("http://%s:%d", AuthentikHost, AuthentikPort)
+		logger.Debug("AUTHENTIK_BASE_URL not set, using default localhost",
+			zap.String("default_url", baseURL),
+			zap.String("note", "Eos on host -> Authentik container via published port"))
 	}
 
 	if apiKey == "" {

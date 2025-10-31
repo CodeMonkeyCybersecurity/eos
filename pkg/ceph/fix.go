@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -201,6 +200,7 @@ func (f *FixEngine) fixMonitor(issue Issue) {
 }
 
 // bootstrapMonitor initializes the monitor if it was never bootstrapped
+// Uses the new complete bootstrap implementation from bootstrap.go
 func (f *FixEngine) bootstrapMonitor() {
 	result := FixResult{
 		FixName:     "Bootstrap Ceph Monitor",
@@ -210,23 +210,21 @@ func (f *FixEngine) bootstrapMonitor() {
 
 	if !f.opts.BootstrapMon {
 		result.Details = "Skipped (use --bootstrap-mon to enable automatic bootstrap)"
-		f.results = append(f.results, result)
-		return
-	}
-
-	// Get hostname
-	hostname, err := os.Hostname()
-	if err != nil {
-		result.Error = fmt.Errorf("failed to get hostname: %w", err)
-		f.results = append(f.results, result)
-		return
-	}
-
-	monDataDir := filepath.Join("/var/lib/ceph/mon", fmt.Sprintf("ceph-%s", hostname))
-
-	// ASSESS: Check if monitor data directory exists
-	if _, err := os.Stat(monDataDir); err == nil {
-		result.Details = "Monitor data directory already exists, skipping bootstrap"
+		f.logger.Info("")
+		f.logger.Info("╔════════════════════════════════════════════════════════════════╗")
+		f.logger.Info("║  CRITICAL: Monitor Bootstrap Required                          ║")
+		f.logger.Info("╚════════════════════════════════════════════════════════════════╝")
+		f.logger.Info("")
+		f.logger.Info("The monitor on this host was never initialized.")
+		f.logger.Info("This is a NEW cluster that needs proper bootstrap.")
+		f.logger.Info("")
+		f.logger.Info("To bootstrap safely, you need to provide:")
+		f.logger.Info("  • Monitor IP address")
+		f.logger.Info("  • Public network CIDR (e.g., 192.168.1.0/24)")
+		f.logger.Info("")
+		f.logger.Info("Run with bootstrap flag:")
+		f.logger.Info("  sudo eos update ceph --fix --bootstrap-mon")
+		f.logger.Info("")
 		f.results = append(f.results, result)
 		return
 	}
@@ -234,65 +232,88 @@ func (f *FixEngine) bootstrapMonitor() {
 	if f.opts.DryRun {
 		result.Applied = true
 		result.Success = true
-		result.Details = fmt.Sprintf("Would bootstrap monitor for host %s", hostname)
+		result.Details = "Would bootstrap monitor using complete Ceph bootstrap process (9 steps)"
 		result.CommandsRun = []string{
-			"ceph-authtool --create-keyring /tmp/ceph.mon.keyring --gen-key -n mon.",
-			fmt.Sprintf("ceph-mon --mkfs -i %s --keyring /tmp/ceph.mon.keyring", hostname),
-			fmt.Sprintf("systemctl enable ceph-mon@%s", hostname),
-			fmt.Sprintf("systemctl start ceph-mon@%s", hostname),
+			"Pre-flight validation checks",
+			"Generate cluster FSID (UUID)",
+			"Create /etc/ceph/ceph.conf with fsid",
+			"Create monitor, admin, and bootstrap keyrings",
+			"Generate monmap",
+			"Initialize monitor database (ceph-mon --mkfs)",
+			"Fix ownership and permissions",
+			"Start monitor service",
+			"Verify monitor health",
 		}
 		f.results = append(f.results, result)
 		return
 	}
 
-	// INTERVENE: Bootstrap the monitor
+	// INTERVENE: Use the complete bootstrap implementation
 	result.Applied = true
 
-	// Step 1: Create keyring
-	f.logger.Info("  Creating monitor keyring...")
-	cmd := exec.Command("ceph-authtool", "--create-keyring", "/tmp/ceph.mon.keyring", "--gen-key", "-n", "mon.")
-	output, err := cmd.CombinedOutput()
-	result.CommandsRun = append(result.CommandsRun, cmd.String())
+	f.logger.Info("")
+	f.logger.Info("╔════════════════════════════════════════════════════════════════╗")
+	f.logger.Info("║  Starting Complete Monitor Bootstrap Process                   ║")
+	f.logger.Info("╚════════════════════════════════════════════════════════════════╝")
+	f.logger.Info("")
+	f.logger.Info("This will create a NEW Ceph cluster with proper configuration.")
+	f.logger.Info("")
+
+	// Gather bootstrap configuration
+	hostname, err := os.Hostname()
 	if err != nil {
-		result.Error = fmt.Errorf("failed to create keyring: %s", output)
+		result.Error = fmt.Errorf("failed to get hostname: %w", err)
 		f.results = append(f.results, result)
 		return
 	}
 
-	// Step 2: Initialize monitor database
-	f.logger.Info("  Initializing monitor database...")
-	cmd = exec.Command("ceph-mon", "--mkfs", "-i", hostname, "--keyring", "/tmp/ceph.mon.keyring")
-	output, err = cmd.CombinedOutput()
-	result.CommandsRun = append(result.CommandsRun, cmd.String())
-	if err != nil {
-		result.Error = fmt.Errorf("failed to initialize monitor: %s", output)
+	// Try to read existing ceph.conf for network settings
+	var monitorIP, publicNetwork string
+	if config, err := ReadCephConf(f.logger); err == nil {
+		monitorIP = config.Global.MonHost
+		publicNetwork = config.Global.PublicNetwork
+		f.logger.Info("Found existing ceph.conf, using network settings from it")
+	}
+
+	// If not in ceph.conf, we need to detect or prompt
+	if monitorIP == "" || publicNetwork == "" {
+		// Try to detect from network interfaces
+		f.logger.Warn("Network configuration not found in ceph.conf")
+		f.logger.Warn("Bootstrap requires monitor IP and public network CIDR")
+		result.Error = fmt.Errorf("cannot auto-detect network configuration - please ensure /etc/ceph/ceph.conf has 'mon host' and 'public network' configured, or use interactive bootstrap")
 		f.results = append(f.results, result)
 		return
 	}
 
-	// Step 3: Enable service
-	f.logger.Info("  Enabling monitor service...")
-	serviceName := fmt.Sprintf("ceph-mon@%s", hostname)
-	cmd = exec.Command("systemctl", "enable", serviceName)
-	_, err = cmd.CombinedOutput()
-	result.CommandsRun = append(result.CommandsRun, cmd.String())
-	if err != nil {
-		f.logger.Warn("Failed to enable service (may already be enabled)", zap.Error(err))
+	// Create bootstrap configuration
+	bootstrapConfig := &BootstrapConfig{
+		Hostname:       hostname,
+		MonitorIP:      monitorIP,
+		PublicNetwork:  publicNetwork,
+		ClusterNetwork: publicNetwork, // Use same network for single-host
+		ClusterName:    "ceph",
 	}
 
-	// Step 4: Start service
-	f.logger.Info("  Starting monitor service...")
-	cmd = exec.Command("systemctl", "start", serviceName)
-	output, err = cmd.CombinedOutput()
-	result.CommandsRun = append(result.CommandsRun, cmd.String())
-	if err != nil {
-		result.Error = fmt.Errorf("failed to start monitor: %s", output)
+	f.logger.Info("Bootstrap configuration:",
+		zap.String("hostname", bootstrapConfig.Hostname),
+		zap.String("monitor_ip", bootstrapConfig.MonitorIP),
+		zap.String("public_network", bootstrapConfig.PublicNetwork))
+	f.logger.Info("")
+
+	// Execute bootstrap
+	if err := BootstrapFirstMonitor(f.rc, bootstrapConfig); err != nil {
+		result.Error = fmt.Errorf("bootstrap failed: %w", err)
+		result.Success = false
 		f.results = append(f.results, result)
 		return
 	}
 
 	result.Success = true
-	result.Details = fmt.Sprintf("Successfully bootstrapped and started monitor on %s", hostname)
+	result.Details = fmt.Sprintf("Successfully bootstrapped monitor on %s (FSID: %s)", hostname, bootstrapConfig.FSID)
+	result.CommandsRun = []string{
+		"Completed full 9-step Ceph bootstrap process",
+		"See logs above for detailed steps",
+	}
 	f.results = append(f.results, result)
 }
 

@@ -43,17 +43,29 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 		logger.Info(fmt.Sprintf("  → Path checked: %s", monDataDir))
 		logger.Info("  → This means the monitor was never bootstrapped on this host")
 		logger.Info("")
-		logger.Info("To create and initialize monitor:")
-		logger.Info("  1. Create keyring:")
-		logger.Info("       ceph-authtool --create-keyring /tmp/ceph.mon.keyring --gen-key -n mon.")
-		logger.Info("  2. Initialize monitor database:")
-		logger.Info(fmt.Sprintf("       ceph-mon --mkfs -i %s --keyring /tmp/ceph.mon.keyring", hostname))
-		logger.Info("  3. Enable service:")
-		logger.Info(fmt.Sprintf("       systemctl enable ceph-mon@%s", hostname))
-		logger.Info("  4. Start service:")
-		logger.Info(fmt.Sprintf("       systemctl start ceph-mon@%s", hostname))
-		logger.Info("  5. Verify:")
-		logger.Info(fmt.Sprintf("       systemctl status ceph-mon@%s", hostname))
+		logger.Info("╔════════════════════════════════════════════════════════════════╗")
+		logger.Info("║  AUTOMATED BOOTSTRAP AVAILABLE                                 ║")
+		logger.Info("╚════════════════════════════════════════════════════════════════╝")
+		logger.Info("")
+		logger.Info("Use Eos automated bootstrap (RECOMMENDED):")
+		logger.Info("  sudo eos update ceph --fix --bootstrap-mon")
+		logger.Info("")
+		logger.Info("This will perform the complete 9-step Ceph bootstrap process:")
+		logger.Info("  1. Pre-flight validation (prevent split-brain)")
+		logger.Info("  2. Generate cluster FSID (UUID)")
+		logger.Info("  3. Create /etc/ceph/ceph.conf with required settings")
+		logger.Info("  4. Create monitor, admin, and bootstrap keyrings")
+		logger.Info("  5. Generate monmap")
+		logger.Info("  6. Initialize monitor database")
+		logger.Info("  7. Fix ownership and permissions")
+		logger.Info("  8. Start monitor service")
+		logger.Info("  9. Verify monitor health")
+		logger.Info("")
+		logger.Info("For manual bootstrap, see:")
+		logger.Info("  https://docs.ceph.com/en/latest/install/manual-deployment/")
+		logger.Info("")
+		logger.Warn("WARNING: Manual bootstrap is complex and error-prone.")
+		logger.Warn("         The automated method is strongly recommended.")
 
 		result.Passed = false
 		result.Error = fmt.Errorf("monitor was never bootstrapped on this host")
@@ -63,11 +75,11 @@ func CheckMonitorBootstrap(logger otelzap.LoggerWithCtx, verbose bool) Diagnosti
 			Description: "Monitor was never bootstrapped on this host",
 			Impact:      "Monitor cannot start because it was never initialized. This is the root cause preventing the cluster from operating.",
 			Remediation: []string{
-				"ceph-authtool --create-keyring /tmp/ceph.mon.keyring --gen-key -n mon.",
-				fmt.Sprintf("ceph-mon --mkfs -i %s --keyring /tmp/ceph.mon.keyring", hostname),
-				fmt.Sprintf("systemctl enable ceph-mon@%s", hostname),
-				fmt.Sprintf("systemctl start ceph-mon@%s", hostname),
-				fmt.Sprintf("systemctl status ceph-mon@%s", hostname),
+				"Use automated bootstrap (RECOMMENDED):",
+				"  sudo eos update ceph --fix --bootstrap-mon",
+				"",
+				"This performs complete Ceph bootstrap with all required steps.",
+				"Manual bootstrap is complex - see https://docs.ceph.com/en/latest/install/manual-deployment/",
 			},
 		})
 
