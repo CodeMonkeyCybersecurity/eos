@@ -779,6 +779,44 @@ func createReadme(outputDir, baseURL string) error {
 	readme := fmt.Sprintf(`# Authentik + Caddy Configuration Backup
 Generated: %s
 
+## ⚠️ CRITICAL: Restoration Limitations (READ THIS FIRST)
+
+**This export is FOR OBSERVABILITY AND DOCUMENTATION ONLY.**
+
+Per Authentik vendor documentation (2025):
+> "Expect to perform significant manual modifications on exported blueprints
+> regardless of your restoration method."
+> — https://docs.goauthentik.io/docs/customize/blueprints/export
+
+**Automated restoration is NOT FULLY SUPPORTED by Authentik.**
+
+**Time Budget for Manual Restoration**: 4-8 hours of careful work
+- Reviewing exported JSON files
+- Manually recreating objects via Authentik UI or API
+- Fixing UUID references and dependencies
+- Testing authentication flows
+- Verifying all integrations work
+
+**What This Export IS Good For:**
+✅ Configuration documentation (what was configured before disaster)
+✅ Compliance records (SOC2, audit trail)
+✅ Understanding drift between disk files and live runtime
+✅ Reference when manually recreating configuration
+✅ Disaster recovery **PLANNING** (not push-button restoration)
+
+**What This Export CANNOT Do:**
+❌ Push-button restoration to new server
+❌ Automated UUID remapping
+❌ Restore secrets (by design - security)
+❌ Restore user passwords (must reset)
+
+**For Actual Disaster Recovery:**
+→ Use PostgreSQL database backup (22_postgresql_backup.sql)
+→ Restore database to new Authentik instance
+→ This gives you EVERYTHING including passwords, sessions, audit logs
+
+---
+
 ## Files Overview
 
 ### Core Configuration

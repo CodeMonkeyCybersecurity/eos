@@ -387,16 +387,43 @@ func checkRedisConnectivity(rc *eos_io.RuntimeContext, hecatePath string) []Auth
 	logger := otelzap.Ctx(rc.Ctx)
 	var results []AuthentikCheckResult
 
+	// P0 FIX: Add authentication support for Redis health check
+	// RATIONALE: Redis may require AUTH if REDIS_PASSWORD is set in .env
+	// EVIDENCE: Diagnostic shows "exit status 1" not "127" (command exists, auth likely failed)
+
+	// Step 1: Check if Redis requires authentication
+	envPath := filepath.Join(hecatePath, ".env")
+	envVars, err := shared.ParseEnvFile(envPath)
+	var redisPassword string
+	if err == nil {
+		redisPassword = envVars["REDIS_PASSWORD"] // May be empty if no auth
+	}
+
+	// Step 2: Build redis-cli command with optional auth
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
-	cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis", "redis-cli", "ping")
+	var cmd *exec.Cmd
+	if redisPassword != "" {
+		logger.Debug("Redis password found in .env, using authenticated ping")
+		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis",
+			"redis-cli", "-a", redisPassword, "ping")
+	} else {
+		logger.Debug("No Redis password in .env, using unauthenticated ping")
+		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis",
+			"redis-cli", "ping")
+	}
 	cmd.Dir = hecatePath
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput() // Use CombinedOutput to capture stderr (auth errors)
 	cancel()
+
+	logger.Debug("Redis ping result",
+		zap.Error(err),
+		zap.String("output", string(output)))
 
 	if err != nil || !strings.Contains(string(output), "PONG") {
 		logger.Error("Redis not responding",
 			zap.Error(err),
-			zap.String("remediation", "restart Redis container"))
+			zap.String("output", string(output)), // Include output for debugging
+			zap.String("remediation", "check Redis logs or restart container"))
 
 		results = append(results, AuthentikCheckResult{
 			CheckName: "Redis Connectivity",
@@ -658,7 +685,8 @@ func checkMemoryUsage(rc *eos_io.RuntimeContext, _ string) []AuthentikCheckResul
 }
 
 // checkBackupStatus checks if recent backups exist
-func checkBackupStatus(_ *eos_io.RuntimeContext, hecatePath string) []AuthentikCheckResult {
+func checkBackupStatus(rc *eos_io.RuntimeContext, hecatePath string) []AuthentikCheckResult {
+	logger := otelzap.Ctx(rc.Ctx)
 	var results []AuthentikCheckResult
 
 	backupDir := filepath.Join(hecatePath, "backups")
@@ -707,11 +735,54 @@ func checkBackupStatus(_ *eos_io.RuntimeContext, hecatePath string) []AuthentikC
 		}
 	}
 
+	// P0 FIX: Validate backup is recent (within 24 hours)
+	// RATIONALE: Pre-upgrade checks should ensure RECENT backups
+	// SECURITY: Prevent data loss from stale backups
+	if latestTime.IsZero() {
+		// No valid backups found (all timestamps were zero)
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Backup Status",
+			Category:  "Pre-Upgrade",
+			Passed:    false,
+			Warning:   true,
+			Details:   "No valid backups found in backup directory",
+			Remediation: []string{
+				"Create a backup before upgrading",
+				"Run: eos backup authentik",
+			},
+		})
+		return results
+	}
+
+	backupAge := time.Since(latestTime)
+	if backupAge > 24*time.Hour {
+		logger.Warn("Backup is stale",
+			zap.String("backup", latestBackup),
+			zap.Duration("age", backupAge),
+			zap.String("remediation", "create fresh backup before upgrade"))
+
+		results = append(results, AuthentikCheckResult{
+			CheckName: "Backup Status",
+			Category:  "Pre-Upgrade",
+			Passed:    false,
+			Warning:   true,
+			Details:   fmt.Sprintf("Latest backup is %s old: %s (created %s)",
+				backupAge.Round(time.Hour), latestBackup, latestTime.Format("2006-01-02 15:04:05")),
+			Remediation: []string{
+				"Backup is stale - create fresh backup before upgrade",
+				"Run: eos backup authentik",
+				fmt.Sprintf("Current backup age: %s (max recommended: 24 hours)", backupAge.Round(time.Hour)),
+			},
+		})
+		return results
+	}
+
 	results = append(results, AuthentikCheckResult{
 		CheckName: "Backup Status",
 		Category:  "Pre-Upgrade",
 		Passed:    true,
-		Details:   fmt.Sprintf("Latest backup: %s (created %s)", latestBackup, latestTime.Format("2006-01-02 15:04:05")),
+		Details:   fmt.Sprintf("Latest backup: %s (created %s ago at %s)",
+			latestBackup, backupAge.Round(time.Minute), latestTime.Format("2006-01-02 15:04:05")),
 	})
 
 	return results
@@ -769,9 +840,13 @@ func checkAuthentikAPI(rc *eos_io.RuntimeContext, hecatePath string) []Authentik
 		zap.String("token_prefix", bootstrapToken[:min(4, len(bootstrapToken))]+"***"))
 
 	// Step 3: Check basic API health (unauthenticated endpoint)
+	// P0 FIX: Use Python instead of wget (Authentik containers don't include wget)
+	// EVIDENCE: GitHub issue #15769 (July 2025) - wget not in container
+	// VENDOR RECOMMENDATION: Use Python for health checks
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-", "http://localhost:9000/-/health/live/")
+		"python3", "-c",
+		`import urllib.request; print(urllib.request.urlopen("http://localhost:9000/-/health/live/").read().decode())`)
 	cmd.Dir = hecatePath
 	output, err := cmd.Output()
 	cancel()
@@ -820,11 +895,11 @@ func checkAuthentikAPI(rc *eos_io.RuntimeContext, hecatePath string) []Authentik
 
 	// Step 4: Test authenticated API call using bootstrap token
 	// Use the /api/v3/core/users/ endpoint (requires authentication)
+	// P0 FIX: Use Python instead of wget
 	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	pythonScript := fmt.Sprintf(`import urllib.request; req = urllib.request.Request("http://localhost:9000/api/v3/core/users/"); req.add_header("Authorization", "Bearer %s"); print(urllib.request.urlopen(req).read().decode())`, bootstrapToken)
 	authCmd := exec.CommandContext(ctx2, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+bootstrapToken,
-		"http://localhost:9000/api/v3/core/users/")
+		"python3", "-c", pythonScript)
 	authCmd.Dir = hecatePath
 	authOutput, authErr := authCmd.Output()
 	cancel2()
@@ -1215,11 +1290,11 @@ func checkEmbeddedOutpostDiagnostics(rc *eos_io.RuntimeContext, hecatePath strin
 		zap.String("outpost_id", outpostID))
 
 	// Query the health endpoint for this specific outpost
+	// P0 FIX: Use Python instead of wget
 	ctx5, cancel5 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	healthScript := fmt.Sprintf(`import urllib.request; req = urllib.request.Request("http://localhost:9000/api/v3/outposts/instances/%s/health/"); req.add_header("Authorization", "Bearer %s"); print(urllib.request.urlopen(req).read().decode())`, outpostID, token)
 	healthCmd := exec.CommandContext(ctx5, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+token,
-		"http://localhost:9000/api/v3/outposts/instances/"+outpostID+"/health/")
+		"python3", "-c", healthScript)
 	healthCmd.Dir = hecatePath
 	healthOutput, healthErr := healthCmd.Output()
 	cancel5()
@@ -1334,11 +1409,11 @@ func checkAuthentikProxyConfiguration(rc *eos_io.RuntimeContext, hecatePath stri
 		zap.String("token_prefix", token[:min(4, len(token))]+"***"))
 
 	// Step 2: List all proxy providers
+	// P0 FIX: Use Python instead of wget
 	ctx1, cancel1 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	providersScript := fmt.Sprintf(`import urllib.request; req = urllib.request.Request("http://localhost:9000/api/v3/providers/proxy/"); req.add_header("Authorization", "Bearer %s"); print(urllib.request.urlopen(req).read().decode())`, token)
 	providersCmd := exec.CommandContext(ctx1, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+token,
-		"http://localhost:9000/api/v3/providers/proxy/")
+		"python3", "-c", providersScript)
 	providersCmd.Dir = hecatePath
 	providersOutput, providersErr := providersCmd.Output()
 	cancel1()
@@ -1401,11 +1476,11 @@ func checkAuthentikProxyConfiguration(rc *eos_io.RuntimeContext, hecatePath stri
 	}
 
 	// Step 3: List all outposts
+	// P0 FIX: Use Python instead of wget
 	ctx2, cancel2 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	outpostsScript := fmt.Sprintf(`import urllib.request; req = urllib.request.Request("http://localhost:9000/api/v3/outposts/instances/"); req.add_header("Authorization", "Bearer %s"); print(urllib.request.urlopen(req).read().decode())`, token)
 	outpostsCmd := exec.CommandContext(ctx2, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+token,
-		"http://localhost:9000/api/v3/outposts/instances/")
+		"python3", "-c", outpostsScript)
 	outpostsCmd.Dir = hecatePath
 	outpostsOutput, outpostsErr := outpostsCmd.Output()
 	cancel2()
@@ -1484,11 +1559,11 @@ func checkAuthentikProxyConfiguration(rc *eos_io.RuntimeContext, hecatePath stri
 	}
 
 	// Step 4: List all applications
+	// P0 FIX: Use Python instead of wget
 	ctx3, cancel3 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	appsScript := fmt.Sprintf(`import urllib.request; req = urllib.request.Request("http://localhost:9000/api/v3/core/applications/"); req.add_header("Authorization", "Bearer %s"); print(urllib.request.urlopen(req).read().decode())`, token)
 	appsCmd := exec.CommandContext(ctx3, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+token,
-		"http://localhost:9000/api/v3/core/applications/")
+		"python3", "-c", appsScript)
 	appsCmd.Dir = hecatePath
 	appsOutput, appsErr := appsCmd.Output()
 	cancel3()
@@ -1549,9 +1624,11 @@ func checkAuthentikProxyConfiguration(rc *eos_io.RuntimeContext, hecatePath stri
 	}
 
 	// Step 5: Test forward auth endpoint
+	// P0 FIX: Use curl (caddy container has curl, not wget)
+	// NOTE: Caddy container is Alpine-based with curl pre-installed
 	ctx4, cancel4 := context.WithTimeout(rc.Ctx, 5*time.Second)
 	forwardAuthCmd := exec.CommandContext(ctx4, "docker", "compose", "exec", "-T", "caddy",
-		"wget", "-S", "-O", "-",
+		"curl", "-i", "-s",
 		"http://hecate-server-1:9000/outpost.goauthentik.io/auth/caddy")
 	forwardAuthCmd.Dir = hecatePath
 	forwardAuthOutput, forwardAuthErr := forwardAuthCmd.CombinedOutput()

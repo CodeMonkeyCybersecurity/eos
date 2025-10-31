@@ -71,7 +71,7 @@ func getDomainForApp(rc *eos_io.RuntimeContext, appName string) (string, error) 
 	routes, err := ListAPIRoutes(rc)
 	if err != nil {
 		return "", fmt.Errorf("failed to list Caddy routes: %w\n\n"+
-			"Ensure Caddy is running and Admin API is accessible at %s", CaddyAdminAPIHost)
+			"Ensure Caddy is running and Admin API is accessible at %s", err, CaddyAdminAPIHost)
 	}
 
 	if len(routes) == 0 {
