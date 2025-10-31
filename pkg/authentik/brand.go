@@ -107,6 +107,15 @@ func (c *APIClient) UpdateBrand(ctx context.Context, pk string, updates map[stri
 
 	// P0 FIX: Correct API endpoint path
 	url := fmt.Sprintf("%s/api/v3/core/brands/%s/", c.BaseURL, pk)
+
+	// P0 DEBUG: Log exact request being sent to API (CRITICAL for diagnosing field name issues)
+	// This will show us the exact JSON payload Authentik receives
+	fmt.Printf("\n========== AUTHENTIK API DEBUG ==========\n")
+	fmt.Printf("HTTP Method: PATCH\n")
+	fmt.Printf("URL: %s\n", url)
+	fmt.Printf("Request Body (JSON):\n%s\n", string(jsonBody))
+	fmt.Printf("=========================================\n\n")
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -127,6 +136,13 @@ func (c *APIClient) UpdateBrand(ctx context.Context, pk string, updates map[stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	// P0 DEBUG: Log exact response received from API
+	// This will show us what Authentik actually returns (including which fields are set/empty)
+	fmt.Printf("\n========== AUTHENTIK API RESPONSE ==========\n")
+	fmt.Printf("HTTP Status: %d\n", resp.StatusCode)
+	fmt.Printf("Response Body (JSON):\n%s\n", string(body))
+	fmt.Printf("============================================\n\n")
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("brand update failed with status %d: %s", resp.StatusCode, string(body))

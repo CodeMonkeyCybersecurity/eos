@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
@@ -48,6 +49,186 @@ type enrollmentStats struct {
 	FieldsCreated   int
 	BindingsReused  int
 	BindingsCreated int
+}
+
+// getDomainForApp discovers the DNS domain for an application by querying Caddy routes
+// and matching against Authentik application metadata.
+//
+// Discovery strategy:
+// 1. List all routes from Caddy Admin API
+// 2. Fetch all Authentik applications
+// 3. Match app name to Authentik application slug/name
+// 4. Find Caddy route where domain prefix matches application slug
+//
+// Example: appName="bionicgpt" → finds app with slug "bionicgpt" → matches domain "chat.codemonkey.net.au"
+func getDomainForApp(rc *eos_io.RuntimeContext, appName string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Auto-detecting DNS domain for application",
+		zap.String("app_name", appName))
+
+	// 1. Get all Caddy routes
+	routes, err := ListAPIRoutes(rc)
+	if err != nil {
+		return "", fmt.Errorf("failed to list Caddy routes: %w\n\n"+
+			"Ensure Caddy is running and Admin API is accessible at %s", CaddyAdminAPIHost)
+	}
+
+	if len(routes) == 0 {
+		return "", fmt.Errorf("no Caddy routes found\n\n"+
+			"Add routes first with: eos update hecate --add %s --dns <domain> --upstream <ip:port>", appName)
+	}
+
+	logger.Debug("Retrieved Caddy routes",
+		zap.Int("route_count", len(routes)))
+
+	// 2. Get Authentik API token
+	token, err := getAuthentikAPIToken(rc)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Authentik API token: %w\n\n"+
+			"Set AUTHENTIK_BOOTSTRAP_TOKEN or AUTHENTIK_API_TOKEN in /opt/hecate/.env", err)
+	}
+
+	// 3. Fetch Authentik applications
+	applications, err := fetchAuthentikApplications(rc, "localhost", AuthentikPort, token)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch Authentik applications: %w", err)
+	}
+
+	logger.Debug("Retrieved Authentik applications",
+		zap.Int("app_count", len(applications)))
+
+	// 4. Find application by name/slug (case-insensitive)
+	var targetApp *AuthentikApplication
+	for i := range applications {
+		app := &applications[i]
+		if strings.EqualFold(app.Slug, appName) || strings.EqualFold(app.Name, appName) {
+			targetApp = app
+			logger.Debug("Found matching Authentik application",
+				zap.String("slug", app.Slug),
+				zap.String("name", app.Name))
+			break
+		}
+	}
+
+	if targetApp == nil {
+		// List available apps for helpful error message
+		availableApps := make([]string, 0, len(applications))
+		for _, app := range applications {
+			availableApps = append(availableApps, app.Slug)
+		}
+
+		return "", fmt.Errorf("no Authentik application found matching: %s\n\n"+
+			"Available applications: %s\n\n"+
+			"Create application in Authentik first, then add route with:\n"+
+			"  eos update hecate --add %s --dns <domain> --upstream <ip:port>",
+			appName, strings.Join(availableApps, ", "), appName)
+	}
+
+	// 5. Find Caddy route matching application slug
+	// Strategy: Extract domain prefix (e.g., "chat" from "chat.codemonkey.net.au")
+	//           and match against application slug
+	for _, route := range routes {
+		domainPrefix := extractDomainPrefix(route.DNS)
+
+		// Check if domain prefix matches app slug or app name
+		if strings.EqualFold(domainPrefix, targetApp.Slug) ||
+			strings.EqualFold(domainPrefix, appName) ||
+			strings.EqualFold(route.DNS, targetApp.Name) {
+
+			logger.Info("Auto-detected domain from application name",
+				zap.String("app_name", appName),
+				zap.String("authentik_slug", targetApp.Slug),
+				zap.String("domain", route.DNS),
+				zap.String("domain_prefix", domainPrefix))
+
+			return route.DNS, nil
+		}
+	}
+
+	// No matching route found - provide helpful error
+	availableDomains := make([]string, 0, len(routes))
+	for _, route := range routes {
+		availableDomains = append(availableDomains, route.DNS)
+	}
+
+	return "", fmt.Errorf("found Authentik application '%s' but no matching Caddy route\n\n"+
+		"Application slug: %s\n"+
+		"Available domains: %s\n\n"+
+		"Add route for this application:\n"+
+		"  eos update hecate --add %s --dns <domain> --upstream <ip:port>\n\n"+
+		"Or manually specify domain:\n"+
+		"  eos update hecate --enable self-enrollment --app %s --dns <domain>",
+		appName, targetApp.Slug, strings.Join(availableDomains, ", "), appName, appName)
+}
+
+// findBrandByDomain finds the Authentik brand that serves a specific domain
+// Returns the brand if found, or error with helpful troubleshooting steps
+func findBrandByDomain(rc *eos_io.RuntimeContext, client *authentik.APIClient, domain string) (*authentik.BrandResponse, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Finding Authentik brand for domain",
+		zap.String("domain", domain))
+
+	// List all brands
+	brands, err := client.ListBrands(rc.Ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Authentik brands: %w", err)
+	}
+
+	if len(brands) == 0 {
+		return nil, fmt.Errorf("no Authentik brands found - this should not happen\n\n"+
+			"Authentik installations always have a default brand.\n"+
+			"Check Authentik status: docker ps | grep authentik")
+	}
+
+	// Try exact domain match first
+	for i := range brands {
+		brand := &brands[i]
+		if strings.EqualFold(brand.Domain, domain) {
+			logger.Info("Found brand with exact domain match",
+				zap.String("brand_title", brand.BrandingTitle),
+				zap.String("brand_pk", brand.PK),
+				zap.String("brand_domain", brand.Domain))
+			return brand, nil
+		}
+	}
+
+	// Try wildcard/subdomain matching
+	// Example: brand.Domain="codemonkey.net.au" matches domain="chat.codemonkey.net.au"
+	for i := range brands {
+		brand := &brands[i]
+		if strings.HasSuffix(domain, brand.Domain) {
+			logger.Info("Found brand with wildcard domain match",
+				zap.String("brand_title", brand.BrandingTitle),
+				zap.String("brand_pk", brand.PK),
+				zap.String("brand_domain", brand.Domain),
+				zap.String("requested_domain", domain))
+			return brand, nil
+		}
+	}
+
+	// No match found - provide helpful error with available brands
+	brandInfo := make([]string, 0, len(brands))
+	for _, brand := range brands {
+		brandInfo = append(brandInfo, fmt.Sprintf("%s (domain: %s)", brand.BrandingTitle, brand.Domain))
+	}
+
+	// If only one brand exists, use it (most common case)
+	if len(brands) == 1 {
+		logger.Warn("No exact domain match, using default brand",
+			zap.String("brand_domain", brands[0].Domain),
+			zap.String("requested_domain", domain))
+		return &brands[0], nil
+	}
+
+	return nil, fmt.Errorf("no Authentik brand found for domain: %s\n\n"+
+		"Available brands:\n  %s\n\n"+
+		"Configure brand domain in Authentik:\n"+
+		"  1. Go to http://localhost:9000/if/admin/#/core/brands\n"+
+		"  2. Edit brand and set Domain field to: %s\n"+
+		"  3. Re-run: eos update hecate --enable self-enrollment --app <app>",
+		domain, strings.Join(brandInfo, "\n  "), domain)
 }
 
 // EnableSelfEnrollment enables self-enrollment for Hecate applications
@@ -127,11 +308,23 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 	logger.Info("✓ Authentik API is responding")
 
-	// P3 FIX: Validate API token AND get brand configuration in single call
+	// Auto-detect DNS domain from application name
+	// This queries Caddy Admin API and Authentik API to find the matching domain
+	logger.Info("Auto-detecting DNS domain from application name")
+	domain, err := getDomainForApp(rc, config.AppName)
+	if err != nil {
+		return fmt.Errorf("failed to auto-detect domain: %w", err)
+	}
+
+	logger.Info("✓ Domain auto-detected",
+		zap.String("app", config.AppName),
+		zap.String("domain", domain))
+
+	// P3 FIX: Validate API token by listing brands
 	// RATIONALE: Health check only verifies service is up, not that token is valid
-	// BENEFIT: Detect auth issues before attempting to create resources + eliminate double API call
-	logger.Info("Validating API token and fetching brand configuration")
-	brands, err := authentikClient.ListBrands(rc.Ctx)
+	// BENEFIT: Detect auth issues before attempting to create resources
+	logger.Info("Validating API token via brand listing")
+	_, err = authentikClient.ListBrands(rc.Ctx)
 	if err != nil {
 		return fmt.Errorf("Authentik API token invalid or failed to fetch brands: %w\n\n"+
 			"Check token in /opt/hecate/.env\n"+
@@ -142,19 +335,20 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 			"  3. Create new token in Authentik UI: Admin → Tokens → Create\n"+
 			"  4. Update /opt/hecate/.env with new token", err, authentikURL)
 	}
-	logger.Info("✓ API token validated and brand configuration fetched")
+	logger.Info("✓ API token validated")
 
-	if len(brands) == 0 {
-		return fmt.Errorf("no Authentik brands found - this should not happen\n\n" +
-			"Authentik installations always have a default brand.\n" +
-			"Check Authentik status: docker ps | grep authentik")
+	// Find brand by domain (domain-aware brand selection)
+	// This replaces the old "brands[0]" logic with intelligent domain matching
+	brand, err := findBrandByDomain(rc, authentikClient, domain)
+	if err != nil {
+		return fmt.Errorf("failed to find brand for domain: %w", err)
 	}
 
-	// Use first brand (default brand)
-	brand := brands[0]
-	logger.Info("Found Authentik brand",
+	logger.Info("Selected Authentik brand for domain",
 		zap.String("brand_pk", brand.PK),
-		zap.String("title", brand.BrandingTitle),
+		zap.String("brand_title", brand.BrandingTitle),
+		zap.String("brand_domain", brand.Domain),
+		zap.String("requested_domain", domain),
 		zap.String("current_enrollment_flow", brand.FlowEnrollment))
 
 	// Check if enrollment is already enabled
@@ -189,7 +383,7 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 
 	// P0: Initialize resource tracking for rollback
 	resources := &enrollmentResources{
-		OriginalBrand: &brand, // Store original brand config for restoration
+		OriginalBrand: brand, // Store original brand config for restoration
 		BrandPK:       brand.PK,
 	}
 

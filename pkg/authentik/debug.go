@@ -5,7 +5,9 @@ package authentik
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1749,27 +1751,36 @@ func displayAuthentikConfiguration(rc *eos_io.RuntimeContext, hecatePath string)
 	logger.Debug("Reading Authentik API token from .env",
 		zap.String("env_path", envPath))
 
-	envFile, err := os.ReadFile(envPath)
+	// P0 FIX: Use correct variable names with fallback chain
+	// RATIONALE: Authentik has TWO token types with different purposes
+	// - AUTHENTIK_API_TOKEN: Scoped operational token (preferred)
+	// - AUTHENTIK_BOOTSTRAP_TOKEN: Full-admin bootstrap token (fallback only)
+	// - AUTHENTIK_TOKEN: Non-existent variable (was hardcoded incorrectly)
+	// EVIDENCE: Your .env has AUTHENTIK_BOOTSTRAP_TOKEN, not AUTHENTIK_TOKEN
+	envVars, err := shared.ParseEnvFile(envPath)
 	if err != nil {
-		return fmt.Errorf("failed to read .env file: %w\nPath: %s", err, envPath)
+		return fmt.Errorf("failed to parse .env file: %w\nPath: %s", err, envPath)
 	}
 
-	// Parse AUTHENTIK_TOKEN from .env
-	var apiToken string
-	for _, line := range strings.Split(string(envFile), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "AUTHENTIK_TOKEN=") {
-			apiToken = strings.TrimPrefix(line, "AUTHENTIK_TOKEN=")
-			apiToken = strings.Trim(apiToken, "\"'") // Remove quotes
-			break
-		}
+	// Try in order of preference (most secure → least secure)
+	apiToken := envVars["AUTHENTIK_API_TOKEN"]
+	tokenSource := "AUTHENTIK_API_TOKEN"
+
+	if apiToken == "" {
+		apiToken = envVars["AUTHENTIK_BOOTSTRAP_TOKEN"]
+		tokenSource = "AUTHENTIK_BOOTSTRAP_TOKEN"
+		logger.Warn("Using AUTHENTIK_BOOTSTRAP_TOKEN as fallback - create scoped API token instead",
+			zap.String("remediation", "Directory → Tokens → Create (Intent: API, Expiry: Never)"))
 	}
 
 	if apiToken == "" {
-		return fmt.Errorf("AUTHENTIK_TOKEN not found in .env file\nPath: %s", envPath)
+		return fmt.Errorf("no API token found in .env\n"+
+			"Expected: AUTHENTIK_API_TOKEN or AUTHENTIK_BOOTSTRAP_TOKEN\n"+
+			"Path: %s", envPath)
 	}
 
-	logger.Debug("✓ API token found in .env")
+	logger.Debug("✓ API token found in .env",
+		zap.String("source", tokenSource))
 
 	// Authentik URL (localhost:9000 for host access)
 	authentikURL := fmt.Sprintf("http://%s:%d", shared.GetInternalHostname(), shared.PortAuthentik)
@@ -1878,7 +1889,99 @@ func displayAuthentikConfiguration(rc *eos_io.RuntimeContext, hecatePath string)
 		fmt.Println()
 	}
 
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// API Schema Information (for debugging API compatibility issues)
+	fmt.Println("\n5. API Schema Information")
+	fmt.Println("   (Brands PATCH endpoint - for debugging field name issues)")
+	fmt.Println()
+
+	// Query OpenAPI schema using Authentik client
+	schemaURL := fmt.Sprintf("%s/api/v3/schema/", authentikURL)
+	schemaReq, schemaErr := http.NewRequestWithContext(rc.Ctx, http.MethodGet, schemaURL, nil)
+	if schemaErr != nil {
+		logger.Warn("Failed to create schema request", zap.Error(schemaErr))
+		fmt.Printf("   ⚠ Could not query API schema: %v\n", schemaErr)
+	} else {
+		schemaReq.Header.Set("Authorization", "Bearer "+apiToken)
+		schemaReq.Header.Set("Accept", "application/json")
+
+		schemaResp, schemaErr := authentikClient.HTTPClient.Do(schemaReq)
+		if schemaErr != nil {
+			logger.Warn("Failed to fetch API schema", zap.Error(schemaErr))
+			fmt.Printf("   ⚠ Could not fetch API schema: %v\n", schemaErr)
+		} else {
+			defer schemaResp.Body.Close()
+
+			if schemaResp.StatusCode == http.StatusOK {
+				var schema map[string]interface{}
+				if schemaErr := json.NewDecoder(schemaResp.Body).Decode(&schema); schemaErr != nil {
+					logger.Warn("Failed to decode schema", zap.Error(schemaErr))
+					fmt.Printf("   ⚠ Could not decode API schema: %v\n", schemaErr)
+				} else {
+					// Extract brands PATCH endpoint schema
+					if paths, ok := schema["paths"].(map[string]interface{}); ok {
+						if brandPath, ok := paths["/api/v3/core/brands/{brand_uuid}/"].(map[string]interface{}); ok {
+							if patch, ok := brandPath["patch"].(map[string]interface{}); ok {
+								if reqBody, ok := patch["requestBody"].(map[string]interface{}); ok {
+									if content, ok := reqBody["content"].(map[string]interface{}); ok {
+										if appJSON, ok := content["application/json"].(map[string]interface{}); ok {
+											if schemaObj, ok := appJSON["schema"].(map[string]interface{}); ok {
+												if properties, ok := schemaObj["properties"].(map[string]interface{}); ok {
+													fmt.Println("   Available fields for brands PATCH:")
+
+													// Check for flow_enrollment specifically
+													if flowEnroll, ok := properties["flow_enrollment"]; ok {
+														fmt.Println("   ✓ flow_enrollment field EXISTS")
+														if flowMap, ok := flowEnroll.(map[string]interface{}); ok {
+															if flowType, ok := flowMap["type"].(string); ok {
+																fmt.Printf("     Type: %s\n", flowType)
+															}
+															if nullable, ok := flowMap["nullable"].(bool); ok {
+																fmt.Printf("     Nullable: %t\n", nullable)
+															}
+														}
+													} else {
+														fmt.Println("   ✗ flow_enrollment field NOT FOUND")
+														fmt.Println("   Available flow-related fields:")
+														for key := range properties {
+															if strings.Contains(strings.ToLower(key), "flow") {
+																fmt.Printf("     - %s\n", key)
+															}
+														}
+													}
+
+													// List all field names
+													fmt.Println("\n   All available brand fields:")
+													fieldNames := make([]string, 0, len(properties))
+													for key := range properties {
+														fieldNames = append(fieldNames, key)
+													}
+													// Sort for readability
+													for i := 0; i < len(fieldNames); i++ {
+														for j := i + 1; j < len(fieldNames); j++ {
+															if fieldNames[i] > fieldNames[j] {
+																fieldNames[i], fieldNames[j] = fieldNames[j], fieldNames[i]
+															}
+														}
+													}
+													for _, field := range fieldNames {
+														fmt.Printf("     - %s\n", field)
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			} else {
+				fmt.Printf("   ⚠ API schema query returned status %d\n", schemaResp.StatusCode)
+			}
+		}
+	}
+
+	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	logger.Debug("✓ Authentik configuration export complete")
 	return nil
