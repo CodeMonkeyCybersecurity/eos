@@ -498,8 +498,13 @@ func generateRecommendations(report *DriftReport) []string {
 		if len(report.CaddyDrift.AddedRoutes) > 0 {
 			recommendations = append(recommendations,
 				"Add missing routes to /opt/hecate/Caddyfile to prevent loss on reload")
+			// PRECIPITATE PATTERN: Query EXISTING RUNNING state → DOCUMENT as declarative .yml
+			// For Caddy: GET /config via Admin API → Convert JSON to Caddyfile → DISPLAY (not write)
+			// For Docker: docker inspect containers → Generate docker-compose.yml → DISPLAY (not write)
+			// GOAL: Show "what's actually running" in declarative format for comparison/documentation
+			// NOTE: Does NOT write to disk - purely observability
 			recommendations = append(recommendations,
-				fmt.Sprintf("Run: eos update hecate --precipitate (Option C) to sync API state to disk"))
+				fmt.Sprintf("Run: eos update hecate --precipitate to document current runtime state"))
 		}
 
 		if len(report.CaddyDrift.RemovedRoutes) > 0 {
@@ -653,8 +658,14 @@ func RenderDriftReport(report *DriftReport) string {
 	// Remediation Commands
 	sb.WriteString("## Remediation Commands\n\n")
 	sb.WriteString("```bash\n")
-	sb.WriteString("# Option 1: Precipitate runtime state to disk (COMING SOON)\n")
-	sb.WriteString("eos update hecate --precipitate\n\n")
+	sb.WriteString("# Option 1: Document runtime state (COMING SOON)\n")
+	sb.WriteString("# PRECIPITATE: Query running state → Display as declarative config\n")
+	sb.WriteString("#   - Caddy Admin API (/config) → Convert to Caddyfile format → DISPLAY\n")
+	sb.WriteString("#   - Docker inspect → Convert to docker-compose.yml → DISPLAY\n")
+	sb.WriteString("#   - Shows what's ACTUALLY running vs what's on disk\n")
+	sb.WriteString("#   - Does NOT write files (purely observability/documentation)\n")
+	sb.WriteString("eos update hecate --precipitate\n")
+	sb.WriteString("# User can then manually copy output to disk files if desired\n\n")
 	sb.WriteString("# Option 2: Reload Caddy from disk Caddyfile (loses API changes)\n")
 	sb.WriteString("docker exec hecate-caddy caddy reload --config /etc/caddy/Caddyfile\n\n")
 	sb.WriteString("# Option 3: Recreate containers from compose file\n")

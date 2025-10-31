@@ -3702,45 +3702,60 @@ sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
 
 ---
 
-### Phase C: Option C - Precipitate Pattern (Runtime → Disk Sync) 📅 DEFERRED (2026-01 → 2026-02)
+### Phase C: Option C - Precipitate Pattern (Runtime State Documentation) ✅ CLARIFIED (2025-10-31)
 
-**Goal**: Automatically sync live Caddy API state and Docker runtime back to disk files
+**Goal**: Document live Caddy API state and Docker runtime in declarative format for observability
 
-**Status**: ⚠️ DEFERRED - Blocked by technical challenges (see below)
+**Status**: ✅ PATTERN CLARIFIED - Pure observability tool, no disk writes
 
-**Rationale for Deferral**:
-1. **Caddy JSON → Caddyfile conversion is lossy/impossible** (Issue #11 from Option B analysis)
-   - Caddy Admin API returns JSON format
-   - No official JSON → Caddyfile converter exists
-   - Manual conversion loses comments, formatting, and some directives
-   - Would require building custom AST parser (100+ hours effort)
+**What --precipitate Does** (CORRECTED UNDERSTANDING):
+1. **Query runtime state**:
+   - Caddy Admin API: `GET http://localhost:2019/config` (JSON)
+   - Docker API: `docker inspect hecate-*` containers
+2. **Convert to declarative format**:
+   - Caddy JSON → Caddyfile format representation
+   - Docker inspect → docker-compose.yml format representation
+3. **DISPLAY output to terminal** (does NOT write to disk)
+4. **User manually copies** if they want to persist the runtime state
 
-2. **Comment preservation is non-trivial**
-   - User's working Caddyfile has inline comments explaining config
-   - JSON format doesn't preserve comments
-   - Precipitating would destroy all documentation
+**Use Cases**:
+- **Documentation**: Capture "what's actually running" for disaster recovery planning
+- **Comparison**: Compare runtime state against git-tracked disk files
+- **Drift understanding**: Visualize the delta between disk templates and live state
+- **Troubleshooting**: See actual running config when debugging issues
 
-3. **Secret handling complexity**
-   - Environment variables in docker-compose.yml may contain secrets
-   - Precipitating runtime values could expose secrets in version control
-   - Need secret detection + Vault integration first
+**NOT Use Cases** (Anti-patterns):
+- ❌ Automatic synchronization (precipitate is display-only)
+- ❌ Writing files to disk (user must manually copy if desired)
+- ❌ Configuration management (use drift detection + manual fixes instead)
+- ❌ Backup/restore workflow (use proper backup tools)
 
-4. **Option B (drift detection) solves 80% of the problem**
-   - Users get actionable drift reports with remediation commands
-   - Manual fixes are well-documented and low-risk
-   - Automatic precipitation adds complexity without proportional value
+**Why Pure Observability**:
+1. **Comment preservation**: Never overwrites Caddyfiles with inline documentation
+2. **Secret safety**: No risk of writing secrets to version control
+3. **User control**: Explicit consent required for any disk changes
+4. **No conversion challenges**: Display format can be approximate/lossy (not authoritative)
 
-**Alternative Approach** (if demand emerges):
-- **Manual Sync Workflow**: User reviews `21_DRIFT_REPORT.md` → manually applies changes
-- **Assisted Sync**: `eos update hecate --suggest-fixes` generates bash script with recommended changes (user reviews before executing)
-- **Partial Precipitation**: Sync ONLY routes (not env vars) using Caddy Admin API → Caddyfile template regeneration
+**Implementation Status**:
+- ✅ Pattern documented in [pkg/hecate/authentik/export.go:870-890](pkg/hecate/authentik/export.go#L870-L890)
+- ✅ Pattern documented in [pkg/hecate/authentik/drift.go:501-507, 661-668](pkg/hecate/authentik/drift.go#L501-L507)
+- ⏳ Drift detection (Phase B) provides recommendations to use `--precipitate`
+- ⏳ CLI flag `--precipitate` implementation (pending)
 
-**Revisit Criteria**:
-- User feedback: 5+ requests for automatic precipitation
-- Caddy upstream: Official JSON → Caddyfile converter released
-- Secret manager: Phase 4-6 complete (Vault integration mature)
+**Comparison with Drift Detection (Phase B)**:
 
-**Revisit Date**: January 15, 2026 (after Phase B.2 complete, gather user feedback)
+| Feature | Drift Detection (Phase B) | Precipitate (Phase C) |
+|---------|---------------------------|------------------------|
+| **Purpose** | Identify differences | Document runtime state |
+| **Output** | Drift report with remediation | Declarative config (display only) |
+| **Actionable?** | Yes (commands to fix) | No (informational only) |
+| **Writes files?** | Yes (drift report) | No (display only) |
+| **Use case** | Ongoing monitoring | Ad-hoc documentation |
+
+**Implementation Priority**: LOW (2026-02+)
+- Drift detection (Phase B) solves operational monitoring
+- Precipitate adds documentation value but not critical path
+- Wait for user feedback after Phase B deployment
 
 ---
 

@@ -905,11 +905,26 @@ ls -lh 19_Caddyfile.disk 19_Caddyfile.live.json
 
 ### Reconciling Drift:
 
-**Option 1: Precipitate API → Disk (coming soon)**
+**Option 1: Document Runtime State (coming soon)**
 `+"```"+`
-# This will be implemented in Option C
+# PRECIPITATE PATTERN: Query running state → Document as declarative config
+#
+# What --precipitate does:
+# 1. Query Caddy Admin API: GET http://localhost:2019/config
+# 2. Convert JSON response to Caddyfile format
+# 3. Query Docker API: docker inspect hecate-* containers
+# 4. Generate docker-compose.yml with actual networks, volumes, env vars
+# 5. DISPLAY both configs (does NOT write to disk)
+#
+# Output shows:
+# - What Caddyfile SHOULD look like to match runtime
+# - What docker-compose.yml SHOULD look like to match runtime
+#
+# User can then:
+# - Copy output to /opt/hecate/Caddyfile if desired
+# - Version control the "runtime reality" for documentation
+# - Compare against git history to understand drift
 eos update hecate --precipitate
-# Writes live API state back to disk files
 `+"```"+`
 
 **Option 2: Manual Reconciliation**

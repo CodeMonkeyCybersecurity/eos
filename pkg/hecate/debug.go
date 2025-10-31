@@ -56,6 +56,7 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	component, _ := cmd.Flags().GetString("component")
 	authentikCheck, _ := cmd.Flags().GetBool("authentik")
 	bionicgptCheck, _ := cmd.Flags().GetBool("bionicgpt")
+	caddyCheck, _ := cmd.Flags().GetBool("caddy")
 	hecatePath, _ := cmd.Flags().GetString("path")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
@@ -63,7 +64,13 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		zap.String("component_filter", component),
 		zap.String("path", hecatePath),
 		zap.Bool("authentik_check", authentikCheck),
-		zap.Bool("bionicgpt_check", bionicgptCheck))
+		zap.Bool("bionicgpt_check", bionicgptCheck),
+		zap.Bool("caddy_check", caddyCheck))
+
+	// If --caddy flag is set, run Caddy Admin API diagnostics
+	if caddyCheck {
+		return RunCaddyAdminAPIDebug(rc, hecatePath, verbose)
+	}
 
 	// If --bionicgpt flag is set, run BionicGPT integration diagnostics
 	if bionicgptCheck {
