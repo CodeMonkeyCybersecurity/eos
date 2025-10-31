@@ -111,8 +111,8 @@ Restore:
 
 		logger.Info("terminal prompt:", zap.String("output", string(output)))
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("\n✓ Backup complete: %s", absPath)))
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Repository: ~/.eos/quick-backups")))
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Restore: eos restore .")))
+		logger.Info("terminal prompt:", zap.String("output", "Repository: ~/.eos/quick-backups"))
+		logger.Info("terminal prompt:", zap.String("output", "Restore: eos restore ."))
 
 		return nil
 	}),

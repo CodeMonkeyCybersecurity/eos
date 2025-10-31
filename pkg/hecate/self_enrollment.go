@@ -3,7 +3,9 @@
 package hecate
 
 import (
+	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -26,11 +28,11 @@ type SelfEnrollmentConfig struct {
 
 // enrollmentResources tracks all created Authentik resources for rollback
 type enrollmentResources struct {
-	PromptFieldPKs []string                     // Created prompt fields (username, email)
-	StagePKs       []string                     // Created stages (prompt, password, user write, login, captcha)
-	FlowPK         string                       // Created enrollment flow
-	OriginalBrand  *authentik.BrandResponse     // Original brand config for restoration
-	BrandPK        string                       // Brand that was modified
+	PromptFieldPKs []string                 // Created prompt fields (username, email)
+	StagePKs       []string                 // Created stages (prompt, password, user write, login, captcha)
+	FlowPK         string                   // Created enrollment flow
+	OriginalBrand  *authentik.BrandResponse // Original brand config for restoration
+	BrandPK        string                   // Brand that was modified
 }
 
 // EnableSelfEnrollment enables self-enrollment for Hecate applications
@@ -88,6 +90,27 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 
 	// Connect to Authentik API
 	authentikClient := authentik.NewClient(authentikURL, authentikToken)
+
+	// P1 REC: Health check before attempting operations
+	// RATIONALE: Distinguishes "Authentik not running" from "wrong credentials" from "wrong API endpoint"
+	// BENEFIT: Faster diagnosis and better error messages
+	logger.Info("Verifying Authentik API health")
+	if err := verifyAuthentikHealth(rc, authentikURL); err != nil {
+		return fmt.Errorf("Authentik health check failed: %w\n\n"+
+			"This usually means:\n"+
+			"  1. Authentik container is not running\n"+
+			"  2. Wrong URL in /opt/hecate/.env (check AUTHENTIK_BASE_URL)\n"+
+			"  3. Port 9000 not published in docker-compose.yml\n\n"+
+			"ARCHITECTURE NOTE:\n"+
+			"  Eos runs on HOST, Authentik in CONTAINER\n"+
+			"  Use: AUTHENTIK_BASE_URL=http://localhost:9000\n"+
+			"  NOT: AUTHENTIK_BASE_URL=http://hecate-server-1:9000\n\n"+
+			"Troubleshooting:\n"+
+			"  docker ps | grep authentik\n"+
+			"  curl %s/-/health/live/\n"+
+			"  docker port hecate-server-1", err, authentikURL)
+	}
+	logger.Info("✓ Authentik API is responding")
 
 	// Get current brand configuration
 	brands, err := authentikClient.ListBrands(rc.Ctx)
@@ -198,33 +221,70 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	// Create prompt fields for username and email collection
 	logger.Info("Creating prompt fields for user information")
 
-	usernameField, err := authentikClient.CreatePromptField(rc.Ctx,
-		"username",        // field_key
-		"username",        // type
-		"Username",        // label
-		"Enter username",  // placeholder
-		true,              // required
-		10)                // order
+	// Rec #3: Check for existing fields first (idempotency)
+	logger.Debug("Checking for existing prompt fields")
+	existingFields, err := authentikClient.ListPromptFields(rc.Ctx)
 	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create username field: %w", err)
-		return enrollmentErr
+		logger.Warn("Failed to list existing prompt fields, will attempt creation",
+			zap.Error(err))
+		existingFields = []authentik.PromptFieldResponse{} // Continue with empty list
 	}
-	resources.PromptFieldPKs = append(resources.PromptFieldPKs, usernameField.PK) // Track for rollback
-	logger.Info("✓ Username field created", zap.String("field_pk", usernameField.PK))
 
-	emailField, err := authentikClient.CreatePromptField(rc.Ctx,
-		"email",           // field_key
-		"email",           // type
-		"Email",           // label
-		"Enter email",     // placeholder
-		true,              // required
-		20)                // order
-	if err != nil {
-		enrollmentErr = fmt.Errorf("failed to create email field: %w", err)
-		return enrollmentErr
+	// Helper to find existing field by name
+	findFieldByName := func(name string) *authentik.PromptFieldResponse {
+		for i := range existingFields {
+			if existingFields[i].Name == name {
+				return &existingFields[i]
+			}
+		}
+		return nil
 	}
-	resources.PromptFieldPKs = append(resources.PromptFieldPKs, emailField.PK) // Track for rollback
-	logger.Info("✓ Email field created", zap.String("field_pk", emailField.PK))
+
+	// Create or reuse username field
+	var usernameField *authentik.PromptFieldResponse
+	if existing := findFieldByName("eos-username-field"); existing != nil {
+		logger.Info("✓ Username field already exists, reusing",
+			zap.String("field_pk", existing.PK),
+			zap.String("field_key", existing.FieldKey))
+		usernameField = existing
+	} else {
+		usernameField, err = authentikClient.CreatePromptField(rc.Ctx,
+			"username",       // field_key
+			"username",       // type
+			"Username",       // label
+			"Enter username", // placeholder
+			true,             // required
+			10)               // order
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create username field: %w", err)
+			return enrollmentErr
+		}
+		resources.PromptFieldPKs = append(resources.PromptFieldPKs, usernameField.PK) // Track for rollback
+		logger.Info("✓ Username field created", zap.String("field_pk", usernameField.PK))
+	}
+
+	// Create or reuse email field
+	var emailField *authentik.PromptFieldResponse
+	if existing := findFieldByName("eos-email-field"); existing != nil {
+		logger.Info("✓ Email field already exists, reusing",
+			zap.String("field_pk", existing.PK),
+			zap.String("field_key", existing.FieldKey))
+		emailField = existing
+	} else {
+		emailField, err = authentikClient.CreatePromptField(rc.Ctx,
+			"email",       // field_key
+			"email",       // type
+			"Email",       // label
+			"Enter email", // placeholder
+			true,          // required
+			20)            // order
+		if err != nil {
+			enrollmentErr = fmt.Errorf("failed to create email field: %w", err)
+			return enrollmentErr
+		}
+		resources.PromptFieldPKs = append(resources.PromptFieldPKs, emailField.PK) // Track for rollback
+		logger.Info("✓ Email field created", zap.String("field_pk", emailField.PK))
+	}
 
 	// Optional: Create captcha stage for bot protection
 	var captchaStage *authentik.CaptchaStageResponse
@@ -397,13 +457,58 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	return nil
 }
 
+// verifyAuthentikHealth checks if Authentik API is responding
+// P1 REC: Pre-flight health check before attempting operations
+//
+// ARCHITECTURE: This is called BEFORE authentication to distinguish:
+//   - Service not running (connection refused)
+//   - Service starting (health endpoint not ready)
+//   - Service ready but auth failed (wrong token)
+//
+// Returns error if health check fails, nil if healthy
+func verifyAuthentikHealth(rc *eos_io.RuntimeContext, baseURL string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	healthURL := fmt.Sprintf("%s/-/health/live/", baseURL)
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
+
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodGet, healthURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health check request: %w", err)
+	}
+
+	logger.Debug("Checking Authentik health endpoint", zap.String("url", healthURL))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("unhealthy (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	logger.Debug("✓ Authentik health check passed", zap.Int("status_code", resp.StatusCode))
+	return nil
+}
+
 // verifyEnrollmentURLAccessible performs a health check on the enrollment URL
 // P1 FIX #3: Add health check for enrollment URL
 //
 // Verification approach:
-//   1. HTTP HEAD request to enrollment URL
-//   2. Check for successful response (200-399)
-//   3. Non-fatal failure (warns but doesn't stop)
+//  1. HTTP HEAD request to enrollment URL
+//  2. Check for successful response (200-399)
+//  3. Non-fatal failure (warns but doesn't stop)
 //
 // RATIONALE: Enrollment flow may be configured in Authentik but:
 //   - DNS not yet propagated
@@ -503,12 +608,12 @@ func discoverAuthentikCredentials(rc *eos_io.RuntimeContext) (string, string, er
 	}
 
 	if apiKey == "" {
-		return "", "", fmt.Errorf("no Authentik API token found in /opt/hecate/.env\n\n"+
-			"Looked for: AUTHENTIK_API_TOKEN, AUTHENTIK_TOKEN, AUTHENTIK_API_KEY, AUTHENTIK_BOOTSTRAP_TOKEN\n\n"+
-			"To fix:\n"+
-			"  1. Check if Authentik is running: docker ps | grep authentik\n"+
-			"  2. Check if bootstrap token exists: grep AUTHENTIK_BOOTSTRAP_TOKEN /opt/hecate/.env\n"+
-			"  3. Create API token in Authentik UI: Admin → Tokens → Create\n"+
+		return "", "", fmt.Errorf("no Authentik API token found in /opt/hecate/.env\n\n" +
+			"Looked for: AUTHENTIK_API_TOKEN, AUTHENTIK_TOKEN, AUTHENTIK_API_KEY, AUTHENTIK_BOOTSTRAP_TOKEN\n\n" +
+			"To fix:\n" +
+			"  1. Check if Authentik is running: docker ps | grep authentik\n" +
+			"  2. Check if bootstrap token exists: grep AUTHENTIK_BOOTSTRAP_TOKEN /opt/hecate/.env\n" +
+			"  3. Create API token in Authentik UI: Admin → Tokens → Create\n" +
 			"  4. Add to /opt/hecate/.env: echo 'AUTHENTIK_API_TOKEN=your-token-here' | sudo tee -a /opt/hecate/.env")
 	}
 
@@ -523,7 +628,7 @@ func discoverAuthentikCredentials(rc *eos_io.RuntimeContext) (string, string, er
 // 4. Delete prompt fields
 func rollbackEnrollmentSetup(rc *eos_io.RuntimeContext, authentikClient *authentik.APIClient, resources *enrollmentResources) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if resources == nil {
 		return
 	}

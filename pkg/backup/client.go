@@ -49,6 +49,8 @@ func NewClient(rc *eos_io.RuntimeContext, repoName string) (*Client, error) {
 }
 
 // RunRestic executes restic with proper environment and logging
+// SECURITY: Uses password file instead of environment variable to prevent
+// password exposure via 'ps auxe' (CVSS 7.5 vulnerability mitigation)
 func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
@@ -58,13 +60,35 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 		return nil, fmt.Errorf("getting repository password: %w", err)
 	}
 
-	// Build command
+	// SECURITY FIX: Create temporary password file with restrictive permissions
+	// This prevents password exposure in process environment variables
+	passwordFile, err := os.CreateTemp("", "restic-password-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary password file: %w", err)
+	}
+	defer os.Remove(passwordFile.Name()) // Clean up immediately after use
+	defer passwordFile.Close()
+
+	// Set restrictive permissions (owner read-only)
+	if err := os.Chmod(passwordFile.Name(), 0400); err != nil {
+		return nil, fmt.Errorf("setting password file permissions: %w", err)
+	}
+
+	// Write password to file
+	if _, err := passwordFile.WriteString(password); err != nil {
+		return nil, fmt.Errorf("writing password to temporary file: %w", err)
+	}
+	if err := passwordFile.Sync(); err != nil {
+		return nil, fmt.Errorf("syncing password file: %w", err)
+	}
+
+	// Build command with password file
 	cmd := exec.CommandContext(c.rc.Ctx, "restic", args...)
 
-	// Set environment
+	// Set environment (WITHOUT password)
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("RESTIC_REPOSITORY=%s", c.repository.URL))
-	env = append(env, fmt.Sprintf("RESTIC_PASSWORD=%s", password))
+	env = append(env, fmt.Sprintf("RESTIC_PASSWORD_FILE=%s", passwordFile.Name()))
 
 	// Add backend-specific environment variables
 	for k, v := range c.repository.Environment {

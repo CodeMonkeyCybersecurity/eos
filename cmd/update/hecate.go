@@ -286,14 +286,14 @@ func runRemoveServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, ser
 		zap.String("service", service))
 
 	// Get dry-run flag (for future implementation)
-	_ , _ = cmd.Flags().GetBool("dry-run")
+	_, _ = cmd.Flags().GetBool("dry-run")
 
 	// TODO: Create remove package and implement RemoveService function
 	// For now, return not implemented error with clear workaround
-	return fmt.Errorf("--remove functionality not yet implemented\n\n" +
-		"Workaround: Manually remove service block from /opt/hecate/Caddyfile\n" +
-		"Then reload Caddy: docker exec hecate-caddy caddy reload --config /etc/caddy/Caddyfile\n\n" +
-		"Service to remove: %s\n" +
+	return fmt.Errorf("--remove functionality not yet implemented\n\n"+
+		"Workaround: Manually remove service block from /opt/hecate/Caddyfile\n"+
+		"Then reload Caddy: docker exec hecate-caddy caddy reload --config /etc/caddy/Caddyfile\n\n"+
+		"Service to remove: %s\n"+
 		"Look for: # Service: %s", service, service)
 }
 

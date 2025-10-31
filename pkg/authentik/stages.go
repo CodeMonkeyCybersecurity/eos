@@ -30,15 +30,15 @@ type PromptStageResponse struct {
 
 // PromptFieldResponse represents a prompt field
 type PromptFieldResponse struct {
-	PK            string `json:"pk"`
-	Name          string `json:"name"`
-	FieldKey      string `json:"field_key"`
-	Type          string `json:"type"` // text, email, password, username, etc.
-	Required      bool   `json:"required"`
-	Placeholder   string `json:"placeholder,omitempty"`
-	Label         string `json:"label,omitempty"`
-	Order         int    `json:"order"`
-	PlaceholderExpression bool `json:"placeholder_expression"`
+	PK                    string `json:"pk"`
+	Name                  string `json:"name"`
+	FieldKey              string `json:"field_key"`
+	Type                  string `json:"type"` // text, email, password, username, etc.
+	Required              bool   `json:"required"`
+	Placeholder           string `json:"placeholder,omitempty"`
+	Label                 string `json:"label,omitempty"`
+	Order                 int    `json:"order"`
+	PlaceholderExpression bool   `json:"placeholder_expression"`
 }
 
 // EmailStageResponse represents an email stage
@@ -285,12 +285,52 @@ func (c *APIClient) ListFlowBindings(ctx context.Context, flowPK string) ([]Stag
 	return result.Results, nil
 }
 
+// ListPromptFields lists all existing prompt fields
+func (c *APIClient) ListPromptFields(ctx context.Context) ([]PromptFieldResponse, error) {
+	url := fmt.Sprintf("%s/api/v3/stages/prompt/prompts/", c.BaseURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("prompt fields list request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("prompt fields list failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Results []PromptFieldResponse `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode prompt fields list response: %w", err)
+	}
+
+	return result.Results, nil
+}
+
 // CreatePromptField creates a prompt field for use in prompt stages
 func (c *APIClient) CreatePromptField(ctx context.Context, fieldKey, fieldType, label, placeholder string, required bool, order int) (*PromptFieldResponse, error) {
+	// P0 FIX: Authentik requires 'name' field (internal identifier) per API schema
+	// The 'name' field is the internal identifier, 'label' is the display text
+	// Generate name from field_key (e.g., "username" -> "eos-username-field")
+	name := fmt.Sprintf("eos-%s-field", fieldKey)
+
 	reqBody := map[string]interface{}{
-		"field_key":              fieldKey,
-		"type":                   fieldType,
-		"label":                  label,
+		"name":                   name,      // REQUIRED: Internal identifier for the prompt field
+		"field_key":              fieldKey,  // The form field name (used in expressions)
+		"type":                   fieldType, // Field type (username, email, password, etc.)
+		"label":                  label,     // Display text shown to users
 		"required":               required,
 		"placeholder":            placeholder,
 		"placeholder_expression": false,
@@ -376,20 +416,20 @@ func (c *APIClient) CreatePromptStage(ctx context.Context, name string, fieldPKs
 
 // UserLoginStageResponse represents a user login stage
 type UserLoginStageResponse struct {
-	PK                      string `json:"pk"`
-	Name                    string `json:"name"`
-	SessionDuration         string `json:"session_duration"`
-	TerminateOtherSessions  bool   `json:"terminate_other_sessions"`
-	RememberMeOffset        string `json:"remember_me_offset"`
+	PK                     string `json:"pk"`
+	Name                   string `json:"name"`
+	SessionDuration        string `json:"session_duration"`
+	TerminateOtherSessions bool   `json:"terminate_other_sessions"`
+	RememberMeOffset       string `json:"remember_me_offset"`
 }
 
 // CreateUserLoginStage creates a user login stage (for auto-login after enrollment)
 func (c *APIClient) CreateUserLoginStage(ctx context.Context, name string) (*UserLoginStageResponse, error) {
 	reqBody := map[string]interface{}{
-		"name":                    name,
-		"session_duration":        "seconds=0", // 0 = use default session duration
+		"name":                     name,
+		"session_duration":         "seconds=0", // 0 = use default session duration
 		"terminate_other_sessions": false,
-		"remember_me_offset":      "weeks=4",
+		"remember_me_offset":       "weeks=4",
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -429,15 +469,15 @@ func (c *APIClient) CreateUserLoginStage(ctx context.Context, name string) (*Use
 
 // CaptchaStageResponse represents a captcha stage
 type CaptchaStageResponse struct {
-	PK           string `json:"pk"`
-	Name         string `json:"name"`
-	PublicKey    string `json:"public_key"`
-	PrivateKey   string `json:"private_key"`
-	JSUrl        string `json:"js_url,omitempty"`
-	APIUrl       string `json:"api_url,omitempty"`
+	PK                string  `json:"pk"`
+	Name              string  `json:"name"`
+	PublicKey         string  `json:"public_key"`
+	PrivateKey        string  `json:"private_key"`
+	JSUrl             string  `json:"js_url,omitempty"`
+	APIUrl            string  `json:"api_url,omitempty"`
 	ScoreMinThreshold float64 `json:"score_min_threshold"`
 	ScoreMaxThreshold float64 `json:"score_max_threshold"`
-	ErrorOnInvalid    bool   `json:"error_on_invalid"`
+	ErrorOnInvalid    bool    `json:"error_on_invalid"`
 }
 
 // CreateCaptchaStage creates a captcha stage (hCaptcha or reCAPTCHA)
@@ -509,19 +549,19 @@ func (c *APIClient) CreateEmailVerificationStage(ctx context.Context, name, from
 	}
 
 	reqBody := map[string]interface{}{
-		"name":                name,
+		"name":                     name,
 		"activate_user_on_success": true,
-		"use_global_settings": false,
-		"host":                host,
-		"port":                port,
-		"username":            "",
-		"use_tls":             true,
-		"use_ssl":             false,
-		"timeout":             30,
-		"from_address":        fromAddress,
-		"token_expiry":        30, // minutes
-		"subject":             "Confirm your account",
-		"template":            template,
+		"use_global_settings":      false,
+		"host":                     host,
+		"port":                     port,
+		"username":                 "",
+		"use_tls":                  true,
+		"use_ssl":                  false,
+		"timeout":                  30,
+		"from_address":             fromAddress,
+		"token_expiry":             30, // minutes
+		"subject":                  "Confirm your account",
+		"template":                 template,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

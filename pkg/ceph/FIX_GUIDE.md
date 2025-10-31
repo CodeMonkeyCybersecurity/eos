@@ -1,6 +1,6 @@
 # Ceph Drift Correction Guide
 
-*Last Updated: 2025-10-22*
+*Last Updated: 2025-10-31*
 
 Automated drift correction for Ceph cluster issues using `eos update ceph --fix`.
 
@@ -21,21 +21,44 @@ sudo eos update ceph --fix --bootstrap-mon
 
 The fix engine automatically corrects these common drift issues:
 
-### 1. Monitor Not Bootstrapped (Critical)
+### 1. Monitor Not Bootstrapped (Critical) - **NEW: Complete Bootstrap Process**
 
 **Issue:** Monitor was never initialized on this host
-**Fix:**
-- Creates monitor keyring (`/tmp/ceph.mon.keyring`)
-- Initializes monitor database (`ceph-mon --mkfs`)
-- Enables monitor service
-- Starts monitor service
+
+**Fix:** Executes complete Ceph official bootstrap process (9 steps):
+1. **Pre-flight validation** - Prevents split-brain, checks for existing clusters
+2. **Generate cluster FSID** - Creates unique cluster UUID
+3. **Create /etc/ceph/ceph.conf** - With fsid, mon_host, public_network
+4. **Create all keyrings** - Monitor, admin, bootstrap-osd/mgr/mds/rgw
+5. **Generate monmap** - Initial monitor map with cluster topology
+6. **Initialize monitor database** - `ceph-mon --mkfs` with proper configuration
+7. **Fix ownership/permissions** - Ensures ceph user owns all files
+8. **Start monitor service** - Enable and start systemd unit
+9. **Verify health** - Confirms monitor is running and quorum formed
 
 **Requires:** `--bootstrap-mon` flag for safety
 
+**Prerequisites:** Existing `/etc/ceph/ceph.conf` must have `mon host` and `public network` configured, OR these will be detected from network interfaces.
+
 **Example:**
 ```bash
+# Ensure ceph.conf has network configuration
+sudo tee -a /etc/ceph/ceph.conf <<EOF
+[global]
+mon host = 192.168.6.77
+public network = 192.168.6.0/24
+EOF
+
+# Then bootstrap
 sudo eos update ceph --fix --bootstrap-mon
 ```
+
+**What Changed (2025-10-31):**
+- **OLD:** Simple 4-step bootstrap (insecure, incomplete)
+- **NEW:** Complete 9-step bootstrap following Ceph official documentation
+- **Added:** FSID generation, admin keyring, bootstrap keyrings, monmap
+- **Added:** Pre-flight validation to prevent split-brain
+- **Added:** Security hardening (secure temporary keyrings, cleanup)
 
 ### 2. Monitor Service Not Running (Critical)
 

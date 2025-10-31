@@ -56,7 +56,7 @@ Examples:
 
 		repoPath := filepath.Join(homeDir, ".eos", "quick-backups")
 		if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-			return fmt.Errorf("quick backup repository not found at %s\nCreate one first with: eos backup .", repoPath)
+			return fmt.Errorf("quick backup repository not found at %s\nCreate one first with: eos backup", repoPath)
 		}
 
 		// Create backup client
@@ -117,6 +117,21 @@ Examples:
 		absTarget, err := filepath.Abs(targetDir)
 		if err != nil {
 			return fmt.Errorf("resolving target path: %w", err)
+		}
+
+		// SECURITY: Prevent restore to critical system directories (CVSS 8.2 mitigation)
+		// Restoring to /, /etc, /usr, /var, /boot, /home without explicit --target is catastrophic
+		if targetDir == "" { // User didn't specify --target, using current directory default
+			for _, criticalPath := range backup.CriticalSystemPaths {
+				if absTarget == criticalPath {
+					return fmt.Errorf("SAFETY: Refusing to restore to critical system directory: %s\n"+
+						"This would overwrite system files and likely destroy your system.\n"+
+						"If you really need to restore to this location, use:\n"+
+						"  eos restore . --target %s --force\n\n"+
+						"WARNING: This is extremely dangerous and should only be done from rescue media",
+						absTarget, absTarget)
+				}
+			}
 		}
 
 		logger.Info("Quick restore initiated",
