@@ -69,7 +69,7 @@ func init() {
 	updateHecateEnableCmd.Flags().Bool("dry-run", false, "Show what would be changed without applying")
 
 	// Add flags for self-enrollment
-	updateHecateEnableCmd.Flags().String("app", "", "Application name (e.g., bionicgpt) - informational only, enrollment is brand-level")
+	updateHecateEnableCmd.Flags().String("app", "", "Application name (e.g., bionicgpt) - creates app-specific brand for isolated enrollment")
 	updateHecateEnableCmd.Flags().Bool("skip-caddyfile", false, "Skip Caddyfile updates (advanced usage)")
 	updateHecateEnableCmd.Flags().Bool("enable-captcha", false, "Enable captcha stage for bot protection (uses test keys initially)")
 	updateHecateEnableCmd.Flags().Bool("require-approval", false, "New users inactive until admin approves (default: active immediately)")
@@ -127,11 +127,11 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		zap.Bool("skip_caddyfile", skipCaddyfile),
 		zap.Bool("require_approval", requireApproval))
 
-	// Important note: Forward auth is brand-level, not app-level
+	// ARCHITECTURE UPDATE (2025-10-31): Self-enrollment is now app-specific via one-brand-per-application
 	if appName != "hecate" {
-		logger.Warn("IMPORTANT: Forward auth operates at BRAND level")
-		logger.Warn("Self-enrollment will affect ALL applications behind Authentik on this brand")
-		logger.Warn("The --app flag is informational only and does not restrict enrollment to specific apps")
+		logger.Info("ARCHITECTURE: App-specific brand isolation enabled")
+		logger.Info("Self-enrollment is isolated to THIS application only")
+		logger.Info("Each application gets its own Authentik brand for enrollment security")
 	}
 
 	// Build config

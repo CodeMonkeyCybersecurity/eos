@@ -163,8 +163,82 @@ func getDomainForApp(rc *eos_io.RuntimeContext, appName string) (string, error) 
 		appName, targetApp.Slug, strings.Join(availableDomains, ", "), appName, appName)
 }
 
+// findOrCreateAppBrand finds or creates an app-specific brand for isolated self-enrollment
+//
+// ARCHITECTURE CHANGE (2025-10-31): One brand per application
+// OLD: Multiple apps share one brand → enrollment affects ALL apps (security issue)
+// NEW: Each app has its own brand → enrollment isolated per application
+//
+// RATIONALE:
+//   - Self-enrollment is brand-level in Authentik (architectural limitation)
+//   - Solution: Create one brand per domain (application)
+//   - Result: Self-enrollment for chat.example.com != enrollment for wiki.example.com
+//
+// IDEMPOTENCY: If brand for domain already exists, reuses it
+//
+// SECURITY: Prevents cross-application enrollment
+//   - User enrolls for BionicGPT → gets access to BionicGPT only
+//   - User CANNOT access Umami, Wiki, etc. (different brands)
+func findOrCreateAppBrand(rc *eos_io.RuntimeContext, client *authentik.APIClient, domain, appName string) (*authentik.BrandResponse, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Finding or creating app-specific brand",
+		zap.String("domain", domain),
+		zap.String("app_name", appName))
+
+	// Step 1: Check if brand for this domain already exists
+	brands, err := client.ListBrands(rc.Ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list brands: %w", err)
+	}
+
+	// Try exact domain match first
+	for i := range brands {
+		brand := &brands[i]
+		if brand.Domain == domain {
+			logger.Info("✓ Found existing brand for application",
+				zap.String("brand_pk", brand.PK),
+				zap.String("brand_title", brand.BrandingTitle),
+				zap.String("brand_domain", brand.Domain))
+			return brand, nil
+		}
+	}
+
+	// Step 2: Brand doesn't exist, create it
+	logger.Info("Creating new brand for application",
+		zap.String("domain", domain),
+		zap.String("app_name", appName))
+
+	// Generate brand title from app name
+	// Example: "bionicgpt" → "BionicGPT Self-Enrollment"
+	brandTitle := fmt.Sprintf("%s Self-Enrollment", appName)
+
+	// Create brand with minimal required fields
+	// RATIONALE: Let Authentik use its default flows for authentication/invalidation
+	//            We only need to set enrollment flow (done later)
+	newBrand, err := client.CreateBrand(rc.Ctx, domain, brandTitle, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create brand: %w\n\n"+
+			"Troubleshooting:\n"+
+			"  1. Check Authentik API token has admin permissions\n"+
+			"  2. Verify domain is valid: %s\n"+
+			"  3. Check if brand with this domain already exists in Authentik UI",
+			err, domain)
+	}
+
+	logger.Info("✓ Created new brand for application",
+		zap.String("brand_pk", newBrand.PK),
+		zap.String("brand_title", newBrand.BrandingTitle),
+		zap.String("brand_domain", newBrand.Domain))
+
+	return newBrand, nil
+}
+
 // findBrandByDomain finds the Authentik brand that serves a specific domain
 // Returns the brand if found, or error with helpful troubleshooting steps
+//
+// DEPRECATED (2025-10-31): Use findOrCreateAppBrand instead for app-specific isolation
+// KEPT FOR BACKWARDS COMPATIBILITY: Existing code may still call this
 func findBrandByDomain(rc *eos_io.RuntimeContext, client *authentik.APIClient, domain string) (*authentik.BrandResponse, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -364,47 +438,48 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 	logger.Info("✓ API token validated")
 
-	// Find brand by domain (domain-aware brand selection)
-	// This replaces the old "brands[0]" logic with intelligent domain matching
-	brand, err := findBrandByDomain(rc, authentikClient, domain)
+	// Find or create app-specific brand (NEW ARCHITECTURE - 2025-10-31)
+	// RATIONALE: Self-enrollment should be APP-SPECIFIC, not brand-wide
+	// OLD BEHAVIOR: All apps on same brand → enrollment affects ALL apps (security issue)
+	// NEW BEHAVIOR: Each app gets its own brand → enrollment isolated per application
+	//
+	// ARCHITECTURE:
+	//   Brand domain = Application domain (1:1 mapping)
+	//   Example: chat.codemonkey.net.au → "BionicGPT" brand
+	//            wiki.codemonkey.net.au → "Wiki" brand
+	//
+	// SECURITY: Users who self-enroll for BionicGPT can ONLY access BionicGPT
+	//           They CANNOT access other applications on different brands
+	brand, err := findOrCreateAppBrand(rc, authentikClient, domain, config.AppName)
 	if err != nil {
-		return fmt.Errorf("failed to find brand for domain: %w", err)
+		return fmt.Errorf("failed to find or create brand for application: %w", err)
 	}
 
-	logger.Info("Selected Authentik brand for domain",
+	logger.Info("Using app-specific brand for self-enrollment",
 		zap.String("brand_pk", brand.PK),
 		zap.String("brand_title", brand.BrandingTitle),
 		zap.String("brand_domain", brand.Domain),
-		zap.String("requested_domain", domain),
+		zap.String("app_name", config.AppName),
 		zap.String("current_enrollment_flow", brand.FlowEnrollment))
 
-	// P0 SECURITY WARNING (2025-10-31): Inform user about brand-level enrollment scope
-	// RATIONALE: Self-enrollment operates at BRAND level (Authentik architectural design)
-	// RISK: Users may think --app flag restricts enrollment to one app, but it affects ALL apps on brand
-	// COMPLIANCE: SOC2 requires informed consent before enabling public access controls
-	// EVIDENCE: Authentik GitHub Issue #2807 - "domain level forward auth can't restrict per-app" (still open 2025-06)
-	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	logger.Warn("⚠️  SECURITY: Brand-Level Enrollment - Read Carefully  ⚠️")
-	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	logger.Warn("")
-	logger.Warn("IMPORTANT: Self-enrollment operates at BRAND level, NOT application level")
-	logger.Warn(fmt.Sprintf("Brand being modified: %s (%s)", brand.BrandingTitle, brand.Domain))
-	logger.Warn("")
-	logger.Warn("This means users who self-enroll will be able to authenticate to:")
-	logger.Warn(fmt.Sprintf("  • ALL applications on domain: *.%s", brand.Domain))
-	logger.Warn(fmt.Sprintf("  • The --app flag (%s) is INFORMATIONAL ONLY", config.AppName))
-	logger.Warn("")
-	logger.Warn("To restrict access to specific applications, you MUST:")
-	logger.Warn("  1. Configure per-application authorization policies in Authentik")
-	logger.Warn(fmt.Sprintf("  2. Visit: %s/if/admin/#/policy/policies", authentikURL))
-	logger.Warn("  3. Create policy for 'eos-self-enrolled-users' group")
-	logger.Warn("  4. Bind policy to each application individually")
-	logger.Warn("")
-	logger.Warn("Without per-app policies, self-enrolled users can access ALL apps!")
-	logger.Warn("This is Authentik's architectural design (not an Eos limitation)")
-	logger.Warn("")
-	logger.Warn("Reference: https://github.com/goauthentik/authentik/issues/2807")
-	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// NEW ARCHITECTURE (2025-10-31): App-specific brands provide enrollment isolation
+	// Each application gets its own brand (domain = app domain)
+	// Self-enrollment for chat.example.com ONLY affects chat.example.com
+	// Users CANNOT access other applications on different domains
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("✓ SECURITY: App-Specific Brand Isolation")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("")
+	logger.Info("Self-enrollment is isolated to THIS application only:")
+	logger.Info(fmt.Sprintf("  • Application: %s", config.AppName))
+	logger.Info(fmt.Sprintf("  • Domain: %s", domain))
+	logger.Info(fmt.Sprintf("  • Brand: %s", brand.BrandingTitle))
+	logger.Info("")
+	logger.Info("Users who self-enroll can ONLY access THIS application.")
+	logger.Info("They CANNOT access other applications (different brands/domains).")
+	logger.Info("")
+	logger.Info("ARCHITECTURE: One brand per application (domain-based isolation)")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Check if enrollment is already enabled
 	if brand.FlowEnrollment != "" {

@@ -20,20 +20,27 @@ type CaddyAdminClient struct {
 }
 
 // NewCaddyAdminClient creates a new Caddy Admin API client
-// Connects to Caddy Admin API via HTTP on localhost:2019
-// RATIONALE: Unix sockets don't work for host-to-container communication with Docker
-// SECURITY: Port only exposed on localhost (127.0.0.1:2019), not accessible from network
-// ARCHITECTURE: Eos runs on host, Caddy runs in container - requires TCP, not Unix socket
+// AUTO-DETECTS container IP via Docker SDK to bypass localhost IPv4/IPv6 resolution issues
+//
+// ARCHITECTURE: Three-tier fallback strategy
+//   1. Use provided host if explicitly given (e.g., "192.168.1.100")
+//   2. Auto-detect Caddy container IP via Docker SDK (bypasses localhost issues)
+//   3. Fall back to localhost:2019 (legacy behavior, may fail with IPv6)
+//
+// ROOT CAUSE FIXED: Caddy binds to 127.0.0.1 (IPv4) inside container
+//                    Host's `localhost` resolves to ::1 (IPv6) first → connection refused
+//                    Docker SDK provides container's bridge IP (172.x.x.x) → direct connection
+//
+// SECURITY: Docker SDK requires socket access (same as `docker ps`)
+//           Connection pooling prevents resource exhaustion
 func NewCaddyAdminClient(host string) *CaddyAdminClient {
-	// P0 FIX (2025-10-31): Add connection pooling to prevent "connection reset by peer" errors
-	// RATIONALE: Docker networking can reset idle connections in default Go HTTP transport
-	// EVIDENCE: https://stackoverflow.com/questions/37774624 (56 upvotes, accepted answer)
-	// VENDOR BEST PRACTICE: Caddy documentation recommends MaxIdleConnsPerHost=10 for high-traffic
-	// LOCALHOST OPTIMIZATION: Using lower limits (2) since this is single-host localhost API
-	// SECURITY: Connection limits prevent resource exhaustion on Caddy Admin API
+	// Connection pooling configuration
+	// RATIONALE: Explicit transport for HTTP/1.1 connection reuse
+	// NOTE: MaxIdleConnsPerHost=2 matches Go default (sufficient for single-container API)
+	// FUTURE: Increase to 10-20 if Admin API performance becomes bottleneck
 	transport := &http.Transport{
 		MaxIdleConns:        10,               // Total idle connections across all hosts
-		MaxIdleConnsPerHost: 2,                // Low for single-host localhost API (not multi-host proxy)
+		MaxIdleConnsPerHost: 2,                // Sufficient for localhost/container-IP API
 		IdleConnTimeout:     30 * time.Second, // Match Caddy's default keep-alive
 	}
 
@@ -42,9 +49,26 @@ func NewCaddyAdminClient(host string) *CaddyAdminClient {
 		Transport: transport,
 	}
 
-	// Connect to Admin API on localhost:2019
-	// SECURITY: Port only exposed as 127.0.0.1:2019 in docker-compose (not 0.0.0.0)
-	baseURL := fmt.Sprintf("http://%s:%d", host, CaddyAdminAPIPort)
+	// Determine which host to use (three-tier fallback)
+	var targetHost string
+	if host != "" && host != "localhost" {
+		// Tier 1: Explicit host provided (e.g., from env var CADDY_ADMIN_HOST)
+		targetHost = host
+	} else {
+		// Tier 2: Auto-detect container IP via Docker SDK (best approach)
+		// RATIONALE: Bypasses localhost IPv4/IPv6 resolution issues
+		// NON-FATAL: If Docker SDK fails, fall back to localhost
+		ctx := context.Background()
+		if containerIP, err := GetCaddyContainerIP(ctx); err == nil {
+			targetHost = containerIP
+		} else {
+			// Tier 3: Fall back to localhost (legacy behavior)
+			// WARNING: May fail with IPv6 resolution issues
+			targetHost = "localhost"
+		}
+	}
+
+	baseURL := fmt.Sprintf("http://%s:%d", targetHost, CaddyAdminAPIPort)
 
 	return &CaddyAdminClient{
 		BaseURL:    baseURL,

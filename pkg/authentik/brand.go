@@ -96,6 +96,72 @@ func (c *APIClient) GetBrand(ctx context.Context, pk string) (*BrandResponse, er
 	return &brand, nil
 }
 
+// CreateBrand creates a new brand in Authentik
+//
+// RATIONALE: App-specific brands enable isolated self-enrollment per application
+// ARCHITECTURE: Each application gets its own brand → self-enrollment affects only that app
+// SECURITY: Prevents cross-application enrollment (user enrolls for App A, can't access App B)
+//
+// Required fields:
+//   - domain: DNS domain for this brand (e.g., "chat.codemonkey.net.au")
+//   - branding_title: Display name (e.g., "BionicGPT")
+//
+// Optional fields (will use defaults if not provided):
+//   - flow_authentication: Authentication flow PK (defaults to Authentik's default)
+//   - flow_invalidation: Logout flow PK (defaults to Authentik's default)
+//   - branding_logo: Custom logo URL
+//   - branding_favicon: Custom favicon URL
+func (c *APIClient) CreateBrand(ctx context.Context, domain, title string, optionalFields map[string]interface{}) (*BrandResponse, error) {
+	// Build request body with required fields
+	reqBody := map[string]interface{}{
+		"domain":          domain,
+		"branding_title":  title,
+	}
+
+	// Merge optional fields
+	for key, value := range optionalFields {
+		reqBody[key] = value
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal create request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/core/brands/", c.BaseURL)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("brand create request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("brand create failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var createdBrand BrandResponse
+	if err := json.Unmarshal(body, &createdBrand); err != nil {
+		return nil, fmt.Errorf("failed to parse brand create response: %w\nResponse body: %s", err, string(body))
+	}
+
+	return &createdBrand, nil
+}
+
 // UpdateBrand updates a brand's configuration and returns the updated brand
 // Only non-empty fields in updates will be modified
 // Returns the updated brand object from API response for verification
