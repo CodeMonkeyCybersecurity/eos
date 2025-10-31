@@ -45,7 +45,8 @@ func FixService(rc *eos_io.RuntimeContext, opts *FixOptions) error {
 	if !exists {
 		return fmt.Errorf("service '%s' does not support drift correction\n\n"+
 			"Supported services:\n"+
-			"  - bionicgpt\n\n"+
+			"  - bionicgpt\n"+
+			"  - caddy\n\n"+
 			"To add support for other services, implement ServiceFixer interface",
 			opts.Service)
 	}

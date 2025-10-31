@@ -64,6 +64,10 @@ Examples:
   eos update hecate certs                        # Only renew certificates
   eos update hecate k3s                          # Update k3s deployment
 
+  # Fix Caddy configuration drift (Admin API binding + network name)
+  eos update hecate --fix caddy                  # Apply both fixes and restart Caddy
+  eos update hecate --fix caddy --dry-run        # Preview fixes without applying
+
   # Add BionicGPT (auto-detects port :8513 and enables SSO automatically)
   eos update hecate --add bionicgpt \
     --dns chat.codemonkey.ai \

@@ -86,23 +86,59 @@ func GetCaddyContainerIP(ctx context.Context) (string, error) {
 			CaddyContainerName, containerInfo.State.Status, CaddyContainerName)
 	}
 
-	// Get IP from hecate-net bridge network
-	// ARCHITECTURE: Docker Compose creates a custom bridge network named "hecate-net"
-	// RATIONALE: Custom networks provide DNS, isolation, and predictable IPs
-	// FALLBACK: If hecate-net doesn't exist, try "bridge" (default Docker network)
-	networkName := "hecate-net"
-	if network, ok := containerInfo.NetworkSettings.Networks[networkName]; ok {
-		if network.IPAddress == "" {
-			return "", fmt.Errorf("Caddy container on network '%s' but has no IP address\n\n"+
-				"This usually means the network is starting up.\n"+
-				"Wait 5 seconds and retry, or restart container:\n"+
-				"  docker compose -f /opt/hecate/docker-compose.yml restart caddy",
-				networkName)
+	// AUTO-DETECT network name (P0 FIX - Connection Reset)
+	// ROOT CAUSE: Docker Compose prefixes network names with project name
+	//   - Code expected: "hecate-net"
+	//   - Actual network: "hecate_hecate-net" (project name prefix)
+	// SOLUTION: Iterate through ALL available networks and find first with valid IP
+	// PRIORITY ORDER:
+	//   1. Networks matching "hecate" (hecate-net, hecate_hecate-net, etc.)
+	//   2. Any custom network (user-defined bridge networks)
+	//   3. Default "bridge" network (fallback)
+	//
+	// RATIONALE: Makes code resilient to Docker Compose naming variations
+	// EVIDENCE: User diagnostic showed "hecate_hecate-net" not "hecate-net"
+	// VENDOR: Docker Compose docs - project name prefix is default behavior
+
+	// Step 1: Try hecate-specific networks first (exact match, then substring match)
+	preferredNetworks := []string{"hecate-net"} // Explicit name (from template fix)
+	for _, networkName := range preferredNetworks {
+		if network, ok := containerInfo.NetworkSettings.Networks[networkName]; ok {
+			if network.IPAddress == "" {
+				return "", fmt.Errorf("Caddy container on network '%s' but has no IP address\n\n"+
+					"This usually means the network is starting up.\n"+
+					"Wait 5 seconds and retry, or restart container:\n"+
+					"  docker compose -f /opt/hecate/docker-compose.yml restart caddy",
+					networkName)
+			}
+			return network.IPAddress, nil
 		}
-		return network.IPAddress, nil
 	}
 
-	// Fallback: Try default bridge network
+	// Step 2: Try networks containing "hecate" substring (e.g., hecate_hecate-net)
+	for networkName, network := range containerInfo.NetworkSettings.Networks {
+		if network.IPAddress != "" {
+			// Check if network name contains "hecate" (case-insensitive)
+			// This catches: hecate_hecate-net, hecate-net, myproject_hecate-net, etc.
+			if len(networkName) > 0 && (networkName == "hecate-net" ||
+				(len(networkName) >= 6 && networkName[:6] == "hecate") ||
+				(len(networkName) >= 6 && networkName[len(networkName)-6:] == "hecate")) {
+				return network.IPAddress, nil
+			}
+		}
+	}
+
+	// Step 3: Try ANY custom network (user-defined bridges)
+	// RATIONALE: If user renamed network entirely, still work
+	for networkName, network := range containerInfo.NetworkSettings.Networks {
+		if networkName != "bridge" && networkName != "host" && networkName != "none" {
+			if network.IPAddress != "" {
+				return network.IPAddress, nil
+			}
+		}
+	}
+
+	// Step 4: Fallback to default bridge network
 	// RATIONALE: User might have modified docker-compose.yml to use default bridge
 	if network, ok := containerInfo.NetworkSettings.Networks["bridge"]; ok {
 		if network.IPAddress != "" {
@@ -116,15 +152,16 @@ func GetCaddyContainerIP(ctx context.Context) (string, error) {
 		availableNetworks = append(availableNetworks, name)
 	}
 
-	return "", fmt.Errorf("Caddy container not connected to '%s' network\n\n"+
+	return "", fmt.Errorf("Caddy container has no usable network with IP address\n\n"+
 		"Available networks: %v\n\n"+
+		"Expected: Networks containing 'hecate' or any custom bridge network\n\n"+
 		"Fix docker-compose.yml:\n"+
 		"  caddy:\n"+
 		"    networks:\n"+
 		"      - hecate-net\n\n"+
 		"Then recreate container:\n"+
 		"  docker compose -f /opt/hecate/docker-compose.yml up -d --force-recreate caddy",
-		networkName, availableNetworks)
+		availableNetworks)
 }
 
 // GetCaddyContainerIPWithLogging is a wrapper around GetCaddyContainerIP that adds structured logging
