@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -361,33 +363,77 @@ func validateAuthProvider(_ *eos_io.RuntimeContext, provider string) error {
 func getAuthentikAPIToken(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Get token from Vault
+	// DEFERRED (2025-10-31): Vault integration deferred to April-May 2026
+	// See ROADMAP.md "Hecate Consul KV + Vault Integration" section
+	// For now, read token from .env file instead of Vault
+
+	// Try Vault first (will be primary source after April-May 2026)
 	vaultClient, err := vault.GetVaultClient(rc)
+	if err == nil {
+		// Vault is available, try to read token
+		secret, err := vaultClient.Logical().Read("secret/data/hecate/authentik")
+		if err == nil && secret != nil && secret.Data != nil {
+			if data, ok := secret.Data["data"].(map[string]interface{}); ok {
+				if token, ok := data["api_token"].(string); ok && token != "" {
+					logger.Debug("Retrieved Authentik API token from Vault")
+					return token, nil
+				}
+			}
+		}
+		// Vault is available but token not found - log warning and try .env fallback
+		logger.Warn("Vault is available but Authentik API token not found, trying .env file fallback")
+	} else {
+		// Vault not available (expected during 6-month deferral period)
+		logger.Debug("Vault not available, using .env file for Authentik API token",
+			zap.Error(err))
+	}
+
+	// Fallback: Read token from .env file (current primary source until April-May 2026)
+	envFilePath := filepath.Join(BaseDir, ".env")
+	envVars, err := shared.ParseEnvFile(envFilePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to get Vault client: %w", err)
+		return "", fmt.Errorf("failed to read .env file %s: %w\n\n"+
+			"Troubleshooting:\n"+
+			"  1. Check .env file exists: ls -l %s\n"+
+			"  2. Verify AUTHENTIK_API_TOKEN or AUTHENTIK_BOOTSTRAP_TOKEN is set\n"+
+			"  3. Check installation logs for bootstrap token",
+			envFilePath, err, envFilePath)
 	}
 
-	secret, err := vaultClient.Logical().Read("secret/data/hecate/authentik")
-	if err != nil {
-		return "", fmt.Errorf("failed to read secret from Vault: %w", err)
+	// ARCHITECTURE NOTE: Try both token types
+	// 1. AUTHENTIK_API_TOKEN - User-created token for production use (preferred)
+	// 2. AUTHENTIK_BOOTSTRAP_TOKEN - Auto-generated during installation (fallback)
+	//
+	// The bootstrap token has admin privileges and is generated during 'eos create hecate'.
+	// Users may optionally create a dedicated API token in Authentik UI for better security.
+
+	// Try AUTHENTIK_API_TOKEN first (production token)
+	if token, exists := envVars["AUTHENTIK_API_TOKEN"]; exists && token != "" {
+		logger.Debug("Retrieved Authentik API token from .env file",
+			zap.String("env_file", envFilePath),
+			zap.String("token_type", "AUTHENTIK_API_TOKEN"))
+		return token, nil
 	}
 
-	if secret == nil || secret.Data == nil {
-		return "", fmt.Errorf("no secret found at path secret/data/hecate/authentik")
+	// Fall back to AUTHENTIK_BOOTSTRAP_TOKEN (installation token)
+	if token, exists := envVars["AUTHENTIK_BOOTSTRAP_TOKEN"]; exists && token != "" {
+		logger.Debug("Retrieved Authentik bootstrap token from .env file",
+			zap.String("env_file", envFilePath),
+			zap.String("token_type", "AUTHENTIK_BOOTSTRAP_TOKEN"))
+		return token, nil
 	}
 
-	data, ok := secret.Data["data"].(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("invalid secret format")
-	}
-
-	token, ok := data["api_token"].(string)
-	if !ok {
-		return "", fmt.Errorf("api_token not found in secret")
-	}
-
-	logger.Debug("Successfully retrieved Authentik API token from Vault")
-	return token, nil
+	// Neither token found
+	return "", fmt.Errorf("no Authentik token found in .env file\n\n"+
+		"Checked for:\n"+
+		"  - AUTHENTIK_API_TOKEN (user-created token)\n"+
+		"  - AUTHENTIK_BOOTSTRAP_TOKEN (installation token)\n\n"+
+		"Neither token is set in %s\n\n"+
+		"This token should have been automatically generated during Hecate installation.\n"+
+		"If it's missing, you may need to:\n"+
+		"  1. Check Hecate installation logs: journalctl -u hecate\n"+
+		"  2. Or recreate Hecate deployment: eos create hecate --domain your-domain.com",
+		envFilePath)
 }
 
 func getAuthentikURL(_ *eos_io.RuntimeContext) string {
