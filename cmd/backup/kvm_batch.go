@@ -124,34 +124,34 @@ func runKVMBackupAll(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	}
 
 	// Print summary
-	fmt.Println()
-	fmt.Println("═══════════════════════════════════════")
-	fmt.Println("Backup Summary")
-	fmt.Println("═══════════════════════════════════════")
-	fmt.Printf("Total VMs:      %d\n", summary.TotalVMs)
-	fmt.Printf("Successful:     %d\n", summary.Successful)
-	fmt.Printf("Failed:         %d\n", summary.Failed)
-	fmt.Printf("Skipped:        %d\n", summary.Skipped)
-	fmt.Printf("Total duration: %s\n", summary.TotalDuration.Round(time.Second))
-	fmt.Printf("Total size:     %s\n", formatBytes(summary.TotalSize))
+	logger.Info("terminal prompt:", zap.String("output", ""))
+	logger.Info("terminal prompt:", zap.String("output", "═══════════════════════════════════════"))
+	logger.Info("terminal prompt:", zap.String("output", "Backup Summary"))
+	logger.Info("terminal prompt:", zap.String("output", "═══════════════════════════════════════"))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Total VMs:      %d", summary.TotalVMs)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Successful:     %d", summary.Successful)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Failed:         %d", summary.Failed)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Skipped:        %d", summary.Skipped)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Total duration: %s", summary.TotalDuration.Round(time.Second))))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Total size:     %s", formatBytes(summary.TotalSize))))
 
 	if len(summary.FailedVMs) > 0 {
-		fmt.Println()
-		fmt.Println("Failed VMs:")
+		logger.Info("terminal prompt:", zap.String("output", ""))
+		logger.Info("terminal prompt:", zap.String("output", "Failed VMs:"))
 		for _, vmName := range summary.FailedVMs {
-			fmt.Printf("  - %s\n", vmName)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("  - %s", vmName)))
 		}
 	}
 
 	if len(summary.SkippedVMs) > 0 {
-		fmt.Println()
-		fmt.Println("Skipped VMs:")
+		logger.Info("terminal prompt:", zap.String("output", ""))
+		logger.Info("terminal prompt:", zap.String("output", "Skipped VMs:"))
 		for _, vmName := range summary.SkippedVMs {
-			fmt.Printf("  - %s\n", vmName)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("  - %s", vmName)))
 		}
 	}
 
-	fmt.Println("═══════════════════════════════════════")
+	logger.Info("terminal prompt:", zap.String("output", "═══════════════════════════════════════"))
 
 	// Return exit code
 	if summary.Failed > 0 {

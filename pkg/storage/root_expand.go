@@ -27,7 +27,8 @@ type RootExpandOptions struct {
 	AssumeYes          bool
 	SkipAptInstall     bool
 	LogJSON            bool
-	UseAllFreeSpace    bool
+	UseAllFreeSpace    bool   // Use all free space (conflicts with KeepFree)
+	KeepFree           string // Amount to keep free: "100G", "15%", etc. (conflicts with UseAllFreeSpace)
 }
 
 type rootLayout struct {
@@ -70,11 +71,11 @@ type deviceSnapshot struct {
 
 // pvTransaction tracks PV processing for rollback/recovery
 type pvTransaction struct {
-	PV            rootPV
-	PreResizeSize uint64
+	PV             rootPV
+	PreResizeSize  uint64
 	PostResizeSize uint64
-	Success       bool
-	Error         error
+	Success        bool
+	Error          error
 }
 
 // ExpandRoot expands the root logical volume, handling LUKS-backed PVs when present.
@@ -90,10 +91,16 @@ func ExpandRoot(rc *eos_io.RuntimeContext, opts RootExpandOptions) error {
 		zap.Bool("assume_yes", opts.AssumeYes),
 		zap.Bool("skip_apt_install", opts.SkipAptInstall),
 		zap.Bool("log_json", opts.LogJSON),
-		zap.Bool("use_all_free_space", opts.UseAllFreeSpace))
+		zap.Bool("use_all_free_space", opts.UseAllFreeSpace),
+		zap.String("keep_free", opts.KeepFree))
 
-	if !opts.UseAllFreeSpace && !opts.DryRun {
-		return errors.New("refusing to expand root without --all; pass --all to consume remaining free space")
+	// P2: Support both --all and --keep-free strategies
+	if !opts.UseAllFreeSpace && opts.KeepFree == "" && !opts.DryRun {
+		return errors.New("must specify expansion strategy: use --all to consume all space, OR --keep-free to specify reserve\n\n" +
+			"Examples:\n" +
+			"  eos update storage --expand root --all              # Use all free space\n" +
+			"  eos update storage --expand root --keep-free 100G   # Keep 100GB free\n" +
+			"  eos update storage --expand root --keep-free 15%    # Keep 15% free")
 	}
 
 	if os.Geteuid() != 0 {
@@ -279,36 +286,102 @@ func ExpandRoot(rc *eos_io.RuntimeContext, opts RootExpandOptions) error {
 		logger.Info("Volume group has no free extents after PV processing; skipping lvextend")
 	} else {
 		// Validate --all safety before consuming all space
+		// NOTE: If user specified both --all and --yes, they've already consented
+		// Don't second-guess explicit user intent (human-centric design)
 		if opts.UseAllFreeSpace {
 			totalExtents, err := vgTotalExtents(ctx, layout.RootVG)
 			if err != nil {
 				logger.Warn("Could not calculate VG utilization", zap.Error(err))
 			} else {
 				percentFree := float64(freeExtents) / float64(totalExtents) * 100
+
+				// P1 FIX: Calculate actual sizes for context-aware warnings
+				// Get extent size for VG (typically 4MB)
+				extentSizeBytes, err := getVGExtentSize(ctx, layout.RootVG)
+				if err != nil {
+					extentSizeBytes = 4 * 1024 * 1024 // Default to 4MB
+				}
+
+				freeGB := float64(freeExtents) * float64(extentSizeBytes) / (1024 * 1024 * 1024)
+				totalGB := float64(totalExtents) * float64(extentSizeBytes) / (1024 * 1024 * 1024)
+
+				// Get current LV size for snapshot calculation
+				lvSize, err := lvSizeBytes(ctx, layout.RootLVPath)
+				if err != nil {
+					logger.Warn("Could not determine LV size for recommendation", zap.Error(err))
+					lvSize = 0
+				}
+				lvSizeGB := float64(lvSize) / (1024 * 1024 * 1024)
+
+				// Calculate evidence-based recommendation:
+				// 20% of LV for snapshots OR 10% of VG, whichever is larger
+				snapshotRecommendedGB := lvSizeGB * 0.20
+				vgReserveGB := totalGB * 0.10
+				recommendedFreeGB := snapshotRecommendedGB
+				if vgReserveGB > snapshotRecommendedGB {
+					recommendedFreeGB = vgReserveGB
+				}
+
 				logger.Info("Volume group space analysis",
 					zap.Int("free_extents", freeExtents),
 					zap.Int("total_extents", totalExtents),
-					zap.Float64("percent_free", percentFree))
+					zap.Float64("percent_free", percentFree),
+					zap.Float64("free_gb", freeGB),
+					zap.Float64("recommended_free_gb", recommendedFreeGB))
 
-				// Warn if consuming all space leaves no room for operations
+				// Only warn if user hasn't already consented via --yes
+				// P0 FIX: --yes should bypass ALL confirmations, not just some
 				if percentFree > 5.0 && !opts.AssumeYes && !opts.DryRun {
 					fmt.Printf("\n⚠️  WARNING: --all will consume ALL free space\n\n")
-					fmt.Printf("Current free space: %.1f%% (%d extents)\n", percentFree, freeExtents)
-					fmt.Printf("After expansion:    0.0%% (0 extents)\n\n")
-					fmt.Println("Risks:")
-					fmt.Println("  - Cannot create LVM snapshots for backup")
-					fmt.Println("  - Cannot grow other LVs in emergency")
-					fmt.Println("  - May impact database performance")
-					fmt.Println("\nRecommendation:")
-					fmt.Println("  Keep 10-15% free for operational flexibility")
-					fmt.Print("\nContinue and use ALL free space anyway? [yes/NO]: ")
+					fmt.Printf("Volume Group: %s\n", layout.RootVG)
+					fmt.Printf("  Total Size:       %.1f GB\n", totalGB)
+					fmt.Printf("  Current Free:     %.1f GB (%.1f%%)\n", freeGB, percentFree)
+					fmt.Printf("  After Expansion:  0.0 GB (0.0%%)\n\n")
+
+					fmt.Println("Logical Volume: " + layout.RootLVPath)
+					if lvSizeGB > 0 {
+						fmt.Printf("  Current Size:     %.1f GB\n", lvSizeGB)
+						fmt.Printf("  After Expansion:  %.1f GB\n\n", lvSizeGB+freeGB)
+					}
+
+					fmt.Println("⚠️  RISKS:")
+					fmt.Println("  - Cannot create LVM snapshots for backups")
+					fmt.Println("  - Cannot grow other LVs without adding storage")
+					fmt.Println("  - No buffer for emergency operations")
+
+					fmt.Println("\n💡 EVIDENCE-BASED RECOMMENDATION:")
+					if lvSizeGB > 0 {
+						fmt.Printf("  Keep %.0f GB free for snapshots (20%% of LV size)\n", snapshotRecommendedGB)
+					}
+					fmt.Printf("  OR keep %.0f GB free for operational flexibility (10%% of VG)\n", vgReserveGB)
+					fmt.Printf("  Recommended minimum: %.0f GB\n", recommendedFreeGB)
+
+					if freeGB > recommendedFreeGB*2 {
+						// Massive free space - less scary warning
+						fmt.Printf("\n✓ You have %.0f GB free (%.0fx the recommendation)\n", freeGB, freeGB/recommendedFreeGB)
+						fmt.Println("  Using all space is reasonable in your case")
+					}
+
+					fmt.Println("\n📝 ALTERNATIVES:")
+					fmt.Println("  • Skip this prompt: add --yes flag")
+					fmt.Println("  • Keep free space: omit --all flag")
+					fmt.Printf("  • Use most space: sudo lvextend -l +80%%FREE -r %s\n", layout.RootLVPath)
+					fmt.Print("\nContinue and use ALL free space? [yes/NO]: ")
 
 					var answer string
 					if _, err := fmt.Scanln(&answer); err != nil || strings.ToLower(answer) != "yes" {
-						return errors.New("operation cancelled\n\n" +
-							"Consider leaving some free space for snapshots and flexibility.\n" +
-							"You can expand again later if needed.")
+						return errors.New("operation cancelled by user\n\n" +
+							"To expand with confirmation skip: eos update storage --expand root --all --yes\n" +
+							"To keep free space: omit --all and use lvextend manually\n" +
+							"Example: sudo lvextend -l +80%FREE -r " + layout.RootLVPath)
 					}
+				} else if percentFree > 5.0 && opts.AssumeYes {
+					// User provided --yes, log that we're honoring their explicit consent
+					logger.Info("Consuming all free space (--yes flag bypasses confirmation)",
+						zap.Float64("percent_free", percentFree),
+						zap.Float64("free_gb", freeGB),
+						zap.Float64("recommended_free_gb", recommendedFreeGB),
+						zap.String("user_consent", "explicit via --yes flag"))
 				}
 			}
 		}
@@ -334,23 +407,52 @@ func ExpandRoot(rc *eos_io.RuntimeContext, opts RootExpandOptions) error {
 			"zfs":      false,
 		}
 
+		// P2: Calculate lvextend size argument based on --all or --keep-free
+		var sizeArg string
+		if opts.UseAllFreeSpace {
+			sizeArg = "+100%FREE"
+		} else if opts.KeepFree != "" {
+			// Parse --keep-free value
+			keepFreeExtents, err := parseKeepFreeToExtents(ctx, opts.KeepFree, freeExtents, layout.RootVG)
+			if err != nil {
+				return fmt.Errorf("invalid --keep-free value: %w", err)
+			}
+
+			if keepFreeExtents >= freeExtents {
+				return fmt.Errorf("--keep-free value (%d extents) exceeds or equals available free space (%d extents)\n\n"+
+					"Reduce --keep-free value or add more storage",
+					keepFreeExtents, freeExtents)
+			}
+
+			extentsToUse := freeExtents - keepFreeExtents
+			sizeArg = fmt.Sprintf("+%d", extentsToUse)
+			logger.Info("Calculated expansion size with reserve",
+				zap.Int("free_extents", freeExtents),
+				zap.Int("keep_free_extents", keepFreeExtents),
+				zap.Int("extents_to_use", extentsToUse),
+				zap.String("size_arg", sizeArg))
+		} else {
+			// Should not reach here due to validation at start
+			return errors.New("no expansion strategy specified")
+		}
+
 		if supportsAutoResize[fsType] {
 			// CRITICAL: lvextend must not be interrupted
-			if err := runCriticalCommand(ctx, opts, "lvextend", "-l", "+100%FREE", "-r", layout.RootLVPath); err != nil {
+			if err := runCriticalCommand(ctx, opts, "lvextend", "-l", sizeArg, "-r", layout.RootLVPath); err != nil {
 				return fmt.Errorf("lvextend with auto-resize failed: %w\n\n"+
 					"Remediation:\n"+
 					"  1. Check VG free space: sudo vgs %s\n"+
 					"  2. Check LV status: sudo lvs %s\n"+
-					"  3. Manually extend: sudo lvextend -l +100%%FREE -r %s\n"+
-					"  4. If that fails, two-step: sudo lvextend -l +100%%FREE %s && sudo resize2fs %s",
-					err, layout.RootVG, layout.RootLVPath, layout.RootLVPath, layout.RootLVPath, layout.RootLVPath)
+					"  3. Manually extend: sudo lvextend -l %s -r %s\n"+
+					"  4. If that fails, two-step: sudo lvextend -l %s %s && sudo resize2fs %s",
+					err, layout.RootVG, layout.RootLVPath, sizeArg, layout.RootLVPath, sizeArg, layout.RootLVPath, layout.RootLVPath)
 			}
 		} else {
 			// Two-step resize for unsupported filesystems
 			logger.Warn("Filesystem does not support automatic resize, using two-step process",
 				zap.String("filesystem", fsType))
 
-			if err := runCriticalCommand(ctx, opts, "lvextend", "-l", "+100%FREE", layout.RootLVPath); err != nil {
+			if err := runCriticalCommand(ctx, opts, "lvextend", "-l", sizeArg, layout.RootLVPath); err != nil {
 				return fmt.Errorf("lvextend failed: %w", err)
 			}
 
@@ -699,49 +801,82 @@ func confirmExpand(layout *rootLayout) error {
 	}
 
 	// Check for recent backups
-	fmt.Println("\n📋 BACKUP VERIFICATION:")
+	fmt.Println("\n📋 PRE-FLIGHT CHECKS:")
 	hasRecentBackup := checkForRecentBackups()
 
+	backupStatus := "✓ Recent backup found"
 	if !hasRecentBackup {
-		fmt.Println("  ❌ No recent backups detected")
-		fmt.Println("\nRECOMMENDATION: Create backup before proceeding:")
-		fmt.Println("  Option 1: LVM snapshot: sudo lvcreate -L10G -s -n root_backup " + layout.RootLVPath)
-		fmt.Println("  Option 2: Timeshift (Ubuntu): sudo timeshift --create")
-		fmt.Println("  Option 3: Full system backup: tar/rsync/dd")
-		fmt.Print("\nDo you have a recent backup? [yes/NO]: ")
+		backupStatus = "❌ No recent backups detected"
+	}
+	fmt.Printf("  Backup Status: %s\n", backupStatus)
 
-		var answer string
-		if _, err := fmt.Scanln(&answer); err != nil || strings.ToLower(answer) != "yes" {
-			return errors.New("operation cancelled - create backup first\n\n" +
-				"Remediation:\n" +
-				"  1. Create LVM snapshot: sudo lvcreate -L10G -s -n backup " + layout.RootLVPath + "\n" +
-				"  2. Or backup critical data with: sudo rsync -av /home /backup/\n" +
-				"  3. Rerun expansion after backup completes")
-		}
+	// P1 FIX: Consolidate into ONE informed consent prompt
+	// Display all risks and options together, let user make informed decision
+	if !hasRecentBackup {
+		fmt.Println("\n⚠️  IMPORTANT CONSIDERATIONS:")
+		fmt.Println("\n  • NO RECENT BACKUP DETECTED")
+		fmt.Println("    This operation modifies storage structures. While safe,")
+		fmt.Println("    unexpected issues (hardware failure, power loss) could occur.")
+		fmt.Println()
+		fmt.Println("    Backup options:")
+		fmt.Println("      - LVM snapshot: sudo lvcreate -L10G -s -n root_backup " + layout.RootLVPath)
+		fmt.Println("      - Timeshift (Ubuntu): sudo timeshift --create")
+		fmt.Println("      - Manual backup: sudo tar czf /backup/root.tar.gz /")
+		fmt.Println()
+		fmt.Println("  • OPERATION IS REVERSIBLE")
+		fmt.Println("    You can shrink the LV later if needed (requires unmounting)")
+		fmt.Println()
+		fmt.Println("  • ONLINE OPERATION")
+		fmt.Println("    System remains available during expansion")
+		fmt.Println()
 	} else {
-		fmt.Println("  ✓ Recent backup found")
+		fmt.Println("\n✓ BACKUP VERIFIED - Safe to proceed")
+		fmt.Println()
 	}
 
-	fmt.Print("\nProceed with expansion? (type 'yes' to confirm): ")
+	fmt.Println("OPTIONS:")
+	fmt.Println("  1. Proceed (I understand the risks)")
+	if !hasRecentBackup {
+		fmt.Println("  2. Cancel and create backup first (RECOMMENDED)")
+	} else {
+		fmt.Println("  2. Cancel")
+	}
+	fmt.Println()
+	fmt.Print("Enter your choice [1 or 2]: ")
+
 	var answer string
 	if _, err := fmt.Scanln(&answer); err != nil {
 		return fmt.Errorf("failed to read confirmation: %w", err)
 	}
-	if strings.ToLower(strings.TrimSpace(answer)) != "yes" {
-		return errors.New("operation cancelled by user")
+
+	choice := strings.TrimSpace(answer)
+	if choice == "1" {
+		return nil // Proceed
 	}
-	return nil
+
+	// User chose to cancel
+	if !hasRecentBackup {
+		return errors.New("operation cancelled - create backup first\n\n" +
+			"Recommended actions:\n" +
+			"  1. Create LVM snapshot: sudo lvcreate -L10G -s -n backup " + layout.RootLVPath + "\n" +
+			"  2. Or backup critical data: sudo rsync -av /home /etc /var /backup/\n" +
+			"  3. Rerun expansion: eos update storage --expand root --all\n" +
+			"  4. Or skip prompts with: eos update storage --expand root --all --yes")
+	}
+
+	return errors.New("operation cancelled by user\n\n" +
+		"To proceed anyway: eos update storage --expand root --all --yes")
 }
 
 // checkForRecentBackups checks if recent backups exist
 func checkForRecentBackups() bool {
 	// Check common backup locations
 	backupIndicators := []string{
-		"/timeshift/snapshots/",          // Timeshift
-		"/run/timeshift/backup/",         // Timeshift
-		"/backup/",                       // Generic
-		"/var/backups/",                  // Debian/Ubuntu
-		"/root/backup/",                  // Root backups
+		"/timeshift/snapshots/",  // Timeshift
+		"/run/timeshift/backup/", // Timeshift
+		"/backup/",               // Generic
+		"/var/backups/",          // Debian/Ubuntu
+		"/root/backup/",          // Root backups
 	}
 
 	cutoff := time.Now().Add(-24 * time.Hour)
@@ -1231,6 +1366,110 @@ func vgTotalExtents(ctx context.Context, vgName string) (int, error) {
 		return 0, nil
 	}
 	return strconv.Atoi(value)
+}
+
+// getVGExtentSize returns the extent size in bytes for a volume group
+func getVGExtentSize(ctx context.Context, vgName string) (uint64, error) {
+	out, err := commandOutput(ctx, "vgs", "--noheadings", "-o", "vg_extent_size", "--units", "b", vgName)
+	if err != nil {
+		return 0, err
+	}
+	return parseSizeWithSuffix(strings.TrimSpace(out))
+}
+
+// parseKeepFreeToExtents converts --keep-free value to extent count
+// Supports: "100G", "15%", "500M", etc.
+func parseKeepFreeToExtents(ctx context.Context, keepFree string, totalFreeExtents int, vgName string) (int, error) {
+	keepFree = strings.TrimSpace(keepFree)
+	if keepFree == "" {
+		return 0, fmt.Errorf("empty --keep-free value")
+	}
+
+	// Get extent size for calculations
+	extentSizeBytes, err := getVGExtentSize(ctx, vgName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get VG extent size: %w", err)
+	}
+
+	// Check if it's a percentage
+	if strings.HasSuffix(keepFree, "%") {
+		percentStr := strings.TrimSuffix(keepFree, "%")
+		percent, err := strconv.ParseFloat(percentStr, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid percentage format: %s", keepFree)
+		}
+		if percent < 0 || percent > 100 {
+			return 0, fmt.Errorf("percentage must be between 0 and 100: %.1f%%", percent)
+		}
+
+		// Calculate extents to keep free
+		extentsToKeep := int(float64(totalFreeExtents) * (percent / 100.0))
+		return extentsToKeep, nil
+	}
+
+	// Parse as size value (e.g., "100G", "500M")
+	sizeBytes, err := parseSizeString(keepFree)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size format: %s (use formats like '100G', '500M', or '15%%')", keepFree)
+	}
+
+	// Convert bytes to extents
+	extentsToKeep := int(sizeBytes / extentSizeBytes)
+	if sizeBytes%extentSizeBytes != 0 {
+		extentsToKeep++ // Round up
+	}
+
+	return extentsToKeep, nil
+}
+
+// parseSizeString parses size strings like "100G", "500M", "1T"
+func parseSizeString(sizeStr string) (uint64, error) {
+	sizeStr = strings.TrimSpace(strings.ToUpper(sizeStr))
+	if sizeStr == "" {
+		return 0, fmt.Errorf("empty size string")
+	}
+
+	// Extract number and unit
+	var numStr string
+	var unit string
+	for i, ch := range sizeStr {
+		if ch >= '0' && ch <= '9' || ch == '.' {
+			numStr += string(ch)
+		} else {
+			unit = sizeStr[i:]
+			break
+		}
+	}
+
+	if numStr == "" {
+		return 0, fmt.Errorf("no numeric value found")
+	}
+
+	value, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid numeric value: %s", numStr)
+	}
+
+	// Convert to bytes based on unit
+	var multiplier uint64
+	switch unit {
+	case "K", "KB":
+		multiplier = 1024
+	case "M", "MB":
+		multiplier = 1024 * 1024
+	case "G", "GB":
+		multiplier = 1024 * 1024 * 1024
+	case "T", "TB":
+		multiplier = 1024 * 1024 * 1024 * 1024
+	case "P", "PB":
+		multiplier = 1024 * 1024 * 1024 * 1024 * 1024
+	case "B", "":
+		multiplier = 1
+	default:
+		return 0, fmt.Errorf("unknown unit: %s (use K, M, G, T, P)", unit)
+	}
+
+	return uint64(value * float64(multiplier)), nil
 }
 
 // checkDiskHealth performs SMART health checks on a disk

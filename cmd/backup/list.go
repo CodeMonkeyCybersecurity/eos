@@ -49,7 +49,7 @@ Examples:
 		// Display repositories
 		logger.Info("terminal prompt: \nConfigured Repositories:")
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
-		fmt.Printf("%-20s %-10s %-40s\n", "NAME", "BACKEND", "URL")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-10s %-40s", "NAME", "BACKEND", "URL")))
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
 
 		for name, repo := range config.Repositories {
@@ -57,8 +57,8 @@ Examples:
 			if name == config.DefaultRepository {
 				isDefault = " (default)"
 			}
-			fmt.Printf("%-20s %-10s %-40s%s\n",
-				name, repo.Backend, repo.URL, isDefault)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-10s %-40s%s",
+				name, repo.Backend, repo.URL, isDefault)))
 		}
 		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 
@@ -95,10 +95,10 @@ Examples:
 
 		// Display profiles
 		logger.Info("terminal prompt: \nConfigured Profiles:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
-		fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
-			"NAME", "REPOSITORY", "PATHS", "SCHEDULE", "RETENTION")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 100))))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 100)))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-15s %-30s %-20s %s",
+			"NAME", "REPOSITORY", "PATHS", "SCHEDULE", "RETENTION")))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 100)))
 
 		for name, profile := range config.Profiles {
 			paths := strings.Join(profile.Paths, ", ")
@@ -129,8 +129,8 @@ Examples:
 				retention = strings.Join(parts, " ")
 			}
 
-			fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
-				name, profile.Repository, paths, schedule, retention)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-15s %-30s %-20s %s",
+				name, profile.Repository, paths, schedule, retention)))
 		}
 		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 
@@ -250,10 +250,10 @@ Examples:
 
 		// Display snapshots
 		logger.Info("terminal prompt: \nSnapshots:")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
-		fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
-			"ID", "TIME", "HOST", "PATHS", "TAGS")
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("-", 120))))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 120)))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-16s %-20s %-15s %-40s %s",
+			"ID", "TIME", "HOST", "PATHS", "TAGS")))
+		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 120)))
 
 		for _, snap := range filtered {
 			id := snap.ID
@@ -270,8 +270,8 @@ Examples:
 
 			tags := strings.Join(snap.Tags, ", ")
 
-			fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
-				id, timeStr, snap.Hostname, paths, tags)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-16s %-20s %-15s %-40s %s",
+				id, timeStr, snap.Hostname, paths, tags)))
 		}
 		logger.Info("terminal prompt:", zap.String("output", "operation completed"))
 

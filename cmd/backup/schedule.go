@@ -236,7 +236,7 @@ Examples:
 
 		logger.Info("terminal prompt: \nBackup Schedule Status:")
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
-		fmt.Printf("%-20s %-20s %-20s %s\n", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-20s %-20s %s", "PROFILE", "SCHEDULE", "TIMER STATUS", "NEXT RUN")))
 		logger.Info("terminal prompt:", zap.String("output", strings.Repeat("-", 80)))
 
 		for profileName, profile := range config.Profiles {
@@ -264,8 +264,8 @@ Examples:
 				nextRun = nextRunTime
 			}
 
-			fmt.Printf("%-20s %-20s %-20s %s\n",
-				profileName, schedule, status, nextRun)
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%-20s %-20s %-20s %s",
+				profileName, schedule, status, nextRun)))
 		}
 		logger.Info("terminal prompt: Backup schedules listed successfully")
 

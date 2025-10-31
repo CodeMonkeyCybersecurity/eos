@@ -21,6 +21,7 @@ var (
 	fsType                   string
 	expandTarget             string
 	expandAll                bool
+	expandKeepFree           string
 	expandAllowPartitionGrow bool
 	expandForceLUKS          bool
 	expandDryRun             bool
@@ -56,6 +57,13 @@ Examples:
 				return fmt.Errorf("unsupported expand target: %s", expandTarget)
 			}
 
+			// P2: Validate --all and --keep-free are mutually exclusive
+			if expandAll && expandKeepFree != "" {
+				return fmt.Errorf("--all and --keep-free are mutually exclusive\n\n" +
+					"Use --all to consume all free space, OR\n" +
+					"Use --keep-free to specify amount to keep (e.g., --keep-free 100G or --keep-free 15%%)")
+			}
+
 			opts := storage.RootExpandOptions{
 				AllowPartitionGrow: expandAllowPartitionGrow,
 				ForceLUKS:          expandForceLUKS,
@@ -64,6 +72,7 @@ Examples:
 				SkipAptInstall:     expandSkipAptInstall,
 				LogJSON:            expandLogJSON,
 				UseAllFreeSpace:    expandAll,
+				KeepFree:           expandKeepFree,
 			}
 
 			return storage.ExpandRoot(rc, opts)
@@ -130,6 +139,7 @@ func init() {
 	UpdateStorageCmd.Flags().StringVar(&fsType, "fs-type", "ext4", "Filesystem type (ext4 or xfs)")
 	UpdateStorageCmd.Flags().StringVar(&expandTarget, "expand", "", "Expand a storage target (supported: root)")
 	UpdateStorageCmd.Flags().BoolVar(&expandAll, "all", false, "Consume all remaining free space during expansion")
+	UpdateStorageCmd.Flags().StringVar(&expandKeepFree, "keep-free", "", "Keep specified amount free (e.g., '100G' or '15%'). Mutually exclusive with --all")
 	UpdateStorageCmd.Flags().BoolVar(&expandAllowPartitionGrow, "allow-partition-grow", false, "Allow partition growth when expanding")
 	UpdateStorageCmd.Flags().BoolVar(&expandForceLUKS, "luks", false, "Force LUKS workflow (error if root PV not backed by LUKS)")
 	UpdateStorageCmd.Flags().BoolVar(&expandDryRun, "dry-run", false, "Show planned commands without executing them")

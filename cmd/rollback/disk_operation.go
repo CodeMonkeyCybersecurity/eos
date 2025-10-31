@@ -79,89 +79,89 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	}
 
 	// Display operation summary
-	fmt.Printf("=== OPERATION DETAILS ===\n")
-	fmt.Printf("Journal ID: %s\n", entry.ID)
-	fmt.Printf("Operation: %s\n", entry.OperationType)
-	fmt.Printf("Target: %s\n", entry.Target.Device)
-	fmt.Printf("Status: %s\n", entry.Status)
-	fmt.Printf("Started: %s\n", entry.StartTime.Format(time.RFC3339))
+	logger.Info("terminal prompt:", zap.String("output", "=== OPERATION DETAILS ==="))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Journal ID: %s", entry.ID)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Operation: %s", entry.OperationType)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Target: %s", entry.Target.Device)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Status: %s", entry.Status)))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Started: %s", entry.StartTime.Format(time.RFC3339))))
 	if entry.EndTime != nil {
-		fmt.Printf("Ended: %s\n", entry.EndTime.Format(time.RFC3339))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Ended: %s", entry.EndTime.Format(time.RFC3339))))
 	}
-	fmt.Printf("User: %s\n", entry.User)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("User: %s", entry.User)))
 
 	if entry.Error != "" {
-		fmt.Printf("Error: %s\n", entry.Error)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Error: %s", entry.Error)))
 	}
 
 	// Generate rollback plan
-	fmt.Printf("\n=== GENERATING ROLLBACK PLAN ===\n")
+	logger.Info("terminal prompt:", zap.String("output", "\n=== GENERATING ROLLBACK PLAN ==="))
 	plan, err := rollbackManager.CreateRollbackPlan(rc.Ctx, journalID)
 	if err != nil {
 		return fmt.Errorf("create rollback plan: %w", err)
 	}
 
 	// Display rollback plan
-	fmt.Printf("Rollback Method: %s\n", string(plan.Method))
-	fmt.Printf("Estimated Duration: %s\n", plan.EstimatedTime.Round(time.Second))
-	fmt.Printf("Description: %s\n", plan.Description)
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Rollback Method: %s", string(plan.Method))))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Estimated Duration: %s", plan.EstimatedTime.Round(time.Second))))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Description: %s", plan.Description)))
 
 	if len(plan.Commands) > 0 {
-		fmt.Printf("\nCommands to execute:\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nCommands to execute:"))
 		for i, cmd := range plan.Commands {
-			fmt.Printf("  %d. %s %s\n", i+1, cmd.Command, strings.Join(cmd.Args, " "))
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("  %d. %s %s", i+1, cmd.Command, strings.Join(cmd.Args, " "))))
 			if cmd.Description != "" {
-				fmt.Printf("     → %s\n", cmd.Description)
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("     → %s", cmd.Description)))
 			}
 		}
 	}
 
 	// If only showing plan, exit here
 	if showPlan {
-		fmt.Printf("\nUse --dry-run to test the rollback or remove --show-plan to execute.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nUse --dry-run to test the rollback or remove --show-plan to execute."))
 		return nil
 	}
 
 	// Safety validations (unless forced)
 	if !forceRollback {
-		fmt.Printf("\n=== SAFETY VALIDATIONS ===\n")
+		logger.Info("terminal prompt:", zap.String("output", "\n=== SAFETY VALIDATIONS ==="))
 		if err := rollbackManager.ValidateRollbackSafety(rc.Ctx, plan, journalID); err != nil {
-			fmt.Printf(" Safety validation failed: %s\n", err.Error())
-			fmt.Printf("\nUse --force to skip safety validations (DANGEROUS).\n")
+			logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("✗ Safety validation failed: %s", err.Error())))
+			logger.Info("terminal prompt:", zap.String("output", "\nUse --force to skip safety validations (DANGEROUS)."))
 			return fmt.Errorf("rollback safety validation failed: %w", err)
 		}
-		fmt.Printf(" Safety validations passed\n")
+		logger.Info("terminal prompt:", zap.String("output", "✓ Safety validations passed"))
 	} else {
-		fmt.Printf("\nSKIPPING SAFETY VALIDATIONS (--force enabled)\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nSKIPPING SAFETY VALIDATIONS (--force enabled)"))
 	}
 
 	// Get user confirmation (unless skipped)
 	if !skipConfirmation && !rollbackDryRun {
-		fmt.Printf("\n=== CONFIRMATION ===\n")
-		if err := getRollbackConfirmation(plan); err != nil {
+		logger.Info("terminal prompt:", zap.String("output", "\n=== CONFIRMATION ==="))
+		if err := getRollbackConfirmation(rc, plan); err != nil {
 			return err
 		}
 	}
 
 	// Handle dry-run mode
 	if rollbackDryRun {
-		fmt.Printf("\n=== DRY RUN ===\n")
-		fmt.Printf("✓ Dry-run mode: Would execute rollback plan but taking no action\n")
-		fmt.Printf("✓ All safety checks passed\n")
-		fmt.Printf("✓ Rollback plan is valid and ready for execution\n")
-		fmt.Printf("\nRemove --dry-run flag to execute the actual rollback.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\n=== DRY RUN ==="))
+		logger.Info("terminal prompt:", zap.String("output", "✓ Dry-run mode: Would execute rollback plan but taking no action"))
+		logger.Info("terminal prompt:", zap.String("output", "✓ All safety checks passed"))
+		logger.Info("terminal prompt:", zap.String("output", "✓ Rollback plan is valid and ready for execution"))
+		logger.Info("terminal prompt:", zap.String("output", "\nRemove --dry-run flag to execute the actual rollback."))
 		return nil
 	}
 
 	// Execute rollback
-	fmt.Printf("\n=== EXECUTING ROLLBACK ===\n")
+	logger.Info("terminal prompt:", zap.String("output", "\n=== EXECUTING ROLLBACK ==="))
 	startTime := time.Now()
 
 	err = rollbackManager.ExecuteRollback(rc.Ctx, plan, journalID)
 	duration := time.Since(startTime)
 
 	if err != nil {
-		fmt.Printf(" Rollback failed after %s: %s\n", duration.Round(time.Second), err.Error())
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("✗ Rollback failed after %s: %s", duration.Round(time.Second), err.Error())))
 		logger.Error("Rollback execution failed",
 			zap.String("journal_id", journalID),
 			zap.Duration("duration", duration),
@@ -170,12 +170,12 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	}
 
 	// Success
-	fmt.Printf(" Rollback completed successfully in %s\n", duration.Round(time.Second))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("✓ Rollback completed successfully in %s", duration.Round(time.Second))))
 
 	// Display final status
 	updatedEntry, _ := journal.Load(journalID)
 	if updatedEntry != nil {
-		fmt.Printf("\nFinal Status: %s\n", updatedEntry.Status)
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("\nFinal Status: %s", updatedEntry.Status)))
 	}
 
 	logger.Info("Disk operation rollback completed successfully",
@@ -186,33 +186,35 @@ func runRollbackDiskOperation(rc *eos_io.RuntimeContext, cmd *cobra.Command, arg
 	// Additional information based on rollback method
 	switch plan.Method {
 	case storage.RollbackSnapshot:
-		fmt.Printf("\nNOTE: Snapshot merge initiated. A system reboot may be required\n")
-		fmt.Printf("for the merge to complete if the logical volume is currently in use.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nNOTE: Snapshot merge initiated. A system reboot may be required"))
+		logger.Info("terminal prompt:", zap.String("output", "for the merge to complete if the logical volume is currently in use."))
 	case storage.RollbackReverse:
-		fmt.Printf("\nVerify that your system is functioning correctly after the rollback.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nVerify that your system is functioning correctly after the rollback."))
 	case storage.RollbackManual:
-		fmt.Printf("\nManual intervention was required. Please review the operation log\n")
-		fmt.Printf("and verify your system state manually.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nManual intervention was required. Please review the operation log"))
+		logger.Info("terminal prompt:", zap.String("output", "and verify your system state manually."))
 	}
 
 	return nil
 }
 
 // getRollbackConfirmation prompts user for rollback confirmation
-func getRollbackConfirmation(plan *storage.RollbackPlan) error {
-	fmt.Printf("This will rollback the operation using: %s\n", string(plan.Method))
-	fmt.Printf("Estimated time: %s\n", plan.EstimatedTime.Round(time.Second))
+func getRollbackConfirmation(rc *eos_io.RuntimeContext, plan *storage.RollbackPlan) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("This will rollback the operation using: %s", string(plan.Method))))
+	logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("Estimated time: %s", plan.EstimatedTime.Round(time.Second))))
 
 	switch plan.Method {
 	case storage.RollbackSnapshot:
-		fmt.Printf("\nWARNING: Snapshot rollback will restore the volume to its\n")
-		fmt.Printf("previous state, potentially losing any changes made after the snapshot.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nWARNING: Snapshot rollback will restore the volume to its"))
+		logger.Info("terminal prompt:", zap.String("output", "previous state, potentially losing any changes made after the snapshot."))
 	case storage.RollbackReverse:
-		fmt.Printf("\nWARNING: Reverse operations will attempt to undo the changes.\n")
-		fmt.Printf("This may involve shrinking volumes or removing created resources.\n")
+		logger.Info("terminal prompt:", zap.String("output", "\nWARNING: Reverse operations will attempt to undo the changes."))
+		logger.Info("terminal prompt:", zap.String("output", "This may involve shrinking volumes or removing created resources."))
 	}
 
-	fmt.Printf("\nDo you want to proceed with the rollback? (yes/no): ")
+	logger.Info("terminal prompt: \nDo you want to proceed with the rollback? (yes/no): ")
 
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
