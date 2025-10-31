@@ -19,6 +19,7 @@ import (
 // SelfEnrollmentConfig holds configuration for enabling self-enrollment
 type SelfEnrollmentConfig struct {
 	AppName         string // Application name (e.g., "bionicgpt")
+	Domain          string // Explicit domain (optional, overrides auto-detection from Caddy routes)
 	DryRun          bool   // If true, show what would be done without applying changes
 	SkipCaddyfile   bool   // If true, don't update Caddyfile (advanced usage)
 	EnableCaptcha   bool   // If true, add captcha stage to prevent spam
@@ -327,26 +328,32 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	// RATIONALE: Self-enrollment without CAPTCHA is vulnerable to bot abuse
 	// EVIDENCE: Common attack vector for account enumeration, resource exhaustion
 	// COMPLIANCE: OWASP recommends CAPTCHA for public registration forms
+	// UPDATE (2025-10-31): CAPTCHA now enabled by default, warning only if explicitly disabled
 	if !config.EnableCaptcha {
 		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		logger.Warn("⚠️  SECURITY WARNING: CAPTCHA Disabled  ⚠️")
+		logger.Warn("⚠️  SECURITY WARNING: CAPTCHA Explicitly Disabled  ⚠️")
 		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 		logger.Warn("")
-		logger.Warn("Self-enrollment is configured WITHOUT CAPTCHA protection")
-		logger.Warn("This makes your enrollment endpoint vulnerable to:")
+		logger.Warn("You explicitly disabled CAPTCHA via --disable-captcha flag")
+		logger.Warn("Self-enrollment WITHOUT CAPTCHA protection is vulnerable to:")
 		logger.Warn("  • Automated bot registration")
 		logger.Warn("  • Account enumeration attacks")
 		logger.Warn("  • Resource exhaustion (database bloat)")
 		logger.Warn("  • Email bombing (if email verification enabled)")
 		logger.Warn("")
-		logger.Warn("STRONGLY RECOMMENDED for production:")
-		logger.Warn("  1. Enable CAPTCHA: --enable-captcha flag")
+		logger.Warn("This configuration is NOT RECOMMENDED for production")
+		logger.Warn("To re-enable CAPTCHA protection:")
+		logger.Warn("  1. Remove --disable-captcha flag (CAPTCHA enabled by default)")
 		logger.Warn("  2. Configure production keys in Authentik UI after enrollment setup")
 		logger.Warn("  3. Path: Admin → Flows & Stages → Stages → eos-enrollment-captcha")
 		logger.Warn("")
-		logger.Warn("Test keys are NOT sufficient for production use")
 		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 		logger.Warn("")
+	} else {
+		logger.Info("✓ CAPTCHA protection enabled (using test keys initially)")
+		logger.Info("IMPORTANT: Configure production CAPTCHA keys in Authentik UI")
+		logger.Info("  Path: Admin → Flows & Stages → Stages → eos-enrollment-captcha → Edit")
+		logger.Info("  Test keys are sufficient for development but NOT for production")
 	}
 
 	// P1: Acquire file lock to prevent concurrent enrollment operations
@@ -409,17 +416,31 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	}
 	logger.Info("✓ Authentik API is responding")
 
-	// Auto-detect DNS domain from application name
-	// This queries Caddy Admin API and Authentik API to find the matching domain
-	logger.Info("Auto-detecting DNS domain from application name")
-	domain, err := getDomainForApp(rc, config.AppName)
-	if err != nil {
-		return fmt.Errorf("failed to auto-detect domain: %w", err)
-	}
+	// Determine domain (explicit or auto-detect)
+	var domain string
+	if config.Domain != "" {
+		// User provided explicit domain via --dns flag
+		logger.Info("Using explicitly provided domain",
+			zap.String("domain", config.Domain),
+			zap.String("source", "--dns flag"))
+		domain = config.Domain
+	} else {
+		// Auto-detect DNS domain from application name
+		// This queries Caddy Admin API and Authentik API to find the matching domain
+		logger.Info("Auto-detecting DNS domain from application name")
+		detectedDomain, err := getDomainForApp(rc, config.AppName)
+		if err != nil {
+			return fmt.Errorf("failed to auto-detect domain: %w\n\n"+
+				"Specify domain explicitly with:\n"+
+				"  eos update hecate --enable self-enrollment --app %s --dns <domain>",
+				err, config.AppName)
+		}
+		domain = detectedDomain
 
-	logger.Info("✓ Domain auto-detected",
-		zap.String("app", config.AppName),
-		zap.String("domain", domain))
+		logger.Info("✓ Domain auto-detected",
+			zap.String("app", config.AppName),
+			zap.String("domain", domain))
+	}
 
 	// P3 FIX: Validate API token by listing brands
 	// RATIONALE: Health check only verifies service is up, not that token is valid

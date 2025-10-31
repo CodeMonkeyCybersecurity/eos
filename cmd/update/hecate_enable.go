@@ -14,11 +14,23 @@ import (
 )
 
 // updateHecateEnableCmd represents the "update hecate enable" command
+// DEPRECATED: Use flag syntax instead: eos update hecate --enable <feature>
+// This subcommand will be removed in Eos v2.0 (approximately Q3 2026)
 var updateHecateEnableCmd = &cobra.Command{
-	Use:   "enable [feature]",
-	Args:  cobra.ExactArgs(1),
-	Short: "Enable features for Hecate deployment",
+	Use:        "enable [feature]",
+	Args:       cobra.ExactArgs(1),
+	Short:      "Enable features for Hecate deployment",
+	Deprecated: "Use 'eos update hecate --enable <feature>' instead. Subcommand will be removed in v2.0.",
 	Long: `Enable additional features for an existing Hecate deployment.
+
+⚠️  DEPRECATION NOTICE:
+This subcommand syntax is deprecated and will be removed in Eos v2.0 (Q3 2026).
+
+NEW SYNTAX (recommended):
+  eos update hecate --enable <feature>
+
+OLD SYNTAX (deprecated, still works):
+  eos update hecate enable <feature>
 
 Available features:
   oauth2-signout     - Add /oauth2/sign_out logout handlers to Authentik-protected routes
@@ -30,20 +42,31 @@ The enable command modifies live configuration via APIs (zero-downtime):
   - No container restarts required
   - Idempotent (safe to run multiple times)
 
-Examples:
-  # Enable logout handlers (auto-discovers protected routes)
-  eos update hecate enable oauth2-signout
+Examples (NEW SYNTAX - RECOMMENDED):
+  # Enable logout handlers
+  eos update hecate --enable oauth2-signout
 
-  # Enable self-enrollment for users to register
-  eos update hecate enable self-enrollment --app bionicgpt
+  # Enable self-enrollment
+  eos update hecate --enable self-enrollment --app bionicgpt --dns chat.example.com
 
-  # Dry run to see what would be changed
-  eos update hecate enable oauth2-signout --dry-run
-  eos update hecate enable self-enrollment --app bionicgpt --dry-run
-
-  # Specify custom Authentik host
-  eos update hecate enable oauth2-signout --authentik-host auth.example.com`,
+  # Dry run
+  eos update hecate --enable oauth2-signout --dry-run`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Show deprecation warning
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("⚠️  DEPRECATION WARNING")
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("")
+		logger.Warn("Subcommand syntax 'eos update hecate enable' is deprecated")
+		logger.Warn("Will be removed in Eos v2.0 (Q3 2026)")
+		logger.Warn("")
+		logger.Warn("Use: eos update hecate --enable <feature>")
+		logger.Warn("")
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("")
+
 		feature := args[0]
 
 		switch feature {
@@ -71,7 +94,8 @@ func init() {
 	// Add flags for self-enrollment
 	updateHecateEnableCmd.Flags().String("app", "", "Application name (e.g., bionicgpt) - creates app-specific brand for isolated enrollment")
 	updateHecateEnableCmd.Flags().Bool("skip-caddyfile", false, "Skip Caddyfile updates (advanced usage)")
-	updateHecateEnableCmd.Flags().Bool("enable-captcha", false, "Enable captcha stage for bot protection (uses test keys initially)")
+	updateHecateEnableCmd.Flags().Bool("enable-captcha", true, "Enable captcha stage for bot protection (default: true, uses test keys initially)")
+	updateHecateEnableCmd.Flags().Bool("disable-captcha", false, "Disable captcha protection (NOT RECOMMENDED for production)")
 	updateHecateEnableCmd.Flags().Bool("require-approval", false, "New users inactive until admin approves (default: active immediately)")
 }
 
@@ -110,10 +134,20 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 
 	// Parse flags
 	appName, _ := cmd.Flags().GetString("app")
+	domain, _ := cmd.Flags().GetString("dns") // Read --dns flag from parent command
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	skipCaddyfile, _ := cmd.Flags().GetBool("skip-caddyfile")
 	enableCaptcha, _ := cmd.Flags().GetBool("enable-captcha")
+	disableCaptcha, _ := cmd.Flags().GetBool("disable-captcha")
 	requireApproval, _ := cmd.Flags().GetBool("require-approval")
+
+	// Handle CAPTCHA flag logic: default enabled, explicit disable overrides
+	if disableCaptcha {
+		enableCaptcha = false
+		logger.Warn("CAPTCHA protection disabled via --disable-captcha flag")
+		logger.Warn("This is NOT RECOMMENDED for production environments")
+		logger.Warn("Self-enrollment endpoints without CAPTCHA are vulnerable to bot attacks")
+	}
 
 	// Validate app flag
 	if appName == "" {
@@ -137,6 +171,7 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	// Build config
 	config := &hecate.SelfEnrollmentConfig{
 		AppName:         appName,
+		Domain:          domain, // Pass explicit domain if provided via --dns flag
 		DryRun:          dryRun,
 		SkipCaddyfile:   skipCaddyfile,
 		EnableCaptcha:   enableCaptcha,

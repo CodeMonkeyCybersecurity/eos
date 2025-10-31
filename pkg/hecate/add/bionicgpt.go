@@ -150,20 +150,54 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 	// This proves: Service is running, HTTP server works, authentication is enforced
 	endpoint := fmt.Sprintf("http://%s/", backend)
 
+	// P0 FIX #8: Add timeout with progress feedback
+	// RATIONALE: If backend is blackholed (routing issue, firewall), user sees progress
+	// HUMAN-CENTRIC: Technology serves humans - provide feedback during wait
+	ctx, cancel := context.WithTimeout(rc.Ctx, 10*time.Second)
+	defer cancel()
+
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 
 	logger.Debug("Checking BionicGPT backend", zap.String("endpoint", endpoint))
 
-	resp, err := httpClient.Get(endpoint)
+	// Show progress feedback to user during check
+	progressDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+		elapsed := 0
+		for {
+			select {
+			case <-progressDone:
+				return
+			case <-ticker.C:
+				elapsed += 2
+				if elapsed <= 8 { // Stop at 8s to avoid overlap with timeout
+					logger.Info(fmt.Sprintf("    Waiting for backend response... (%ds/10s)", elapsed))
+				}
+			}
+		}
+	}()
+	defer close(progressDone)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return eos_err.NewUserError(fmt.Sprintf(
+		return eos_err.NewUserError(
+			"BionicGPT backend request creation failed: %v\n\n"+
+				"This is likely a bug in Eos. Please report this issue.",
+			err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return eos_err.NewUserError(
 			"BionicGPT backend not reachable at %s: %v\n\n"+
 				"Troubleshooting:\n"+
 				"  1. Verify service is running: docker ps -a | grep -i bionic\n"+
 				"  2. Check service logs: docker logs <container_name>\n"+
 				"  3. Test connectivity: curl -v http://%s/\n"+
 				"  4. Skip this validation: --skip-backend-check",
-			backend, err, backend))
+			backend, err, backend)
 	}
 	defer resp.Body.Close()
 
@@ -185,11 +219,11 @@ func (b *BionicGPTIntegrator) ValidateService(rc *eos_io.RuntimeContext, opts *S
 		return nil
 	}
 
-	return eos_err.NewUserError(fmt.Sprintf(
+	return eos_err.NewUserError(
 		"BionicGPT backend returned server error: %d %s\n\n"+
 			"This indicates the service is running but experiencing issues.\n"+
 			"Check service logs: docker logs <container_name>",
-		resp.StatusCode, resp.Status))
+		resp.StatusCode, resp.Status)
 }
 
 // ConfigureAuthentication sets up Authentik proxy provider for BionicGPT (forward auth mode)

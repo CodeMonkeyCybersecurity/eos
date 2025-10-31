@@ -9,15 +9,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // CaddyAdminClient represents a client for the Caddy Admin API
 type CaddyAdminClient struct {
 	BaseURL    string
 	HTTPClient *http.Client
+	logger     *zap.Logger // Optional logger for structured logging (nil = use stderr)
 }
 
 // NewCaddyAdminClient creates a new Caddy Admin API client
@@ -70,13 +72,15 @@ func NewCaddyAdminClient(host string) *CaddyAdminClient {
 			// Tier 3: Fall back to localhost (legacy behavior)
 			// WARNING: May fail with IPv6 resolution issues
 
-			// CRITICAL: Log why Docker SDK failed (P0 finding from adversarial analysis)
-			// RATIONALE: Silent failures are impossible to debug
-			// NOTE: Can't use structured logger here (no RuntimeContext in constructor)
-			//       Using fmt.Fprintf to stderr as diagnostic output
-			fmt.Fprintf(os.Stderr, "WARN: Caddy Admin API - Docker SDK container IP detection failed: %v\n", err)
-			fmt.Fprintf(os.Stderr, "WARN: Caddy Admin API - Falling back to localhost:2019 (may fail with IPv6 issues)\n")
-			fmt.Fprintf(os.Stderr, "INFO: Caddy Admin API - Run 'eos debug hecate --caddy' to diagnose Docker SDK issues\n")
+			// P1 FIX #9: Use structured logging for Docker SDK fallback
+			// RATIONALE: Observability is critical for production troubleshooting (CLAUDE.md Rule #1)
+			// NOTE: Use global logger if no RuntimeContext available (backward compatibility)
+			logger := zap.L()
+			logger.Warn("Caddy Admin API - Docker SDK container IP detection failed, falling back to localhost",
+				zap.Error(err),
+				zap.String("strategy", "localhost_fallback"),
+				zap.String("remediation", "Run 'eos debug hecate --caddy' to diagnose Docker SDK issues"),
+				zap.String("warning", "localhost may fail with IPv6 resolution issues"))
 
 			targetHost = "localhost"
 			strategyUsed = "localhost_fallback"
@@ -85,13 +89,16 @@ func NewCaddyAdminClient(host string) *CaddyAdminClient {
 
 	baseURL := fmt.Sprintf("http://%s:%d", targetHost, CaddyAdminAPIPort)
 
-	// Log which strategy was used for observability (P2 finding from adversarial analysis)
-	// NOTE: This goes to stderr so it doesn't pollute stdout but is visible to user
-	fmt.Fprintf(os.Stderr, "INFO: Caddy Admin API client created - strategy=%s, url=%s\n", strategyUsed, baseURL)
+	// Log which strategy was used for observability
+	logger := zap.L()
+	logger.Debug("Caddy Admin API client created",
+		zap.String("strategy", strategyUsed),
+		zap.String("url", baseURL))
 
 	return &CaddyAdminClient{
 		BaseURL:    baseURL,
 		HTTPClient: httpClient,
+		logger:     nil, // Will use zap.L() by default
 	}
 }
 

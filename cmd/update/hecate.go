@@ -64,6 +64,11 @@ Examples:
   eos update hecate certs                        # Only renew certificates
   eos update hecate k3s                          # Update k3s deployment
 
+  # Enable features (OAuth2 signout, self-enrollment)
+  eos update hecate --enable oauth2-signout      # Add logout handlers to protected routes
+  eos update hecate --enable self-enrollment --app bionicgpt --dns chat.example.com
+  eos update hecate --enable self-enrollment --app bionicgpt --dns chat.example.com --dry-run
+
   # Fix Caddy configuration drift (Admin API binding + network name)
   eos update hecate --fix caddy                  # Apply both fixes and restart Caddy
   eos update hecate --fix caddy --dry-run        # Preview fixes without applying
@@ -215,7 +220,9 @@ func init() {
 	updateHecateCmd.Flags().String("authentik-host", "hecate-server-1", "Authentik hostname (used with --enable)")
 	updateHecateCmd.Flags().Int("authentik-port", hecate.AuthentikPort, "Authentik port (used with --enable)")
 	updateHecateCmd.Flags().Bool("skip-caddyfile", false, "Skip Caddyfile updates (used with --enable, advanced usage)")
-	updateHecateCmd.Flags().Bool("enable-captcha", false, "Enable captcha for self-enrollment (used with --enable self-enrollment)")
+	updateHecateCmd.Flags().Bool("enable-captcha", true, "Enable captcha for self-enrollment (default: true, uses test keys initially)")
+	updateHecateCmd.Flags().Bool("disable-captcha", false, "Disable captcha protection (NOT RECOMMENDED for production)")
+	updateHecateCmd.Flags().Bool("require-approval", false, "New users inactive until admin approves (default: active immediately)")
 
 	// Optional flags for --add
 	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route (NOTE: BionicGPT always uses Authentik forward auth regardless of this flag)")

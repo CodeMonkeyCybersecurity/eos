@@ -1,6 +1,6 @@
 # Eos Development Roadmap
 
-**Last Updated**: 2025-10-30
+**Last Updated**: 2025-10-31
 **Version**: 1.2
 
 ---
@@ -3455,6 +3455,21 @@ sudo eos update hecate --migrate-to-vault  # Migrates existing .env to Vault
    - **Change**: Add `127.0.0.1:2019:2019` to Caddy ports
    - **Impact**: Enables Option B drift detection, Option C precipitate, oauth2-signout injection
    - **Effort**: 5 minutes
+
+4. **Domain Auto-Detection via Redirect URIs** 📅 DEFERRED (P2 - Polish)
+   - **File**: [pkg/hecate/self_enrollment.go:129-164](pkg/hecate/self_enrollment.go#L129-L164)
+   - **Current**: Matches app slug to domain prefix (e.g., "bionicgpt" → "bionicgpt.example.com")
+   - **Problem**: Fails when user chooses different subdomain (e.g., "chat.example.com" for bionicgpt)
+   - **Solution**: Query Authentik application's `redirect_uris` field via API
+     - Extract domain from redirect URI: `https://chat.codemonkey.net.au/akprox/callback` → `chat.codemonkey.net.au`
+     - Match extracted domain against Caddy routes
+   - **Pros**: True auto-detection, works regardless of subdomain naming convention
+   - **Cons**: Additional API call, assumes redirect URIs configured correctly
+   - **Rationale**: Current workaround (explicit `--dns` flag) is acceptable for now
+   - **Target**: 2026-Q1 (low priority, user feedback needed)
+   - **Effort**: 2-3 hours
+   - **Testing**: Test with apps using non-slug subdomains
+   - **Reference**: Authentik API `/api/v3/core/applications/{id}/` returns `redirect_uris` array
    - **Testing**: Verify `curl http://localhost:2019/config/` works from host
 
 4. **Missing HTTP/3 UDP Port** ([Issue #8](https://github.com/CodeMonkeyCybersecurity/eos/issues/TBD))
@@ -4137,4 +4152,283 @@ authentik-worker:
 
 3. **Off-site Storage** - S3 or B2?
    - Recommendation: B2 (cost-effective, good restic support)
+
+---
+
+## 🔐 Hecate Security & Reliability Improvements (2025-10-31 Adversarial Analysis)
+
+**Last Updated**: 2025-10-31
+**Status**: P0 Complete, P1-P3 Planned
+**Owner**: Henry + Claude
+**Context**: Comprehensive adversarial analysis of 26 command files + 83 package files identified improvements
+
+---
+
+### ✅ Completed (2025-10-31)
+
+#### P0 #8: Backend Health Check Timeout Feedback ✅
+- **Priority**: P0 - Usability
+- **Status**: ✅ COMPLETE
+- **Effort**: 30 minutes
+- **Impact**: Human-centric - users see progress during 10s backend checks
+- **Implementation**: [pkg/hecate/add/bionicgpt.go:153-181](pkg/hecate/add/bionicgpt.go#L153-L181)
+- **Changes**:
+  - Added context-aware timeout with progress feedback
+  - Shows "Waiting for backend response... (Xs/10s)" every 2 seconds
+  - Prevents user confusion during network delays
+- **Evidence**: Follows "Technology serves humans" principle from CLAUDE.md
+
+#### P0 #9: Docker SDK Fallback Logging ✅
+- **Priority**: P1 - Observability
+- **Status**: ✅ COMPLETE
+- **Effort**: 20 minutes
+- **Impact**: Production troubleshooting, telemetry-enabled
+- **Implementation**: [pkg/hecate/caddy_admin_api.go:76-97](pkg/hecate/caddy_admin_api.go#L76-L97)
+- **Changes**:
+  - Replaced `fmt.Fprintf(stderr)` with structured logging (zap)
+  - Added error context, remediation steps, strategy tracking
+  - Complies with CLAUDE.md Rule #1 (ONLY use otelzap.Ctx)
+- **Before**: Silent failures, no telemetry
+- **After**: Structured logs with error details, remediation guidance
+
+---
+
+### 📅 This Month (November 2025)
+
+#### P1 #6: Admin API Network Segmentation
+- **Priority**: P1 - Security
+- **Status**: PLANNED
+- **Effort**: 2-3 hours
+- **Deadline**: 2025-11-15
+- **CVSS**: 7.2 (High) - Container compromise → full proxy control
+- **Risk**: Caddy Admin API accessible to ALL containers on Docker bridge
+- **Attack Scenario**:
+  1. Attacker compromises any container in Hecate stack
+  2. From container: `curl http://hecate-caddy:2019/config/` → retrieve full config
+  3. Attacker modifies config → routes traffic to malicious backend
+- **Solution**:
+  ```yaml
+  # docker-compose.yml
+  services:
+    caddy:
+      networks:
+        - caddy_admin   # Separate network for Admin API
+        - caddy_proxy   # Existing proxy network
+
+  networks:
+    caddy_admin:
+      internal: true    # No external routing
+  ```
+- **Impact**: Limits blast radius of container compromise
+- **Vendor Evidence**: Caddy docs 2025: "Protect admin endpoint... bind to permissioned unix socket"
+- **Files to Change**:
+  - `pkg/hecate/types_docker.go` - Add admin network
+  - `assets/hecate/docker-compose.yml` - Update template
+  - Documentation update
+
+#### P1 #10: Authentik Token Discovery Cleanup
+- **Priority**: P1 - Reliability/Security
+- **Status**: PLANNED
+- **Effort**: 4-6 hours (with migration plan)
+- **Deadline**: 2025-12-01 (1 month migration window)
+- **Current Issues**:
+  - 5 different env var names (AUTHENTIK_API_TOKEN, AUTHENTIK_TOKEN, AUTHENTIK_API_KEY, etc.)
+  - 2 file locations (/opt/hecate/.env, /opt/bionicgpt/.env)
+  - Bootstrap token used as API key (never expires, root privileges)
+- **Target State**:
+  ```yaml
+  # /opt/hecate/.env (SINGLE location)
+  AUTHENTIK_BOOTSTRAP_TOKEN=<admin-login-token>  # UI login only
+  AUTHENTIK_API_TOKEN=<dedicated-api-token>      # API access, 365d expiry
+  ```
+- **Migration Plan**:
+  - **Month 1** (Nov 2025): Add deprecation warnings for legacy vars
+  - **Month 3** (Jan 2026): Fail with error if legacy vars used (with migration steps)
+  - **Month 6** (Apr 2026): Remove legacy code paths entirely
+- **Files to Change**:
+  - `pkg/hecate/add/bionicgpt.go:390-488` - Simplify token discovery
+  - `pkg/hecate/auth.go:362-423` - Remove legacy fallbacks
+  - `pkg/hecate/authentik/export.go` - Update token retrieval
+- **Vendor Evidence**: Authentik 2023.2+ invalidates all sessions on logout
+
+---
+
+### 📅 Next Quarter (Q1 2026)
+
+#### P2 #14: Implement `--remove` Flag
+- **Priority**: P2 - Completeness
+- **Status**: PLANNED
+- **Effort**: 2-3 weeks
+- **Deadline**: 2026-01-31
+- **Current State**: Returns "not yet implemented" with manual workaround
+- **Impact**: Completes CRUD operations for Hecate routes
+- **Design**: Use same 8-phase pattern as `--add`:
+  ```
+  Phase 1: Validation (service exists)
+  Phase 2: Pre-flight checks (Caddy running)
+  Phase 3: Backup (BEFORE removal)
+  Phase 4: Service-specific cleanup (Authentik resources)
+  Phase 5: Remove route from Caddyfile
+  Phase 6: Validate and reload Caddy
+  Phase 7: Verify route is gone
+  Phase 8: Cleanup backups
+  ```
+- **Files to Create**:
+  - `pkg/hecate/remove/remove.go` - Business logic (mirror of add.go)
+  - `pkg/hecate/remove/validation.go` - Input validation
+  - `pkg/hecate/remove/integrators.go` - Service-specific cleanup
+- **Integration Points**:
+  - `cmd/update/hecate.go:286-302` - Replace stub with delegation
+  - Authentik cleanup: Delete proxy provider, application
+  - Caddyfile: Remove route block, reload Caddy
+- **Testing**: Add integration test for add → remove → verify gone
+
+#### P2 #12: Backup Integrity Verification
+- **Priority**: P2 - Reliability
+- **Status**: PLANNED
+- **Effort**: 1 week
+- **Deadline**: 2025-11-30
+- **Current Gap**: Backups created but never verified
+- **Risk**: Corrupt backup discovered only during emergency restore
+- **Solution**:
+  ```go
+  func BackupCaddyfile(rc *RuntimeContext) (string, error) {
+      // Create backup
+      backupPath := fmt.Sprintf("%s/Caddyfile.backup.%s", BackupDir, timestamp)
+      copyFile(CaddyfilePath, backupPath)
+
+      // VERIFY: Read back and checksum
+      originalHash := sha256File(CaddyfilePath)
+      backupHash := sha256File(backupPath)
+
+      if originalHash != backupHash {
+          os.Remove(backupPath)  // Delete corrupt backup
+          return "", fmt.Errorf("backup verification failed")
+      }
+
+      logger.Info("Backup verified", zap.String("checksum", backupHash[:16]))
+      return backupPath, nil
+  }
+  ```
+- **Files to Change**:
+  - `pkg/hecate/add/backup.go` - Add verification logic
+  - Add SHA256 helper function
+- **Testing**: Test with corrupted backup, ensure detection
+- **Vendor Evidence**: Docker Compose 2025 best practices: "Configure health checks"
+
+#### P2 #11: Rate Limiting on Admin API
+- **Priority**: P2 - Security (DoS prevention)
+- **Status**: PLANNED
+- **Effort**: 1-2 weeks
+- **Deadline**: 2026-01-15
+- **Risk**: Attacker floods Admin API → DoS via resource exhaustion
+- **Solution**: Token bucket algorithm (10 req/s, burst of 20)
+  ```go
+  type RateLimitedCaddyClient struct {
+      client *CaddyAdminClient
+      limiter *rate.Limiter  // golang.org/x/time/rate
+  }
+
+  func (r *RateLimitedCaddyClient) LoadConfig(ctx, config) error {
+      if err := r.limiter.Wait(ctx); err != nil {
+          return fmt.Errorf("rate limit exceeded: %w", err)
+      }
+      return r.client.LoadConfig(ctx, config)
+  }
+  ```
+- **Files to Change**:
+  - `pkg/hecate/caddy_admin_api.go` - Add rate limiting wrapper
+  - Update all call sites to use rate-limited client
+- **Monitoring**: Log rate limit violations with source for forensics
+
+#### P2 #7: DNS Validation Strictness
+- **Priority**: P2 - Usability
+- **Status**: PLANNED
+- **Effort**: 1 week
+- **Deadline**: 2025-11-22
+- **Current**: DNS check is warning (non-fatal)
+- **Issue**: User may not notice warning, deploy broken config
+- **Solution**: Add `--dev` and `--prod` flags to control strictness
+  ```bash
+  eos update hecate --add app --dns test.local --upstream 10.0.0.1 --dev   # Warning
+  eos update hecate --add app --dns prod.com --upstream 10.0.0.1 --prod   # Error
+  ```
+- **Files to Change**:
+  - `cmd/update/hecate.go` - Add --dev/--prod flags
+  - `pkg/hecate/add/add.go:384-402` - Use flag for DNS validation strictness
+- **Vendor Evidence**: Docker Compose 2025: Use `compose.production.yaml` for prod config
+
+---
+
+### 📅 Backlog (Q2 2026)
+
+#### P3 #13: Circuit Breaker for Authentik API
+- **Priority**: P3 - Resilience
+- **Status**: BACKLOG
+- **Effort**: 2-3 weeks
+- **Deadline**: 2026-04-30
+- **Blind Spot**: If Authentik API flapping, Eos retries indefinitely
+- **Solution**: Use `github.com/sony/gobreaker` for circuit breaker
+- **Pattern**: Open circuit after 3 consecutive failures, retry after 60s
+- **Impact**: Prevents long hangs when Authentik down, fails fast with clear error
+
+#### P3 #15: Metrics/Observability for Caddy
+- **Priority**: P3 - Operations
+- **Status**: BACKLOG
+- **Effort**: 2-3 months
+- **Deadline**: 2026-06-30
+- **Blind Spot**: No visibility into Caddy performance (latency, error rates)
+- **Solution**: Add `eos read hecate metrics` command
+  ```bash
+  # Output:
+  Caddy Metrics (Last 5 minutes):
+    Total Requests: 15,234
+    Error Rate: 0.2%
+    P50 Latency: 45ms
+    P95 Latency: 120ms
+
+  Backend Health:
+    bionicgpt: Healthy (99.8% uptime)
+    wazuh: Degraded (2 failures in 5min)
+  ```
+- **Implementation**: Use Caddy Admin API `/metrics` or parse JSON logs
+- **Vendor Evidence**: Caddy docs: `/reverse_proxy/upstreams` endpoint for backend status
+
+---
+
+### 📊 Priority Matrix
+
+| Priority | Items | Timeline | Effort | Impact |
+|----------|-------|----------|--------|--------|
+| **P0** | 2 fixes | ✅ Complete | 1 hour | Usability + Observability |
+| **P1** | 2 items | Nov 2025 | 1-2 weeks | Security + Reliability |
+| **P2** | 4 items | Q1 2026 | 6-8 weeks | Completeness + Resilience |
+| **P3** | 2 items | Q2 2026 | 3-5 months | Operations + Monitoring |
+
+---
+
+### 🎯 Success Metrics
+
+**November 2025** (This Month):
+- [ ] P1 #6: Admin API network segmentation deployed
+- [ ] P1 #10: Token discovery simplified, migration plan announced
+
+**Q1 2026** (Next Quarter):
+- [ ] P2 #14: `--remove` flag fully implemented
+- [ ] P2 #12: All backups verified with SHA256
+- [ ] P2 #11: Rate limiting prevents API DoS
+- [ ] P2 #7: Production deployments fail on DNS issues
+
+**Q2 2026** (Backlog):
+- [ ] P3 #13: Circuit breaker prevents Authentik cascade failures
+- [ ] P3 #15: Operators have visibility into Caddy performance
+
+---
+
+### 📚 References
+
+- **Adversarial Analysis Date**: 2025-10-31
+- **Vendor Documentation**: Caddy 2025, Authentik 2025, Docker Compose 2025
+- **Industry Standards**: OWASP, NIST, SOC2, PCI-DSS
+- **Compliance**: Human-centric, Evidence-based, Sustainable Innovation (CLAUDE.md)
 
