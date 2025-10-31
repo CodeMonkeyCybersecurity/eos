@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -363,32 +362,19 @@ func validateAuthProvider(_ *eos_io.RuntimeContext, provider string) error {
 func getAuthentikAPIToken(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// DEFERRED (2025-10-31): Vault integration deferred to April-May 2026
+	// ARCHITECTURE DECISION (2025-10-31):
+	// Read token from .env file ONLY (no Vault integration)
+	// Vault integration is deferred to April-May 2026
 	// See ROADMAP.md "Hecate Consul KV + Vault Integration" section
-	// For now, read token from .env file instead of Vault
+	//
+	// RATIONALE: Hecate does not use Vault yet. Calling vault.GetVaultClient()
+	// triggers expensive authentication attempts (Vault Agent, AppRole, interactive),
+	// which wastes 1m+ on environments without Vault infrastructure.
+	//
+	// When Vault integration is added (April-May 2026), this function will be
+	// refactored to try Vault first, then fall back to .env.
 
-	// Try Vault first (will be primary source after April-May 2026)
-	vaultClient, err := vault.GetVaultClient(rc)
-	if err == nil {
-		// Vault is available, try to read token
-		secret, err := vaultClient.Logical().Read("secret/data/hecate/authentik")
-		if err == nil && secret != nil && secret.Data != nil {
-			if data, ok := secret.Data["data"].(map[string]interface{}); ok {
-				if token, ok := data["api_token"].(string); ok && token != "" {
-					logger.Debug("Retrieved Authentik API token from Vault")
-					return token, nil
-				}
-			}
-		}
-		// Vault is available but token not found - log warning and try .env fallback
-		logger.Warn("Vault is available but Authentik API token not found, trying .env file fallback")
-	} else {
-		// Vault not available (expected during 6-month deferral period)
-		logger.Debug("Vault not available, using .env file for Authentik API token",
-			zap.Error(err))
-	}
-
-	// Fallback: Read token from .env file (current primary source until April-May 2026)
+	// Read token from .env file (only source until April-May 2026)
 	envFilePath := filepath.Join(BaseDir, ".env")
 	envVars, err := shared.ParseEnvFile(envFilePath)
 	if err != nil {
