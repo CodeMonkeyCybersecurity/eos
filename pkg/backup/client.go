@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -112,6 +114,16 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	duration := time.Since(start)
 
 	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			logger.Error("Restic binary not found in PATH",
+				zap.Error(err),
+				zap.String("binary", ResticBinaryName),
+				zap.Strings("args", safeArgs),
+				zap.String("repository", c.repository.URL),
+				zap.String("backend", c.repository.Backend))
+			return output, fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
+		}
+
 		logger.Error("Restic command failed",
 			zap.Error(err),
 			zap.String("output", string(output)),
@@ -146,6 +158,14 @@ func (c *Client) getRepositoryPassword() (string, error) {
 
 		passwordFile := fmt.Sprintf("/var/lib/eos/secrets/backup/%s.password", c.repository.Name)
 		if data, err := os.ReadFile(passwordFile); err == nil {
+			return strings.TrimSpace(string(data)), nil
+		}
+
+		// Fallback: repository-local password file (used by quick backups)
+		localPasswordFile := filepath.Join(c.repository.URL, ".password")
+		if data, err := os.ReadFile(localPasswordFile); err == nil {
+			logger.Info("Using repository-local password file",
+				zap.String("path", localPasswordFile))
 			return strings.TrimSpace(string(data)), nil
 		}
 

@@ -4,10 +4,11 @@
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
@@ -122,84 +123,93 @@ Restore:
 func ensureQuickBackupRepo(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Load config
 	config, err := backup.LoadConfig(rc)
 	if err != nil {
-		// Config doesn't exist yet, create it
 		config = &backup.Config{
-			Repositories:      make(map[string]backup.Repository),
-			Profiles:          make(map[string]backup.Profile),
-			DefaultRepository: "quick-backups",
+			Repositories: make(map[string]backup.Repository),
+			Profiles:     make(map[string]backup.Profile),
 		}
 	}
 
-	// Check if quick-backups repo already exists
-	if _, exists := config.Repositories["quick-backups"]; exists {
-		logger.Debug("Quick backup repository already exists")
-		return nil
-	}
+	repoName := backup.QuickBackupRepositoryName
+	repoConfig, exists := config.Repositories[repoName]
 
-	// Create repository directory
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("getting home directory: %w", err)
 	}
 
-	repoPath := filepath.Join(homeDir, ".eos", "quick-backups")
-	if err := os.MkdirAll(repoPath, 0700); err != nil {
+	defaultRepoPath := filepath.Join(homeDir, backup.QuickBackupRelativePath)
+
+	if repoConfig.URL == "" {
+		repoConfig.URL = defaultRepoPath
+	}
+	if repoConfig.Backend == "" {
+		repoConfig.Backend = "local"
+	}
+	if repoConfig.Name == "" {
+		repoConfig.Name = repoName
+	}
+
+	if err := os.MkdirAll(repoConfig.URL, 0700); err != nil {
 		return fmt.Errorf("creating repository directory: %w", err)
 	}
 
-	logger.Info("Creating quick backup repository",
-		zap.String("path", repoPath))
-
-	// Generate secure password
-	password, err := generateQuickBackupPassword(rc, repoPath)
-	if err != nil {
-		return fmt.Errorf("generating password: %w", err)
+	if _, err := ensureQuickBackupPassword(rc, repoConfig.URL); err != nil {
+		return fmt.Errorf("ensuring password: %w", err)
 	}
 
-	// Initialize restic repository
-	if err := initializeResticRepo(rc, repoPath, password); err != nil {
-		return fmt.Errorf("initializing restic repository: %w", err)
-	}
+	config.Repositories[repoName] = repoConfig
+	config.DefaultRepository = repoName
 
-	// Add to config
-	config.Repositories["quick-backups"] = backup.Repository{
-		Name:    "quick-backups",
-		Backend: "local",
-		URL:     repoPath,
-	}
-
-	config.DefaultRepository = "quick-backups"
-
-	// Save config
 	if err := backup.SaveConfig(rc, config); err != nil {
 		return fmt.Errorf("saving configuration: %w", err)
 	}
 
-	logger.Info("terminal prompt:", zap.String("output", "✓ Quick backup repository created at ~/.eos/quick-backups"))
+	client, err := backup.NewClient(rc, repoName)
+	if err != nil {
+		return fmt.Errorf("creating backup client: %w", err)
+	}
 
+	configPath := filepath.Join(repoConfig.URL, "config")
+	_, statErr := os.Stat(configPath)
+
+	if err := client.InitRepository(); err != nil {
+		if errors.Is(err, backup.ErrResticNotInstalled) {
+			logger.Info("terminal prompt:", zap.String("output",
+				"Restic is not installed. Install restic (e.g., sudo apt-get install restic) and rerun eos backup ."))
+		}
+		return err
+	}
+
+	if !exists || os.IsNotExist(statErr) {
+		logger.Info("terminal prompt:", zap.String("output", "✓ Quick backup repository created at ~/.eos/quick-backups"))
+	}
 	return nil
 }
 
-// generateQuickBackupPassword generates and stores password for quick backups
-func generateQuickBackupPassword(rc *eos_io.RuntimeContext, repoPath string) (string, error) {
+// ensureQuickBackupPassword retrieves or generates the password for quick backups.
+func ensureQuickBackupPassword(rc *eos_io.RuntimeContext, repoPath string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Try Vault first
+	passwordFile := filepath.Join(repoPath, ".password")
+	if data, err := os.ReadFile(passwordFile); err == nil {
+		password := strings.TrimSpace(string(data))
+		if password != "" {
+			return password, nil
+		}
+		logger.Warn("Quick backup password file is empty, generating new password",
+			zap.String("path", passwordFile))
+	}
+
 	vaultAddr := os.Getenv("VAULT_ADDR")
 	if vaultAddr == "" {
 		vaultAddr = "https://localhost:8200"
 	}
-
-	// TODO: Fix Vault client API - WriteKV method investigation needed
-	// Temporarily disabled pending vault client method fix
+	// TODO: Implement Vault password storage for quick backups once client supports WriteKV.
 	_, _ = vault.NewClient(vaultAddr, logger.Logger().Logger)
 
-	// Fallback to local file
-	passwordFile := filepath.Join(repoPath, ".password")
-	password, err := crypto.GeneratePassword(32)
+	password, err := crypto.GeneratePassword(backup.QuickBackupPasswordLength)
 	if err != nil {
 		return "", fmt.Errorf("generating password: %w", err)
 	}
@@ -212,37 +222,6 @@ func generateQuickBackupPassword(rc *eos_io.RuntimeContext, repoPath string) (st
 		zap.String("path", passwordFile))
 
 	return password, nil
-}
-
-// initializeResticRepo initializes a new restic repository
-func initializeResticRepo(rc *eos_io.RuntimeContext, repoPath, password string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if already initialized
-	if _, err := os.Stat(filepath.Join(repoPath, "config")); err == nil {
-		logger.Debug("Repository already initialized")
-		return nil
-	}
-
-	logger.Info("Initializing restic repository", zap.String("path", repoPath))
-
-	// Build init command
-	cmd := exec.CommandContext(rc.Ctx, "restic", "init")
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("RESTIC_REPOSITORY=%s", repoPath),
-		fmt.Sprintf("RESTIC_PASSWORD=%s", password),
-	)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		logger.Error("Failed to initialize repository",
-			zap.Error(err),
-			zap.String("output", string(output)))
-		return fmt.Errorf("restic init failed: %w\n%s", err, output)
-	}
-
-	logger.Info("Repository initialized successfully")
-	return nil
 }
 
 func init() {
