@@ -49,6 +49,8 @@ type HecateCheckResult struct {
 }
 
 // RunHecateDebug is the main entry point for Hecate diagnostics
+// ARCHITECTURE: Flags are FILTERS, not switches - no flags = run ALL diagnostics
+// This allows: eos debug hecate (all), eos debug hecate --caddy (caddy only), etc.
 func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -60,37 +62,87 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	hecatePath, _ := cmd.Flags().GetString("path")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
+	// Determine if ANY filter flag was set
+	anyFlagSet := authentikCheck || bionicgptCheck || caddyCheck
+	runAll := !anyFlagSet // If no flags, run everything
+
 	logger.Info("Starting Hecate diagnostics",
 		zap.String("component_filter", component),
 		zap.String("path", hecatePath),
-		zap.Bool("authentik_check", authentikCheck),
-		zap.Bool("bionicgpt_check", bionicgptCheck),
-		zap.Bool("caddy_check", caddyCheck))
+		zap.Bool("run_all", runAll),
+		zap.Bool("authentik_check", authentikCheck || runAll),
+		zap.Bool("bionicgpt_check", bionicgptCheck || runAll),
+		zap.Bool("caddy_check", caddyCheck || runAll))
 
-	// If --caddy flag is set, run Caddy Admin API diagnostics
-	if caddyCheck {
-		return RunCaddyAdminAPIDebug(rc, hecatePath, verbose)
-	}
+	// Run diagnostics based on filters (or all if no filters)
+	var allErrors []error
 
-	// If --bionicgpt flag is set, run BionicGPT integration diagnostics
-	if bionicgptCheck {
-		config := &BionicGPTDebugConfig{
-			HecatePath: hecatePath,
-			Verbose:    verbose,
+	// 1. Standard component diagnostics (always runs unless specific flag filters it out)
+	if runAll {
+		if err := runStandardDiagnostics(rc, component, hecatePath, verbose); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("standard diagnostics failed: %w", err))
 		}
-		return RunBionicGPTIntegrationDebug(rc, config)
 	}
 
-	// If --authentik flag is set, run comprehensive Authentik check
-	// Now includes configuration export integrated into the command
-	// Delegate to pkg/authentik for business logic
-	if authentikCheck {
+	// 2. Caddy Admin API diagnostics
+	if caddyCheck || runAll {
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("CADDY ADMIN API DIAGNOSTICS")
+		fmt.Println(strings.Repeat("=", 80))
+
+		if err := RunCaddyAdminAPIDebug(rc, hecatePath, verbose); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("caddy diagnostics failed: %w", err))
+		}
+	}
+
+	// 3. Authentik diagnostics
+	if authentikCheck || runAll {
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("AUTHENTIK DIAGNOSTICS")
+		fmt.Println(strings.Repeat("=", 80))
+
 		config := &authentik.DebugConfig{
 			HecatePath: hecatePath,
 			Verbose:    verbose,
 		}
-		return authentik.RunAuthentikDebug(rc, config)
+		if err := authentik.RunAuthentikDebug(rc, config); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("authentik diagnostics failed: %w", err))
+		}
 	}
+
+	// 4. BionicGPT integration diagnostics
+	if bionicgptCheck || runAll {
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Println("BIONICGPT INTEGRATION DIAGNOSTICS")
+		fmt.Println(strings.Repeat("=", 80))
+
+		config := &BionicGPTDebugConfig{
+			HecatePath: hecatePath,
+			Verbose:    verbose,
+		}
+		if err := RunBionicGPTIntegrationDebug(rc, config); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("bionicgpt diagnostics failed: %w", err))
+		}
+	}
+
+	// Report any errors
+	if len(allErrors) > 0 {
+		logger.Warn("Some diagnostics failed",
+			zap.Int("error_count", len(allErrors)))
+		for _, err := range allErrors {
+			logger.Error("Diagnostic error", zap.Error(err))
+		}
+		return fmt.Errorf("%d diagnostic(s) failed (see logs above)", len(allErrors))
+	}
+
+	logger.Info("All diagnostics completed successfully")
+	return nil
+}
+
+// runStandardDiagnostics runs the original component-based diagnostics
+// Extracted to separate function for clarity
+func runStandardDiagnostics(rc *eos_io.RuntimeContext, component string, hecatePath string, verbose bool) error {
+	logger := otelzap.Ctx(rc.Ctx)
 
 	// Detect components
 	components := detectHecateComponents(rc, hecatePath)
@@ -127,7 +179,7 @@ func RunHecateDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		allResults = append(allResults, results...)
 	}
 
-	// INTERVENE: Display comprehensive file contents (new functionality)
+	// INTERVENE: Display comprehensive file contents
 	logger.Info("Displaying configuration file contents")
 	fileResults := displayHecateConfigFiles(rc, hecatePath)
 	allResults = append(allResults, fileResults...)

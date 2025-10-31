@@ -387,32 +387,19 @@ func checkRedisConnectivity(rc *eos_io.RuntimeContext, hecatePath string) []Auth
 	logger := otelzap.Ctx(rc.Ctx)
 	var results []AuthentikCheckResult
 
-	// P0 FIX: Add authentication support for Redis health check
-	// RATIONALE: Redis may require AUTH if REDIS_PASSWORD is set in .env
-	// EVIDENCE: Diagnostic shows "exit status 1" not "127" (command exists, auth likely failed)
+	// P0 FIX (2025-10-31): Remove authentication logic - match docker-compose healthcheck
+	// RATIONALE: Redis server has NO --requirepass in docker-compose.yml (line 90)
+	// EVIDENCE: docker healthcheck uses "redis-cli ping" (no auth) and passes
+	// ROOT CAUSE: REDIS_PASSWORD in .env is for Authentik client (AUTHENTIK_REDIS__PASSWORD)
+	//             NOT for Redis server itself (which would need --requirepass in command)
+	// ERROR: "ERR Client sent AUTH, but no password is set" proves server has no password
+	// SOLUTION: Always use unauthenticated ping (match docker-compose healthcheck exactly)
 
-	// Step 1: Check if Redis requires authentication
-	envPath := filepath.Join(hecatePath, ".env")
-	envVars, err := shared.ParseEnvFile(envPath)
-	var redisPassword string
-	if err == nil {
-		redisPassword = envVars["REDIS_PASSWORD"] // May be empty if no auth
-	}
-
-	// Step 2: Build redis-cli command with optional auth
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
-	var cmd *exec.Cmd
-	if redisPassword != "" {
-		logger.Debug("Redis password found in .env, using authenticated ping")
-		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis",
-			"redis-cli", "-a", redisPassword, "ping")
-	} else {
-		logger.Debug("No Redis password in .env, using unauthenticated ping")
-		cmd = exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis",
-			"redis-cli", "ping")
-	}
+	cmd := exec.CommandContext(ctx, "docker", "compose", "exec", "-T", "redis",
+		"redis-cli", "ping") // No -a flag, match docker healthcheck
 	cmd.Dir = hecatePath
-	output, err := cmd.CombinedOutput() // Use CombinedOutput to capture stderr (auth errors)
+	output, err := cmd.CombinedOutput() // Use CombinedOutput to capture stderr
 	cancel()
 
 	logger.Debug("Redis ping result",
@@ -766,7 +753,7 @@ func checkBackupStatus(rc *eos_io.RuntimeContext, hecatePath string) []Authentik
 			Category:  "Pre-Upgrade",
 			Passed:    false,
 			Warning:   true,
-			Details:   fmt.Sprintf("Latest backup is %s old: %s (created %s)",
+			Details: fmt.Sprintf("Latest backup is %s old: %s (created %s)",
 				backupAge.Round(time.Hour), latestBackup, latestTime.Format("2006-01-02 15:04:05")),
 			Remediation: []string{
 				"Backup is stale - create fresh backup before upgrade",
@@ -781,7 +768,7 @@ func checkBackupStatus(rc *eos_io.RuntimeContext, hecatePath string) []Authentik
 		CheckName: "Backup Status",
 		Category:  "Pre-Upgrade",
 		Passed:    true,
-		Details:   fmt.Sprintf("Latest backup: %s (created %s ago at %s)",
+		Details: fmt.Sprintf("Latest backup: %s (created %s ago at %s)",
 			latestBackup, backupAge.Round(time.Minute), latestTime.Format("2006-01-02 15:04:05")),
 	})
 
@@ -1212,11 +1199,19 @@ func checkEmbeddedOutpostDiagnostics(rc *eos_io.RuntimeContext, hecatePath strin
 
 	// Step 5: Check outpost instance health via API
 	// First, get the outpost ID (usually the embedded outpost)
+	// P0 FIX (2025-10-31): Use Python instead of wget (wget not in Authentik container)
+	// RATIONALE: Authentik server container (ghcr.io/goauthentik/server:2025.8) has Python, NOT wget
+	// EVIDENCE: Exit status 127 = command not found (diagnostic false positive)
+	// PATTERN: Matches other API calls in this file (lines 849, 900, 1295, 1414)
 	ctx4, cancel4 := context.WithTimeout(rc.Ctx, 10*time.Second)
+	pythonScript := fmt.Sprintf(`
+import urllib.request
+req = urllib.request.Request("http://localhost:9000/api/v3/outposts/instances/")
+req.add_header("Authorization", "Bearer %s")
+print(urllib.request.urlopen(req).read().decode())
+`, token)
 	outpostsCmd := exec.CommandContext(ctx4, "docker", "compose", "exec", "-T", "server",
-		"wget", "-q", "-O", "-",
-		"--header", "Authorization: Bearer "+token,
-		"http://localhost:9000/api/v3/outposts/instances/")
+		"python3", "-c", pythonScript)
 	outpostsCmd.Dir = hecatePath
 	outpostsOutput, outpostsErr := outpostsCmd.Output()
 	cancel4()
@@ -1994,8 +1989,19 @@ func displayAuthentikConfiguration(rc *eos_io.RuntimeContext, hecatePath string)
 					logger.Warn("Failed to decode schema", zap.Error(schemaErr))
 					fmt.Printf("   ⚠ Could not decode API schema: %v\n", schemaErr)
 				} else {
-					// Extract brands PATCH endpoint schema
-					if paths, ok := schema["paths"].(map[string]interface{}); ok {
+					logger.Debug("Schema decoded successfully", zap.Int("top_level_keys", len(schema)))
+
+					// Extract brands PATCH endpoint schema with defensive checks
+					paths, ok := schema["paths"].(map[string]interface{})
+					if !ok {
+						logger.Warn("Schema missing 'paths' key", zap.Any("schema_keys", getKeys(schema)))
+						fmt.Println("   ⚠ API schema structure unexpected (missing 'paths')")
+						fmt.Printf("   Top-level keys: %v\n", getKeys(schema))
+						goto schemaEnd
+					}
+					logger.Debug("Found paths", zap.Int("count", len(paths)))
+
+					if paths != nil {
 						if brandPath, ok := paths["/api/v3/core/brands/{brand_uuid}/"].(map[string]interface{}); ok {
 							if patch, ok := brandPath["patch"].(map[string]interface{}); ok {
 								if reqBody, ok := patch["requestBody"].(map[string]interface{}); ok {
@@ -2058,8 +2064,18 @@ func displayAuthentikConfiguration(rc *eos_io.RuntimeContext, hecatePath string)
 		}
 	}
 
+schemaEnd:
 	fmt.Println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	logger.Debug("✓ Authentik configuration export complete")
 	return nil
+}
+
+// getKeys extracts keys from a map for debugging
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }

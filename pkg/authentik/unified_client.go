@@ -200,3 +200,109 @@ func isTransientError(err error) bool {
 		strings.Contains(errStr, "temporary failure") ||
 		strings.Contains(errStr, "EOF")
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Policy Management (P1 - Security Enhancement for Self-Enrollment)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// CreateExpressionPolicy creates an expression-based policy in Authentik
+// SECURITY: Enables per-application access control for self-enrolled users
+// USE CASE: Restrict which applications a group can access
+// RATIONALE: Authentik enrollment is brand-level, but authorization can be app-level
+// REFERENCE: https://github.com/goauthentik/authentik/issues/2807 (domain-level forward auth limitation)
+//
+// Example expression: "return ak_is_group_member(request.user, 'uuid-of-group')"
+func (c *UnifiedClient) CreateExpressionPolicy(ctx context.Context, name, expression string) (string, error) {
+	payload := map[string]interface{}{
+		"name":       name,
+		"expression": expression,
+	}
+
+	respBody, err := c.Post(ctx, "/api/v3/policies/expression/", payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to create expression policy: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("failed to parse policy response: %w", err)
+	}
+
+	policyPK, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("policy response missing 'pk' field")
+	}
+
+	return policyPK, nil
+}
+
+// CreatePolicyBinding binds a policy to a target (application, flow, etc.)
+// SECURITY: Enforces policy evaluation before granting access
+// ARCHITECTURE: Policy bindings create the access control layer
+// ORDER: Lower order number = evaluated first (use 10 for general group policies)
+//
+// Parameters:
+//   - policyPK: The policy UUID to bind
+//   - targetPK: The target UUID (application, flow, stage, etc.)
+//   - order: Evaluation order (lower = earlier, recommend 10 for standard policies)
+//   - enabled: Whether the binding is active
+func (c *UnifiedClient) CreatePolicyBinding(ctx context.Context, policyPK, targetPK string, order int, enabled bool) (string, error) {
+	payload := map[string]interface{}{
+		"policy":  policyPK,
+		"target":  targetPK,
+		"order":   order,
+		"enabled": enabled,
+	}
+
+	respBody, err := c.Post(ctx, "/api/v3/policies/bindings/", payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to create policy binding: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("failed to parse binding response: %w", err)
+	}
+
+	bindingPK, ok := result["pk"].(string)
+	if !ok {
+		return "", fmt.Errorf("binding response missing 'pk' field")
+	}
+
+	return bindingPK, nil
+}
+
+// CreateGroupApplicationPolicy creates a policy that allows a group to access an application
+// CONVENIENCE METHOD: Combines CreateExpressionPolicy + CreatePolicyBinding
+// SECURITY: Implements per-app authorization for self-enrollment
+//
+// This is the recommended way to restrict self-enrolled users to specific applications:
+//  1. Create enrollment flow (brand-level, affects all apps)
+//  2. Create group for self-enrolled users
+//  3. Call this method for EACH application that should be accessible
+//
+// Example:
+//
+//	err := client.CreateGroupApplicationPolicy(ctx, "eos-self-enrolled-users-uuid", "bionicgpt-app-uuid", "BionicGPT")
+//
+// Returns: (policyPK, bindingPK, error)
+func (c *UnifiedClient) CreateGroupApplicationPolicy(ctx context.Context, groupPK, appPK, appName string) (string, string, error) {
+	// Step 1: Create expression policy
+	policyName := fmt.Sprintf("eos-enrollment-allow-%s", appName)
+	expression := fmt.Sprintf("return ak_is_group_member(request.user, '%s')", groupPK)
+
+	policyPK, err := c.CreateExpressionPolicy(ctx, policyName, expression)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create policy for %s: %w", appName, err)
+	}
+
+	// Step 2: Bind policy to application
+	bindingPK, err := c.CreatePolicyBinding(ctx, policyPK, appPK, 10, true)
+	if err != nil {
+		// Attempt to clean up policy if binding fails
+		_, _ = c.Delete(ctx, fmt.Sprintf("/api/v3/policies/expression/%s/", policyPK))
+		return "", "", fmt.Errorf("failed to bind policy to %s: %w", appName, err)
+	}
+
+	return policyPK, bindingPK, nil
+}

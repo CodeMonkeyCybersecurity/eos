@@ -5,6 +5,7 @@ package authentik
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -115,4 +116,78 @@ func (c *APIClient) GetVersion(ctx context.Context) (string, error) {
 	// Simple version extraction - this can be improved with proper JSON parsing
 	// For now, return empty string if we can't determine version
 	return "", nil
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Application & Policy Management (P1 - Security Enhancement)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// GetApplicationBySlug retrieves an application by its slug
+// SECURITY: Required to get app PK for policy binding
+// PATTERN: Slug is typically the app name in lowercase (e.g., "bionicgpt")
+func (c *APIClient) GetApplicationBySlug(ctx context.Context, slug string) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("core/applications/?slug=%s", slug)
+	respBody, err := c.APICall(ctx, endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get application: %w", err)
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse application response: %w", err)
+	}
+
+	// API returns paginated results
+	results, ok := result["results"].([]interface{})
+	if !ok || len(results) == 0 {
+		return nil, fmt.Errorf("application not found: %s", slug)
+	}
+
+	app, ok := results[0].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid application data structure")
+	}
+
+	return app, nil
+}
+
+// CreateGroupApplicationPolicy creates a policy to restrict application access to a group
+// SECURITY: Implements per-app authorization for self-enrollment
+// ARCHITECTURE: Wrapper around unified client's policy methods
+//
+// This provides per-application access control on top of brand-level enrollment:
+//   - Self-enrollment is brand-level (Authentik design constraint)
+//   - Authorization policies are app-level (this method)
+//   - Result: Users enroll at brand level, but only access authorized apps
+//
+// Parameters:
+//   - groupPK: UUID of the group (e.g., "eos-self-enrolled-users")
+//   - appSlug: Application slug (e.g., "bionicgpt")
+//
+// Returns: (policyPK, bindingPK, error)
+func (c *APIClient) CreateGroupApplicationPolicy(ctx context.Context, groupPK, appSlug string) (string, string, error) {
+	// Get application details
+	app, err := c.GetApplicationBySlug(ctx, appSlug)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get application %s: %w", appSlug, err)
+	}
+
+	appPK, ok := app["pk"].(string)
+	if !ok {
+		return "", "", fmt.Errorf("application %s missing PK field", appSlug)
+	}
+
+	appName, ok := app["name"].(string)
+	if !ok {
+		appName = appSlug // Fallback to slug if name not available
+	}
+
+	// Use unified client for policy operations
+	unifiedClient := NewUnifiedClient(c.BaseURL, c.Token)
+	policyPK, bindingPK, err := unifiedClient.CreateGroupApplicationPolicy(ctx, groupPK, appPK, appName)
+	if err != nil {
+		return "", "", err
+	}
+
+	return policyPK, bindingPK, nil
 }

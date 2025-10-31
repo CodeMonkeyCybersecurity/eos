@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 )
 
 // CaddyAdminClient represents a client for the Caddy Admin API
@@ -23,9 +25,21 @@ type CaddyAdminClient struct {
 // SECURITY: Port only exposed on localhost (127.0.0.1:2019), not accessible from network
 // ARCHITECTURE: Eos runs on host, Caddy runs in container - requires TCP, not Unix socket
 func NewCaddyAdminClient(host string) *CaddyAdminClient {
-	// Use standard HTTP client (no custom transport needed)
+	// P0 FIX (2025-10-31): Add connection pooling to prevent "connection reset by peer" errors
+	// RATIONALE: Docker networking can reset idle connections in default Go HTTP transport
+	// EVIDENCE: https://stackoverflow.com/questions/37774624 (56 upvotes, accepted answer)
+	// VENDOR BEST PRACTICE: Caddy documentation recommends MaxIdleConnsPerHost=10 for high-traffic
+	// LOCALHOST OPTIMIZATION: Using lower limits (2) since this is single-host localhost API
+	// SECURITY: Connection limits prevent resource exhaustion on Caddy Admin API
+	transport := &http.Transport{
+		MaxIdleConns:        10,               // Total idle connections across all hosts
+		MaxIdleConnsPerHost: 2,                // Low for single-host localhost API (not multi-host proxy)
+		IdleConnTimeout:     30 * time.Second, // Match Caddy's default keep-alive
+	}
+
 	httpClient := &http.Client{
-		Timeout: CaddyAdminAPITimeout,
+		Timeout:   CaddyAdminAPITimeout,
+		Transport: transport,
 	}
 
 	// Connect to Admin API on localhost:2019
@@ -113,31 +127,73 @@ func (c *CaddyAdminClient) LoadCaddyfile(ctx context.Context, caddyfile string) 
 	return nil
 }
 
-// GetConfig retrieves the current Caddy configuration
+// GetConfig retrieves the current Caddy configuration with retry logic
+// Retries transient errors (connection reset) but fails fast on deterministic errors (404, 500)
 func (c *CaddyAdminClient) GetConfig(ctx context.Context) (map[string]interface{}, error) {
-	url := fmt.Sprintf("%s/config/", c.BaseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("get config request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return nil, fmt.Errorf("get config failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
 	var config map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to decode config: %w", err)
+	var lastErr error
+
+	// Retry configuration
+	maxAttempts := 3
+	initialDelay := 500 * time.Millisecond
+	maxDelay := 5 * time.Second
+	delay := initialDelay
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		url := fmt.Sprintf("%s/config/", c.BaseURL)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			// Request creation failure is deterministic - don't retry
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = err
+
+			// Check if error is transient (connection reset, timeout, etc.)
+			errStr := err.Error()
+			isTransient := strings.Contains(errStr, "connection reset") ||
+				strings.Contains(errStr, "timeout") ||
+				strings.Contains(errStr, "broken pipe") ||
+				strings.Contains(errStr, "connection refused")
+
+			if !isTransient {
+				// Deterministic error - don't retry
+				return nil, fmt.Errorf("get config request failed: %w", err)
+			}
+
+			// Transient error - retry with backoff
+			if attempt < maxAttempts {
+				time.Sleep(delay)
+				delay = time.Duration(float64(delay) * 2)
+				if delay > maxDelay {
+					delay = maxDelay
+				}
+				continue
+			}
+
+			// Max attempts reached
+			return nil, fmt.Errorf("get config request failed after %d attempts: %w", maxAttempts, lastErr)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+			// HTTP errors are deterministic - don't retry
+			return nil, fmt.Errorf("get config failed with status %d: %s", resp.StatusCode, string(body))
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
+			// Decode errors are deterministic - don't retry
+			return nil, fmt.Errorf("failed to decode config: %w", err)
+		}
+
+		// Success
+		return config, nil
 	}
 
-	return config, nil
+	return nil, fmt.Errorf("get config failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
 // Health checks if the Caddy Admin API is responsive

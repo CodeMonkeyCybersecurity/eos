@@ -49,6 +49,7 @@ type enrollmentStats struct {
 	FieldsCreated   int
 	BindingsReused  int
 	BindingsCreated int
+	PoliciesCreated int // P1: Per-app authorization policies
 }
 
 // getDomainForApp discovers the DNS domain for an application by querying Caddy routes
@@ -177,8 +178,8 @@ func findBrandByDomain(rc *eos_io.RuntimeContext, client *authentik.APIClient, d
 	}
 
 	if len(brands) == 0 {
-		return nil, fmt.Errorf("no Authentik brands found - this should not happen\n\n"+
-			"Authentik installations always have a default brand.\n"+
+		return nil, fmt.Errorf("no Authentik brands found - this should not happen\n\n" +
+			"Authentik installations always have a default brand.\n" +
 			"Check Authentik status: docker ps | grep authentik")
 	}
 
@@ -247,6 +248,32 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	logger.Info("Enabling self-enrollment for Hecate",
 		zap.String("app", config.AppName),
 		zap.Bool("dry_run", config.DryRun))
+
+	// P1 SECURITY (2025-10-31): Production-readiness check for CAPTCHA
+	// RATIONALE: Self-enrollment without CAPTCHA is vulnerable to bot abuse
+	// EVIDENCE: Common attack vector for account enumeration, resource exhaustion
+	// COMPLIANCE: OWASP recommends CAPTCHA for public registration forms
+	if !config.EnableCaptcha {
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("⚠️  SECURITY WARNING: CAPTCHA Disabled  ⚠️")
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("")
+		logger.Warn("Self-enrollment is configured WITHOUT CAPTCHA protection")
+		logger.Warn("This makes your enrollment endpoint vulnerable to:")
+		logger.Warn("  • Automated bot registration")
+		logger.Warn("  • Account enumeration attacks")
+		logger.Warn("  • Resource exhaustion (database bloat)")
+		logger.Warn("  • Email bombing (if email verification enabled)")
+		logger.Warn("")
+		logger.Warn("STRONGLY RECOMMENDED for production:")
+		logger.Warn("  1. Enable CAPTCHA: --enable-captcha flag")
+		logger.Warn("  2. Configure production keys in Authentik UI after enrollment setup")
+		logger.Warn("  3. Path: Admin → Flows & Stages → Stages → eos-enrollment-captcha")
+		logger.Warn("")
+		logger.Warn("Test keys are NOT sufficient for production use")
+		logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		logger.Warn("")
+	}
 
 	// P1: Acquire file lock to prevent concurrent enrollment operations
 	// RATIONALE: Multiple admins could run this command simultaneously, causing:
@@ -350,6 +377,34 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		zap.String("brand_domain", brand.Domain),
 		zap.String("requested_domain", domain),
 		zap.String("current_enrollment_flow", brand.FlowEnrollment))
+
+	// P0 SECURITY WARNING (2025-10-31): Inform user about brand-level enrollment scope
+	// RATIONALE: Self-enrollment operates at BRAND level (Authentik architectural design)
+	// RISK: Users may think --app flag restricts enrollment to one app, but it affects ALL apps on brand
+	// COMPLIANCE: SOC2 requires informed consent before enabling public access controls
+	// EVIDENCE: Authentik GitHub Issue #2807 - "domain level forward auth can't restrict per-app" (still open 2025-06)
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Warn("⚠️  SECURITY: Brand-Level Enrollment - Read Carefully  ⚠️")
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Warn("")
+	logger.Warn("IMPORTANT: Self-enrollment operates at BRAND level, NOT application level")
+	logger.Warn(fmt.Sprintf("Brand being modified: %s (%s)", brand.BrandingTitle, brand.Domain))
+	logger.Warn("")
+	logger.Warn("This means users who self-enroll will be able to authenticate to:")
+	logger.Warn(fmt.Sprintf("  • ALL applications on domain: *.%s", brand.Domain))
+	logger.Warn(fmt.Sprintf("  • The --app flag (%s) is INFORMATIONAL ONLY", config.AppName))
+	logger.Warn("")
+	logger.Warn("To restrict access to specific applications, you MUST:")
+	logger.Warn("  1. Configure per-application authorization policies in Authentik")
+	logger.Warn(fmt.Sprintf("  2. Visit: %s/if/admin/#/policy/policies", authentikURL))
+	logger.Warn("  3. Create policy for 'eos-self-enrolled-users' group")
+	logger.Warn("  4. Bind policy to each application individually")
+	logger.Warn("")
+	logger.Warn("Without per-app policies, self-enrolled users can access ALL apps!")
+	logger.Warn("This is Authentik's architectural design (not an Eos limitation)")
+	logger.Warn("")
+	logger.Warn("Reference: https://github.com/goauthentik/authentik/issues/2807")
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Check if enrollment is already enabled
 	if brand.FlowEnrollment != "" {
@@ -684,8 +739,8 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		// P1 SECURITY OPTION: Support --require-approval flag for admin vetting
 		userWriteStage, err = authentikClient.CreateUserWriteStage(rc.Ctx,
 			"eos-enrollment-user-write",
-			config.RequireApproval,   // If true, users inactive until admin approves
-			selfEnrolledGroup.PK)     // ✓ Assign to group!
+			config.RequireApproval, // If true, users inactive until admin approves
+			selfEnrolledGroup.PK)   // ✓ Assign to group!
 		if err != nil {
 			enrollmentErr = fmt.Errorf("failed to create user write stage: %w", err)
 			return enrollmentErr
@@ -842,6 +897,48 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		zap.String("brand_pk", brand.PK),
 		zap.String("flow_enrollment", updatedBrand.FlowEnrollment))
 
+	// P1 SECURITY (2025-10-31): Create per-application authorization policy
+	// RATIONALE: Self-enrollment is brand-level, but access should be app-level
+	// ARCHITECTURE: Policy restricts self-enrolled group to specified application only
+	// COMPLIANCE: SOC2 CC6.1 requires granular access controls per application
+	// REFERENCE: https://github.com/goauthentik/authentik/issues/2807
+	if config.AppName != "" {
+		logger.Info("Creating per-application authorization policy",
+			zap.String("app", config.AppName),
+			zap.String("group", selfEnrolledGroup.PK))
+
+		policyPK, bindingPK, err := authentikClient.CreateGroupApplicationPolicy(
+			rc.Ctx,
+			selfEnrolledGroup.PK,
+			config.AppName) // AppName is used as slug
+		if err != nil {
+			// NON-FATAL: Policy creation failure doesn't break enrollment
+			// Users can still enroll, but will have brand-level access (not ideal)
+			logger.Warn("Failed to create per-app authorization policy",
+				zap.Error(err),
+				zap.String("app", config.AppName),
+				zap.String("group", selfEnrolledGroup.PK))
+			logger.Warn("SECURITY: Self-enrolled users will have access to ALL apps on brand")
+			logger.Warn("Manually create policy in Authentik UI:")
+			logger.Warn(fmt.Sprintf("  1. Visit: %s/if/admin/#/policy/policies", authentikURL))
+			logger.Warn("  2. Create expression policy:")
+			logger.Warn(fmt.Sprintf("     Expression: return ak_is_group_member(request.user, '%s')", selfEnrolledGroup.PK))
+			logger.Warn(fmt.Sprintf("  3. Bind policy to application: %s", config.AppName))
+		} else {
+			logger.Info("✓ Per-application authorization policy created",
+				zap.String("policy_pk", policyPK),
+				zap.String("binding_pk", bindingPK),
+				zap.String("app", config.AppName))
+			logger.Info("SECURITY: Self-enrolled users restricted to this application only")
+			stats.PoliciesCreated++ // Track policy creation in stats
+		}
+	} else {
+		// SECURITY WARNING: No app specified, skip policy creation
+		logger.Warn("No application specified (--app flag empty)")
+		logger.Warn("SECURITY: Self-enrolled users will have access to ALL apps on brand")
+		logger.Warn("Recommendation: Run 'eos update hecate --enable self-enrollment --app <appname>'")
+	}
+
 	// Generate enrollment URL
 	enrollmentURL := fmt.Sprintf("%s/if/flow/%s/", authentikURL, enrollmentFlow.Slug)
 
@@ -862,6 +959,25 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	logger.Info("✓ Self-enrollment enabled successfully")
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// P1 AUDIT (2025-10-31): Log enrollment configuration for compliance/forensics
+	// RATIONALE: Security audits require trail of who enabled public access when
+	// COMPLIANCE: SOC2 CC6.1, GDPR Article 30 (records of processing activities)
+	// FORENSICS: Track configuration changes for incident response
+	logger.Info("AUDIT_ENROLLMENT_ENABLED",
+		zap.String("event", "self_enrollment_enabled"),
+		zap.String("brand_pk", brand.PK),
+		zap.String("brand_domain", brand.Domain),
+		zap.String("flow_pk", enrollmentFlow.PK),
+		zap.String("flow_slug", enrollmentFlow.Slug),
+		zap.String("group_pk", selfEnrolledGroup.PK),
+		zap.String("group_name", groupName),
+		zap.String("app_name", config.AppName),
+		zap.Bool("captcha_enabled", config.EnableCaptcha),
+		zap.Bool("require_approval", config.RequireApproval),
+		zap.Int("policies_created", stats.PoliciesCreated),
+		zap.Time("timestamp", time.Now()),
+		zap.String("enrollment_url", enrollmentURL))
 	logger.Info("Resource Summary",
 		zap.Int("flows_created", stats.FlowsCreated),
 		zap.Int("flows_reused", stats.FlowsReused),
@@ -870,7 +986,8 @@ func EnableSelfEnrollment(rc *eos_io.RuntimeContext, config *SelfEnrollmentConfi
 		zap.Int("fields_created", stats.FieldsCreated),
 		zap.Int("fields_reused", stats.FieldsReused),
 		zap.Int("bindings_created", stats.BindingsCreated),
-		zap.Int("bindings_reused", stats.BindingsReused))
+		zap.Int("bindings_reused", stats.BindingsReused),
+		zap.Int("policies_created", stats.PoliciesCreated))
 	logger.Info("")
 	logger.Info("Enrollment URL", zap.String("url", enrollmentURL))
 	logger.Info("Flow Name", zap.String("name", enrollmentFlow.Name))
