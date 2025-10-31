@@ -21,7 +21,7 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 
 	fmt.Println("\n=========================================")
 	fmt.Println("Caddy Admin API Diagnostics")
-	fmt.Println("=========================================\n")
+	fmt.Println("=========================================")
 
 	logger.Info("Starting Caddy Admin API diagnostics",
 		zap.String("hecate_path", hecatePath),
@@ -34,9 +34,9 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 	fmt.Println("[1/7] Checking Admin API port accessibility...")
 	portAccessible := checkCaddyAdminAPIPort(logger)
 	if portAccessible {
-		fmt.Printf("✓ Port %d:%d is open and accepting connections\n\n", CaddyAdminAPIHost, CaddyAdminAPIPort)
+		fmt.Printf("✓ Port %s:%d is open and accepting connections\n\n", CaddyAdminAPIHost, CaddyAdminAPIPort)
 	} else {
-		fmt.Printf("✗ Port %d:%d is not accessible\n", CaddyAdminAPIHost, CaddyAdminAPIPort)
+		fmt.Printf("✗ Port %s:%d is not accessible\n", CaddyAdminAPIHost, CaddyAdminAPIPort)
 		fmt.Println("  Remediation:")
 		fmt.Println("    • Check Caddy is running: docker compose -f /opt/hecate/docker-compose.yml ps caddy")
 		fmt.Println("    • Check port mapping: docker compose port caddy 2019")
@@ -57,7 +57,7 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 		fmt.Println("    • Permissions issue accessing Admin API")
 		fmt.Println()
 	} else {
-		fmt.Println("✓ Health endpoint responding\n")
+		fmt.Println("✓ Health endpoint responding")
 	}
 
 	// Test 3: Health Endpoint with Retry (simulates actual usage)
@@ -67,7 +67,7 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 		fmt.Printf("✗ Health check failed after 3 retries: %v\n", healthRetryErr)
 		fmt.Println()
 	} else {
-		fmt.Println("✓ Health endpoint responding after retry\n")
+		fmt.Println("✓ Health endpoint responding after retry")
 	}
 
 	// Test 4: Config Retrieval (single attempt)
@@ -158,7 +158,7 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 	// Summary
 	fmt.Println("=========================================")
 	fmt.Println("Summary & Recommendations")
-	fmt.Println("=========================================\n")
+	fmt.Println("=========================================")
 
 	if configRetryErr == nil && routesErr == nil {
 		fmt.Println("✅ All tests PASSED")
