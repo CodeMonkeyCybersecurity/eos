@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -72,6 +73,9 @@ Restore:
 
 		// Ensure quick backup repository exists
 		if err := ensureQuickBackupRepo(rc); err != nil {
+			if eos_err.IsExpectedUserError(err) {
+				return err
+			}
 			return fmt.Errorf("initializing quick backup repository: %w", err)
 		}
 
@@ -106,6 +110,13 @@ Restore:
 
 		output, err := client.RunRestic(args...)
 		if err != nil {
+			if errors.Is(err, backup.ErrResticNotInstalled) {
+				logger.Info("terminal prompt:", zap.String("output",
+					"Restic is not installed. Install restic (e.g., sudo apt-get install restic) and rerun eos backup ."))
+				userErr := eos_err.DependencyError("restic", "run quick backup", err)
+				return eos_err.NewExpectedError(rc.Ctx, userErr)
+			}
+
 			logger.Error("Backup failed", zap.Error(err), zap.String("output", string(output)))
 			return fmt.Errorf("backup failed: %w", err)
 		}
@@ -178,6 +189,8 @@ func ensureQuickBackupRepo(rc *eos_io.RuntimeContext) error {
 		if errors.Is(err, backup.ErrResticNotInstalled) {
 			logger.Info("terminal prompt:", zap.String("output",
 				"Restic is not installed. Install restic (e.g., sudo apt-get install restic) and rerun eos backup ."))
+			userErr := eos_err.DependencyError("restic", "initialize quick backup repository", err)
+			return eos_err.NewExpectedError(rc.Ctx, userErr)
 		}
 		return err
 	}

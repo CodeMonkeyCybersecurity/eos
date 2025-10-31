@@ -130,7 +130,7 @@ func isTransientError(err error) bool {
 // ExportAuthentikConfig exports the complete Authentik configuration
 func ExportAuthentikConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Authentik configuration export")
+	logger.Info("Starting Authentik blueprint export")
 
 	// Step 1: Get token from .env file
 	token, err := getAuthentikToken()
@@ -146,163 +146,31 @@ func ExportAuthentikConfig(rc *eos_io.RuntimeContext) error {
 
 	// Step 3: Create output directory
 	timestamp := time.Now().Format("20060102_150405")
-	outputDir := filepath.Join(hecate.ExportsDir, fmt.Sprintf("authentik_config_backup_%s", timestamp))
+	outputDir := filepath.Join(hecate.ExportsDir, fmt.Sprintf("authentik_blueprint_%s", timestamp))
 
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	logger.Info("Export configuration",
+	logger.Info("Resolved Authentik environment",
 		zap.String("output_dir", outputDir),
 		zap.String("base_url", baseURL),
+		zap.Bool("token_detected", token != ""),
 	)
 
 	// Step 4: Create Authentik client
-	client := NewAuthentikClient(baseURL, token)
+	_ = NewAuthentikClient(baseURL, token) // Ensure we reuse detection logic for future API interactions
 
-	// Step 5: Export all configurations
-	if err := exportAllConfigurations(rc, client, outputDir); err != nil {
-		return fmt.Errorf("export failed: %w", err)
-	}
-
-	// Step 6: Copy Caddyfile from disk
-	if err := copyCaddyfile(outputDir); err != nil {
-		logger.Warn("Failed to copy Caddyfile from disk", zap.Error(err))
-	}
-
-	// Step 6b: Export Caddyfile from Caddy Admin API (live state)
-	if err := exportCaddyfileFromAPI(rc, outputDir); err != nil {
-		logger.Warn("Failed to export Caddyfile from Caddy API (live state)",
-			zap.Error(err),
-			zap.String("note", "This is the ACTUAL running configuration"))
-	}
-
-	// Step 7: Copy docker-compose.yml from disk
-	if err := copyDockerCompose(outputDir); err != nil {
-		logger.Warn("Failed to copy docker-compose.yml from disk", zap.Error(err))
-	}
-
-	// Step 7b: Export docker-compose from running containers (runtime state)
-	if err := exportDockerComposeFromRuntime(rc, outputDir); err != nil {
-		logger.Warn("Failed to export docker-compose from runtime (live state)",
-			zap.Error(err),
-			zap.String("note", "This is the ACTUAL running container configuration"))
-	}
-
-	// Step 8: Create README
-	if err := createReadme(outputDir, baseURL); err != nil {
-		logger.Warn("Failed to create README", zap.Error(err))
-	}
-
-	// Step 9: Detect configuration drift (Option B)
-	logger.Info("Analyzing configuration drift between disk and runtime")
-	driftReport, err := DetectDrift(rc, outputDir)
-	if err != nil {
-		logger.Warn("Failed to analyze configuration drift", zap.Error(err))
-	} else {
-		// Save drift report as 21_DRIFT_REPORT.md
-		driftReportPath := filepath.Join(outputDir, "21_DRIFT_REPORT.md")
-		driftContent := RenderDriftReport(driftReport)
-		if err := os.WriteFile(driftReportPath, []byte(driftContent), 0644); err != nil {
-			logger.Warn("Failed to write drift report", zap.Error(err))
-		} else {
-			logger.Info("Generated drift report",
-				zap.String("path", driftReportPath),
-				zap.Int("total_issues", driftReport.Summary.TotalDriftIssues),
-				zap.Float64("drift_percentage", driftReport.Summary.DriftPercentage))
-		}
-	}
-
-	// Step 10: Export Authentik Blueprint (vendor-recommended approach)
+	// Step 4b: Export Authentik Blueprint (vendor-recommended approach)
 	logger.Info("Exporting Authentik Blueprint (vendor-recommended format)")
 	blueprintPath, err := exportAuthentikBlueprint(rc, outputDir)
 	if err != nil {
-		logger.Warn("Failed to export Blueprint - falling back to REST API export only",
-			zap.Error(err),
-			zap.String("note", "Blueprint export is recommended but optional"))
-	} else {
-		logger.Info("✓ Blueprint export successful",
-			zap.String("file", "23_authentik_blueprint.yaml"))
-		_ = blueprintPath // Will be used in restoration automation
+		return fmt.Errorf("failed to export Authentik blueprint: %w", err)
 	}
 
-	// Step 11: Backup PostgreSQL database
-	logger.Info("Backing up PostgreSQL database")
-	if err := backupPostgreSQLDatabase(rc, outputDir); err != nil {
-		logger.Warn("Failed to backup database - restore will be incomplete without this",
-			zap.Error(err),
-			zap.String("remediation", "Database contains password hashes and secrets required for complete restoration"))
-	} else {
-		logger.Info("PostgreSQL backup completed successfully")
-	}
-
-	// Step 11: Validate export completeness
-	logger.Info("Validating export completeness")
-	validationReport, err := ValidateExport(rc, outputDir)
-	if err != nil {
-		logger.Warn("Failed to validate export", zap.Error(err))
-	} else {
-		// Append validation report to drift report
-		validationContent := "\n\n---\n\n" + RenderValidationReport(validationReport)
-		driftReportPath := filepath.Join(outputDir, "21_DRIFT_REPORT.md")
-
-		// Read existing drift report
-		existingContent, err := os.ReadFile(driftReportPath)
-		if err != nil {
-			logger.Warn("Failed to read drift report for appending validation", zap.Error(err))
-		} else {
-			// Append validation report
-			combinedContent := string(existingContent) + validationContent
-			if err := os.WriteFile(driftReportPath, []byte(combinedContent), 0644); err != nil {
-				logger.Warn("Failed to append validation report", zap.Error(err))
-			}
-		}
-
-		logger.Info("Export validation complete",
-			zap.Float64("completeness", validationReport.CompletenessScore),
-			zap.Int("successful_files", validationReport.SuccessfulFiles),
-			zap.Int("missing_files", len(validationReport.MissingFiles)))
-
-		// Log critical issues
-		if len(validationReport.CriticalMissing) > 0 {
-			logger.Warn("Critical files missing from export",
-				zap.Strings("files", validationReport.CriticalMissing))
-		}
-	}
-
-	// Step 12: Create compressed archive
-	archivePath, err := createArchive(outputDir)
-	if err != nil {
-		logger.Warn("Failed to create archive", zap.Error(err))
-	} else {
-		logger.Info("Created compressed archive", zap.String("path", archivePath))
-	}
-
-	// Final summary with drift and completeness
-	logger.Info("Configuration export completed",
+	logger.Info("Authentik blueprint export completed",
 		zap.String("location", outputDir),
-		zap.String("archive", archivePath))
-
-	if driftReport != nil {
-		logger.Info("Drift analysis summary",
-			zap.Int("drift_issues", driftReport.Summary.TotalDriftIssues),
-			zap.Float64("drift_percentage", driftReport.Summary.DriftPercentage))
-
-		if len(driftReport.Summary.CriticalIssues) > 0 {
-			logger.Warn("Critical drift detected",
-				zap.Strings("issues", driftReport.Summary.CriticalIssues))
-		}
-	}
-
-	if validationReport != nil {
-		logger.Info("Export completeness",
-			zap.Float64("score", validationReport.CompletenessScore))
-
-		if validationReport.CompletenessScore < 70.0 {
-			logger.Warn("Export is incomplete - re-run may be needed",
-				zap.Float64("completeness", validationReport.CompletenessScore))
-		}
-	}
+		zap.String("blueprint", blueprintPath))
 
 	return nil
 }
@@ -1160,7 +1028,7 @@ func backupPostgreSQLDatabase(rc *eos_io.RuntimeContext, outputDir string) error
 		"-d", dbName,
 		"-F", "p", // Plain SQL format
 		"--no-owner", // Don't dump ownership commands
-		"--no-acl", // Don't dump access privileges
+		"--no-acl",   // Don't dump access privileges
 	)
 
 	// Capture output

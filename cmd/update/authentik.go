@@ -14,45 +14,21 @@ var updateAuthentikCmd = &cobra.Command{
 	Use:   "authentik",
 	Args:  cobra.NoArgs,
 	Short: "Update or export Authentik configuration",
-	Long: `Update Authentik configuration or export the current configuration to a backup.
+	Long: `Update Authentik configuration or export the current setup as a Blueprint archive.
 
 With --export flag:
-  1. Retrieves Authentik API token from /opt/hecate/.env
-  2. Queries Caddy API to determine Authentik base URL
-  3. Exports all Authentik configurations via API:
-     - Applications (BionicGPT)
-     - Proxy providers
-     - Outposts and health status
-     - Authentication and authorization flows
-     - Property mappings
-     - OAuth2 sources
-     - Policies
-     - System configuration
-     - Tenants and brands
-  4. Copies Caddyfile and docker-compose.yml
-  5. Creates timestamped backup in /opt/hecate/exports/
-  6. Generates README with restore instructions
-  7. Creates compressed tar.gz archive
+  1. Retrieves Authentik credentials from /opt/hecate/.env
+  2. Queries Caddy to determine the correct Authentik base URL
+  3. Runs "ak export_blueprint" inside the Authentik container
+  4. Copies the generated Blueprint YAML to /opt/hecate/exports/authentik_blueprint_TIMESTAMP/
 
 Use this when:
-  - You want to backup Authentik configuration before changes
-  - You need to replicate configuration to another environment
-  - You're troubleshooting Authentik integration issues
-  - You want to document current SSO setup
+  - You want a vendor-supported export that respects Authentik dependencies
+  - You need to promote changes between environments using Blueprints
+  - You prefer a single YAML artifact instead of the legacy multi-file dump
 
-Examples:
-  # Export current Authentik configuration
-  eos update authentik --export
-
-  # The export will be saved to:
-  # /opt/hecate/exports/authentik_config_backup_YYYYMMDD_HHMMSS/
-
-Output includes:
-  - JSON files with all Authentik configurations
-  - Caddyfile with reverse proxy rules
-  - docker-compose.yml with service definitions
-  - README.md with restore instructions
-  - Compressed tar.gz archive for easy transfer`,
+Example:
+  eos update authentik --export`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Check if --export flag is set
 		exportFlag, _ := cmd.Flags().GetBool("export")
@@ -70,5 +46,5 @@ func init() {
 	UpdateCmd.AddCommand(updateAuthentikCmd)
 
 	// Add --export flag
-	updateAuthentikCmd.Flags().Bool("export", false, "Export Authentik configuration to backup")
+	updateAuthentikCmd.Flags().Bool("export", false, "Export Authentik configuration as a Blueprint")
 }
