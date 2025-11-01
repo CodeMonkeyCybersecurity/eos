@@ -334,3 +334,75 @@ const (
 	// NOTE: This is Authentik's default outpost name, created during installation
 	AuthentikEmbeddedOutpostName = "authentik Embedded Outpost"
 )
+
+// ============================================================================
+// AUTHENTIK EMAIL CONFIGURATION CONSTANTS
+// ============================================================================
+
+const (
+	// AuthentikEmailHostKey is the .env variable name for SMTP server hostname
+	// RATIONALE: Double-underscore format required by Authentik 2025.x multi-tenant email config
+	// REFERENCE: https://docs.goauthentik.io/docs/installation/configuration#email-configuration-optional
+	// SECURITY: Not secret data, but controls where emails are sent (audit trail importance)
+	AuthentikEmailHostKey = "AUTHENTIK_EMAIL__HOST"
+
+	// AuthentikEmailPortKey is the .env variable name for SMTP server port
+	// RATIONALE: Standard SMTP ports: 587 (TLS/STARTTLS), 465 (SSL), 25 (plain/legacy)
+	// DEFAULT: 587 (TLS) is recommended for security
+	AuthentikEmailPortKey = "AUTHENTIK_EMAIL__PORT"
+
+	// AuthentikEmailUsernameKey is the .env variable name for SMTP authentication username
+	// RATIONALE: Typically an email address (e.g., mail@example.com)
+	// SECURITY: Not highly sensitive, but part of authentication credentials
+	AuthentikEmailUsernameKey = "AUTHENTIK_EMAIL__USERNAME"
+
+	// AuthentikEmailPasswordKey is the .env variable name for SMTP authentication password
+	// RATIONALE: Password for SMTP server authentication
+	// SECURITY: CRITICAL - stored in .env with 0600 permissions (EnvFilePerm constant)
+	// THREAT MODEL: Prevents non-root users from reading SMTP credentials
+	// NOTE: Future enhancement could store this in Vault instead of .env
+	AuthentikEmailPasswordKey = "AUTHENTIK_EMAIL__PASSWORD"
+
+	// AuthentikEmailUseTLSKey is the .env variable name for TLS encryption setting
+	// RATIONALE: Enables STARTTLS (opportunistic encryption on port 587)
+	// SECURITY: Should be "true" for production (prevents plaintext email transmission)
+	AuthentikEmailUseTLSKey = "AUTHENTIK_EMAIL__USE_TLS"
+
+	// AuthentikEmailUseSSLKey is the .env variable name for SSL encryption setting
+	// RATIONALE: Enables SSL/TLS from connection start (port 465)
+	// SECURITY: Mutually exclusive with USE_TLS (use one or the other, not both)
+	AuthentikEmailUseSSLKey = "AUTHENTIK_EMAIL__USE_SSL"
+
+	// AuthentikEmailTimeoutKey is the .env variable name for SMTP connection timeout
+	// RATIONALE: Prevents indefinite hangs on unresponsive SMTP servers
+	// DEFAULT: 10 seconds is reasonable for most SMTP servers
+	AuthentikEmailTimeoutKey = "AUTHENTIK_EMAIL__TIMEOUT"
+
+	// AuthentikEmailFromKey is the .env variable name for sender email address
+	// RATIONALE: "From" address in outgoing emails (e.g., noreply@example.com)
+	// SECURITY: Should match domain or be authorized sender (SPF/DKIM/DMARC compliance)
+	AuthentikEmailFromKey = "AUTHENTIK_EMAIL__FROM"
+)
+
+// ============================================================================
+// AUTHENTIK EMAIL DEFAULT VALUES
+// ============================================================================
+
+const (
+	// AuthentikEmailDefaultPort is the recommended default SMTP port (TLS/STARTTLS)
+	// RATIONALE: Port 587 with TLS is modern best practice for email submission
+	// SECURITY: Enforces encrypted SMTP by default
+	AuthentikEmailDefaultPort = "587"
+
+	// AuthentikEmailDefaultTimeout is the default SMTP connection timeout in seconds
+	// RATIONALE: 10 seconds balances responsiveness vs. allowing slow SMTP servers
+	AuthentikEmailDefaultTimeout = "10"
+
+	// AuthentikEmailDefaultUseTLS is the default TLS encryption setting
+	// RATIONALE: TLS enabled by default for security
+	AuthentikEmailDefaultUseTLS = "true"
+
+	// AuthentikEmailDefaultUseSSL is the default SSL encryption setting
+	// RATIONALE: SSL disabled by default (USE_TLS is preferred for port 587)
+	AuthentikEmailDefaultUseSSL = "false"
+)

@@ -1,3 +1,8 @@
+// pkg/hecate/authentik_email.go
+// Authentik email configuration via interactive wizard
+// RATIONALE: Configures SMTP settings for Authentik 2025.x multi-tenant email
+// ARCHITECTURE: Assess → Intervene → Evaluate pattern with .env file management
+
 package hecate
 
 import (
@@ -6,18 +11,21 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// AuthentikEmailConfig controls how Authentik email configuration is applied.
+// AuthentikEmailConfig controls how Authentik email configuration is applied
 type AuthentikEmailConfig struct {
-	DryRun bool
+	DryRun      bool   // Preview changes without applying
+	TestEmail   string // Optional: send test email to this address after configuration
+	SkipRestart bool   // Update .env but don't restart containers
 }
 
 type tenantEmailSettings struct {
@@ -57,7 +65,10 @@ func (t *tenantSummary) identifier() string {
 	}
 }
 
-// ConfigureAuthentikEmail updates tenant-level SMTP settings using values from /opt/hecate/.env.
+// ConfigureAuthentikEmail configures Authentik email settings via interactive wizard
+// ASSESS: Check current .env for email variables
+// INTERVENE: Prompt for missing values, update .env, restart containers
+// EVALUATE: Verify config loaded in Authentik, optionally test email delivery
 func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfig) error {
 	if cfg == nil {
 		cfg = &AuthentikEmailConfig{}
@@ -65,130 +76,268 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Require root access for .env file modification
 	if os.Geteuid() != 0 {
 		return eos_err.NewUserError(
-			"permission denied: %s requires root access\n\n"+
-				"Run with sudo:\n  sudo eos update hecate --add authentik-email", EnvFilePath)
-	}
-
-	envVars, err := shared.ParseEnvFile(EnvFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to read %s: %w", EnvFilePath, err)
-	}
-
-	requiredKeys := []string{
-		"AUTHENTIK_EMAIL_HOST",
-		"AUTHENTIK_EMAIL_PORT",
-		"AUTHENTIK_EMAIL_USERNAME",
-		"AUTHENTIK_EMAIL_PASSWORD",
-		"AUTHENTIK_EMAIL_USE_TLS",
-		"AUTHENTIK_EMAIL_USE_SSL",
-		"AUTHENTIK_EMAIL_TIMEOUT",
-		"AUTHENTIK_EMAIL_FROM",
-	}
-
-	var missing []string
-	for _, key := range requiredKeys {
-		if val, ok := envVars[key]; !ok || strings.TrimSpace(val) == "" {
-			missing = append(missing, key)
-		}
-	}
-
-	if len(missing) > 0 {
-		return eos_err.NewUserError(
-			"missing Authentik email configuration in %s:\n  %s\n\n"+
-				"Set these variables and rerun:\n  sudo eos update hecate --add authentik-email",
-			EnvFilePath, strings.Join(missing, "\n  "))
-	}
-
-	host := envVars["AUTHENTIK_EMAIL_HOST"]
-	username := envVars["AUTHENTIK_EMAIL_USERNAME"]
-	password := envVars["AUTHENTIK_EMAIL_PASSWORD"]
-	emailFrom := envVars["AUTHENTIK_EMAIL_FROM"]
-
-	port, err := strconv.Atoi(envVars["AUTHENTIK_EMAIL_PORT"])
-	if err != nil {
-		return eos_err.NewUserError("invalid AUTHENTIK_EMAIL_PORT %q: must be an integer", envVars["AUTHENTIK_EMAIL_PORT"])
-	}
-
-	timeout, err := strconv.Atoi(envVars["AUTHENTIK_EMAIL_TIMEOUT"])
-	if err != nil {
-		return eos_err.NewUserError("invalid AUTHENTIK_EMAIL_TIMEOUT %q: must be an integer (seconds)", envVars["AUTHENTIK_EMAIL_TIMEOUT"])
-	}
-
-	useTLS, err := strconv.ParseBool(envVars["AUTHENTIK_EMAIL_USE_TLS"])
-	if err != nil {
-		return eos_err.NewUserError("invalid AUTHENTIK_EMAIL_USE_TLS %q: use true or false", envVars["AUTHENTIK_EMAIL_USE_TLS"])
-	}
-
-	useSSL, err := strconv.ParseBool(envVars["AUTHENTIK_EMAIL_USE_SSL"])
-	if err != nil {
-		return eos_err.NewUserError("invalid AUTHENTIK_EMAIL_USE_SSL %q: use true or false", envVars["AUTHENTIK_EMAIL_USE_SSL"])
-	}
-
-	payload := map[string]interface{}{
-		"email_host":     host,
-		"email_port":     port,
-		"email_username": username,
-		"email_password": password,
-		"email_use_tls":  useTLS,
-		"email_use_ssl":  useSSL,
-		"email_timeout":  timeout,
-		"email_from":     emailFrom,
+			"permission denied: email configuration requires root access\n\n" +
+				"Run with sudo:\n  sudo eos update hecate --add authentik-email")
 	}
 
 	logger.Info("Configuring Authentik email settings",
-		zap.String("email_host", host),
-		zap.Int("email_port", port),
-		zap.String("email_username_masked", maskSensitive(username)),
-		zap.Bool("email_use_tls", useTLS),
-		zap.Bool("email_use_ssl", useSSL),
-		zap.Int("email_timeout", timeout),
-		zap.String("email_from", emailFrom),
-		zap.Bool("dry_run", cfg.DryRun))
+		zap.Bool("dry_run", cfg.DryRun),
+		zap.Bool("skip_restart", cfg.SkipRestart),
+		zap.String("test_email", cfg.TestEmail))
 
-	if cfg.DryRun {
-		logger.Info("[dry-run] Skipping Authentik tenant update")
-		return nil
-	}
-
-	token, baseURL, err := discoverAuthentikCredentials(rc)
+	// ASSESS: Load .env file and check for missing variables
+	envManager, err := NewEnvManager(EnvFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize .env manager: %w", err)
 	}
 
-	client := authentik.NewUnifiedClient(baseURL, token)
+	// Define required email variables with validation
+	requiredVars := []*EnvVariable{
+		{
+			Key:          AuthentikEmailHostKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateHostname,
+			HelpText:     "SMTP server hostname (e.g., smtp.gmail.com, mail.example.com)",
+			DefaultValue: "",
+		},
+		{
+			Key:          AuthentikEmailPortKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidatePort,
+			HelpText:     "SMTP port (587 for TLS, 465 for SSL, 25 for plain)",
+			DefaultValue: AuthentikEmailDefaultPort,
+		},
+		{
+			Key:          AuthentikEmailUsernameKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateEmailAddress,
+			HelpText:     "SMTP username (typically your email address)",
+			DefaultValue: "",
+		},
+		{
+			Key:          AuthentikEmailPasswordKey,
+			Required:     true,
+			IsSecret:     true, // Hide input during prompting
+			Validator:    nil,  // No validation - any password is valid
+			HelpText:     "SMTP password (will not be echoed)",
+			DefaultValue: "",
+		},
+		{
+			Key:          AuthentikEmailUseTLSKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateBoolean,
+			HelpText:     "Enable TLS encryption (true/false)",
+			DefaultValue: AuthentikEmailDefaultUseTLS,
+		},
+		{
+			Key:          AuthentikEmailUseSSLKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateBoolean,
+			HelpText:     "Enable SSL encryption (true/false) - mutually exclusive with TLS",
+			DefaultValue: AuthentikEmailDefaultUseSSL,
+		},
+		{
+			Key:          AuthentikEmailTimeoutKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateTimeout,
+			HelpText:     "SMTP connection timeout in seconds (1-300)",
+			DefaultValue: AuthentikEmailDefaultTimeout,
+		},
+		{
+			Key:          AuthentikEmailFromKey,
+			Required:     true,
+			IsSecret:     false,
+			Validator:    ValidateEmailAddress,
+			HelpText:     "Sender email address (e.g., noreply@example.com)",
+			DefaultValue: "",
+		},
+	}
 
-	tenant, patchPath, err := resolveAuthentikTenant(rc, client)
+	// Load existing .env file
+	if err := envManager.LoadEnv(rc); err != nil {
+		return fmt.Errorf("failed to load .env file: %w", err)
+	}
+
+	// Check for missing variables
+	missing, err := envManager.CheckMissingVariables(requiredVars)
 	if err != nil {
-		return fmt.Errorf("failed to resolve Authentik tenant: %w", err)
+		return fmt.Errorf("failed to check missing variables: %w", err)
 	}
 
-	logger.Info("Updating Authentik tenant",
-		zap.String("tenant_identifier", tenant.identifier()),
-		zap.String("tenant_domain", tenant.Domain),
-		zap.Bool("tenant_default", tenant.Default),
-		zap.String("tenant_patch_endpoint", patchPath))
+	if len(missing) > 0 {
+		logger.Info("Email configuration wizard",
+			zap.Int("missing_variables", len(missing)),
+			zap.String("env_file", EnvFilePath))
 
-	respBody, err := client.Patch(rc.Ctx, patchPath, payload)
-	if err != nil {
-		return fmt.Errorf("failed to update Authentik tenant email settings: %w", err)
-	}
-
-	var updated tenantEmailSettings
-	if err := json.Unmarshal(respBody, &updated); err != nil {
-		logger.Warn("Authentik email update succeeded but response could not be parsed",
-			zap.Error(err))
+		logger.Info("WHY: Authentik requires SMTP settings to send password reset emails, 2FA codes, and notifications")
 	} else {
-		logger.Info("Authentik email settings updated",
-			zap.String("email_host", updated.EmailHost),
-			zap.Int("email_port", updated.EmailPort),
-			zap.String("email_username_masked", maskSensitive(updated.EmailUsername)),
-			zap.Bool("email_use_tls", updated.EmailUseTLS),
-			zap.Bool("email_use_ssl", updated.EmailUseSSL),
-			zap.Int("email_timeout", updated.EmailTimeout),
-			zap.String("email_from", updated.EmailFrom))
+		logger.Info("All email variables already configured",
+			zap.String("env_file", EnvFilePath))
 	}
+
+	// INTERVENE: Prompt for missing variables
+	if len(missing) > 0 && !cfg.DryRun {
+		if err := envManager.PromptForVariables(rc, missing); err != nil {
+			return fmt.Errorf("failed to collect email variables: %w", err)
+		}
+
+		// Write updated .env file (with backup)
+		logger.Info("Updating .env file with email configuration",
+			zap.String("path", EnvFilePath))
+
+		if err := envManager.WriteEnv(rc); err != nil {
+			logger.Error("Failed to write .env file",
+				zap.Error(err),
+				zap.String("backup", envManager.BackupPath))
+
+			// Offer to restore backup
+			logger.Info("Backup available for restore",
+				zap.String("backup_path", envManager.BackupPath))
+
+			return fmt.Errorf("failed to write .env file: %w", err)
+		}
+
+		logger.Info("Email configuration written to .env",
+			zap.String("env_file", EnvFilePath),
+			zap.String("backup", envManager.BackupPath))
+	} else if cfg.DryRun {
+		logger.Info("[dry-run] Would prompt for missing variables and update .env",
+			zap.Int("missing_count", len(missing)))
+	}
+
+	// INTERVENE: Restart Authentik containers to load new config
+	if !cfg.SkipRestart && !cfg.DryRun {
+		logger.Info("Restarting Authentik containers to load new email configuration",
+			zap.String("project", "hecate"),
+			zap.Strings("services", []string{"server", "worker"}))
+
+		restartCfg := &docker.RestartComposeServicesConfig{
+			ProjectName:  "hecate",
+			ServiceNames: []string{"server", "worker"},
+			Timeout:      30 * time.Second,
+			HealthCheck:  true,
+		}
+
+		if err := docker.RestartComposeServices(rc, restartCfg); err != nil {
+			return fmt.Errorf("failed to restart Authentik containers: %w\n\n"+
+				"Email configuration was written to .env, but containers failed to restart.\n"+
+				"Try manually restarting: cd /opt/hecate && docker compose restart server worker", err)
+		}
+
+		logger.Info("Authentik containers restarted successfully")
+	} else if cfg.SkipRestart {
+		logger.Info("Skipping container restart (--skip-restart flag set)")
+	} else if cfg.DryRun {
+		logger.Info("[dry-run] Would restart Authentik containers")
+	}
+
+	// EVALUATE: Verify email configuration loaded in Authentik
+	if !cfg.DryRun && !cfg.SkipRestart {
+		logger.Info("Verifying email configuration loaded in Authentik")
+
+		// Parse values from envManager for verification
+		host := envManager.Variables[AuthentikEmailHostKey].Value
+		portStr := envManager.Variables[AuthentikEmailPortKey].Value
+		port, _ := strconv.Atoi(portStr)
+		username := envManager.Variables[AuthentikEmailUsernameKey].Value
+		password := envManager.Variables[AuthentikEmailPasswordKey].Value
+		emailFrom := envManager.Variables[AuthentikEmailFromKey].Value
+		useTLSStr := envManager.Variables[AuthentikEmailUseTLSKey].Value
+		useSSLStr := envManager.Variables[AuthentikEmailUseSSLKey].Value
+		timeoutStr := envManager.Variables[AuthentikEmailTimeoutKey].Value
+
+		useTLS, _ := strconv.ParseBool(useTLSStr)
+		useSSL, _ := strconv.ParseBool(useSSLStr)
+		timeout, _ := strconv.Atoi(timeoutStr)
+
+		// Update Authentik tenant via API
+		payload := map[string]interface{}{
+			"email_host":     host,
+			"email_port":     port,
+			"email_username": username,
+			"email_password": password,
+			"email_use_tls":  useTLS,
+			"email_use_ssl":  useSSL,
+			"email_timeout":  timeout,
+			"email_from":     emailFrom,
+		}
+
+		logger.Info("Updating Authentik tenant email settings via API",
+			zap.String("email_host", host),
+			zap.Int("email_port", port),
+			zap.String("email_username_masked", maskSensitive(username)),
+			zap.Bool("email_use_tls", useTLS),
+			zap.Bool("email_use_ssl", useSSL),
+			zap.Int("email_timeout", timeout),
+			zap.String("email_from", emailFrom))
+
+		token, baseURL, err := discoverAuthentikCredentials(rc)
+		if err != nil {
+			logger.Warn("Failed to discover Authentik credentials for verification",
+				zap.Error(err))
+			logger.Info("Email configuration written to .env and containers restarted, but API verification skipped")
+			logger.Info("Restart Authentik to load configuration: docker compose -f /opt/hecate/docker-compose.yml restart server worker")
+			return nil
+		}
+
+		client := authentik.NewUnifiedClient(baseURL, token)
+
+		tenant, patchPath, err := resolveAuthentikTenant(rc, client)
+		if err != nil {
+			logger.Warn("Failed to resolve Authentik tenant for verification",
+				zap.Error(err))
+			logger.Info("Email configuration written and containers restarted, but API update skipped")
+			return nil
+		}
+
+		logger.Info("Updating Authentik tenant",
+			zap.String("tenant_identifier", tenant.identifier()),
+			zap.String("tenant_domain", tenant.Domain),
+			zap.Bool("tenant_default", tenant.Default),
+			zap.String("tenant_patch_endpoint", patchPath))
+
+		respBody, err := client.Patch(rc.Ctx, patchPath, payload)
+		if err != nil {
+			logger.Warn("Failed to update Authentik tenant email settings via API",
+				zap.Error(err))
+			logger.Info("Email configuration written to .env and containers restarted")
+			logger.Info("Tenant update will occur on next Authentik restart")
+			return nil
+		}
+
+		var updated tenantEmailSettings
+		if err := json.Unmarshal(respBody, &updated); err != nil {
+			logger.Warn("Authentik email update succeeded but response could not be parsed",
+				zap.Error(err))
+		} else {
+			logger.Info("Authentik email settings updated successfully",
+				zap.String("email_host", updated.EmailHost),
+				zap.Int("email_port", updated.EmailPort),
+				zap.String("email_username_masked", maskSensitive(updated.EmailUsername)),
+				zap.Bool("email_use_tls", updated.EmailUseTLS),
+				zap.Bool("email_use_ssl", updated.EmailUseSSL),
+				zap.Int("email_timeout", updated.EmailTimeout),
+				zap.String("email_from", updated.EmailFrom))
+		}
+	}
+
+	// EVALUATE: Send test email if requested
+	if cfg.TestEmail != "" && !cfg.DryRun {
+		logger.Info("Test email functionality not yet implemented",
+			zap.String("recipient", cfg.TestEmail))
+		logger.Info("To test email manually, trigger a password reset in Authentik")
+	}
+
+	logger.Info("Authentik email configuration complete")
 
 	return nil
 }

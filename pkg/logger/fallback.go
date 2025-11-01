@@ -41,8 +41,10 @@ func InitFallback() {
 		writer = zapcore.AddSync(os.Stdout)
 	}
 
+	consoleCore := zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel)
+
 	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
+		newTerminalConsoleCore(consoleCore),
 		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), writer, zap.InfoLevel),
 	)
 

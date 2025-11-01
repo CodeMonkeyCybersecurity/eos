@@ -920,6 +920,22 @@ AUTHENTIK_BOOTSTRAP_TOKEN=%s
 # Leave empty if you don't plan to use automated SSO integration
 AUTHENTIK_API_TOKEN=
 
+# Email Configuration (SMTP) - OPTIONAL
+# Configure these for Authentik to send emails (password reset, 2FA codes, notifications)
+# To configure interactively: sudo eos update hecate --add authentik-email
+#
+# NOTE: Double-underscore format (EMAIL__HOST) is required by Authentik 2025.x
+# SECURITY: SMTP password stored here with 0600 permissions (root-only readable)
+#
+AUTHENTIK_EMAIL__HOST=
+AUTHENTIK_EMAIL__PORT=587
+AUTHENTIK_EMAIL__USERNAME=
+AUTHENTIK_EMAIL__PASSWORD=
+AUTHENTIK_EMAIL__USE_TLS=true
+AUTHENTIK_EMAIL__USE_SSL=false
+AUTHENTIK_EMAIL__TIMEOUT=10
+AUTHENTIK_EMAIL__FROM=
+
 # Ports
 COMPOSE_PORT_HTTP=%s
 COMPOSE_PORT_HTTPS=%s
