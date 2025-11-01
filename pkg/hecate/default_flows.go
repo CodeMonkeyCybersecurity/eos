@@ -198,22 +198,78 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 				zap.String("domain", domain),
 				zap.Error(err))
 		} else {
-			updates := map[string]interface{}{
-				"flow_authentication":                fmt.Sprintf("%s-authentication", appSlug),
-				"flow_enrollment":                    fmt.Sprintf("%s-enrollment", appSlug),
-				"flow_invalidation":                  fmt.Sprintf("%s-invalidation-global", appSlug),
-				"default_provider_invalidation_flow": fmt.Sprintf("%s-invalidation-provider", appSlug),
-				"flow_recovery":                      fmt.Sprintf("%s-recovery", appSlug),
-				"flow_unenrollment":                  fmt.Sprintf("%s-unenrollment", appSlug),
-			}
-			if _, err := client.UpdateBrand(rc.Ctx, brand.PK, updates); err != nil {
-				logger.Warn("Failed to update brand flows",
-					zap.String("brand_pk", brand.PK),
+			// CRITICAL: Brand API requires flow UUIDs, not slugs
+			// Lookup each flow to get its PK (UUID)
+			authFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-authentication", appSlug))
+			if err != nil {
+				logger.Warn("Failed to lookup authentication flow UUID",
+					zap.String("slug", fmt.Sprintf("%s-authentication", appSlug)),
 					zap.Error(err))
-			} else {
-				logger.Info("✓ Brand configured with new default flows",
+			}
+
+			enrollmentFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-enrollment", appSlug))
+			if err != nil {
+				logger.Warn("Failed to lookup enrollment flow UUID",
+					zap.String("slug", fmt.Sprintf("%s-enrollment", appSlug)),
+					zap.Error(err))
+			}
+
+			invalidationGlobalFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-invalidation-global", appSlug))
+			if err != nil {
+				logger.Warn("Failed to lookup invalidation (global) flow UUID",
+					zap.String("slug", fmt.Sprintf("%s-invalidation-global", appSlug)),
+					zap.Error(err))
+			}
+
+			recoveryFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-recovery", appSlug))
+			if err != nil {
+				logger.Warn("Failed to lookup recovery flow UUID",
+					zap.String("slug", fmt.Sprintf("%s-recovery", appSlug)),
+					zap.Error(err))
+			}
+
+			unenrollmentFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-unenrollment", appSlug))
+			if err != nil {
+				logger.Warn("Failed to lookup unenrollment flow UUID",
+					zap.String("slug", fmt.Sprintf("%s-unenrollment", appSlug)),
+					zap.Error(err))
+			}
+
+			// Only update brand if we successfully looked up all flow UUIDs
+			if authFlow != nil && enrollmentFlow != nil && invalidationGlobalFlow != nil && recoveryFlow != nil && unenrollmentFlow != nil {
+				updates := map[string]interface{}{
+					"flow_authentication":                authFlow.PK,                                      // UUID required
+					"flow_enrollment":                    enrollmentFlow.PK,                                // UUID required
+					"flow_invalidation":                  invalidationGlobalFlow.PK,                        // UUID required
+					"default_provider_invalidation_flow": fmt.Sprintf("%s-invalidation-provider", appSlug), // Slug accepted
+					"flow_recovery":                      recoveryFlow.PK,                                  // UUID required
+					"flow_unenrollment":                  unenrollmentFlow.PK,                              // UUID required
+				}
+
+				logger.Debug("Updating brand with flow UUIDs",
 					zap.String("brand_pk", brand.PK),
-					zap.String("domain", brand.Domain))
+					zap.String("auth_flow_uuid", authFlow.PK),
+					zap.String("enrollment_flow_uuid", enrollmentFlow.PK),
+					zap.String("invalidation_flow_uuid", invalidationGlobalFlow.PK),
+					zap.String("recovery_flow_uuid", recoveryFlow.PK),
+					zap.String("unenrollment_flow_uuid", unenrollmentFlow.PK))
+
+				if _, err := client.UpdateBrand(rc.Ctx, brand.PK, updates); err != nil {
+					logger.Warn("Failed to update brand flows",
+						zap.String("brand_pk", brand.PK),
+						zap.Error(err))
+				} else {
+					logger.Info("✓ Brand configured with new default flows",
+						zap.String("brand_pk", brand.PK),
+						zap.String("domain", brand.Domain))
+				}
+			} else {
+				logger.Warn("Skipping brand update - failed to lookup one or more flow UUIDs",
+					zap.Bool("auth_flow_found", authFlow != nil),
+					zap.Bool("enrollment_flow_found", enrollmentFlow != nil),
+					zap.Bool("invalidation_flow_found", invalidationGlobalFlow != nil),
+					zap.Bool("recovery_flow_found", recoveryFlow != nil),
+					zap.Bool("unenrollment_flow_found", unenrollmentFlow != nil))
 			}
 		}
 	} else {
