@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 // GroupRequest represents the request body for creating a group
@@ -73,11 +74,16 @@ func (c *APIClient) CreateGroup(ctx context.Context, name string, attributes map
 	return &group, nil
 }
 
-// GetGroupByName retrieves a group by name
+// GetGroupByName retrieves a group by name using search parameter and client-side filtering.
+// RATIONALE: Authentik API doesn't support exact filtering by name parameter (?name=).
+// Using ?search= and client-side filtering ensures exact case-sensitive match.
 func (c *APIClient) GetGroupByName(ctx context.Context, name string) (*GroupResponse, error) {
-	url := fmt.Sprintf("%s/api/v3/core/groups/?name=%s", c.BaseURL, name)
+	// Use search parameter instead of name filter (Authentik API limitation)
+	// URL-encode the search term to handle spaces and special characters
+	encodedName := url.QueryEscape(name)
+	apiURL := fmt.Sprintf("%s/api/v3/core/groups/?search=%s", c.BaseURL, encodedName)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -91,8 +97,20 @@ func (c *APIClient) GetGroupByName(ctx context.Context, name string) (*GroupResp
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Read body for both error and success cases
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if readErr != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", readErr)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		// Try to parse error detail from response
+		var apiError struct {
+			Detail string `json:"detail"`
+		}
+		if json.Unmarshal(body, &apiError) == nil && apiError.Detail != "" {
+			return nil, fmt.Errorf("group fetch failed with status %d: %s", resp.StatusCode, apiError.Detail)
+		}
 		return nil, fmt.Errorf("group fetch failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -100,15 +118,20 @@ func (c *APIClient) GetGroupByName(ctx context.Context, name string) (*GroupResp
 		Results []GroupResponse `json:"results"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode group response: %w", err)
 	}
 
-	if len(result.Results) == 0 {
-		return nil, fmt.Errorf("group not found: %s", name)
+	// Filter results for exact case-sensitive match
+	// (search may return partial matches)
+	for i := range result.Results {
+		if result.Results[i].Name == name {
+			return &result.Results[i], nil
+		}
 	}
 
-	return &result.Results[0], nil
+	// Group not found
+	return nil, fmt.Errorf("group not found: %s", name)
 }
 
 // ListGroups lists all groups, optionally filtered by prefix
