@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/authentik"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -199,41 +200,13 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 				zap.Error(err))
 		} else {
 			// CRITICAL: Brand API requires flow UUIDs, not slugs
-			// Lookup each flow to get its PK (UUID)
-			authFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-authentication", appSlug))
-			if err != nil {
-				logger.Warn("Failed to lookup authentication flow UUID",
-					zap.String("slug", fmt.Sprintf("%s-authentication", appSlug)),
-					zap.Error(err))
-			}
-
-			enrollmentFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-enrollment", appSlug))
-			if err != nil {
-				logger.Warn("Failed to lookup enrollment flow UUID",
-					zap.String("slug", fmt.Sprintf("%s-enrollment", appSlug)),
-					zap.Error(err))
-			}
-
-			invalidationGlobalFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-invalidation-global", appSlug))
-			if err != nil {
-				logger.Warn("Failed to lookup invalidation (global) flow UUID",
-					zap.String("slug", fmt.Sprintf("%s-invalidation-global", appSlug)),
-					zap.Error(err))
-			}
-
-			recoveryFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-recovery", appSlug))
-			if err != nil {
-				logger.Warn("Failed to lookup recovery flow UUID",
-					zap.String("slug", fmt.Sprintf("%s-recovery", appSlug)),
-					zap.Error(err))
-			}
-
-			unenrollmentFlow, err := client.GetFlow(rc.Ctx, fmt.Sprintf("%s-unenrollment", appSlug))
-			if err != nil {
-				logger.Warn("Failed to lookup unenrollment flow UUID",
-					zap.String("slug", fmt.Sprintf("%s-unenrollment", appSlug)),
-					zap.Error(err))
-			}
+			// Lookup each flow to get its PK (UUID) with retry logic for eventual consistency
+			// RATIONALE: Freshly imported flows may not be immediately queryable due to Authentik indexing
+			authFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-authentication", appSlug), 3, 2*time.Second)
+			enrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-enrollment", appSlug), 3, 2*time.Second)
+			invalidationGlobalFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-invalidation-global", appSlug), 3, 2*time.Second)
+			recoveryFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-recovery", appSlug), 3, 2*time.Second)
+			unenrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-unenrollment", appSlug), 3, 2*time.Second)
 
 			// Only update brand if we successfully looked up all flow UUIDs
 			if authFlow != nil && enrollmentFlow != nil && invalidationGlobalFlow != nil && recoveryFlow != nil && unenrollmentFlow != nil {
@@ -989,3 +962,42 @@ entries:
       enabled: true
       timeout: 30
 `
+
+// getFlowWithRetry attempts to retrieve a flow with retry logic for eventual consistency
+// RATIONALE: Freshly imported flows may not be immediately queryable in Authentik
+// This is a timing issue - the flow exists but the index hasn't updated yet
+func getFlowWithRetry(rc *eos_io.RuntimeContext, client *authentik.APIClient, logger otelzap.LoggerWithCtx, slug string, maxRetries int, retryDelay time.Duration) *authentik.FlowResponse {
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		flow, err := client.GetFlow(rc.Ctx, slug)
+		if err != nil {
+			logger.Warn("Failed to lookup flow UUID",
+				zap.String("slug", slug),
+				zap.Int("attempt", attempt),
+				zap.Int("max_retries", maxRetries),
+				zap.Error(err))
+		} else if flow != nil {
+			// Success - flow found
+			logger.Debug("Found flow UUID",
+				zap.String("slug", slug),
+				zap.String("uuid", flow.PK),
+				zap.Int("attempt", attempt))
+			return flow
+		}
+
+		// Flow not found yet (flow == nil, err == nil means "not found" per GetFlow contract)
+		if attempt < maxRetries {
+			logger.Debug("Flow not found yet, waiting before retry",
+				zap.String("slug", slug),
+				zap.Int("attempt", attempt),
+				zap.Int("max_retries", maxRetries),
+				zap.Duration("retry_delay", retryDelay))
+			time.Sleep(retryDelay)
+		}
+	}
+
+	// All retries exhausted
+	logger.Warn("Flow not found after all retries",
+		zap.String("slug", slug),
+		zap.Int("max_retries", maxRetries))
+	return nil
+}
