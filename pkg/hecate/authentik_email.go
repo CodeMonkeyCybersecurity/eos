@@ -31,13 +31,30 @@ type tenantEmailSettings struct {
 }
 
 type tenantSummary struct {
-	PK      string `json:"pk"`
-	Domain  string `json:"domain"`
-	Default bool   `json:"default"`
+	PK         string `json:"pk"`
+	TenantUUID string `json:"tenant_uuid"`
+	UUID       string `json:"uuid"`
+	ID         string `json:"id"`
+	Domain     string `json:"domain"`
+	Default    bool   `json:"default"`
 }
 
-type tenantListResponse struct {
-	Results []tenantSummary `json:"results"`
+func (t *tenantSummary) identifier() string {
+	if t == nil {
+		return ""
+	}
+	switch {
+	case strings.TrimSpace(t.PK) != "":
+		return t.PK
+	case strings.TrimSpace(t.TenantUUID) != "":
+		return t.TenantUUID
+	case strings.TrimSpace(t.UUID) != "":
+		return t.UUID
+	case strings.TrimSpace(t.ID) != "":
+		return t.ID
+	default:
+		return ""
+	}
 }
 
 // ConfigureAuthentikEmail updates tenant-level SMTP settings using values from /opt/hecate/.env.
@@ -142,17 +159,16 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 
 	client := authentik.NewUnifiedClient(baseURL, token)
 
-	tenant, err := resolveAuthentikTenant(rc, client)
+	tenant, patchPath, err := resolveAuthentikTenant(rc, client)
 	if err != nil {
 		return fmt.Errorf("failed to resolve Authentik tenant: %w", err)
 	}
 
 	logger.Info("Updating Authentik tenant",
-		zap.String("tenant_pk", tenant.PK),
+		zap.String("tenant_identifier", tenant.identifier()),
 		zap.String("tenant_domain", tenant.Domain),
-		zap.Bool("tenant_default", tenant.Default))
-
-	patchPath := fmt.Sprintf("/core/tenants/%s/", tenant.PK)
+		zap.Bool("tenant_default", tenant.Default),
+		zap.String("tenant_patch_endpoint", patchPath))
 
 	respBody, err := client.Patch(rc.Ctx, patchPath, payload)
 	if err != nil {
@@ -177,34 +193,137 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 	return nil
 }
 
-func resolveAuthentikTenant(rc *eos_io.RuntimeContext, client *authentik.UnifiedClient) (*tenantSummary, error) {
+type tenantEndpointCandidate struct {
+	ListPath       string
+	BuildPatchPath func(string) string
+	Description    string
+}
+
+func resolveAuthentikTenant(rc *eos_io.RuntimeContext, client *authentik.UnifiedClient) (*tenantSummary, string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	data, err := client.Get(rc.Ctx, "/core/tenants/")
-	if err != nil {
-		return nil, fmt.Errorf("failed to list Authentik tenants: %w", err)
+	candidates := []tenantEndpointCandidate{
+		{
+			ListPath: "/core/tenants/",
+			BuildPatchPath: func(id string) string {
+				return fmt.Sprintf("/core/tenants/%s/", id)
+			},
+			Description: "Authentik ≤2024.12 core tenants endpoint",
+		},
+		{
+			ListPath: "/tenants/tenants/",
+			BuildPatchPath: func(id string) string {
+				return fmt.Sprintf("/tenants/tenants/%s/", id)
+			},
+			Description: "Authentik 2025 tenants endpoint",
+		},
+		{
+			ListPath: "/tenants/",
+			BuildPatchPath: func(id string) string {
+				return fmt.Sprintf("/tenants/%s/", id)
+			},
+			Description: "Authentik 2025 short tenants endpoint",
+		},
 	}
 
-	var tenants tenantListResponse
-	if err := json.Unmarshal(data, &tenants); err != nil {
-		return nil, fmt.Errorf("failed to decode Authentik tenant list: %w", err)
+	var lastErr error
+
+	for _, candidate := range candidates {
+		logger.Debug("Attempting Authentik tenant discovery",
+			zap.String("endpoint", candidate.ListPath),
+			zap.String("description", candidate.Description))
+
+		data, err := client.Get(rc.Ctx, candidate.ListPath)
+		if err != nil {
+			logger.Debug("Tenant endpoint request failed",
+				zap.String("endpoint", candidate.ListPath),
+				zap.Error(err))
+			lastErr = err
+			continue
+		}
+
+		tenants, err := parseTenantListResponse(data)
+		if err != nil {
+			logger.Debug("Failed to parse tenant list response",
+				zap.String("endpoint", candidate.ListPath),
+				zap.Error(err))
+			lastErr = err
+			continue
+		}
+
+		if len(tenants) == 0 {
+			logger.Debug("Tenant endpoint returned no tenants",
+				zap.String("endpoint", candidate.ListPath))
+			lastErr = fmt.Errorf("no tenants returned from %s", candidate.ListPath)
+			continue
+		}
+
+		selected := selectTenant(tenants)
+		id := selected.identifier()
+		if id == "" {
+			logger.Debug("Tenant missing identifier fields",
+				zap.Any("tenant", selected))
+			lastErr = fmt.Errorf("tenant has no identifier in %s", candidate.ListPath)
+			continue
+		}
+
+		patchPath := candidate.BuildPatchPath(id)
+		logger.Debug("Tenant resolved",
+			zap.String("endpoint", candidate.ListPath),
+			zap.String("tenant_identifier", id),
+			zap.String("patch_endpoint", patchPath))
+
+		return selected, patchPath, nil
 	}
 
-	if len(tenants.Results) == 0 {
-		return nil, fmt.Errorf("no tenants returned by Authentik API")
+	if lastErr != nil {
+		return nil, "", fmt.Errorf("failed to list Authentik tenants: %w", lastErr)
 	}
 
-	// Prefer the default tenant if flagged as such.
-	for _, tenant := range tenants.Results {
-		if tenant.Default {
-			return &tenant, nil
+	return nil, "", fmt.Errorf("failed to list Authentik tenants: no endpoints succeeded")
+}
+
+func parseTenantListResponse(data []byte) ([]*tenantSummary, error) {
+	type tenantEnvelope struct {
+		Results []*tenantSummary `json:"results"`
+		Tenants []*tenantSummary `json:"tenants"`
+	}
+
+	var envelope tenantEnvelope
+	if err := json.Unmarshal(data, &envelope); err == nil {
+		switch {
+		case len(envelope.Results) > 0:
+			return envelope.Results, nil
+		case len(envelope.Tenants) > 0:
+			return envelope.Tenants, nil
 		}
 	}
 
-	// Fall back to the first tenant in the list.
-	logger.Warn("No default tenant flagged; using first tenant from list",
-		zap.Int("tenant_count", len(tenants.Results)))
-	return &tenants.Results[0], nil
+	var arr []*tenantSummary
+	if err := json.Unmarshal(data, &arr); err == nil && len(arr) > 0 {
+		return arr, nil
+	}
+
+	// If both attempts failed, return last error for context.
+	if len(envelope.Results) == 0 && len(envelope.Tenants) == 0 && len(arr) == 0 {
+		return nil, fmt.Errorf("unexpected tenant response format")
+	}
+
+	return arr, nil
+}
+
+func selectTenant(tenants []*tenantSummary) *tenantSummary {
+	if len(tenants) == 0 {
+		return nil
+	}
+
+	for _, tenant := range tenants {
+		if tenant != nil && tenant.Default {
+			return tenant
+		}
+	}
+
+	return tenants[0]
 }
 
 func maskSensitive(value string) string {
