@@ -30,6 +30,16 @@ type tenantEmailSettings struct {
 	EmailFrom     string `json:"email_from"`
 }
 
+type tenantSummary struct {
+	PK      string `json:"pk"`
+	Domain  string `json:"domain"`
+	Default bool   `json:"default"`
+}
+
+type tenantListResponse struct {
+	Results []tenantSummary `json:"results"`
+}
+
 // ConfigureAuthentikEmail updates tenant-level SMTP settings using values from /opt/hecate/.env.
 func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfig) error {
 	if cfg == nil {
@@ -132,7 +142,19 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 
 	client := authentik.NewUnifiedClient(baseURL, token)
 
-	respBody, err := client.Patch(rc.Ctx, "/core/tenants/current/", payload)
+	tenant, err := resolveAuthentikTenant(rc, client)
+	if err != nil {
+		return fmt.Errorf("failed to resolve Authentik tenant: %w", err)
+	}
+
+	logger.Info("Updating Authentik tenant",
+		zap.String("tenant_pk", tenant.PK),
+		zap.String("tenant_domain", tenant.Domain),
+		zap.Bool("tenant_default", tenant.Default))
+
+	patchPath := fmt.Sprintf("/core/tenants/%s/", tenant.PK)
+
+	respBody, err := client.Patch(rc.Ctx, patchPath, payload)
 	if err != nil {
 		return fmt.Errorf("failed to update Authentik tenant email settings: %w", err)
 	}
@@ -153,6 +175,36 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 	}
 
 	return nil
+}
+
+func resolveAuthentikTenant(rc *eos_io.RuntimeContext, client *authentik.UnifiedClient) (*tenantSummary, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	data, err := client.Get(rc.Ctx, "/core/tenants/")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Authentik tenants: %w", err)
+	}
+
+	var tenants tenantListResponse
+	if err := json.Unmarshal(data, &tenants); err != nil {
+		return nil, fmt.Errorf("failed to decode Authentik tenant list: %w", err)
+	}
+
+	if len(tenants.Results) == 0 {
+		return nil, fmt.Errorf("no tenants returned by Authentik API")
+	}
+
+	// Prefer the default tenant if flagged as such.
+	for _, tenant := range tenants.Results {
+		if tenant.Default {
+			return &tenant, nil
+		}
+	}
+
+	// Fall back to the first tenant in the list.
+	logger.Warn("No default tenant flagged; using first tenant from list",
+		zap.Int("tenant_count", len(tenants.Results)))
+	return &tenants.Results[0], nil
 }
 
 func maskSensitive(value string) string {
