@@ -734,9 +734,9 @@ entries:
         - !KeyOf prompt-field-name
         - !KeyOf prompt-field-email
 
-  # P0 FIX: Email verification stage (prevents email spoofing)
-  # SECURITY: Validates user owns the email before account activation
-  # COMPLIANCE: Required for OIDC email_verified claim accuracy
+  # DEFERRED 2FA STRATEGY: Email verification during enrollment, 2FA deferred to authentication
+  # SECURITY: Email verified at signup, but 2FA setup happens at first login
+  # RATIONALE: Simpler signup UX while maintaining 100% 2FA enforcement before app access
   - identifiers:
       name: {{ .AppSlug }}-enrollment-email-verification
     id: email-verification-stage
@@ -755,52 +755,6 @@ entries:
       user_creation_mode: always_create
       create_users_as_inactive: false
       create_users_group: "{{ .GroupUUID }}"
-
-  # P0 FIX: Add proper MFA configuration stages (TOTP, WebAuthn, Static)
-  # RATIONALE: authenticatorvalidatestage.configuration_stages requires stage UUIDs, not strings
-  # SECURITY: Ensures MFA is actually configured during enrollment
-  - identifiers:
-      name: {{ .AppSlug }}-enrollment-totp-setup
-    id: totp-setup-stage
-    model: authentik_stages_authenticator_totp.authenticatortotpstage
-    attrs:
-      configure_flow: null
-      friendly_name: null
-      digits: 6
-
-  - identifiers:
-      name: {{ .AppSlug }}-enrollment-webauthn-setup
-    id: webauthn-setup-stage
-    model: authentik_stages_authenticator_webauthn.authenticatorwebauthnstage
-    attrs:
-      configure_flow: null
-      user_verification: preferred
-      resident_key_requirement: preferred
-
-  - identifiers:
-      name: {{ .AppSlug }}-enrollment-static-setup
-    id: static-setup-stage
-    model: authentik_stages_authenticator_static.authenticatorstaticstage
-    attrs:
-      configure_flow: null
-      token_count: 6
-      token_length: 12
-
-  - identifiers:
-      name: {{ .AppSlug }}-enrollment-mfa-validation
-    id: {{ .AppSlug }}-enrollment-mfa-validation
-    model: authentik_stages_authenticator_validate.authenticatorvalidatestage
-    attrs:
-      device_classes:
-        - totp
-        - webauthn
-        - static
-      configuration_stages:
-        - !KeyOf totp-setup-stage
-        - !KeyOf webauthn-setup-stage
-        - !KeyOf static-setup-stage
-      not_configured_action: configure
-      last_validation_threshold: seconds=0
 
   - identifiers:
       name: {{ .AppSlug }}-enrollment-user-login
@@ -867,21 +821,12 @@ entries:
       policy_engine_mode: any
       invalid_response_action: retry
 
-  - identifiers:
-      target: !KeyOf flow
-      stage: !KeyOf {{ .AppSlug }}-enrollment-mfa-validation
-      order: 30
-    model: authentik_flows.flowstagebinding
-    attrs:
-      evaluate_on_plan: true
-      re_evaluate_policies: false
-      policy_engine_mode: any
-      invalid_response_action: retry
-
+  # DEFERRED 2FA: Login immediately after enrollment
+  # User will be prompted for 2FA setup on first authentication attempt
   - identifiers:
       target: !KeyOf flow
       stage: !KeyOf {{ .AppSlug }}-enrollment-user-login
-      order: 100
+      order: 30
     model: authentik_flows.flowstagebinding
     attrs:
       evaluate_on_plan: true
@@ -952,6 +897,38 @@ entries:
         - authentik.core.auth.TokenBackend
       failed_attempts_before_cancel: 5
 
+  # DEFERRED 2FA: MFA configuration stages for first-time setup
+  # SECURITY: Users without 2FA will be forced to configure it here (not_configured_action: configure)
+  # RATIONALE: Simpler enrollment UX, but 100% enforcement before app access
+  - identifiers:
+      name: {{ .AppSlug }}-auth-totp-setup
+    id: auth-totp-setup-stage
+    model: authentik_stages_authenticator_totp.authenticatortotpstage
+    attrs:
+      configure_flow: null
+      friendly_name: null
+      digits: 6
+
+  - identifiers:
+      name: {{ .AppSlug }}-auth-webauthn-setup
+    id: auth-webauthn-setup-stage
+    model: authentik_stages_authenticator_webauthn.authenticatorwebauthnstage
+    attrs:
+      configure_flow: null
+      user_verification: preferred
+      resident_key_requirement: preferred
+
+  - identifiers:
+      name: {{ .AppSlug }}-auth-static-setup
+    id: auth-static-setup-stage
+    model: authentik_stages_authenticator_static.authenticatorstaticstage
+    attrs:
+      configure_flow: null
+      token_count: 6
+      token_length: 12
+
+  # CRITICAL: This is where 2FA enforcement happens
+  # not_configured_action: configure forces users to set up 2FA before proceeding
   - identifiers:
       name: {{ .AppSlug }}-auth-mfa-validation
     id: {{ .AppSlug }}-auth-mfa-validation
@@ -961,7 +938,12 @@ entries:
         - totp
         - webauthn
         - static
-      not_configured_action: deny
+      configuration_stages:
+        - !KeyOf auth-totp-setup-stage
+        - !KeyOf auth-webauthn-setup-stage
+        - !KeyOf auth-static-setup-stage
+      not_configured_action: configure
+      last_validation_threshold: seconds=0
       webauthn_user_verification: preferred
 
   - identifiers:
