@@ -273,10 +273,11 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 
 	// CRITICAL FIX: Parse response body on ALL status codes, not just errors
 	// Authentik may return 200 OK but include validation errors in the response
+	// NOTE: Logs is an array of structured objects, not strings
 	var importResponse struct {
-		Success bool     `json:"success"`
-		Detail  string   `json:"detail"`
-		Logs    []string `json:"logs"`
+		Success bool              `json:"success"`
+		Detail  string            `json:"detail"`
+		Logs    []json.RawMessage `json:"logs"` // Raw JSON objects - Authentik returns structured log entries
 	}
 
 	// Try to parse the response (may be JSON or empty on 204 No Content)
@@ -290,7 +291,7 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 			logger.Info("Parsed import response",
 				zap.Bool("success", importResponse.Success),
 				zap.String("detail", importResponse.Detail),
-				zap.Strings("logs", importResponse.Logs))
+				zap.Int("logs_count", len(importResponse.Logs)))
 		}
 	}
 
@@ -301,8 +302,8 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 			logger.Error("Flow import failed with API error",
 				zap.Int("status_code", resp.StatusCode),
 				zap.String("error_detail", importResponse.Detail),
-				zap.Strings("import_logs", importResponse.Logs))
-			return fmt.Errorf("flow import failed with status %d: %s (logs: %v)", resp.StatusCode, importResponse.Detail, importResponse.Logs)
+				zap.Int("import_logs_count", len(importResponse.Logs)))
+			return fmt.Errorf("flow import failed with status %d: %s (%d log entries)", resp.StatusCode, importResponse.Detail, len(importResponse.Logs))
 		}
 
 		logger.Error("Flow import failed",
@@ -316,14 +317,14 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 		logger.Error("Flow import returned success status but validation failed",
 			zap.Int("status_code", resp.StatusCode),
 			zap.String("error_detail", importResponse.Detail),
-			zap.Strings("import_logs", importResponse.Logs))
-		return fmt.Errorf("flow import validation failed: %s (logs: %v)", importResponse.Detail, importResponse.Logs)
+			zap.Int("import_logs_count", len(importResponse.Logs)))
+		return fmt.Errorf("flow import validation failed: %s (%d log entries)", importResponse.Detail, len(importResponse.Logs))
 	}
 
 	// Log import logs if available (may contain warnings or info)
 	if len(importResponse.Logs) > 0 {
 		logger.Info("Flow import completed with logs",
-			zap.Strings("import_logs", importResponse.Logs))
+			zap.Int("import_logs_count", len(importResponse.Logs)))
 	}
 
 	logger.Debug("Flow import successful",
