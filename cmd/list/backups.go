@@ -28,7 +28,7 @@ import (
 )
 
 var backupsCmd = &cobra.Command{
-	Use:     "backups",
+	Use:     "backups [repository]",
 	Short:   "List backup snapshots and repository metadata",
 	Aliases: []string{"backup", "snap", "snapshots"},
 	Long: `List backup snapshots with detailed metadata from restic repositories.
@@ -43,6 +43,9 @@ This command provides a comprehensive view of your backup snapshots including:
 Examples:
   # List all snapshots in default repository
   eos list backups
+
+  # Quick view of snapshots created with "eos backup ."
+  eos ls backups .
 
   # List snapshots in specific repository
   eos list backups --repo remote
@@ -64,6 +67,7 @@ Examples:
 
   # Show repository statistics
   eos list backups --stats`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(listBackups),
 }
 
@@ -99,6 +103,18 @@ func listBackups(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 	detailed, _ := cmd.Flags().GetBool("detailed")
 	groupBy, _ := cmd.Flags().GetString("group-by")
 	showStats, _ := cmd.Flags().GetBool("stats")
+
+	// Positional repository selection (e.g., "eos ls backups .")
+	if repoName == "" && len(args) > 0 {
+		switch arg := strings.TrimSpace(args[0]); arg {
+		case ".":
+			repoName = backup.QuickBackupRepositoryName
+		case "":
+			// No-op - treated same as no argument
+		default:
+			repoName = arg
+		}
+	}
 
 	// Use default repository if not specified
 	if repoName == "" {

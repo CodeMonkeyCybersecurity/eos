@@ -13,12 +13,16 @@ import (
 
 // ProxyProviderConfig represents the configuration for creating a proxy provider
 type ProxyProviderConfig struct {
-	Name              string // Provider name
-	Mode              string // "forward_single", "forward_domain", or "proxy"
-	ExternalHost      string // External URL (e.g., https://app.example.com)
-	InternalHost      string // Internal URL (not used in forward auth mode, but required by API)
-	AuthorizationFlow string // Authorization flow slug or UUID
-	InvalidationFlow  string // Invalidation flow slug or UUID (required by Authentik API)
+	Name                string // Provider name
+	Mode                string // "forward_single", "forward_domain", or "proxy"
+	ExternalHost        string // External URL (e.g., https://app.example.com)
+	InternalHost        string // Internal URL (not used in forward auth mode, but required by API)
+	AuthorizationFlow   string // Authorization flow slug or UUID
+	InvalidationFlow    string // Invalidation flow slug or UUID (required by Authentik API)
+	BasicAuthEnabled    *bool  // Whether to enable HTTP basic authentication
+	InterceptHeaderAuth *bool  // Whether to accept authentication from upstream headers
+	CookieDomain        string // Cookie domain scope (e.g., .example.com)
+	AccessTokenValidity string // Token validity duration string (e.g., "hours=1")
 }
 
 // ProxyProviderResponse represents a proxy provider from Authentik
@@ -41,6 +45,19 @@ func (c *APIClient) CreateProxyProvider(ctx context.Context, config *ProxyProvid
 		"mode":               config.Mode,
 		"external_host":      config.ExternalHost,
 		"internal_host":      config.InternalHost,
+	}
+
+	if config.BasicAuthEnabled != nil {
+		reqBody["basic_auth_enabled"] = *config.BasicAuthEnabled
+	}
+	if config.InterceptHeaderAuth != nil {
+		reqBody["intercept_header_auth"] = *config.InterceptHeaderAuth
+	}
+	if config.CookieDomain != "" {
+		reqBody["cookie_domain"] = config.CookieDomain
+	}
+	if config.AccessTokenValidity != "" {
+		reqBody["access_token_validity"] = config.AccessTokenValidity
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
@@ -182,6 +199,19 @@ func (c *APIClient) UpdateProxyProvider(ctx context.Context, pk int, config *Pro
 		"mode":               config.Mode,
 		"external_host":      config.ExternalHost,
 		"internal_host":      config.InternalHost,
+	}
+
+	if config.BasicAuthEnabled != nil {
+		reqBody["basic_auth_enabled"] = *config.BasicAuthEnabled
+	}
+	if config.InterceptHeaderAuth != nil {
+		reqBody["intercept_header_auth"] = *config.InterceptHeaderAuth
+	}
+	if config.CookieDomain != "" {
+		reqBody["cookie_domain"] = config.CookieDomain
+	}
+	if config.AccessTokenValidity != "" {
+		reqBody["access_token_validity"] = config.AccessTokenValidity
 	}
 
 	jsonBody, err := json.Marshal(reqBody)

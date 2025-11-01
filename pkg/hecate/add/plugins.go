@@ -14,6 +14,8 @@ type IntegrationResources struct {
 	ApplicationSlug string   // Authentik application slug (for cleanup)
 	UserPK          string   // Created user PK (for cleanup)
 	GroupPKs        []string // Created group PKs (for cleanup)
+	PolicyPK        string   // Created policy PK
+	PolicyBindingPK string   // Created policy binding PK
 }
 
 // ServiceIntegrator defines the interface for service-specific integrations

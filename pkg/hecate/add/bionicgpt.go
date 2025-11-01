@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -25,6 +26,13 @@ import (
 // Uses Authentik forward auth (NOT oauth2-proxy)
 type BionicGPTIntegrator struct {
 	resources *IntegrationResources // Track created resources for rollback
+}
+
+type authentikProxySettings struct {
+	ExternalHost string
+	InternalHost string
+	CookieDomain string
+	LaunchURL    string
 }
 
 func init() {
@@ -260,11 +268,12 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 	logger.Info("  [2/3] Configuring Authentik proxy provider (forward auth mode)")
 
 	if opts.DryRun {
-		logger.Info("    [DRY RUN] Would create Authentik proxy provider (forward auth mode)")
-		logger.Info("    [DRY RUN] Would create Authentik application 'BionicGPT'")
-		logger.Info("    [DRY RUN] Would create groups: bionicgpt-superadmin, bionicgpt-demo")
-		logger.Info("    [DRY RUN] Would assign application to embedded outpost")
-		logger.Info("    [DRY RUN] Would create BionicGPT admin user")
+		logger.Info("    [DRY RUN] Would ensure Authentik group", zap.String("name", hecate.BionicGPTUserGroupName))
+		logger.Info("    [DRY RUN] Would create/update proxy provider", zap.String("name", hecate.BionicGPTProxyProviderName))
+		logger.Info("    [DRY RUN] Would create/update Authentik application", zap.String("slug", hecate.BionicGPTApplicationSlug))
+		logger.Info("    [DRY RUN] Would bind expression policy", zap.String("name", hecate.BionicGPTExpressionPolicyName))
+		logger.Info("    [DRY RUN] Would configure enrollment auto-assignment for BionicGPT Users")
+		logger.Info("    [DRY RUN] Would create Authentik admin user and supporting groups")
 		return nil
 	}
 
@@ -284,11 +293,31 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 		return nil // Non-fatal: generic route still works
 	}
 
-	// Step 2: Initialize Authentik API client
+	// Step 2: Initialize Authentik clients
 	logger.Info("    Initializing Authentik API client", zap.String("base_url", authentikBaseURL))
 	authentikClient := authentik.NewClient(authentikBaseURL, authentikToken)
 
-	// Step 3: Get default authorization flow UUID
+	authentikUserClient, userClientErr := authentik.NewAuthentikClient(authentikBaseURL, authentikToken)
+	if userClientErr != nil {
+		logger.Warn("    Unable to initialize Authentik user client (continuing without user seeding)", zap.Error(userClientErr))
+	}
+
+	proxySettings, err := buildBionicGPTProxySettings(opts)
+	if err != nil {
+		return fmt.Errorf("failed to derive proxy configuration: %w", err)
+	}
+
+	// Step 3: Ensure core Authentik group exists
+	group, err := b.ensureUserGroup(rc.Ctx, authentikClient, logger)
+	if err != nil {
+		return fmt.Errorf("failed to ensure BionicGPT group: %w", err)
+	}
+
+	if authentikUserClient != nil {
+		b.ensureSeedUserMembership(authentikUserClient, group.Name, logger)
+	}
+
+	// Step 4: Resolve default flows
 	logger.Info("    Getting authorization flow")
 	authFlowUUID, err := b.getDefaultAuthFlowUUID(rc.Ctx, authentikClient)
 	if err != nil {
@@ -296,7 +325,6 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 		authFlowUUID = "default-authentication-flow"
 	}
 
-	// Step 3b: Get default invalidation flow UUID
 	logger.Info("    Getting invalidation flow")
 	invalidationFlowUUID, err := b.getDefaultInvalidationFlowUUID(rc.Ctx, authentikClient)
 	if err != nil {
@@ -304,52 +332,259 @@ func (b *BionicGPTIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext,
 		invalidationFlowUUID = "default-invalidation-flow"
 	}
 
-	// Step 4: Create proxy provider
+	// Step 5: Create or update proxy provider
 	logger.Info("    Creating proxy provider (forward auth mode)")
-	providerPK, err := b.createProxyProvider(rc.Ctx, authentikClient, opts, authFlowUUID, invalidationFlowUUID)
+	providerPK, err := b.ensureProxyProvider(rc.Ctx, authentikClient, proxySettings, authFlowUUID, invalidationFlowUUID, logger)
 	if err != nil {
-		return fmt.Errorf("failed to create proxy provider: %w", err)
+		return fmt.Errorf("failed to ensure proxy provider: %w", err)
 	}
-	logger.Info("    ✓ Proxy provider created", zap.Int("provider_pk", providerPK))
 	b.resources.ProxyProviderPK = providerPK // Track for rollback
 
-	// Step 5: Create Authentik application
+	// Step 6: Create or update Authentik application
 	logger.Info("    Creating Authentik application")
-	if err := b.createAuthentikApplication(rc.Ctx, authentikClient, providerPK, opts.DNS); err != nil {
-		return fmt.Errorf("failed to create application: %w", err)
+	app, err := b.ensureAuthentikApplication(rc.Ctx, authentikClient, providerPK, group.PK, proxySettings.LaunchURL, logger)
+	if err != nil {
+		return fmt.Errorf("failed to ensure application: %w", err)
 	}
-	logger.Info("    ✓ Application 'BionicGPT' created")
-	b.resources.ApplicationSlug = "bionicgpt" // Track for rollback
+	b.resources.ApplicationSlug = app.Slug
+	b.resources.ApplicationPK = app.PK
 
-	// Step 6: Assign application to embedded outpost
+	// Step 7: Assign application to embedded outpost
 	logger.Info("    Assigning application to embedded outpost")
 	if err := b.assignToOutpost(rc.Ctx, authentikClient, providerPK); err != nil {
 		return fmt.Errorf("failed to assign to outpost: %w", err)
 	}
 	logger.Info("    ✓ Application assigned to outpost")
 
-	// Step 7: Create groups
+	// Step 8: Create supporting groups
 	logger.Info("    Creating Authentik groups (superadmin, demo)")
 	if err := b.createAuthentikGroups(rc.Ctx, authentikClient); err != nil {
 		return fmt.Errorf("failed to create groups: %w", err)
 	}
 	logger.Info("    ✓ Groups configured")
 
-	// Step 8: Create BionicGPT admin user
+	// Step 9: Create BionicGPT admin user
 	logger.Info("    Creating BionicGPT admin user")
-	// Note: User creation uses AuthentikClient (different from APIClient used for providers)
-	authentikUserClient, err := authentik.NewAuthentikClient(authentikBaseURL, authentikToken)
-	if err != nil {
-		logger.Warn("Failed to create user client", zap.Error(err))
-	} else {
+	if authentikUserClient != nil {
 		if err := b.createBionicGPTAdmin(rc.Ctx, authentikUserClient, opts); err != nil {
 			logger.Warn("Failed to create admin user", zap.Error(err))
-			// Non-fatal
+		} else {
+			if err := authentikUserClient.AddUserToGroup("bionicgpt-admin", hecate.BionicGPTUserGroupName); err == nil {
+				logger.Info("    ✓ Ensured bionicgpt-admin is part of BionicGPT Users group")
+			} else {
+				logger.Debug("Failed to add bionicgpt-admin to BionicGPT Users group", zap.Error(err))
+			}
 		}
+	}
+
+	// Step 10: Enforce policy binding between group and application
+	logger.Info("    Creating access policy binding")
+	if err := b.ensureAccessPolicy(rc.Ctx, authentikClient, app, logger); err != nil {
+		return fmt.Errorf("failed to configure access policy: %w", err)
+	}
+
+	// Step 11: Configure enrollment flow auto-group assignment
+	logger.Info("    Configuring enrollment flow auto-assignment")
+	enrollmentSlug, err := b.configureEnrollment(rc.Ctx, authentikClient, group.PK, logger)
+	if err != nil {
+		logger.Warn("    Enrollment flow not updated", zap.Error(err))
+	} else if enrollmentSlug != "" {
+		enrollmentURL := fmt.Sprintf("%s/if/flow/%s/", strings.TrimRight(authentikBaseURL, "/"), enrollmentSlug)
+		logger.Info("    ✓ Self-service enrollment configured", zap.String("flow", enrollmentSlug), zap.String("url", enrollmentURL))
 	}
 
 	logger.Info("  ✓ Authentik proxy provider configuration complete")
 	return nil
+}
+
+func buildBionicGPTProxySettings(opts *ServiceOptions) (*authentikProxySettings, error) {
+	if opts == nil {
+		return nil, fmt.Errorf("service options required")
+	}
+
+	dns := strings.TrimSpace(opts.DNS)
+	if dns == "" {
+		return nil, fmt.Errorf("DNS is required to configure Authentik integration")
+	}
+
+	internalHost, err := normalizeInternalHost(opts.Backend)
+	if err != nil {
+		return nil, fmt.Errorf("invalid backend address: %w", err)
+	}
+
+	externalHost := fmt.Sprintf("https://%s", dns)
+
+	return &authentikProxySettings{
+		ExternalHost: externalHost,
+		InternalHost: internalHost,
+		CookieDomain: deriveCookieDomain(dns),
+		LaunchURL:    externalHost,
+	}, nil
+}
+
+func (b *BionicGPTIntegrator) ensureUserGroup(ctx context.Context, client *authentik.APIClient, logger otelzap.LoggerWithCtx) (*authentik.GroupResponse, error) {
+	exists, err := client.GroupExists(ctx, hecate.BionicGPTUserGroupName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check group existence: %w", err)
+	}
+
+	attrs := map[string]interface{}{
+		"description": "BionicGPT authenticated users",
+	}
+
+	group, err := client.CreateGroupIfNotExists(ctx, hecate.BionicGPTUserGroupName, attrs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure Authentik group: %w", err)
+	}
+
+	if !exists && group != nil {
+		logger.Info("    ✓ Authentik group created", zap.String("group", group.Name))
+		b.resources.GroupPKs = append(b.resources.GroupPKs, group.PK)
+	} else {
+		logger.Info("    ✓ Authentik group exists", zap.String("group", group.Name))
+	}
+
+	return group, nil
+}
+
+func (b *BionicGPTIntegrator) ensureSeedUserMembership(client *authentik.AuthentikClient, groupName string, logger otelzap.LoggerWithCtx) {
+	candidates := []string{"bionicgpt-admin", "henry", "akadmin"}
+	for _, username := range candidates {
+		if err := client.AddUserToGroup(username, groupName); err != nil {
+			logger.Debug("    Candidate user not added to BionicGPT Users group", zap.String("user", username), zap.Error(err))
+			continue
+		}
+		logger.Info("    ✓ Added existing user to BionicGPT Users group", zap.String("user", username))
+		return
+	}
+	logger.Warn("    No existing Authentik user matched seeding list for BionicGPT Users group")
+}
+
+func (b *BionicGPTIntegrator) ensureAccessPolicy(ctx context.Context, client *authentik.APIClient, app *authentik.ApplicationResponse, logger otelzap.LoggerWithCtx) error {
+	expression := fmt.Sprintf(`return ak_is_group_member(request.user, name="%s")`, hecate.BionicGPTUserGroupName)
+	policy, err := client.EnsureExpressionPolicy(ctx, hecate.BionicGPTExpressionPolicyName, expression)
+	if err != nil {
+		return fmt.Errorf("failed to ensure expression policy: %w", err)
+	}
+
+	b.resources.PolicyPK = policy.PK
+
+	binding, err := client.EnsurePolicyBinding(ctx, policy.PK, app.PK, 0, 30, true)
+	if err != nil {
+		return fmt.Errorf("failed to ensure policy binding: %w", err)
+	}
+
+	b.resources.PolicyBindingPK = binding.PK
+
+	logger.Info("    ✓ Expression policy bound to application",
+		zap.String("policy", hecate.BionicGPTExpressionPolicyName),
+		zap.String("application", app.Name))
+	return nil
+}
+
+func (b *BionicGPTIntegrator) configureEnrollment(ctx context.Context, client *authentik.APIClient, groupPK string, logger otelzap.LoggerWithCtx) (string, error) {
+	slugs := []string{"eos-self-registration", "default-source-enrollment"}
+
+	for _, slug := range slugs {
+		flow, err := client.GetFlow(ctx, slug)
+		if err != nil {
+			logger.Debug("    Failed to fetch enrollment flow", zap.String("slug", slug), zap.Error(err))
+			continue
+		}
+		if flow == nil {
+			continue
+		}
+
+		bindings, err := client.ListFlowBindings(ctx, flow.PK)
+		if err != nil {
+			logger.Debug("    Failed to list flow bindings", zap.String("flow", flow.Name), zap.Error(err))
+			continue
+		}
+
+		for _, binding := range bindings {
+			stage, err := client.GetUserWriteStage(ctx, binding.Stage)
+			if err != nil {
+				continue
+			}
+
+			if stage.CreateUsersGroup == groupPK {
+				logger.Info("    ✓ Enrollment flow already assigns new users to group", zap.String("flow", flow.Name))
+				return flow.Slug, nil
+			}
+
+			update := map[string]interface{}{"create_users_group": groupPK}
+			if err := client.UpdateUserWriteStage(ctx, stage.PK, update); err != nil {
+				return "", fmt.Errorf("failed to update user-write stage %s: %w", stage.PK, err)
+			}
+
+			logger.Info("    ✓ Enrollment flow updated to auto-assign group",
+				zap.String("flow", flow.Name),
+				zap.String("stage", stage.Name))
+			return flow.Slug, nil
+		}
+	}
+
+	return "", fmt.Errorf("no enrollment flow with configurable user-write stage found")
+}
+
+func normalizeInternalHost(raw string) (string, error) {
+	backend := strings.TrimSpace(raw)
+	if backend == "" {
+		backend = fmt.Sprintf("127.0.0.1:%d", hecate.BionicGPTDefaultPort)
+	}
+
+	if strings.HasPrefix(backend, "http://") || strings.HasPrefix(backend, "https://") {
+		parsed, err := url.Parse(backend)
+		if err != nil {
+			return "", err
+		}
+
+		host := parsed.Host
+		if host == "" {
+			host = parsed.Path
+			parsed.Path = ""
+		}
+
+		if !strings.Contains(host, ":") {
+			host = fmt.Sprintf("%s:%d", host, hecate.BionicGPTDefaultPort)
+		}
+
+		parsed.Host = host
+		if parsed.Scheme == "" {
+			parsed.Scheme = "http"
+		}
+
+		return parsed.String(), nil
+	}
+
+	if !strings.Contains(backend, ":") {
+		backend = fmt.Sprintf("%s:%d", backend, hecate.BionicGPTDefaultPort)
+	}
+
+	return "http://" + backend, nil
+}
+
+func deriveCookieDomain(dns string) string {
+	trimmed := strings.TrimSpace(strings.ToLower(dns))
+	if trimmed == "" {
+		return ""
+	}
+
+	parts := strings.Split(trimmed, ".")
+	if len(parts) < 2 {
+		return ""
+	}
+
+	if len(parts) == 2 {
+		return "." + strings.Join(parts, ".")
+	}
+
+	return "." + strings.Join(parts[len(parts)-2:], ".")
+}
+
+func boolPtr(v bool) *bool {
+	value := v
+	return &value
 }
 
 // HealthCheck verifies Authentik forward auth configuration
@@ -413,6 +648,22 @@ func (b *BionicGPTIntegrator) Rollback(rc *eos_io.RuntimeContext) error {
 		logger.Info("Deleting proxy provider", zap.Int("pk", b.resources.ProxyProviderPK))
 		if err := client.DeleteProxyProvider(rc.Ctx, b.resources.ProxyProviderPK); err != nil {
 			logger.Warn("Failed to delete proxy provider", zap.Error(err))
+		}
+	}
+
+	// Delete policy binding (if created)
+	if b.resources.PolicyBindingPK != "" {
+		logger.Info("Deleting policy binding", zap.String("pk", b.resources.PolicyBindingPK))
+		if err := client.DeletePolicyBinding(rc.Ctx, b.resources.PolicyBindingPK); err != nil {
+			logger.Warn("Failed to delete policy binding", zap.Error(err))
+		}
+	}
+
+	// Delete expression policy (if created)
+	if b.resources.PolicyPK != "" {
+		logger.Info("Deleting expression policy", zap.String("pk", b.resources.PolicyPK))
+		if err := client.DeleteExpressionPolicy(rc.Ctx, b.resources.PolicyPK); err != nil {
+			logger.Warn("Failed to delete expression policy", zap.Error(err))
 		}
 	}
 
@@ -619,91 +870,110 @@ func (b *BionicGPTIntegrator) getDefaultInvalidationFlowUUID(ctx context.Context
 	return "default-invalidation-flow", nil
 }
 
-// createProxyProvider creates a proxy provider in Authentik
-func (b *BionicGPTIntegrator) createProxyProvider(ctx context.Context, client *authentik.APIClient, opts *ServiceOptions, authFlowUUID, invalidationFlowUUID string) (int, error) {
+// ensureProxyProvider creates or updates the Authentik proxy provider for BionicGPT.
+func (b *BionicGPTIntegrator) ensureProxyProvider(ctx context.Context, client *authentik.APIClient, settings *authentikProxySettings, authFlowUUID, invalidationFlowUUID string, logger otelzap.LoggerWithCtx) (int, error) {
 	// Check if provider already exists
 	providers, err := client.ListProxyProviders(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to list proxy providers: %w", err)
 	}
 
-	// Sanitize DNS (remove protocol, port)
-	domain := strings.TrimPrefix(opts.DNS, "http://")
-	domain = strings.TrimPrefix(domain, "https://")
-	if colonPos := strings.Index(domain, ":"); colonPos != -1 {
-		domain = domain[:colonPos] // Strip port
+	config := &authentik.ProxyProviderConfig{
+		Name:                hecate.BionicGPTProxyProviderName,
+		Mode:                "forward_single",
+		ExternalHost:        settings.ExternalHost,
+		InternalHost:        settings.InternalHost,
+		AuthorizationFlow:   authFlowUUID,
+		InvalidationFlow:    invalidationFlowUUID,
+		BasicAuthEnabled:    boolPtr(false),
+		InterceptHeaderAuth: boolPtr(true),
+		CookieDomain:        settings.CookieDomain,
+		AccessTokenValidity: "hours=1",
 	}
-	domain = strings.TrimSpace(domain)
-
-	externalHost := fmt.Sprintf("https://%s", domain)
-	internalHost := fmt.Sprintf("http://%s", opts.Backend)
 
 	for _, provider := range providers {
-		if provider.Name == "BionicGPT" {
-			// Check if external host changed
-			if provider.ExternalHost != externalHost {
-				// Update provider
-				if err := client.UpdateProxyProvider(ctx, provider.PK, &authentik.ProxyProviderConfig{
-					Name:              "BionicGPT",
-					Mode:              "forward_single",
-					ExternalHost:      externalHost,
-					InternalHost:      internalHost,
-					AuthorizationFlow: authFlowUUID,
-					InvalidationFlow:  invalidationFlowUUID,
-				}); err != nil {
-					return 0, fmt.Errorf("failed to update proxy provider: %w", err)
-				}
+		if provider.Name == hecate.BionicGPTProxyProviderName {
+			if err := client.UpdateProxyProvider(ctx, provider.PK, config); err != nil {
+				return 0, fmt.Errorf("failed to update proxy provider: %w", err)
 			}
+			logger.Info("    ✓ Proxy provider updated",
+				zap.Int("provider_pk", provider.PK),
+				zap.String("external_host", settings.ExternalHost))
 			return provider.PK, nil
 		}
 	}
 
-	// Create new provider
-	provider, err := client.CreateProxyProvider(ctx, &authentik.ProxyProviderConfig{
-		Name:              "BionicGPT",
-		Mode:              "forward_single", // Forward auth for single application
-		ExternalHost:      externalHost,
-		InternalHost:      internalHost, // Not actually used in forward auth, but required by API
-		AuthorizationFlow: authFlowUUID,
-		InvalidationFlow:  invalidationFlowUUID,
-	})
+	provider, err := client.CreateProxyProvider(ctx, config)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create proxy provider: %w", err)
 	}
 
+	logger.Info("    ✓ Proxy provider created",
+		zap.Int("provider_pk", provider.PK),
+		zap.String("external_host", settings.ExternalHost))
+
 	return provider.PK, nil
 }
 
-// createAuthentikApplication creates the BionicGPT application in Authentik
-func (b *BionicGPTIntegrator) createAuthentikApplication(ctx context.Context, client *authentik.APIClient, providerPK int, domain string) error {
-	// Check if application already exists FOR THIS SPECIFIC DNS (P1 #5 fix)
+// ensureAuthentikApplication creates or updates the Authentik application.
+func (b *BionicGPTIntegrator) ensureAuthentikApplication(ctx context.Context, client *authentik.APIClient, providerPK int, groupPK, launchURL string, logger otelzap.LoggerWithCtx) (*authentik.ApplicationResponse, error) {
 	apps, err := client.ListApplications(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to list applications: %w", err)
+		return nil, fmt.Errorf("failed to list applications: %w", err)
 	}
 
-	expectedLaunchURL := fmt.Sprintf("https://%s", domain)
 	for _, app := range apps {
-		// Check both slug AND launch URL to support multiple BionicGPT deployments
-		if app.Slug == "bionicgpt" && app.MetaLaunchURL == expectedLaunchURL {
-			return nil // Already exists for this DNS
+		if app.Slug == hecate.BionicGPTApplicationSlug {
+			updates := map[string]interface{}{}
+			if app.Provider != providerPK {
+				updates["provider"] = providerPK
+			}
+			if launchURL != "" && app.MetaLaunchURL != launchURL {
+				updates["meta_launch_url"] = launchURL
+			}
+			if groupPK != "" && app.Group != groupPK {
+				updates["group"] = groupPK
+			}
+
+			if len(updates) > 0 {
+				if err := client.UpdateApplication(ctx, hecate.BionicGPTApplicationSlug, updates); err != nil {
+					return nil, fmt.Errorf("failed to update application: %w", err)
+				}
+			}
+
+			if launchURL != "" {
+				app.MetaLaunchURL = launchURL
+			}
+			if groupPK != "" {
+				app.Group = groupPK
+			}
+			app.Provider = providerPK
+
+			logger.Info("    ✓ Authentik application updated", zap.String("slug", app.Slug))
+			return &app, nil
 		}
 	}
 
-	// Create new application
-	launchURL := expectedLaunchURL
-	_, err = client.CreateApplication(
+	app, err := client.CreateApplication(
 		ctx,
-		"BionicGPT",
-		"bionicgpt",
+		hecate.BionicGPTApplicationName,
+		hecate.BionicGPTApplicationSlug,
 		providerPK,
 		launchURL,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create application: %w", err)
+		return nil, fmt.Errorf("failed to create application: %w", err)
 	}
 
-	return nil
+	if groupPK != "" {
+		if err := client.UpdateApplication(ctx, hecate.BionicGPTApplicationSlug, map[string]interface{}{"group": groupPK}); err != nil {
+			return nil, fmt.Errorf("failed to assign group to application: %w", err)
+		}
+		app.Group = groupPK
+	}
+
+	logger.Info("    ✓ Authentik application created", zap.String("slug", app.Slug))
+	return app, nil
 }
 
 // assignToOutpost assigns the BionicGPT application to the embedded outpost

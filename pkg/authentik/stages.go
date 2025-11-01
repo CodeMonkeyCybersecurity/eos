@@ -163,6 +163,79 @@ func (c *APIClient) CreateUserWriteStage(ctx context.Context, name string, creat
 	return &stage, nil
 }
 
+// GetUserWriteStage retrieves a user-write stage by primary key.
+func (c *APIClient) GetUserWriteStage(ctx context.Context, pk string) (*UserWriteStageResponse, error) {
+	url := fmt.Sprintf("%s/api/v3/stages/user_write/%s/", c.BaseURL, pk)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("user write stage fetch failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("user write stage fetch failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var stage UserWriteStageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&stage); err != nil {
+		return nil, fmt.Errorf("failed to decode user write stage response: %w", err)
+	}
+
+	return &stage, nil
+}
+
+// UpdateUserWriteStage applies partial updates to a user-write stage.
+func (c *APIClient) UpdateUserWriteStage(ctx context.Context, pk string, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	jsonBody, err := json.Marshal(updates)
+	if err != nil {
+		return fmt.Errorf("failed to marshal user write stage update: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/stages/user_write/%s/", c.BaseURL, pk)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("user write stage update failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("user write stage update failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // CreatePasswordStage creates a password stage
 func (c *APIClient) CreatePasswordStage(ctx context.Context, name string) (*PasswordStageResponse, error) {
 	reqBody := map[string]interface{}{

@@ -13,12 +13,13 @@ import (
 
 // ApplicationRequest represents the request body for creating an application
 type ApplicationRequest struct {
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Provider    int    `json:"provider,omitempty"` // Provider PK
-	MetaLaunchURL string `json:"meta_launch_url,omitempty"`
-	MetaIcon    string `json:"meta_icon,omitempty"`
-	MetaDescription string `json:"meta_description,omitempty"`
+	Name             string `json:"name"`
+	Slug             string `json:"slug"`
+	Provider         int    `json:"provider,omitempty"` // Provider PK
+	Group            string `json:"group,omitempty"`
+	MetaLaunchURL    string `json:"meta_launch_url,omitempty"`
+	MetaIcon         string `json:"meta_icon,omitempty"`
+	MetaDescription  string `json:"meta_description,omitempty"`
 	PolicyEngineMode string `json:"policy_engine_mode,omitempty"` // "all" or "any"
 }
 
@@ -28,23 +29,24 @@ type ApplicationResponse struct {
 	Name        string `json:"name"`
 	Slug        string `json:"slug"`
 	Provider    int    `json:"provider,omitempty"`
+	Group       string `json:"group,omitempty"`
 	ProviderObj struct {
 		PK   int    `json:"pk"`
 		Name string `json:"name"`
 	} `json:"provider_obj,omitempty"`
-	MetaLaunchURL string `json:"meta_launch_url,omitempty"`
-	MetaIcon    string `json:"meta_icon,omitempty"`
-	MetaDescription string `json:"meta_description,omitempty"`
+	MetaLaunchURL    string `json:"meta_launch_url,omitempty"`
+	MetaIcon         string `json:"meta_icon,omitempty"`
+	MetaDescription  string `json:"meta_description,omitempty"`
 	PolicyEngineMode string `json:"policy_engine_mode,omitempty"`
 }
 
 // CreateApplication creates a new application in Authentik
 func (c *APIClient) CreateApplication(ctx context.Context, name, slug string, providerPK int, launchURL string) (*ApplicationResponse, error) {
 	reqBody := ApplicationRequest{
-		Name:        name,
-		Slug:        slug,
-		Provider:    providerPK,
-		MetaLaunchURL: launchURL,
+		Name:             name,
+		Slug:             slug,
+		Provider:         providerPK,
+		MetaLaunchURL:    launchURL,
 		PolicyEngineMode: "any", // Default to "any" policy mode
 	}
 
@@ -178,6 +180,45 @@ func (c *APIClient) DeleteApplication(ctx context.Context, slug string) error {
 	if resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("application deletion failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// UpdateApplication updates an application's configuration using PATCH semantics.
+// Common use cases: attach proxy provider, set default group, update launch URL.
+func (c *APIClient) UpdateApplication(ctx context.Context, slug string, updates map[string]interface{}) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	jsonBody, err := json.Marshal(updates)
+	if err != nil {
+		return fmt.Errorf("failed to marshal application update request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/core/applications/%s/", c.BaseURL, slug)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("application update request failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("application update failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

@@ -259,6 +259,13 @@ func (c *AuthentikClient) AddUserToGroup(username, groupName string) error {
 	}
 
 	// Add user to group by updating user's groups
+	// Ensure we don't duplicate group assignments (idempotent call)
+	for _, existing := range user.Groups {
+		if existing == targetGroup.UUID {
+			return nil
+		}
+	}
+
 	body := map[string]interface{}{
 		"groups": append(user.Groups, targetGroup.UUID),
 	}

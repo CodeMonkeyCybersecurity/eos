@@ -280,6 +280,17 @@ const (
 	// REFERENCE: https://github.com/bionic-gpt/bionic-gpt
 	BionicGPTDefaultPort = shared.PortBionicGPT // 8513
 
+	// BionicGPTApplicationName is the human-readable application name in Authentik
+	BionicGPTApplicationName = "BionicGPT"
+	// BionicGPTApplicationSlug is the slug used when creating the Authentik application
+	BionicGPTApplicationSlug = "bionicgpt"
+	// BionicGPTProxyProviderName is the Authentik proxy provider name
+	BionicGPTProxyProviderName = "BionicGPT Proxy"
+	// BionicGPTUserGroupName is the Authentik group granting access to the app
+	BionicGPTUserGroupName = "BionicGPT Users"
+	// BionicGPTExpressionPolicyName is the Authentik policy enforcing group membership
+	BionicGPTExpressionPolicyName = "Only BionicGPT Users"
+
 	// BionicGPTHealthEndpoint - DEPRECATED - This endpoint does NOT exist in BionicGPT
 	// VENDOR RESEARCH: Verified via source code analysis - NO /health, /healthz, /ready endpoints
 	// SOURCE: https://github.com/bionic-gpt/bionic-gpt (crates/web-server/main.rs)
