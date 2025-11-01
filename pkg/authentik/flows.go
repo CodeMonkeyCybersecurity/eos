@@ -258,7 +258,7 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 32768))
 	if readErr != nil {
 		logger.Error("Failed to read import response body",
 			zap.Error(readErr))
