@@ -143,6 +143,33 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 			continue
 		}
 
+		// CRITICAL: Authentication flow requires enrollment and recovery flow UUIDs
+		// RATIONALE: Authentik API requires flow references by UUID, not slug
+		// TIMING: Must look up after enrollment/recovery are imported, before authentication is rendered
+		if flow.Name == "Authentication" {
+			// Look up enrollment and recovery flows that were just imported
+			enrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-enrollment", appSlug), 5, 1*time.Second)
+			recoveryFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-recovery", appSlug), 5, 1*time.Second)
+
+			if enrollmentFlow != nil {
+				templateData.EnrollmentUUID = enrollmentFlow.PK
+				logger.Debug("Resolved enrollment flow UUID for authentication flow",
+					zap.String("enrollment_uuid", enrollmentFlow.PK))
+			}
+			if recoveryFlow != nil {
+				templateData.RecoveryUUID = recoveryFlow.PK
+				logger.Debug("Resolved recovery flow UUID for authentication flow",
+					zap.String("recovery_uuid", recoveryFlow.PK))
+			}
+
+			if enrollmentFlow == nil || recoveryFlow == nil {
+				logger.Warn("Authentication flow requires enrollment and recovery flows to be imported first",
+					zap.Bool("enrollment_found", enrollmentFlow != nil),
+					zap.Bool("recovery_found", recoveryFlow != nil))
+				// Continue anyway - template will render with empty UUIDs which will fail Authentik validation
+			}
+		}
+
 		rendered, err := renderFlowTemplate(flow.Template, templateData)
 		if err != nil {
 			return fmt.Errorf("failed to render flow template %q: %w", flow.Name, err)
@@ -316,10 +343,12 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 }
 
 type flowTemplateData struct {
-	AppSlug   string
-	AppTitle  string
-	GroupUUID string
-	GroupName string
+	AppSlug        string
+	AppTitle       string
+	GroupUUID      string
+	GroupName      string
+	EnrollmentUUID string // UUID of enrollment flow (for authentication flow template)
+	RecoveryUUID   string // UUID of recovery flow (for authentication flow template)
 }
 
 type flowDefinition struct {
@@ -883,8 +912,12 @@ entries:
         - email
         - username
       template: stages/identification/login.html
-      enrollment_flow: "{{ .AppSlug }}-enrollment"
-      recovery_flow: "{{ .AppSlug }}-recovery"
+      {{- if .EnrollmentUUID }}
+      enrollment_flow: {{ .EnrollmentUUID }}
+      {{- end }}
+      {{- if .RecoveryUUID }}
+      recovery_flow: {{ .RecoveryUUID }}
+      {{- end }}
       show_source_labels: true
 
   - identifiers:
