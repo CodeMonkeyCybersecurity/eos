@@ -148,6 +148,12 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 			return fmt.Errorf("failed to render flow template %q: %w", flow.Name, err)
 		}
 
+		// CRITICAL: Log rendered YAML preview to verify template interpolation
+		logger.Debug("Rendered flow YAML",
+			zap.String("flow", flow.Name),
+			zap.Int("yaml_size", len(rendered)),
+			zap.String("yaml_preview", string(rendered[:min(500, len(rendered))]))) // First 500 chars
+
 		if cfg.DryRun {
 			logger.Info("[dry-run] Would import Authentik flow",
 				zap.String("flow", flow.Name),
@@ -163,13 +169,31 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 			}
 		}
 
+		logger.Info("Importing flow to Authentik",
+			zap.String("flow", flow.Name),
+			zap.String("slug", flow.Slug))
+
 		if err := client.ImportFlow(rc.Ctx, rendered); err != nil {
 			return fmt.Errorf("failed to import flow %q: %w", flow.Name, err)
 		}
 
-		logger.Info("✓ Flow imported",
+		// CRITICAL: Verify flow actually exists after import
+		// RATIONALE: Authentik may return 200 OK but not create the flow (validation errors, etc.)
+		// Use retry to handle eventual consistency (API indexing lag)
+		// RETRY STRATEGY: 5 attempts with 2s initial delay (2s, 4s, 8s, 16s, 32s = max 62s wait)
+		verifiedFlow := getFlowWithRetry(rc, client, logger, flow.Slug, 5, 2*time.Second)
+		if verifiedFlow == nil {
+			logger.Error("Flow import reported success but flow does not exist",
+				zap.String("flow_name", flow.Name),
+				zap.String("slug", flow.Slug),
+				zap.String("remediation", "Check Authentik logs and YAML syntax"))
+			return fmt.Errorf("flow import verification failed: flow %q does not exist after import", flow.Name)
+		}
+
+		logger.Info("✓ Flow imported and verified",
 			zap.String("flow", flow.Name),
-			zap.String("slug", flow.Slug))
+			zap.String("slug", flow.Slug),
+			zap.String("uuid", verifiedFlow.PK))
 		importedSlugs = append(importedSlugs, flow.Slug)
 	}
 
@@ -202,11 +226,12 @@ func EnableDefaultFlows(rc *eos_io.RuntimeContext, cfg *DefaultFlowsConfig) erro
 			// CRITICAL: Brand API requires flow UUIDs, not slugs
 			// Lookup each flow to get its PK (UUID) with retry logic for eventual consistency
 			// RATIONALE: Freshly imported flows may not be immediately queryable due to Authentik indexing
-			authFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-authentication", appSlug), 3, 2*time.Second)
-			enrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-enrollment", appSlug), 3, 2*time.Second)
-			invalidationGlobalFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-invalidation-global", appSlug), 3, 2*time.Second)
-			recoveryFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-recovery", appSlug), 3, 2*time.Second)
-			unenrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-unenrollment", appSlug), 3, 2*time.Second)
+			// RETRY STRATEGY: 5 attempts with exponential backoff (1s, 2s, 4s, 8s, 16s = max 31s wait)
+			authFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-authentication", appSlug), 5, 1*time.Second)
+			enrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-enrollment", appSlug), 5, 1*time.Second)
+			invalidationGlobalFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-invalidation-global", appSlug), 5, 1*time.Second)
+			recoveryFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-recovery", appSlug), 5, 1*time.Second)
+			unenrollmentFlow := getFlowWithRetry(rc, client, logger, fmt.Sprintf("%s-unenrollment", appSlug), 5, 1*time.Second)
 
 			// Only update brand if we successfully looked up all flow UUIDs
 			if authFlow != nil && enrollmentFlow != nil && invalidationGlobalFlow != nil && recoveryFlow != nil && unenrollmentFlow != nil {
@@ -963,41 +988,49 @@ entries:
       timeout: 30
 `
 
-// getFlowWithRetry attempts to retrieve a flow with retry logic for eventual consistency
-// RATIONALE: Freshly imported flows may not be immediately queryable in Authentik
-// This is a timing issue - the flow exists but the index hasn't updated yet
-func getFlowWithRetry(rc *eos_io.RuntimeContext, client *authentik.APIClient, logger otelzap.LoggerWithCtx, slug string, maxRetries int, retryDelay time.Duration) *authentik.FlowResponse {
+// getFlowWithRetry attempts to retrieve a flow with retry logic and exponential backoff
+// RATIONALE: Freshly imported flows may not be immediately queryable in Authentik due to indexing lag
+// This is a timing issue - the flow exists but the API index hasn't updated yet
+// RETRY STRATEGY: Exponential backoff (1s, 2s, 4s, 8s, 16s) for up to 5 attempts (max 31s wait)
+func getFlowWithRetry(rc *eos_io.RuntimeContext, client *authentik.APIClient, logger otelzap.LoggerWithCtx, slug string, maxRetries int, initialDelay time.Duration) *authentik.FlowResponse {
+	currentDelay := initialDelay
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		flow, err := client.GetFlow(rc.Ctx, slug)
 		if err != nil {
-			logger.Warn("Failed to lookup flow UUID",
+			logger.Warn("Failed to lookup flow UUID (API error)",
 				zap.String("slug", slug),
 				zap.Int("attempt", attempt),
 				zap.Int("max_retries", maxRetries),
 				zap.Error(err))
 		} else if flow != nil {
 			// Success - flow found
-			logger.Debug("Found flow UUID",
+			logger.Debug("Flow UUID resolved",
 				zap.String("slug", slug),
 				zap.String("uuid", flow.PK),
+				zap.String("flow_name", flow.Name),
 				zap.Int("attempt", attempt))
 			return flow
 		}
 
 		// Flow not found yet (flow == nil, err == nil means "not found" per GetFlow contract)
 		if attempt < maxRetries {
-			logger.Debug("Flow not found yet, waiting before retry",
+			logger.Debug("Flow not indexed yet, retrying with exponential backoff",
 				zap.String("slug", slug),
 				zap.Int("attempt", attempt),
 				zap.Int("max_retries", maxRetries),
-				zap.Duration("retry_delay", retryDelay))
-			time.Sleep(retryDelay)
+				zap.Duration("retry_delay", currentDelay),
+				zap.String("reason", "Authentik API eventual consistency"))
+			time.Sleep(currentDelay)
+			currentDelay *= 2 // Exponential backoff: 1s → 2s → 4s → 8s → 16s
 		}
 	}
 
-	// All retries exhausted
-	logger.Warn("Flow not found after all retries",
+	// All retries exhausted - flow may not exist or API is very slow
+	logger.Warn("Flow not found after all retries (may not exist or API indexing is slow)",
 		zap.String("slug", slug),
-		zap.Int("max_retries", maxRetries))
+		zap.Int("max_retries", maxRetries),
+		zap.Duration("total_wait_time", initialDelay*(1<<uint(maxRetries)-1)), // Sum of geometric series
+		zap.String("remediation", "Check if flow was actually imported successfully"))
 	return nil
 }

@@ -10,6 +10,9 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // FlowResponse represents an Authentik flow
@@ -202,25 +205,44 @@ func (c *APIClient) DeleteFlowBySlug(ctx context.Context, slug string) error {
 
 // ImportFlow uploads a blueprint YAML definition for a flow.
 func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
+	logger := otelzap.Ctx(ctx)
+
+	logger.Debug("Importing Authentik flow",
+		zap.Int("yaml_size_bytes", len(yaml)))
+
 	url := fmt.Sprintf("%s/api/v3/flows/instances/import/", c.BaseURL)
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", "flow.yaml")
 	if err != nil {
+		logger.Error("Failed to create multipart form for flow import",
+			zap.Error(err))
 		return fmt.Errorf("failed to create multipart form: %w", err)
 	}
 
 	if _, err := part.Write(yaml); err != nil {
+		logger.Error("Failed to write flow blueprint to multipart form",
+			zap.Error(err))
 		return fmt.Errorf("failed to write flow blueprint: %w", err)
 	}
 
 	if err := writer.Close(); err != nil {
+		logger.Error("Failed to finalize multipart form",
+			zap.Error(err))
 		return fmt.Errorf("failed to finalize multipart form: %w", err)
 	}
 
+	logger.Debug("Making flow import request",
+		zap.String("url", url),
+		zap.String("method", http.MethodPost),
+		zap.String("content_type", writer.FormDataContentType()))
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
+		logger.Error("Failed to create HTTP request for flow import",
+			zap.String("url", url),
+			zap.Error(err))
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -229,14 +251,84 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
+		logger.Error("Flow import request failed",
+			zap.String("url", url),
+			zap.Error(err))
 		return fmt.Errorf("flow import request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("flow import failed with status %d: %s", resp.StatusCode, string(body))
+	responseBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if readErr != nil {
+		logger.Error("Failed to read import response body",
+			zap.Error(readErr))
+		return fmt.Errorf("failed to read response body: %w", readErr)
 	}
+
+	// CRITICAL: Log response body at INFO level so we can see what Authentik returned
+	logger.Info("Received flow import response",
+		zap.Int("status_code", resp.StatusCode),
+		zap.Int("body_length", len(responseBody)),
+		zap.String("response_body", string(responseBody))) // CRITICAL: Log actual response
+
+	// CRITICAL FIX: Parse response body on ALL status codes, not just errors
+	// Authentik may return 200 OK but include validation errors in the response
+	var importResponse struct {
+		Success bool     `json:"success"`
+		Detail  string   `json:"detail"`
+		Logs    []string `json:"logs"`
+	}
+
+	// Try to parse the response (may be JSON or empty on 204 No Content)
+	if len(responseBody) > 0 {
+		if err := json.Unmarshal(responseBody, &importResponse); err != nil {
+			logger.Warn("Failed to parse import response as JSON",
+				zap.Error(err),
+				zap.String("raw_response", string(responseBody)))
+			// Continue - may be plain text or empty response
+		} else {
+			logger.Info("Parsed import response",
+				zap.Bool("success", importResponse.Success),
+				zap.String("detail", importResponse.Detail),
+				zap.Strings("logs", importResponse.Logs))
+		}
+	}
+
+	// Check for HTTP-level errors
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		// HTTP error status
+		if importResponse.Detail != "" {
+			logger.Error("Flow import failed with API error",
+				zap.Int("status_code", resp.StatusCode),
+				zap.String("error_detail", importResponse.Detail),
+				zap.Strings("import_logs", importResponse.Logs))
+			return fmt.Errorf("flow import failed with status %d: %s (logs: %v)", resp.StatusCode, importResponse.Detail, importResponse.Logs)
+		}
+
+		logger.Error("Flow import failed",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("response_body", string(responseBody)))
+		return fmt.Errorf("flow import failed with status %d: %s", resp.StatusCode, string(responseBody))
+	}
+
+	// CRITICAL: Check response body for import validation errors even on 200 OK
+	if importResponse.Success == false && importResponse.Detail != "" {
+		logger.Error("Flow import returned success status but validation failed",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("error_detail", importResponse.Detail),
+			zap.Strings("import_logs", importResponse.Logs))
+		return fmt.Errorf("flow import validation failed: %s (logs: %v)", importResponse.Detail, importResponse.Logs)
+	}
+
+	// Log import logs if available (may contain warnings or info)
+	if len(importResponse.Logs) > 0 {
+		logger.Info("Flow import completed with logs",
+			zap.Strings("import_logs", importResponse.Logs))
+	}
+
+	logger.Debug("Flow import successful",
+		zap.Int("status_code", resp.StatusCode),
+		zap.String("note", "Flow may take a few seconds to become queryable due to API indexing"))
 
 	return nil
 }
