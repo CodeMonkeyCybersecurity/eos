@@ -14,7 +14,7 @@ import (
 
 var (
 	authType, authURL, authToken, authOut string
-	authAkBaseURL, authAkToken             string // Authentik support
+	authAkBaseURL, authAkToken            string // Authentik support
 )
 
 var AuthExportCmd = &cobra.Command{
@@ -76,13 +76,16 @@ func exportAuthentik(_ *eos_io.RuntimeContext) error {
 	}
 
 	// Use the existing AuthentikCmd logic
-	akBaseURL = url
-	akToken = token
-	akOut = authOut
+	readAuthentikBaseURL = url
+	readAuthentikToken = token
+	readAuthentikBlueprintOut = authOut
+	readAuthentikFlowSlug = ""
+	readAuthentikStageIdentifier = ""
+	readAuthentikStageTypeHint = ""
+	readAuthentikRawOutput = false
 
 	return AuthentikCmd.RunE(AuthentikCmd, []string{})
 }
-
 
 func init() {
 	// General flags

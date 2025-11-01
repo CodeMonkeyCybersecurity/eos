@@ -234,6 +234,9 @@ func init() {
 	updateHecateCmd.Flags().Bool("skip-backend-check", false, "Skip backend connectivity check")
 	updateHecateCmd.Flags().Int("backup-retention-days", 30, "Days to keep old backups (0 = keep forever)")
 
+	// Email configuration flags (used with --add authentik-email)
+	updateHecateCmd.Flags().String("test-email", "", "Send test email to this address after configuration")
+
 	// Mark route and upstream as required when --add is used (validated in RunE)
 }
 
@@ -241,7 +244,8 @@ func init() {
 func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, service string) error {
 	if service == "authentik-email" {
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		return runAddAuthentikEmail(rc, dryRun)
+		testEmail, _ := cmd.Flags().GetString("test-email")
+		return runAddAuthentikEmail(rc, dryRun, testEmail)
 	}
 
 	// Parse flags
@@ -295,10 +299,11 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 	return add.AddService(rc, opts)
 }
 
-// runAddAuthentikEmail configures Authentik email settings using tenant API.
-func runAddAuthentikEmail(rc *eos_io.RuntimeContext, dryRun bool) error {
+// runAddAuthentikEmail configures Authentik email settings using admin API.
+func runAddAuthentikEmail(rc *eos_io.RuntimeContext, dryRun bool, testEmail string) error {
 	if err := hecate.ConfigureAuthentikEmail(rc, &hecate.AuthentikEmailConfig{
-		DryRun: dryRun,
+		DryRun:    dryRun,
+		TestEmail: testEmail,
 	}); err != nil {
 		return fmt.Errorf("failed to configure Authentik email settings: %w", err)
 	}

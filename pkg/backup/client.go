@@ -178,6 +178,18 @@ func (c *Client) getRepositoryPassword() (string, error) {
 			zap.Error(err))
 	}
 
+	// 4a. Secrets directory .env file (fallback for non-local repositories)
+	secretsEnvPath := filepath.Join(SecretsDir, fmt.Sprintf("%s.env", c.repository.Name))
+	if password, err := readPasswordFromEnvFile(secretsEnvPath); err == nil {
+		logger.Debug("Using secrets .env file for restic password",
+			zap.String("path", secretsEnvPath))
+		return password, nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Warn("Failed to read secrets .env file",
+			zap.String("path", secretsEnvPath),
+			zap.Error(err))
+	}
+
 	// 4. Environment variable overrides (least preferred, but supported for manual ops)
 	if password := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD")); password != "" {
 		logger.Warn("Using RESTIC_PASSWORD environment variable; prefer password files for security")
@@ -192,7 +204,19 @@ func (c *Client) getRepositoryPassword() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("restic repository password not found; expected password file at %s or %s", localPasswordPath, secretsPasswordPath)
+	missingErr := fmt.Errorf("restic repository password not found; expected password file at %s, secrets fallback at %s, or RESTIC_PASSWORD in %s",
+		localPasswordPath, secretsPasswordPath, envPath)
+
+	password, wizardErr := c.runPasswordWizard(localPasswordPath, secretsPasswordPath, []string{envPath, secretsEnvPath})
+	if wizardErr == nil {
+		return password, nil
+	}
+	if wizardErr != nil && !errors.Is(wizardErr, errPasswordWizardSkipped) {
+		logger.Warn("Password setup wizard failed",
+			zap.Error(wizardErr))
+	}
+
+	return "", missingErr
 }
 
 // InitRepository initializes a new restic repository

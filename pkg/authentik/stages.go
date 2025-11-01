@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // StageResponse represents a generic stage in Authentik
@@ -74,12 +75,32 @@ type PasswordStageResponse struct {
 
 // StageBindingResponse represents a binding between a flow and a stage
 type StageBindingResponse struct {
-	PK                 string `json:"pk"`
-	Target             string `json:"target"` // Flow PK
-	Stage              string `json:"stage"`  // Stage PK
-	Order              int    `json:"order"`
-	EvaluateOnPlan     bool   `json:"evaluate_on_plan"`
-	ReEvaluatePolicies bool   `json:"re_evaluate_policies"`
+	PK                 string          `json:"pk"`
+	Target             string          `json:"target"` // Flow PK
+	Stage              string          `json:"stage"`  // Stage PK
+	Order              int             `json:"order"`
+	EvaluateOnPlan     bool            `json:"evaluate_on_plan"`
+	ReEvaluatePolicies bool            `json:"re_evaluate_policies"`
+	StageObj           *StageResponse  `json:"stage_obj,omitempty"`
+	TargetObj          *FlowSummary    `json:"target_obj,omitempty"`
+	PolicyBindings     []PolicyBinding `json:"policy_bindings,omitempty"`
+}
+
+// FlowSummary represents minimal flow metadata returned in binding lookups
+type FlowSummary struct {
+	PK          string `json:"pk"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Designation string `json:"designation"`
+}
+
+// PolicyBinding summarizes a policy attached to a binding
+type PolicyBinding struct {
+	PK      string `json:"pk"`
+	Policy  string `json:"policy"`
+	Negate  bool   `json:"negate"`
+	Enabled bool   `json:"enabled"`
+	Order   int    `json:"order"`
 }
 
 // ListStages lists all stages
@@ -231,6 +252,51 @@ func (c *APIClient) UpdateUserWriteStage(ctx context.Context, pk string, updates
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		return fmt.Errorf("user write stage update failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// UpdateStage performs a generic PATCH update for a stage of the specified type.
+func (c *APIClient) UpdateStage(ctx context.Context, stageType, pk string, updates map[string]interface{}) error {
+	if strings.TrimSpace(stageType) == "" {
+		return fmt.Errorf("stage type is required")
+	}
+	if strings.TrimSpace(pk) == "" {
+		return fmt.Errorf("stage primary key is required")
+	}
+	if len(updates) == 0 {
+		return fmt.Errorf("updates map is empty")
+	}
+
+	jsonBody, err := json.Marshal(updates)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stage update request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/stages/%s/%s/", c.BaseURL, stageType, pk)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("stage update request failed: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			_ = closeErr
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("stage update failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

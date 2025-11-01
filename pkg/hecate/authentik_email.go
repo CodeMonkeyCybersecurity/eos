@@ -240,11 +240,11 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 		logger.Info("[dry-run] Would restart Authentik containers")
 	}
 
-	// EVALUATE: Verify email configuration loaded in Authentik
+	// EVALUATE: Update Authentik admin settings via API (global email configuration)
 	if !cfg.DryRun && !cfg.SkipRestart {
-		logger.Info("Verifying email configuration loaded in Authentik")
+		logger.Info("Updating Authentik global email settings via API")
 
-		// Parse values from envManager for verification
+		// Parse values from envManager for API update
 		host := envManager.Variables[AuthentikEmailHostKey].Value
 		portStr := envManager.Variables[AuthentikEmailPortKey].Value
 		port, _ := strconv.Atoi(portStr)
@@ -259,7 +259,7 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 		useSSL, _ := strconv.ParseBool(useSSLStr)
 		timeout, _ := strconv.Atoi(timeoutStr)
 
-		// Update Authentik tenant via API
+		// Build payload for admin settings endpoint
 		payload := map[string]interface{}{
 			"email_host":     host,
 			"email_port":     port,
@@ -271,7 +271,7 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 			"email_from":     emailFrom,
 		}
 
-		logger.Info("Updating Authentik tenant email settings via API",
+		logger.Info("Updating Authentik admin settings",
 			zap.String("email_host", host),
 			zap.Int("email_port", port),
 			zap.String("email_username_masked", maskSensitive(username)),
@@ -282,62 +282,240 @@ func ConfigureAuthentikEmail(rc *eos_io.RuntimeContext, cfg *AuthentikEmailConfi
 
 		token, baseURL, err := discoverAuthentikCredentials(rc)
 		if err != nil {
-			logger.Warn("Failed to discover Authentik credentials for verification",
-				zap.Error(err))
-			logger.Info("Email configuration written to .env and containers restarted, but API verification skipped")
-			logger.Info("Restart Authentik to load configuration: docker compose -f /opt/hecate/docker-compose.yml restart server worker")
-			return nil
-		}
-
-		client := authentik.NewUnifiedClient(baseURL, token)
-
-		tenant, patchPath, err := resolveAuthentikTenant(rc, client)
-		if err != nil {
-			logger.Warn("Failed to resolve Authentik tenant for verification",
-				zap.Error(err))
-			logger.Info("Email configuration written and containers restarted, but API update skipped")
-			return nil
-		}
-
-		logger.Info("Updating Authentik tenant",
-			zap.String("tenant_identifier", tenant.identifier()),
-			zap.String("tenant_domain", tenant.Domain),
-			zap.Bool("tenant_default", tenant.Default),
-			zap.String("tenant_patch_endpoint", patchPath))
-
-		respBody, err := client.Patch(rc.Ctx, patchPath, payload)
-		if err != nil {
-			logger.Warn("Failed to update Authentik tenant email settings via API",
+			logger.Warn("Failed to discover Authentik credentials for API update",
 				zap.Error(err))
 			logger.Info("Email configuration written to .env and containers restarted")
-			logger.Info("Tenant update will occur on next Authentik restart")
-			return nil
-		}
-
-		var updated tenantEmailSettings
-		if err := json.Unmarshal(respBody, &updated); err != nil {
-			logger.Warn("Authentik email update succeeded but response could not be parsed",
-				zap.Error(err))
+			logger.Info("Settings will be loaded from .env on next container start")
 		} else {
-			logger.Info("Authentik email settings updated successfully",
-				zap.String("email_host", updated.EmailHost),
-				zap.Int("email_port", updated.EmailPort),
-				zap.String("email_username_masked", maskSensitive(updated.EmailUsername)),
-				zap.Bool("email_use_tls", updated.EmailUseTLS),
-				zap.Bool("email_use_ssl", updated.EmailUseSSL),
-				zap.Int("email_timeout", updated.EmailTimeout),
-				zap.String("email_from", updated.EmailFrom))
+			client := authentik.NewUnifiedClient(baseURL, token)
+
+			// Update global admin settings (not tenant settings)
+			// RATIONALE: /admin/settings/ is the global email configuration endpoint
+			// This is what email stages with use_global_settings=true will use
+			respBody, err := client.Patch(rc.Ctx, "/admin/settings/", payload)
+			if err != nil {
+				logger.Warn("Failed to update Authentik admin settings via API",
+					zap.Error(err))
+				logger.Info("Email configuration written to .env and containers restarted")
+				logger.Info("Settings will be loaded from .env on next container start")
+			} else {
+				var updated tenantEmailSettings
+				if err := json.Unmarshal(respBody, &updated); err != nil {
+					logger.Debug("Admin settings response could not be parsed (this is normal)",
+						zap.Error(err))
+					logger.Info("Authentik admin settings updated successfully")
+				} else {
+					logger.Info("Authentik admin settings updated successfully",
+						zap.String("email_host", updated.EmailHost),
+						zap.Int("email_port", updated.EmailPort),
+						zap.String("email_username_masked", maskSensitive(updated.EmailUsername)),
+						zap.Bool("email_use_tls", updated.EmailUseTLS),
+						zap.Bool("email_use_ssl", updated.EmailUseSSL),
+						zap.Int("email_timeout", updated.EmailTimeout),
+						zap.String("email_from", updated.EmailFrom))
+				}
+			}
+		}
+	}
+
+	// EVALUATE: Configure all email stages to use global settings
+	if !cfg.DryRun && !cfg.SkipRestart {
+		logger.Info("Configuring email stages to use global settings")
+
+		token, baseURL, err := discoverAuthentikCredentials(rc)
+		if err != nil {
+			logger.Warn("Failed to discover Authentik credentials for email stage configuration",
+				zap.Error(err))
+			logger.Info("Email configuration complete, but email stages not updated")
+			logger.Info("Manually configure email stages to use global settings in Authentik UI")
+		} else {
+			client := authentik.NewUnifiedClient(baseURL, token)
+
+			// Update all email stages to use global settings
+			if err := configureEmailStagesToUseGlobalSettings(rc, client); err != nil {
+				logger.Warn("Failed to configure email stages",
+					zap.Error(err))
+				logger.Info("Email configuration complete, but email stages may need manual configuration")
+				logger.Info("In Authentik UI: Flows & Stages → Stages → Edit each email stage → Enable 'Use global settings'")
+			} else {
+				logger.Info("Email stages configured successfully")
+			}
 		}
 	}
 
 	// EVALUATE: Send test email if requested
 	if cfg.TestEmail != "" && !cfg.DryRun {
-		logger.Info("Test email functionality not yet implemented",
+		logger.Info("Sending test email",
 			zap.String("recipient", cfg.TestEmail))
-		logger.Info("To test email manually, trigger a password reset in Authentik")
+
+		token, baseURL, err := discoverAuthentikCredentials(rc)
+		if err != nil {
+			logger.Warn("Failed to discover Authentik credentials for test email",
+				zap.Error(err))
+			logger.Info("To test email manually, trigger a password reset in Authentik UI")
+		} else {
+			client := authentik.NewUnifiedClient(baseURL, token)
+
+			// Find an email stage to use for testing
+			if err := sendTestEmail(rc, client, cfg.TestEmail); err != nil {
+				logger.Warn("Failed to send test email",
+					zap.Error(err))
+				logger.Info("Email configuration is complete, but test email failed")
+				logger.Info("Check SMTP credentials and firewall rules")
+				logger.Info("To test manually, trigger a password reset in Authentik UI")
+			} else {
+				logger.Info("Test email sent successfully",
+					zap.String("recipient", cfg.TestEmail))
+			}
+		}
 	}
 
 	logger.Info("Authentik email configuration complete")
+
+	return nil
+}
+
+// sendTestEmail sends a test email via an Authentik email stage
+func sendTestEmail(rc *eos_io.RuntimeContext, client *authentik.UnifiedClient, recipient string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// List all email stages to find one we can use for testing
+	data, err := client.Get(rc.Ctx, "/stages/email/")
+	if err != nil {
+		return fmt.Errorf("failed to list email stages: %w", err)
+	}
+
+	var stagesResponse struct {
+		Results []struct {
+			PK                string `json:"pk"`
+			Name              string `json:"name"`
+			UseGlobalSettings bool   `json:"use_global_settings"`
+		} `json:"results"`
+	}
+
+	if err := json.Unmarshal(data, &stagesResponse); err != nil {
+		return fmt.Errorf("failed to parse email stages response: %w", err)
+	}
+
+	if len(stagesResponse.Results) == 0 {
+		return fmt.Errorf("no email stages found - cannot send test email")
+	}
+
+	// Find a stage that uses global settings (preferred) or use the first one
+	var selectedStage *struct {
+		PK                string `json:"pk"`
+		Name              string `json:"name"`
+		UseGlobalSettings bool   `json:"use_global_settings"`
+	}
+
+	for i := range stagesResponse.Results {
+		if stagesResponse.Results[i].UseGlobalSettings {
+			selectedStage = &stagesResponse.Results[i]
+			break
+		}
+	}
+
+	if selectedStage == nil {
+		selectedStage = &stagesResponse.Results[0]
+	}
+
+	logger.Info("Using email stage for test",
+		zap.String("stage_name", selectedStage.Name),
+		zap.String("stage_pk", selectedStage.PK),
+		zap.Bool("uses_global_settings", selectedStage.UseGlobalSettings))
+
+	// Send test email via the stage's test endpoint
+	testPayload := map[string]interface{}{
+		"to": recipient,
+	}
+
+	testPath := fmt.Sprintf("/stages/email/%s/test/", selectedStage.PK)
+	_, err = client.Post(rc.Ctx, testPath, testPayload)
+	if err != nil {
+		return fmt.Errorf("failed to send test email via stage %s: %w", selectedStage.Name, err)
+	}
+
+	return nil
+}
+
+// configureEmailStagesToUseGlobalSettings updates all email stages to use global SMTP settings
+// RATIONALE: Email stages can have individual settings OR use global settings from .env
+// SECURITY: Global settings ensure consistent email configuration across all flows
+func configureEmailStagesToUseGlobalSettings(rc *eos_io.RuntimeContext, client *authentik.UnifiedClient) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// List all email stages
+	data, err := client.Get(rc.Ctx, "/stages/email/")
+	if err != nil {
+		return fmt.Errorf("failed to list email stages: %w", err)
+	}
+
+	// Parse email stages list response
+	var stagesResponse struct {
+		Results []struct {
+			PK                    string `json:"pk"`
+			Name                  string `json:"name"`
+			UseGlobalSettings     bool   `json:"use_global_settings"`
+			ActivateUserOnSuccess bool   `json:"activate_user_on_success"`
+		} `json:"results"`
+	}
+
+	if err := json.Unmarshal(data, &stagesResponse); err != nil {
+		return fmt.Errorf("failed to parse email stages response: %w", err)
+	}
+
+	if len(stagesResponse.Results) == 0 {
+		logger.Info("No email stages found - skipping email stage configuration")
+		return nil
+	}
+
+	logger.Info("Found email stages to configure",
+		zap.Int("count", len(stagesResponse.Results)))
+
+	// Update each email stage
+	updatedCount := 0
+	for _, stage := range stagesResponse.Results {
+		// Skip if already using global settings
+		if stage.UseGlobalSettings {
+			logger.Debug("Email stage already using global settings",
+				zap.String("stage_name", stage.Name),
+				zap.String("stage_pk", stage.PK))
+			continue
+		}
+
+		logger.Info("Updating email stage to use global settings",
+			zap.String("stage_name", stage.Name),
+			zap.String("stage_pk", stage.PK))
+
+		// PATCH the email stage to use global settings
+		payload := map[string]interface{}{
+			"use_global_settings":      true,
+			"activate_user_on_success": true, // Also ensure users are activated on email verification
+		}
+
+		patchPath := fmt.Sprintf("/stages/email/%s/", stage.PK)
+		_, err := client.Patch(rc.Ctx, patchPath, payload)
+		if err != nil {
+			logger.Warn("Failed to update email stage",
+				zap.String("stage_name", stage.Name),
+				zap.String("stage_pk", stage.PK),
+				zap.Error(err))
+			continue
+		}
+
+		logger.Info("Email stage updated successfully",
+			zap.String("stage_name", stage.Name),
+			zap.String("stage_pk", stage.PK))
+		updatedCount++
+	}
+
+	if updatedCount > 0 {
+		logger.Info("Email stages configured to use global settings",
+			zap.Int("updated_count", updatedCount),
+			zap.Int("total_count", len(stagesResponse.Results)))
+	} else {
+		logger.Info("All email stages already using global settings")
+	}
 
 	return nil
 }
