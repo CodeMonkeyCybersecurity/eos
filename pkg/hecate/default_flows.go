@@ -939,7 +939,6 @@ entries:
     model: authentik_stages_authenticator_totp.authenticatortotpstage
     attrs:
       configure_flow: null
-      friendly_name: null
       digits: 6
 
   - identifiers:
