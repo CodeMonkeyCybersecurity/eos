@@ -11,7 +11,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -27,18 +26,14 @@ type InstallConfig struct {
 
 	// SSHPort is the SSH port for Git operations (default: 2222)
 	SSHPort int
-
-	// SecretManager is the initialized secret manager for credential storage
-	SecretManager *secrets.Manager
 }
 
 // DefaultInstallConfig returns the default installation configuration
-func DefaultInstallConfig(secretManager *secrets.Manager) *InstallConfig {
+func DefaultInstallConfig() *InstallConfig {
 	return &InstallConfig{
-		InstallDir:    GiteaDir,
-		Port:          GiteaPort,
-		SSHPort:       GiteaSSHPort,
-		SecretManager: secretManager,
+		InstallDir: GiteaDir,
+		Port:       GiteaPort,
+		SSHPort:    GiteaSSHPort,
 	}
 }
 
@@ -105,33 +100,13 @@ func interveneInstall(rc *eos_io.RuntimeContext, config *InstallConfig) error {
 		}
 	}
 
-	// Step 3: Generate or retrieve database password
-	logger.Info("Managing secrets for Gitea")
-	requiredSecrets := map[string]secrets.SecretType{
-		"db_password": secrets.SecretTypePassword,
-	}
-	serviceSecrets, err := config.SecretManager.EnsureServiceSecrets(rc.Ctx, "gitea", requiredSecrets)
+	// Step 3: Generate database password
+	logger.Info("Generating database password")
+	dbPassword, err := crypto.GeneratePassword(32)
 	if err != nil {
-		// Fallback: generate password locally if secret manager fails
-		logger.Warn("Failed to manage secrets via secret manager, generating locally", zap.Error(err))
-		password, genErr := crypto.GeneratePassword(32)
-		if genErr != nil {
-			return fmt.Errorf("failed to generate password: %w", genErr)
-		}
-		serviceSecrets = &secrets.ServiceSecrets{
-			Secrets: map[string]interface{}{
-				"db_password": password,
-			},
-			Backend: "local",
-		}
+		return fmt.Errorf("failed to generate database password: %w", err)
 	}
-
-	dbPassword, ok := serviceSecrets.Secrets["db_password"].(string)
-	if !ok {
-		return fmt.Errorf("database password is not a string")
-	}
-	logger.Info("Secrets managed",
-		zap.String("backend", serviceSecrets.Backend))
+	logger.Debug("Database password generated")
 
 	// Step 4: Create docker-compose.yml
 	composeFilePath := filepath.Join(config.InstallDir, GiteaComposeFile)
@@ -189,7 +164,8 @@ func evaluateInstallation(rc *eos_io.RuntimeContext, config *InstallConfig) erro
 		zap.String("installation_directory", config.InstallDir),
 		zap.String("compose_file", filepath.Join(config.InstallDir, GiteaComposeFile)),
 		zap.String("data_directory", filepath.Join(config.InstallDir, "data")),
-		zap.String("database_password_location", "Retrieve via: eos read credentials --service gitea"))
+		zap.String("env_file", filepath.Join(config.InstallDir, ".env")),
+		zap.String("database_password_note", "Database password stored in .env file"))
 
 	logger.Info("Next steps",
 		zap.String("step_1", fmt.Sprintf("Navigate to http://%s:%d", shared.GetInternalHostname(), config.Port)),
