@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -163,6 +164,83 @@ func (c *APIClient) UpdateFlow(ctx context.Context, pk string, updates map[strin
 	return nil
 }
 
+// DeleteFlow removes a flow by PK.
+func (c *APIClient) DeleteFlow(ctx context.Context, pk string) error {
+	url := fmt.Sprintf("%s/api/v3/flows/instances/%s/", c.BaseURL, pk)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("flow deletion request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("flow deletion failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// DeleteFlowBySlug removes a flow if it exists.
+func (c *APIClient) DeleteFlowBySlug(ctx context.Context, slug string) error {
+	flow, err := c.GetFlow(ctx, slug)
+	if err != nil {
+		return err
+	}
+	if flow == nil {
+		return nil
+	}
+	return c.DeleteFlow(ctx, flow.PK)
+}
+
+// ImportFlow uploads a blueprint YAML definition for a flow.
+func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
+	url := fmt.Sprintf("%s/api/v3/flows/instances/import/", c.BaseURL)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", "flow.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to create multipart form: %w", err)
+	}
+
+	if _, err := part.Write(yaml); err != nil {
+		return fmt.Errorf("failed to write flow blueprint: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("failed to finalize multipart form: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("flow import request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("flow import failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
 // CreateEnrollmentFlow creates a new enrollment flow
 func (c *APIClient) CreateEnrollmentFlow(ctx context.Context, name, slug, title string) (*FlowResponse, error) {
 	reqBody := map[string]interface{}{
@@ -209,30 +287,6 @@ func (c *APIClient) CreateEnrollmentFlow(ctx context.Context, name, slug, title 
 	}
 
 	return &flow, nil
-}
-
-// DeleteFlow deletes a flow by PK
-func (c *APIClient) DeleteFlow(ctx context.Context, pk string) error {
-	url := fmt.Sprintf("%s/api/v3/flows/instances/%s/", c.BaseURL, pk)
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("flow deletion request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("flow deletion failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
 }
 
 // GetFlowStages retrieves all stage bindings for a flow (ordered by binding order)

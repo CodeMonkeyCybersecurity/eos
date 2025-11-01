@@ -211,7 +211,7 @@ func init() {
 	updateHecateCmd.Flags().String("add", "", "Add a new service to Hecate (service name)")
 	updateHecateCmd.Flags().String("remove", "", "Remove a service from Hecate (service name)")
 	updateHecateCmd.Flags().String("fix", "", "Fix drift/misconfigurations for a service (service name)")
-	updateHecateCmd.Flags().String("enable", "", "Enable a feature for Hecate (feature name: self-enrollment, oauth2-signout)")
+	updateHecateCmd.Flags().String("enable", "", "Enable a feature for Hecate (feature name: self-enrollment, oauth2-signout, default-flows)")
 	updateHecateCmd.Flags().StringP("dns", "d", "", "Domain/subdomain for the service (required with --add)")
 	updateHecateCmd.Flags().StringP("upstream", "u", "", "Backend address (ip:port or hostname:port, required with --add)")
 
@@ -223,6 +223,7 @@ func init() {
 	updateHecateCmd.Flags().Bool("enable-captcha", true, "Enable captcha for self-enrollment (default: true, uses test keys initially)")
 	updateHecateCmd.Flags().Bool("disable-captcha", false, "Disable captcha protection (NOT RECOMMENDED for production)")
 	updateHecateCmd.Flags().Bool("require-approval", false, "New users inactive until admin approves (default: active immediately)")
+	updateHecateCmd.Flags().Bool("update-existing", true, "Replace existing Authentik resources when enabling default flows")
 
 	// Optional flags for --add
 	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route (NOTE: BionicGPT always uses Authentik forward auth regardless of this flag)")
@@ -409,7 +410,9 @@ func runEnableFeature(rc *eos_io.RuntimeContext, cmd *cobra.Command, feature str
 		return runEnableOAuth2Signout(rc, cmd)
 	case "self-enrollment":
 		return runEnableSelfEnrollment(rc, cmd)
+	case "default-flows":
+		return runEnableDefaultFlows(rc, cmd)
 	default:
-		return fmt.Errorf("unknown feature: %s\n\nAvailable features:\n  - oauth2-signout\n  - self-enrollment", feature)
+		return fmt.Errorf("unknown feature: %s\n\nAvailable features:\n  - oauth2-signout\n  - self-enrollment\n  - default-flows", feature)
 	}
 }

@@ -35,6 +35,7 @@ OLD SYNTAX (deprecated, still works):
 Available features:
   oauth2-signout     - Add /oauth2/sign_out logout handlers to Authentik-protected routes
   self-enrollment    - Enable user self-registration via Authentik enrollment flow
+  default-flows      - Deploy opinionated Authentik 2025.10 default flows for an app
 
 The enable command modifies live configuration via APIs (zero-downtime):
   - Uses Caddy Admin API to inject route handlers
@@ -75,7 +76,7 @@ Examples (NEW SYNTAX - RECOMMENDED):
 		case "self-enrollment":
 			return runEnableSelfEnrollment(rc, cmd)
 		default:
-			return fmt.Errorf("unknown feature: %s\n\nAvailable features:\n  - oauth2-signout\n  - self-enrollment", feature)
+			return fmt.Errorf("unknown feature: %s\n\nAvailable features:\n  - oauth2-signout\n  - self-enrollment\n  - default-flows", feature)
 		}
 	}),
 }
@@ -190,4 +191,34 @@ func runEnableSelfEnrollment(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	}
 
 	return nil
+}
+
+// runEnableDefaultFlows deploys the opinionated Authentik default flows.
+func runEnableDefaultFlows(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	appName, _ := cmd.Flags().GetString("app")
+	domain, _ := cmd.Flags().GetString("dns")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	updateExisting, _ := cmd.Flags().GetBool("update-existing")
+
+	if appName == "" {
+		appName = hecate.BionicGPTApplicationSlug
+		logger.Info("No --app provided, defaulting to", zap.String("app", appName))
+	}
+
+	logger.Info("Enabling Authentik default flows",
+		zap.String("app", appName),
+		zap.String("domain", domain),
+		zap.Bool("dry_run", dryRun),
+		zap.Bool("replace_existing", updateExisting))
+
+	config := &hecate.DefaultFlowsConfig{
+		App:            appName,
+		Domain:         domain,
+		DryRun:         dryRun,
+		UpdateExisting: updateExisting,
+	}
+
+	return hecate.EnableDefaultFlows(rc, config)
 }
