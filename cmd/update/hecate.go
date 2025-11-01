@@ -239,6 +239,11 @@ func init() {
 
 // runAddServiceFromFlag handles adding a new service when --add flag is used
 func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, service string) error {
+	if service == "authentik-email" {
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		return runAddAuthentikEmail(rc, dryRun)
+	}
+
 	// Parse flags
 	dns, _ := cmd.Flags().GetString("dns")
 	upstream, _ := cmd.Flags().GetString("upstream")
@@ -288,6 +293,16 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 
 	// Execute the add operation
 	return add.AddService(rc, opts)
+}
+
+// runAddAuthentikEmail configures Authentik email settings using tenant API.
+func runAddAuthentikEmail(rc *eos_io.RuntimeContext, dryRun bool) error {
+	if err := hecate.ConfigureAuthentikEmail(rc, &hecate.AuthentikEmailConfig{
+		DryRun: dryRun,
+	}); err != nil {
+		return fmt.Errorf("failed to configure Authentik email settings: %w", err)
+	}
+	return nil
 }
 
 // runRemoveServiceFromFlag handles removing a service when --remove flag is used

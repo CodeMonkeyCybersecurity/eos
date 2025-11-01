@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -265,12 +266,6 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 		return fmt.Errorf("failed to read response body: %w", readErr)
 	}
 
-	// CRITICAL: Log response body at INFO level so we can see what Authentik returned
-	logger.Info("Received flow import response",
-		zap.Int("status_code", resp.StatusCode),
-		zap.Int("body_length", len(responseBody)),
-		zap.String("response_body", string(responseBody))) // CRITICAL: Log actual response
-
 	// CRITICAL FIX: Parse response body on ALL status codes, not just errors
 	// Authentik may return 200 OK but include validation errors in the response
 	// NOTE: Logs is an array of structured objects, not strings
@@ -285,46 +280,94 @@ func (c *APIClient) ImportFlow(ctx context.Context, yaml []byte) error {
 		if err := json.Unmarshal(responseBody, &importResponse); err != nil {
 			logger.Warn("Failed to parse import response as JSON",
 				zap.Error(err),
-				zap.String("raw_response", string(responseBody)))
+				zap.Int("body_length", len(responseBody)))
+			// DEBUG: Full response for troubleshooting parsing failures
+			logger.Debug("Unparseable import response body",
+				zap.String("response_body", string(responseBody)))
 			// Continue - may be plain text or empty response
 		} else {
-			logger.Info("Parsed import response",
+			// P0 FIX: Concise INFO-level logging (success, detail, log count)
+			logger.Info("Received flow import response",
+				zap.Int("status_code", resp.StatusCode),
 				zap.Bool("success", importResponse.Success),
 				zap.String("detail", importResponse.Detail),
 				zap.Int("logs_count", len(importResponse.Logs)))
+
+			// P0 FIX: Full response body only at DEBUG level (prevents 20KB+ terminal spam)
+			logger.Debug("Flow import response body",
+				zap.String("response_body", string(responseBody)))
 		}
 	}
 
+	// P1 FIX: Extract structured error and warning messages from logs
+	errorMessages := extractErrorsFromLogs(importResponse.Logs)
+	warningMessages := extractWarningsFromLogs(importResponse.Logs)
+
 	// Check for HTTP-level errors
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		// HTTP error status
+		// P1 FIX: Include extracted errors in log output for better debugging
+		if len(errorMessages) > 0 {
+			logger.Error("Flow import failed with validation errors",
+				zap.Int("status_code", resp.StatusCode),
+				zap.Strings("errors", errorMessages),
+				zap.Strings("warnings", warningMessages),
+				zap.String("detail", importResponse.Detail))
+			return fmt.Errorf("flow import failed: %s", errorMessages[0])
+		}
+
+		// Fallback to generic error if no structured errors found
 		if importResponse.Detail != "" {
 			logger.Error("Flow import failed with API error",
 				zap.Int("status_code", resp.StatusCode),
 				zap.String("error_detail", importResponse.Detail),
 				zap.Int("import_logs_count", len(importResponse.Logs)))
-			return fmt.Errorf("flow import failed with status %d: %s (%d log entries)", resp.StatusCode, importResponse.Detail, len(importResponse.Logs))
+			return fmt.Errorf("flow import failed with status %d: %s", resp.StatusCode, importResponse.Detail)
 		}
 
 		logger.Error("Flow import failed",
-			zap.Int("status_code", resp.StatusCode),
+			zap.Int("status_code", resp.StatusCode))
+		logger.Debug("Flow import error response",
 			zap.String("response_body", string(responseBody)))
-		return fmt.Errorf("flow import failed with status %d: %s", resp.StatusCode, string(responseBody))
+		return fmt.Errorf("flow import failed with status %d", resp.StatusCode)
 	}
 
 	// CRITICAL: Check response body for import validation errors even on 200 OK
-	if importResponse.Success == false && importResponse.Detail != "" {
-		logger.Error("Flow import returned success status but validation failed",
+	// P1 FIX: Use extracted error messages for better error reporting
+	if importResponse.Success == false {
+		if len(errorMessages) > 0 {
+			logger.Error("Flow import validation failed",
+				zap.Int("status_code", resp.StatusCode),
+				zap.Strings("errors", errorMessages),
+				zap.Strings("warnings", warningMessages))
+			return fmt.Errorf("flow import validation failed: %s", errorMessages[0])
+		}
+
+		// Fallback if success=false but no errors extracted
+		if importResponse.Detail != "" {
+			logger.Error("Flow import validation failed",
+				zap.Int("status_code", resp.StatusCode),
+				zap.String("error_detail", importResponse.Detail))
+			return fmt.Errorf("flow import validation failed: %s", importResponse.Detail)
+		}
+
+		logger.Error("Flow import validation failed with no error details",
 			zap.Int("status_code", resp.StatusCode),
-			zap.String("error_detail", importResponse.Detail),
 			zap.Int("import_logs_count", len(importResponse.Logs)))
-		return fmt.Errorf("flow import validation failed: %s (%d log entries)", importResponse.Detail, len(importResponse.Logs))
+		logger.Debug("Flow import response details",
+			zap.String("response_body", string(responseBody)))
+		return fmt.Errorf("flow import validation failed (no error details available)")
 	}
 
-	// Log import logs if available (may contain warnings or info)
+	// SUCCESS CASE: Log warnings if present (non-fatal but may affect functionality)
+	if len(warningMessages) > 0 {
+		logger.Warn("Flow imported successfully but with warnings",
+			zap.Strings("warnings", warningMessages))
+	}
+
+	// Log completion summary (concise)
 	if len(importResponse.Logs) > 0 {
-		logger.Info("Flow import completed with logs",
-			zap.Int("import_logs_count", len(importResponse.Logs)))
+		logger.Info("Flow import completed",
+			zap.Int("log_entries", len(importResponse.Logs)))
 	}
 
 	logger.Debug("Flow import successful",
@@ -415,4 +458,67 @@ func (c *APIClient) GetFlowStages(ctx context.Context, flowPK string) ([]StageBi
 	}
 
 	return result.Results, nil
+}
+
+// extractErrorsFromLogs parses Authentik import logs and returns error messages
+// P1 FIX: Extract actionable error messages from structured log entries
+// RATIONALE: Authentik embeds validation errors in structured log entries (not top-level detail)
+// SECURITY: Helps users identify and fix security misconfigurations (weak passwords, missing policies)
+// Example log: {"log_level": "warning", "event": "Entry invalid: Serializer errors {...}"}
+func extractErrorsFromLogs(logs []json.RawMessage) []string {
+	var errors []string
+
+	for _, logEntry := range logs {
+		var entry struct {
+			LogLevel string `json:"log_level"`
+			Event    string `json:"event"`
+		}
+
+		if err := json.Unmarshal(logEntry, &entry); err != nil {
+			// Skip unparseable log entries
+			continue
+		}
+
+		// Authentik logs validation errors at "warning" level with "invalid" in event
+		if entry.LogLevel == "warning" && strings.Contains(entry.Event, "invalid") {
+			errors = append(errors, entry.Event)
+		}
+
+		// Also capture explicit error-level logs
+		if entry.LogLevel == "error" {
+			errors = append(errors, entry.Event)
+		}
+
+		// Capture validation failures (common pattern)
+		if strings.Contains(entry.Event, "validation failed") {
+			errors = append(errors, entry.Event)
+		}
+	}
+
+	return errors
+}
+
+// extractWarningsFromLogs parses Authentik import logs and returns warning messages
+// P1 FIX: Extract warnings (non-fatal issues that may affect functionality)
+// RATIONALE: Warnings indicate configuration drift or deprecated settings
+func extractWarningsFromLogs(logs []json.RawMessage) []string {
+	var warnings []string
+
+	for _, logEntry := range logs {
+		var entry struct {
+			LogLevel string `json:"log_level"`
+			Event    string `json:"event"`
+		}
+
+		if err := json.Unmarshal(logEntry, &entry); err != nil {
+			continue
+		}
+
+		// Warning level, but NOT validation errors (those are treated as errors)
+		if entry.LogLevel == "warning" && !strings.Contains(entry.Event, "invalid") && !strings.Contains(entry.Event, "validation failed") {
+			warnings = append(warnings, entry.Event)
+		}
+	}
+
+	return warnings
 }
