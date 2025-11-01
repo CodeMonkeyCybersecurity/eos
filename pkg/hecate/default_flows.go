@@ -438,6 +438,26 @@ entries:
       designation: recovery
       authentication: require_unauthenticated
 
+  # P1 FIX: Password strength policy (shared with enrollment)
+  # SECURITY: Enforces complexity, checks breach databases, minimum length
+  - identifiers:
+      name: {{ .AppSlug }}-password-complexity-policy
+    id: password-policy
+    model: authentik_policies_password.passwordpolicy
+    attrs:
+      password_field: password
+      check_static_rules: true
+      check_have_i_been_pwned: true
+      check_zxcvbn: true
+      hibp_allowed_count: 0
+      zxcvbn_score_threshold: 3
+      length_min: 12
+      amount_uppercase: 1
+      amount_lowercase: 1
+      amount_digits: 1
+      amount_symbols: 1
+      error_message: "Password must be at least 12 characters with uppercase, lowercase, numbers, and symbols. Commonly breached passwords are rejected."
+
   - identifiers:
       name: {{ .AppSlug }}-recovery-field-password
     id: prompt-field-password
@@ -470,7 +490,9 @@ entries:
     model: authentik_policies_expression.expressionpolicy
     attrs:
       expression: |
-        return bool(request.context.get('is_restored', True))
+        # P0 FIX: Default to False for security (paranoid default)
+        # SECURITY: If is_restored context is missing, force identification step
+        return bool(request.context.get('is_restored', False))
 
   - identifiers:
       name: {{ .AppSlug }}-recovery-email
@@ -518,7 +540,8 @@ entries:
       fields:
         - !KeyOf prompt-field-password
         - !KeyOf prompt-field-password-repeat
-      validation_policies: []
+      validation_policies:
+        - !KeyOf password-policy
 
   - identifiers:
       target: !KeyOf flow
@@ -671,6 +694,27 @@ entries:
       placeholder_expression: false
       order: 1
 
+  # P1 FIX: Password strength policy (prevents weak passwords)
+  # SECURITY: Enforces complexity, checks breach databases, minimum length
+  # COMPLIANCE: Common compliance requirements (PCI-DSS, SOC2, etc.)
+  - identifiers:
+      name: {{ .AppSlug }}-password-complexity-policy
+    id: password-policy
+    model: authentik_policies_password.passwordpolicy
+    attrs:
+      password_field: password
+      check_static_rules: true
+      check_have_i_been_pwned: true
+      check_zxcvbn: true
+      hibp_allowed_count: 0
+      zxcvbn_score_threshold: 3
+      length_min: 12
+      amount_uppercase: 1
+      amount_lowercase: 1
+      amount_digits: 1
+      amount_symbols: 1
+      error_message: "Password must be at least 12 characters with uppercase, lowercase, numbers, and symbols. Commonly breached passwords are rejected."
+
   - identifiers:
       name: {{ .AppSlug }}-enrollment-prompt-first
     id: {{ .AppSlug }}-enrollment-prompt-first
@@ -690,6 +734,19 @@ entries:
         - !KeyOf prompt-field-name
         - !KeyOf prompt-field-email
 
+  # P0 FIX: Email verification stage (prevents email spoofing)
+  # SECURITY: Validates user owns the email before account activation
+  # COMPLIANCE: Required for OIDC email_verified claim accuracy
+  - identifiers:
+      name: {{ .AppSlug }}-enrollment-email-verification
+    id: email-verification-stage
+    model: authentik_stages_email.emailstage
+    attrs:
+      use_global_settings: true
+      template: email/account_confirmation.html
+      activate_user_on_success: true
+      token_expiry: hours=24
+
   - identifiers:
       name: {{ .AppSlug }}-enrollment-user-write
     id: {{ .AppSlug }}-enrollment-user-write
@@ -697,11 +754,41 @@ entries:
     attrs:
       user_creation_mode: always_create
       create_users_as_inactive: false
-      create_users_group: {{ .GroupUUID }}
+      create_users_group: "{{ .GroupUUID }}"
+
+  # P0 FIX: Add proper MFA configuration stages (TOTP, WebAuthn, Static)
+  # RATIONALE: authenticatorvalidatestage.configuration_stages requires stage UUIDs, not strings
+  # SECURITY: Ensures MFA is actually configured during enrollment
+  - identifiers:
+      name: {{ .AppSlug }}-enrollment-totp-setup
+    id: totp-setup-stage
+    model: authentik_stages_authenticator_totp.authenticatortotpstage
+    attrs:
+      configure_flow: null
+      friendly_name: null
+      digits: 6
 
   - identifiers:
-      name: {{ .AppSlug }}-enrollment-mfa-setup
-    id: {{ .AppSlug }}-enrollment-mfa-setup
+      name: {{ .AppSlug }}-enrollment-webauthn-setup
+    id: webauthn-setup-stage
+    model: authentik_stages_authenticator_webauthn.authenticatorwebauthnstage
+    attrs:
+      configure_flow: null
+      user_verification: preferred
+      resident_key_requirement: preferred
+
+  - identifiers:
+      name: {{ .AppSlug }}-enrollment-static-setup
+    id: static-setup-stage
+    model: authentik_stages_authenticator_static.authenticatorstaticstage
+    attrs:
+      configure_flow: null
+      token_count: 6
+      token_length: 12
+
+  - identifiers:
+      name: {{ .AppSlug }}-enrollment-mfa-validation
+    id: {{ .AppSlug }}-enrollment-mfa-validation
     model: authentik_stages_authenticator_validate.authenticatorvalidatestage
     attrs:
       device_classes:
@@ -709,9 +796,9 @@ entries:
         - webauthn
         - static
       configuration_stages:
-        - totp
-        - webauthn
-        - static
+        - !KeyOf totp-setup-stage
+        - !KeyOf webauthn-setup-stage
+        - !KeyOf static-setup-stage
       not_configured_action: configure
       last_validation_threshold: seconds=0
 
@@ -727,6 +814,7 @@ entries:
       target: !KeyOf flow
       stage: !KeyOf {{ .AppSlug }}-enrollment-prompt-first
       order: 10
+    id: flow-binding-prompt-first
     model: authentik_flows.flowstagebinding
     attrs:
       evaluate_on_plan: true
@@ -734,10 +822,33 @@ entries:
       policy_engine_mode: any
       invalid_response_action: retry
 
+  # P1 FIX: Bind password policy to enrollment prompt
+  - identifiers:
+      policy: !KeyOf password-policy
+      target: !KeyOf flow-binding-prompt-first
+      order: 0
+    model: authentik_policies.policybinding
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30
+
   - identifiers:
       target: !KeyOf flow
       stage: !KeyOf {{ .AppSlug }}-enrollment-prompt-second
       order: 11
+    model: authentik_flows.flowstagebinding
+    attrs:
+      evaluate_on_plan: true
+      re_evaluate_policies: false
+      policy_engine_mode: any
+      invalid_response_action: retry
+
+  # P0 FIX: Email verification binding (order 15 - after prompts, before user-write)
+  - identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf email-verification-stage
+      order: 15
     model: authentik_flows.flowstagebinding
     attrs:
       evaluate_on_plan: true
@@ -758,7 +869,7 @@ entries:
 
   - identifiers:
       target: !KeyOf flow
-      stage: !KeyOf {{ .AppSlug }}-enrollment-mfa-setup
+      stage: !KeyOf {{ .AppSlug }}-enrollment-mfa-validation
       order: 30
     model: authentik_flows.flowstagebinding
     attrs:
@@ -797,6 +908,19 @@ entries:
       authentication: require_unauthenticated
       compatibility_mode: true
 
+  # P1 FIX: Reputation policy for brute force protection
+  # SECURITY: Blocks repeated failed login attempts (IP + username tracking)
+  # PREVENTS: Unlimited password guessing attacks
+  - identifiers:
+      name: {{ .AppSlug }}-auth-reputation-policy
+    id: auth-reputation-policy
+    model: authentik_policies_reputation.reputationpolicy
+    attrs:
+      check_ip: true
+      check_username: true
+      threshold: -5
+      duration_seconds: 3600
+
   - identifiers:
       name: {{ .AppSlug }}-auth-skip-mfa-for-app-password
     id: skip-mfa-app-password
@@ -814,8 +938,8 @@ entries:
         - email
         - username
       template: stages/identification/login.html
-      enrollment_flow: {{ .AppSlug }}-enrollment
-      recovery_flow: {{ .AppSlug }}-recovery
+      enrollment_flow: "{{ .AppSlug }}-enrollment"
+      recovery_flow: "{{ .AppSlug }}-recovery"
       show_source_labels: true
 
   - identifiers:
@@ -863,12 +987,24 @@ entries:
       target: !KeyOf flow
       stage: !KeyOf {{ .AppSlug }}-auth-password
       order: 20
+    id: flow-binding-password
     model: authentik_flows.flowstagebinding
     attrs:
       evaluate_on_plan: true
       re_evaluate_policies: false
       policy_engine_mode: any
       invalid_response_action: retry
+
+  # P1 FIX: Bind reputation policy to password stage for brute force protection
+  - identifiers:
+      policy: !KeyOf auth-reputation-policy
+      target: !KeyOf flow-binding-password
+      order: 0
+    model: authentik_policies.policybinding
+    attrs:
+      negate: false
+      enabled: true
+      timeout: 30
 
   - identifiers:
       target: !KeyOf flow
