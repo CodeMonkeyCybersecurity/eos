@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -55,6 +56,10 @@ func NewClient(rc *eos_io.RuntimeContext, repoName string) (*Client, error) {
 // password exposure via 'ps auxe' (CVSS 7.5 vulnerability mitigation)
 func (c *Client) RunRestic(args ...string) ([]byte, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
+
+	if err := c.ensureResticAvailable(); err != nil {
+		return nil, err
+	}
 
 	// Get repository password
 	password, err := c.getRepositoryPassword()
@@ -136,6 +141,46 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 		zap.Int("output_bytes", len(output)))
 
 	return output, nil
+}
+
+// ensureResticAvailable verifies restic is in PATH and offers to install it if missing.
+func (c *Client) ensureResticAvailable() error {
+	if _, err := interaction.CheckDependencyInstalled(ResticBinaryName); err == nil {
+		return nil
+	}
+
+	// In non-interactive environments we cannot prompt, so return the standard dependency error.
+	if !interaction.IsTTY() {
+		return fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
+	}
+
+	autoInstall := os.Geteuid() == 0
+	installCmd := "apt-get update && apt-get install -y restic"
+	if !autoInstall {
+		installCmd = "sudo apt-get update && sudo apt-get install -y restic"
+	}
+
+	config := interaction.DependencyConfig{
+		Name:           "Restic",
+		Description:    "Encrypted, deduplicated backups required for eos backup operations",
+		CheckCommand:   ResticBinaryName,
+		CheckArgs:      []string{"version"},
+		InstallCmd:     installCmd,
+		Required:       true,
+		AutoInstall:    autoInstall,
+		InstallTimeout: 15 * time.Minute,
+	}
+
+	result, err := interaction.CheckDependencyWithPrompt(c.rc, config)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrResticNotInstalled, err)
+	}
+
+	if result == nil || !result.Found {
+		return fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
+	}
+
+	return nil
 }
 
 // getRepositoryPassword retrieves the repository password using local secret stores
