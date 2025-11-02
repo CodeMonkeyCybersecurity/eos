@@ -120,6 +120,12 @@ Restore:
 				return eos_err.NewExpectedError(rc.Ctx, userErr)
 			}
 
+			if errors.Is(err, backup.ErrRepositoryNotInitialized) {
+				logger.Info("terminal prompt:", zap.String("output",
+					"Restic repository is not initialized. Initialize it (e.g., eos backup create repository local --path /var/lib/eos/backups) and rerun the command."))
+				return eos_err.NewExpectedError(rc.Ctx, err)
+			}
+
 			logger.Error("Backup failed", zap.Error(err), zap.String("output", string(output)))
 			return fmt.Errorf("backup failed: %w", err)
 		}

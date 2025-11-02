@@ -55,6 +55,10 @@ func NewClient(rc *eos_io.RuntimeContext, repoName string) (*Client, error) {
 // SECURITY: Uses password file instead of environment variable to prevent
 // password exposure via 'ps auxe' (CVSS 7.5 vulnerability mitigation)
 func (c *Client) RunRestic(args ...string) ([]byte, error) {
+	return c.runResticWithInitRetry(false, args...)
+}
+
+func (c *Client) runResticWithInitRetry(initAttempted bool, args ...string) ([]byte, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
 	if err := c.ensureResticAvailable(); err != nil {
@@ -114,8 +118,9 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 
 	// Execute with timing
 	start := time.Now()
-	output, err := cmd.CombinedOutput()
+	outputBytes, err := cmd.CombinedOutput()
 	duration := time.Since(start)
+	output := string(outputBytes)
 
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
@@ -125,22 +130,30 @@ func (c *Client) RunRestic(args ...string) ([]byte, error) {
 				zap.Strings("args", safeArgs),
 				zap.String("repository", c.repository.URL),
 				zap.String("backend", c.repository.Backend))
-			return output, fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
+			return outputBytes, fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
+		}
+
+		if !initAttempted && isRepositoryInitializationError(output) {
+			if handleErr := c.handleRepositoryNotInitialized(output); handleErr != nil {
+				return nil, handleErr
+			}
+			// Repository initialized, retry original command once.
+			return c.runResticWithInitRetry(true, args...)
 		}
 
 		logger.Error("Restic command failed",
 			zap.Error(err),
-			zap.String("output", string(output)),
+			zap.String("output", output),
 			zap.Duration("duration", duration))
-		return output, fmt.Errorf("restic %s: %w\n%s", args[0], err, output)
+		return outputBytes, fmt.Errorf("restic %s: %w\n%s", args[0], err, output)
 	}
 
 	logger.Info("Restic command completed",
 		zap.String("command", args[0]),
 		zap.Duration("duration", duration),
-		zap.Int("output_bytes", len(output)))
+		zap.Int("output_bytes", len(outputBytes)))
 
-	return output, nil
+	return outputBytes, nil
 }
 
 // ensureResticAvailable verifies restic is in PATH and offers to install it if missing.
@@ -180,6 +193,76 @@ func (c *Client) ensureResticAvailable() error {
 		return fmt.Errorf("%w: install the %s binary and ensure it is in PATH", ErrResticNotInstalled, ResticBinaryName)
 	}
 
+	return nil
+}
+
+// isRepositoryInitializationError detects restic output indicating repository initialization issues.
+func isRepositoryInitializationError(output string) bool {
+	lower := strings.ToLower(output)
+	if lower == "" {
+		return false
+	}
+
+	switch {
+	case strings.Contains(lower, "is there a repository at the following location"):
+		return true
+	case strings.Contains(lower, "unable to open config file"):
+		return true
+	case strings.Contains(lower, "repository does not exist"):
+		return true
+	case strings.Contains(lower, "no such repository"):
+		return true
+	case strings.Contains(lower, "config file is not there"):
+		return true
+	default:
+		return false
+	}
+}
+
+// handleRepositoryNotInitialized prompts the user to initialize the repository when possible.
+func (c *Client) handleRepositoryNotInitialized(resticOutput string) error {
+	logger := otelzap.Ctx(c.rc.Ctx)
+
+	logger.Warn("Restic repository appears uninitialized",
+		zap.String("repository", c.repository.URL),
+		zap.String("backend", c.repository.Backend),
+		zap.String("restic_output", strings.TrimSpace(resticOutput)))
+
+	message := fmt.Sprintf("Restic repository at %s is not initialized.", c.repository.URL)
+
+	if !interaction.IsTTY() {
+		return fmt.Errorf("%w: %s Initialize it with 'restic init' and rerun the command.", ErrRepositoryNotInitialized, message)
+	}
+
+	logger.Info("terminal prompt:", zap.String("output", "⚠ "+message))
+	logger.Info("terminal prompt:", zap.String("output",
+		"Initializing the repository will run: restic init --repository-version "+ResticRepositoryVersion))
+	logger.Info("terminal prompt:", zap.String("output",
+		fmt.Sprintf("Repository: %s", c.repository.URL)))
+
+	if c.repository.Backend == "local" && strings.HasPrefix(c.repository.URL, "/") {
+		logger.Info("terminal prompt:", zap.String("output",
+			fmt.Sprintf("Ensure the directory exists and is writable: sudo mkdir -p %s", c.repository.URL)))
+	}
+
+	consent := interaction.PromptYesNo(c.rc.Ctx, "Initialize restic repository now", true)
+	if !consent {
+		return fmt.Errorf("%w: initialization declined by user", ErrRepositoryNotInitialized)
+	}
+
+	logger.Info("terminal prompt:", zap.String("output", "Initializing restic repository..."))
+
+	if c.repository.Backend == "local" && strings.HasPrefix(c.repository.URL, "/") {
+		if err := os.MkdirAll(c.repository.URL, 0o750); err != nil {
+			return fmt.Errorf("%w: failed to prepare repository directory %s: %v", ErrRepositoryNotInitialized, c.repository.URL, err)
+		}
+	}
+
+	if err := c.InitRepository(); err != nil {
+		return fmt.Errorf("%w: initialization failed: %v", ErrRepositoryNotInitialized, err)
+	}
+
+	logger.Info("terminal prompt:", zap.String("output", "✓ Restic repository initialized"))
 	return nil
 }
 
@@ -271,7 +354,7 @@ func (c *Client) InitRepository() error {
 		zap.String("name", c.repository.Name),
 		zap.String("url", c.repository.URL))
 
-	_, err := c.RunRestic("init", "--repository-version", "2")
+	_, err := c.RunRestic("init", "--repository-version", ResticRepositoryVersion)
 	if err != nil {
 		// Check if already initialized
 		if strings.Contains(err.Error(), "already initialized") {

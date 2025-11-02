@@ -1,0 +1,437 @@
+# pkg/authentik/api_definition.yaml
+# Authentik 2025.10 API Definition
+#
+# ARCHITECTURE: Declarative REST API mapping for Eos CLI
+# HUMAN-CENTRIC: Human-friendly CLI → REST API translation
+# SECURITY: Credentials via .env file (PRIMARY) → Consul KV → Vault
+
+service: authentik
+version: 2025.10
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Authentication Configuration (AUTHORITATIVE PRIORITY)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+auth:
+  type: bearer_token
+
+  # Priority 1: .env file (PRIMARY for next 6 months)
+  # RATIONALE: Simpler migration path, existing services use .env
+  token_env_file: "/opt/hecate/.env"
+  token_env_var: "AUTHENTIK_TOKEN"
+
+  # Priority 2: Consul KV (preferred long-term)
+  # MIGRATION: Services will move to Consul KV over next 6 months
+  token_consul_key: "service/hecate/secrets/authentik_token"
+
+  # Priority 3: Vault (secure, rotatable)
+  # ARCHITECTURE: Vault provides secret rotation, audit logging
+  token_vault_path: "secret/hecate/authentik_token"
+
+  # Base URL discovery
+  base_url_env_file: "/opt/hecate/.env"
+  base_url_env_var: "AUTHENTIK_URL"
+  base_url_consul_key: "service/hecate/config/authentik_url"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Resource Definitions (API v3)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+resources:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Users Resource
+  # ──────────────────────────────────────────────────────────────────────────
+  users:
+    path: /api/v3/core/users
+    description: "Manage Authentik users"
+
+    operations:
+      list:
+        method: GET
+        description: "List all users"
+        filters:
+          - name: is_superuser
+            type: boolean
+            description: "Filter by superuser status"
+          - name: type
+            type: enum
+            values: [internal, external, service_account]
+            description: "Filter by user type"
+          - name: is_active
+            type: boolean
+            description: "Filter by active status"
+          - name: email
+            type: string
+            description: "Filter by email address (exact match)"
+          - name: username
+            type: string
+            description: "Filter by username (exact match)"
+        output_fields: [pk, username, email, type, is_active, is_superuser]
+
+      get:
+        method: GET
+        path: /api/v3/core/users/{pk}
+        description: "Get user details by UUID"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "User UUID"
+        output_fields: [pk, username, email, name, type, is_active, is_superuser, groups, groups_obj]
+
+      create:
+        method: POST
+        description: "Create a new user"
+        fields:
+          - name: username
+            type: string
+            required: true
+            description: "Unique username"
+            help_text: "Username for login (lowercase, no spaces)"
+          - name: email
+            type: email
+            required: true
+            description: "User email address"
+            help_text: "Valid email address (e.g., user@example.com)"
+          - name: name
+            type: string
+            required: true
+            description: "User's full name"
+            help_text: "Display name (e.g., 'Alice Wonderland')"
+          - name: password
+            type: password
+            required: false
+            description: "User password (required for internal users, optional for external/service_account)"
+            help_text: "Strong password: 12+ chars, uppercase, lowercase, numbers, symbols. Not required for external SSO users."
+          - name: type
+            type: enum
+            values: [internal, external, service_account]
+            default: internal
+            description: "User type"
+            help_text: "internal = managed by Authentik, external = federated SSO, service_account = API/automation"
+          - name: is_active
+            type: boolean
+            default: true
+            description: "Enable user account"
+          - name: path
+            type: string
+            default: "users"
+            description: "LDAP path for user"
+        returns: "User UUID"
+
+      update:
+        method: PATCH
+        path: /api/v3/core/users/{pk}
+        description: "Update user attributes"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "User UUID to update"
+        fields:
+          - name: username
+            type: string
+            description: "Change username"
+          - name: email
+            type: email
+            description: "Change email address"
+          - name: name
+            type: string
+            description: "Change display name"
+          - name: type
+            type: enum
+            values: [internal, external, service_account]
+            description: "Change user type"
+          - name: is_active
+            type: boolean
+            description: "Enable or disable user account"
+
+      delete:
+        method: DELETE
+        path: /api/v3/core/users/{pk}
+        description: "Delete a user permanently"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "User UUID to delete"
+        confirm: true
+        confirm_message: "This will permanently delete user {pk}. Continue?"
+
+    # Nested resources (user-specific endpoints)
+    subresources:
+      permissions:
+        path: /api/v3/core/users/{pk}/permissions
+        description: "User's effective permissions"
+        operations:
+          list:
+            method: GET
+            description: "List all permissions for user"
+            output_fields: [pk, name, codename]
+
+      roles:
+        path: /api/v3/core/users/{pk}/roles
+        description: "User's assigned roles"
+        operations:
+          list:
+            method: GET
+            description: "List all roles for user"
+            output_fields: [pk, name]
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Groups Resource
+  # ──────────────────────────────────────────────────────────────────────────
+  groups:
+    path: /api/v3/core/groups
+    description: "Manage Authentik groups"
+
+    operations:
+      list:
+        method: GET
+        description: "List all groups"
+        filters:
+          - name: members_by_pk
+            type: uuid
+            description: "Filter groups by member UUID"
+          - name: name
+            type: string
+            description: "Filter by group name (exact match)"
+        output_fields: [pk, name, num_users, users_obj]
+
+      get:
+        method: GET
+        path: /api/v3/core/groups/{pk}
+        description: "Get group details"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Group UUID"
+        output_fields: [pk, name, is_superuser, users, users_obj, attributes]
+
+      create:
+        method: POST
+        description: "Create a new group"
+        fields:
+          - name: name
+            type: string
+            required: true
+            description: "Group name"
+            help_text: "Unique group name (e.g., 'BionicGPT Users')"
+          - name: is_superuser
+            type: boolean
+            default: false
+            description: "Grant superuser privileges to group members"
+          - name: attributes
+            type: json
+            description: "Custom attributes (JSON object)"
+            help_text: "Optional custom attributes"
+        returns: "Group UUID"
+
+      update:
+        method: PATCH
+        path: /api/v3/core/groups/{pk}
+        description: "Update group attributes"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Group UUID to update"
+        fields:
+          - name: name
+            type: string
+            description: "Change group name"
+          - name: is_superuser
+            type: boolean
+            description: "Change superuser privilege"
+          - name: attributes
+            type: json
+            description: "Update custom attributes"
+
+      delete:
+        method: DELETE
+        path: /api/v3/core/groups/{pk}
+        description: "Delete a group permanently"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Group UUID to delete"
+        confirm: true
+        confirm_message: "This will permanently delete group {pk} and remove all members. Continue?"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Flows Resource
+  # ──────────────────────────────────────────────────────────────────────────
+  flows:
+    path: /api/v3/flows/instances
+    description: "Manage Authentik flows"
+
+    operations:
+      list:
+        method: GET
+        description: "List all flows"
+        filters:
+          - name: designation
+            type: enum
+            values: [authentication, authorization, enrollment, invalidation, recovery, unenrollment, stage_configuration]
+            description: "Filter by flow designation"
+          - name: slug
+            type: string
+            description: "Filter by flow slug"
+          - name: name
+            type: string
+            description: "Filter by flow name"
+        output_fields: [pk, slug, name, title, designation]
+
+      get:
+        method: GET
+        path: /api/v3/flows/instances/{pk}
+        description: "Get flow details"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Flow UUID"
+        output_fields: [pk, slug, name, title, designation, authentication, background]
+
+      delete:
+        method: DELETE
+        path: /api/v3/flows/instances/{pk}
+        description: "Delete a flow permanently"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Flow UUID to delete"
+        confirm: true
+        confirm_message: "This will permanently delete flow {pk}. Continue?"
+
+    # Nested resources
+    subresources:
+      bindings:
+        path: /api/v3/flows/bindings
+        description: "Flow stage bindings"
+        operations:
+          list:
+            method: GET
+            description: "List stage bindings for flow"
+            filters:
+              - name: target
+                type: uuid
+                description: "Flow UUID to get bindings for"
+              - name: order
+                type: string
+                description: "Sort order (e.g., 'order')"
+            output_fields: [pk, target, stage, stage_obj, order, evaluate_on_plan, re_evaluate_policies]
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Applications Resource
+  # ──────────────────────────────────────────────────────────────────────────
+  applications:
+    path: /api/v3/core/applications
+    description: "Manage Authentik applications"
+
+    operations:
+      list:
+        method: GET
+        description: "List all applications"
+        filters:
+          - name: name
+            type: string
+            description: "Filter by application name"
+          - name: slug
+            type: string
+            description: "Filter by application slug"
+        output_fields: [pk, name, slug, provider, provider_obj]
+
+      get:
+        method: GET
+        path: /api/v3/core/applications/{pk}
+        description: "Get application details"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Application UUID"
+        output_fields: [pk, name, slug, provider, provider_obj, meta_launch_url, open_in_new_tab]
+
+      delete:
+        method: DELETE
+        path: /api/v3/core/applications/{pk}
+        description: "Delete an application"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Application UUID to delete"
+        confirm: true
+        confirm_message: "This will permanently delete application {pk}. Continue?"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Providers Resource (Proxy providers for forward auth)
+  # ──────────────────────────────────────────────────────────────────────────
+  providers:
+    path: /api/v3/providers/proxy
+    description: "Manage Authentik proxy providers"
+
+    operations:
+      list:
+        method: GET
+        description: "List all proxy providers"
+        filters:
+          - name: name
+            type: string
+            description: "Filter by provider name"
+        output_fields: [pk, name, authorization_flow, mode, external_host, internal_host]
+
+      get:
+        method: GET
+        path: /api/v3/providers/proxy/{pk}
+        description: "Get proxy provider details"
+        params:
+          - name: pk
+            type: integer
+            required: true
+            description: "Provider ID"
+        output_fields: [pk, name, authorization_flow, invalidation_flow, mode, external_host, internal_host, client_id]
+
+      delete:
+        method: DELETE
+        path: /api/v3/providers/proxy/{pk}
+        description: "Delete a proxy provider"
+        params:
+          - name: pk
+            type: integer
+            required: true
+            description: "Provider ID to delete"
+        confirm: true
+        confirm_message: "This will permanently delete provider {pk}. Continue?"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Brands Resource (Domain-specific branding)
+  # ──────────────────────────────────────────────────────────────────────────
+  brands:
+    path: /api/v3/core/brands
+    description: "Manage Authentik brands"
+
+    operations:
+      list:
+        method: GET
+        description: "List all brands"
+        filters:
+          - name: domain
+            type: string
+            description: "Filter by domain"
+        output_fields: [pk, domain, default, branding_title, branding_logo]
+
+      get:
+        method: GET
+        path: /api/v3/core/brands/{pk}
+        description: "Get brand details"
+        params:
+          - name: pk
+            type: uuid
+            required: true
+            description: "Brand UUID"
+        output_fields: [pk, domain, default, branding_title, branding_logo, branding_favicon, flow_authentication, flow_invalidation, flow_recovery, flow_unenrollment, flow_user_settings, flow_device_code]

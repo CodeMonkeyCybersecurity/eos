@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -62,6 +63,7 @@ func NewUnifiedClient(baseURL, token string) *UnifiedClient {
 
 // DoRequest performs an HTTP request with authentication and retry logic
 // ENHANCED: Exponential backoff retry for transient failures
+// P1 FIX: Respects Retry-After header for rate limiting
 // CONSOLIDATION: Unified implementation from pkg/hecate/authentik/export.go
 func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body interface{}) ([]byte, error) {
 	var lastErr error
@@ -70,8 +72,11 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			// Exponential backoff: 1s, 2s, 4s
-			delay := baseDelay * time.Duration(1<<uint(attempt-1))
+			// P1 FIX: Use Retry-After header if present (from previous attempt)
+			// RATIONALE: API knows best when to retry (rate limit windows, maintenance)
+			// SECURITY: Prevents aggressive retry that could trigger IP ban
+			// Note: retryAfter is set below when we get 429/503 response
+			delay := baseDelay * time.Duration(1<<uint(attempt-1)) // Default: exponential backoff
 			select {
 			case <-time.After(delay):
 			case <-ctx.Done():
@@ -107,8 +112,8 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = fmt.Errorf("request failed: %w", err)
-			// Retry on network errors
-			if isTransientError(err) && attempt < maxRetries {
+			// P1 FIX: Only retry network errors (no status code), not HTTP errors
+			if isTransientError(err, 0) && attempt < maxRetries {
 				continue
 			}
 			return nil, lastErr
@@ -120,22 +125,43 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 			return nil, fmt.Errorf("failed to read response: %w", err)
 		}
 
-		// Check for transient HTTP errors
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
-			lastErr = fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
-			if attempt < maxRetries {
-				continue
-			}
-			return nil, lastErr
-		}
-
 		// Success status codes
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return respBody, nil
 		}
 
-		// Error status codes (non-retryable)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
+		// P1 FIX: Parse Retry-After header for rate limiting (RFC 7231)
+		// RATIONALE: API specifies exact retry time, more efficient than guessing
+		// SECURITY: Prevents aggressive retry that could trigger IP ban
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+				// Retry-After can be seconds (integer) or HTTP date
+				if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil && seconds > 0 {
+					// Wait for specified seconds before next retry
+					retryDelay := time.Duration(seconds) * time.Second
+					// Cap at 5 minutes to prevent indefinite wait
+					if retryDelay > 5*time.Minute {
+						retryDelay = 5 * time.Minute
+					}
+					select {
+					case <-time.After(retryDelay):
+					case <-ctx.Done():
+						return nil, ctx.Err()
+					}
+				}
+				// Note: HTTP date format parsing not implemented - use default backoff
+			}
+		}
+
+		// P1 FIX: Use isTransientError to decide whether to retry based on status code
+		lastErr = fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
+		if isTransientError(lastErr, resp.StatusCode) && attempt < maxRetries {
+			// Transient error (429, 5xx) - retry with backoff
+			continue
+		}
+
+		// Deterministic error (4xx except 429) - fail immediately
+		return nil, lastErr
 	}
 
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
@@ -190,14 +216,31 @@ func (c *UnifiedClient) GetVersion(ctx context.Context) (string, error) {
 }
 
 // isTransientError checks if an error is transient and should be retried
-func isTransientError(err error) bool {
+// P1 FIX: Only retry transient failures, fail fast on deterministic errors
+// RATIONALE: Retrying validation errors (400) wastes time and API quota
+// SECURITY: Prevents retry-based DoS when user provides invalid input
+func isTransientError(err error, statusCode int) bool {
 	if err == nil {
 		return false
 	}
+
+	// FAIL FAST: Client errors are deterministic (bad request, auth failure, not found)
+	// DO NOT RETRY: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 405 Method Not Allowed
+	if statusCode >= 400 && statusCode < 500 {
+		return false // Client errors - configuration/validation issue, won't fix with retry
+	}
+
+	// RETRY: Rate limiting (429) and server errors (5xx) are transient
+	if statusCode == 429 || statusCode >= 500 {
+		return true // Transient failures - retry with backoff
+	}
+
+	// Network errors (no status code) - check error string
 	errStr := err.Error()
 	return strings.Contains(errStr, "connection refused") ||
 		strings.Contains(errStr, "timeout") ||
 		strings.Contains(errStr, "temporary failure") ||
+		strings.Contains(errStr, "connection reset") ||
 		strings.Contains(errStr, "EOF")
 }
 
