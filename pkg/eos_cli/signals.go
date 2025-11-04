@@ -67,7 +67,11 @@ func (h *SignalHandler) handleSignals() {
 	logger := otelzap.Ctx(h.ctx)
 
 	select {
-	case sig := <-h.sigChan:
+	case sig, ok := <-h.sigChan:
+		if !ok || sig == nil {
+			logger.Debug("Signal handler stopped - channel closed")
+			return
+		}
 		logger.Info("Received signal, initiating cleanup",
 			zap.String("signal", sig.String()))
 
@@ -85,7 +89,11 @@ func (h *SignalHandler) handleSignals() {
 		fmt.Fprintln(os.Stderr, "✓ Cleanup complete")
 		os.Exit(130) // Standard exit code for SIGINT
 
-	case sig := <-h.sigChan:
+	case sig, ok := <-h.sigChan:
+		if !ok || sig == nil {
+			logger.Debug("Signal handler stopped - channel closed (secondary)")
+			return
+		}
 		// Second signal - force exit
 		logger.Error("Received second signal, forcing exit",
 			zap.String("signal", sig.String()))
