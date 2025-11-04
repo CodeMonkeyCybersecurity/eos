@@ -91,20 +91,20 @@ func loadGiteaConfigFromEnv(rc *eos_io.RuntimeContext, interactive bool) (*Gitea
 func setupGiteaInteractive(rc *eos_io.RuntimeContext, defaults *GiteaConfig) (*GiteaConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	fmt.Printf("\n⚠️  Gitea credentials not found in %s\n\n", EnvFilePath)
-	fmt.Println("Let's set up your Gitea connection:\n")
+	fmt.Printf("\n⚠️  Gitea credentials not found in %s\n", EnvFilePath)
+	fmt.Println("Let's set up your Gitea connection:")
 
 	reader := bufio.NewReader(os.Stdin)
 
 	url := promptWithDefault(reader, "Gitea URL", defaultIfEmpty(defaults.URL, DefaultGiteaURL))
 	username := promptWithDefault(reader, "Username", defaultIfEmpty(defaults.Username, DefaultGiteaUser))
 
-	fmt.Println("\nTo generate an API token:")
+	fmt.Println("To generate an API token:")
 	fmt.Printf("  1. Visit %s/user/settings/applications\n", url)
 	fmt.Println("  2. Click 'Generate New Token'")
 	fmt.Println("  3. Give it a name (e.g., 'EOS CLI')")
 	fmt.Println("  4. Select 'repo' scope")
-	fmt.Println("  5. Copy the generated token\n")
+	fmt.Println("  5. Copy the generated token")
 
 	token := promptSecret("API Token")
 	if token == "" {
@@ -128,8 +128,8 @@ func setupGiteaInteractive(rc *eos_io.RuntimeContext, defaults *GiteaConfig) (*G
 	logger.Info("Gitea credentials saved for eos create repo workflow", fields...)
 
 	fmt.Printf("\n✓ Credentials saved to %s\n", EnvFilePath)
-	fmt.Println("✓ File permissions set to 600\n")
-	fmt.Println("Continuing with repository creation...\n")
+	fmt.Println("✓ File permissions set to 600")
+	fmt.Println("Continuing with repository creation...")
 
 	return cfg, nil
 }

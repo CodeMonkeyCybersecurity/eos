@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -218,7 +219,7 @@ func RunCaddyAdminAPIDebug(rc *eos_io.RuntimeContext, hecatePath string, verbose
 
 // checkCaddyAdminAPIPort checks if the Admin API port is accessible
 func checkCaddyAdminAPIPort(logger otelzap.LoggerWithCtx) bool {
-	address := fmt.Sprintf("%s:%d", CaddyAdminAPIHost, CaddyAdminAPIPort)
+	address := net.JoinHostPort(CaddyAdminAPIHost, strconv.Itoa(CaddyAdminAPIPort))
 	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
 		logger.Debug("Port check failed", zap.String("address", address), zap.Error(err))

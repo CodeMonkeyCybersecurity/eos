@@ -344,13 +344,12 @@ func (c *Creator) printSuccess(repo *gitea.Repository) {
 		zap.String("url", repo.HTMLURL),
 		zap.String("clone_url", repo.CloneURL))
 
-	fmt.Println("Repository created successfully!\n")
+	fmt.Println("Repository created successfully!")
 	fmt.Printf("  Name:        %s\n", repo.Name)
 	fmt.Printf("  Owner:       %s\n", repo.Owner.UserName)
 	fmt.Printf("  Visibility:  %s\n", visibilityLabel(repo.Private))
 	fmt.Printf("  URL:         %s\n", repo.HTMLURL)
 	fmt.Printf("  Clone:       %s\n", repo.CloneURL)
-	fmt.Println()
 
 	if c.opts.NoPush {
 		fmt.Println("Next steps:")
