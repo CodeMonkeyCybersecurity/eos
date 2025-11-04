@@ -69,7 +69,8 @@ func (g *GitWrapper) EnsureBranch(branch string) error {
 func (g *GitWrapper) HasCommits() (bool, error) {
 	_, err := g.run("rev-parse", "HEAD")
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 128 {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 128 {
 			return false, nil
 		}
 		return false, err
