@@ -50,6 +50,22 @@ func (c *GiteaClient) RepoExists(owner, repo string) (*gitea.Repository, bool, e
 	return r, true, nil
 }
 
+// OrgExists checks if the specified organization is present on the server.
+func (c *GiteaClient) OrgExists(org string) (bool, error) {
+	if strings.TrimSpace(org) == "" {
+		return false, nil
+	}
+
+	_, resp, err := c.client.GetOrg(org)
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query organization %s: %w", org, err)
+	}
+	return true, nil
+}
+
 // CreateUserRepo creates a repository in the authenticated user's namespace.
 func (c *GiteaClient) CreateUserRepo(opts *gitea.CreateRepoOption) (*gitea.Repository, error) {
 	repo, resp, err := c.client.CreateRepo(*opts)

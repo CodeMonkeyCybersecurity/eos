@@ -189,7 +189,32 @@ func (c *Creator) ensureInitialCommit() error {
 func (c *Creator) ensureRemoteRepository() (*gitea.Repository, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
-	owner := c.opts.Organization
+	owner := strings.TrimSpace(c.opts.Organization)
+	c.opts.Organization = owner
+
+	if owner != "" {
+		exists, err := c.giteaClient.OrgExists(owner)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			if c.opts.NonInteractive {
+				return nil, fmt.Errorf("organization %s not found on Gitea; create it first or choose an existing organization", owner)
+			}
+
+			personalOwner := c.giteaClient.Username()
+			if !promptYesNo(fmt.Sprintf("Organization %q was not found on Gitea. Create the repository under your personal account (%s) instead?", owner, personalOwner), false) {
+				return nil, fmt.Errorf("organization %s not found on Gitea; create it first or choose an existing organization", owner)
+			}
+
+			logger.Warn("Organization not found on Gitea; falling back to personal namespace",
+				zap.String("organization", owner),
+				zap.String("username", personalOwner))
+			c.opts.Organization = ""
+			owner = ""
+		}
+	}
+
 	if owner == "" {
 		owner = c.giteaClient.Username()
 	}
