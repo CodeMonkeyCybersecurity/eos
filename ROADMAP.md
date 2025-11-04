@@ -52,6 +52,11 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
 ### Deprecated BionicGPT Text Fix
 - Retained `pkg/hecate/add/bionicgpt_fix.go.DEPRECATED` for historical context; Admin API-driven workflow now production-ready.
 
+### Service Initialization Framework – Phase 0 Scaffolding (completed 2025-10-31)
+- Introduced declarative service command group (`cmd/service`) with list/init/health/status/reset/logs entry points wired through `eos.Wrap`.
+- Added definition loader and discovery utilities (`internal/service/definition.go`) plus execution placeholder to retain compile-time coverage while downstream phases land.
+- Published baseline Langfuse definition (`services/langfuse.yaml`) so dependency validation and CLI surfacing can be exercised immediately ahead of executor delivery.
+
 ### Lessons Learned
 - Verify critical Authentik behaviours against current source (v2025.10) rather than relying solely on documentation.
 - Telemetry and fallbacks should ship alongside API migrations to keep rollouts observable.
@@ -167,6 +172,12 @@ Rollback per item; full build/vet/test suites must pass before promotion.
   - Publish `docs/SECRET_MANAGEMENT.md` (architecture + examples) and `docs/MIGRATION_SECRET_MANAGER.md` (step-by-step).
   - Extend vault cluster documentation with detailed Godoc, UX prompts, troubleshooting, and testing requirements.
 
+### Service Initialization Framework – Phases 1-2 (2025-11-03 → 2025-11-28)
+- **Phase 1 (Nov 03 → Nov 14):** deliver persisted state manager (`internal/service/state.go`), lock-file protection, and container/command/variable preflight checks surfaced via `eos service init --dry-run`. Include validation-focused unit tests plus operator docs covering the new workflow.
+- **Phase 2 (Nov 17 → Nov 28):** implement executor loop with retry/backoff utilities, HTTP healthcheck + API call handlers, and structured logging to `~/.eos/logs/service-<name>.log`. Resume semantics should reach parity with scaffolding before December resilience work.
+- **Exit criteria:** Langfuse definition can complete dry-run successfully, and CI covers state/preflight paths.
+- **Risks:** Vault ACL alignment for state/log directories and potential scheduling conflicts with Secret Manager Phase 5 testing window.
+
 ---
 
 ### Authentik Client Consolidation & Export Enhancements (2025-11 → 2026-01)
@@ -239,6 +250,12 @@ Rollback per item; full build/vet/test suites must pass before promotion.
 ### Secret Manager Documentation (Phase 6) Completion
 - Finalise guides, run manual migration dry-run using docs, ensure CLAUDE patterns reference new API.
 
+### Service Initialization Framework – Phases 3-4 (2025-12-01 → 2026-01-17)
+- **Phase 3 (Dec 01 → Dec 19):** harden executor with idempotent checks, edge-case handlers, and persisted summary output. Introduce Vault write + env update + docker restart step handlers, plus regression tests covering resume and failure paths.
+- **Phase 4 (Jan 06 → Jan 17):** migrate Langfuse bootstrap to the new executor, including integration test harness (`test/integration/langfuse_init.sh`) and operator docs. Retire legacy shell script once end-to-end validation completes.
+- **Exit criteria:** `eos service init langfuse` completes end-to-end in staging, and roadmap sign-off to decommission ad-hoc scripts.
+- **Risks:** coordination with BionicGPT releases for env updates, and ensuring Vault/Consul credentials align with production guardrails.
+
 ---
 
 ## 2026-02 → 2026-04 – Mid-Term Focus
@@ -249,6 +266,13 @@ Rollback per item; full build/vet/test suites must pass before promotion.
 - Update Caddy to route through oauth2-proxy; remove forward-auth configuration, add health checks.
 - Execute blue/green migration, run end-to-end/regression/perf testing, and verify rollback plan.
 - Update documentation and clean up deprecated file-based routes post-verification.
+
+### Service Initialization Framework – Phase 5 (2026-02-03 → 2026-03-28)
+- Generalise service definitions for Authentik and BionicGPT, building shared step templates where possible.
+- Extend executor to support database query handlers and remote state (Vault) options if warranted by production usage.
+- Publish operator playbooks and ADR describing declarative service onboarding, and baseline monitoring dashboards for init flows.
+- Exit criteria: at least three services running through the framework with integration tests; legacy per-service scripts deprecated.
+- Risks: scope creep into full environment automation, ensuring Docs/Support teams trained before retiring old flows.
 
 ### Environment Automation Phases 2-3
 - **Phase 2 (Testing → Staging, 2026-02-01 → 2026-03-15):**

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/repository"
@@ -27,8 +28,9 @@ Examples:
   eos create repo ./service --org codemonkey --remote upstream
   eos create repo . --dry-run
   eos create repo . --non-interactive --name hecate --private --no-push`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: eos.Wrap(runCreateRepo),
+	Args:         cobra.MaximumNArgs(1),
+	RunE:         eos.Wrap(runCreateRepo),
+	SilenceUsage: true, // Don't print usage on runtime errors (P1 fix)
 }
 
 func init() {
@@ -47,31 +49,91 @@ func init() {
 }
 
 func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
+	// ========================================
+	// P0 FIX #1: Setup signal handling FIRST
+	// ========================================
+	handler := eos.NewSignalHandler(rc.Ctx)
+	defer handler.Stop()
 
-	// CRITICAL P0: Preflight checks BEFORE interactive prompts (fail-fast principle)
-	// This prevents wasting user time on 5+ prompts only to fail on missing git config
+	// Use handler's cancellable context for all operations
+	ctx := handler.Context()
+	logger := otelzap.Ctx(ctx)
 
-	// Step 1: Check sudo usage and warn if unnecessary
-	eos.CheckAndWarnPrivileges(rc.Ctx, "git", false)
+	logger.Info("Starting repository creation with comprehensive preflight checks")
 
-	// Step 2: Run git preflight checks
-	logger.Info("Running preflight checks for git repository creation")
-	gitPreflightConfig := git.DefaultGitPreflightConfig()
-	if err := git.RunGitPreflightChecks(rc.Ctx, gitPreflightConfig); err != nil {
-		return fmt.Errorf("preflight check failed: %w\n\n"+
-			"Eos checks your environment BEFORE asking questions to avoid wasting your time.\n"+
-			"Please fix the issue above and try again.", err)
-	}
+	// ========================================
+	// PREFLIGHT PHASE: Fail-fast validation
+	// ========================================
 
+	// Check 1: Warn about sudo usage
+	eos.CheckAndWarnPrivileges(ctx, "git", false)
+
+	// Check 2: Resolve path early (needed for subsequent checks)
 	path := "."
 	if len(args) > 0 {
 		path = args[0]
 	}
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf("failed to resolve path: %w", err)
+		return eos_err.NewFilesystemError(
+			"Failed to resolve repository path",
+			err,
+			fmt.Sprintf("Check path: %s", path),
+		)
 	}
+
+	logger.Debug("Repository path resolved", zap.String("path", absPath))
+
+	// ========================================
+	// P0 FIX #2: Acquire repository lock
+	// ========================================
+	logger.Debug("Acquiring repository lock to prevent concurrent operations")
+	lockCleanup, err := git.AcquireRepositoryLock(ctx, absPath)
+	if err != nil {
+		return err // Already has good error message from AcquireRepositoryLock
+	}
+	// Register cleanup - will run on normal exit OR Ctrl-C
+	handler.RegisterCleanup(func() error {
+		logger.Debug("Releasing repository lock")
+		lockCleanup()
+		return nil
+	})
+
+	// ========================================
+	// P0 FIX #3: Run comprehensive preflight checks
+	// ========================================
+
+	// Check 3: Basic git environment (installed, identity configured)
+	logger.Info("Running git environment preflight checks")
+	gitPreflightConfig := git.DefaultGitPreflightConfig()
+	if err := git.RunGitPreflightChecks(ctx, gitPreflightConfig); err != nil {
+		// Error already has good formatting from preflight functions
+		return eos_err.ClassifyError(err, "git environment validation")
+	}
+
+	// Check 4: Filesystem validation (disk space, write permissions, path safety)
+	logger.Debug("Checking filesystem prerequisites")
+
+	// Check disk space (1GB minimum for safety)
+	if err := git.CheckDiskSpace(ctx, absPath, 1*1024*1024*1024); err != nil {
+		return err
+	}
+
+	// Check write permissions
+	if err := git.CheckWritePermissions(ctx, absPath); err != nil {
+		return err
+	}
+
+	// Validate path safety (symlinks, temp dirs, path traversal)
+	if err := git.ValidatePathSafety(ctx, absPath); err != nil {
+		return err
+	}
+
+	logger.Info("All preflight checks passed - proceeding with repository creation")
+
+	// ========================================
+	// CONFIGURATION PHASE: Parse flags and preferences
+	// ========================================
 
 	name, _ := cmd.Flags().GetString("name")
 	description, _ := cmd.Flags().GetString("description")
@@ -101,11 +163,19 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	prefsPath := repository.PreferencesPath(absPath)
 	prefs, err := repository.LoadRepoPreferences(prefsPath)
 	if err != nil {
-		return fmt.Errorf("failed to load repository preferences: %w", err)
+		return eos_err.NewFilesystemError(
+			"Failed to load repository preferences",
+			err,
+			fmt.Sprintf("Check if %s is readable", prefsPath),
+		)
 	}
 
 	opts.ApplyDefaults(prefs)
 	opts.EnsurePathDefaults()
+
+	// ========================================
+	// INTERACTIVE PHASE: Prompt for missing values
+	// ========================================
 
 	needsPrompt := !nonInteractive && (!cmd.Flags().Changed("name") ||
 		!cmd.Flags().Changed("private") ||
@@ -114,21 +184,38 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		!cmd.Flags().Changed("remote"))
 
 	if !nonInteractive && needsPrompt {
+		logger.Debug("Prompting for missing configuration values")
 		if _, err := repository.PromptRepoOptions(absPath, opts, prefs); err != nil {
-			return fmt.Errorf("interactive prompt failed: %w", err)
+			return eos_err.NewUserCancelledError("repository configuration")
 		}
 	}
+
+	// ========================================
+	// REMOTE SETUP PHASE: Configure Gitea client
+	// ========================================
 
 	var giteaClient *repository.GiteaClient
 	credOpts := repository.CredentialOptions{
 		Interactive: !nonInteractive,
 	}
-	cfg, cfgErr := repository.GetGiteaConfig(rc, credOpts)
+
+	// Use RuntimeContext with handler's context for Gitea config
+	// (GiteaConfig expects RuntimeContext, not bare context)
+	rcWithHandler := &eos_io.RuntimeContext{
+		Ctx: ctx,
+	}
+
+	cfg, cfgErr := repository.GetGiteaConfig(rcWithHandler, credOpts)
 	if cfgErr != nil {
 		if dryRun {
 			logger.Warn("Gitea credentials unavailable; dry-run will skip remote operations", zap.Error(cfgErr))
 		} else {
-			return fmt.Errorf("failed to load Gitea configuration: %w", cfgErr)
+			return eos_err.NewNetworkError(
+				"Failed to load Gitea configuration",
+				cfgErr,
+				"Check VAULT_ADDR and Vault connectivity",
+				"Ensure Gitea credentials are stored in Vault",
+			)
 		}
 	} else {
 		client, err := repository.NewGiteaClient(cfg)
@@ -136,19 +223,35 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			if dryRun {
 				logger.Warn("Failed to initialize Gitea client; remote operations skipped", zap.Error(err))
 			} else {
-				return fmt.Errorf("failed to create Gitea client: %w", err)
+				return eos_err.NewNetworkError(
+					"Failed to create Gitea client",
+					err,
+					"Check Gitea URL is accessible",
+					"Verify Gitea credentials are correct",
+				)
 			}
 		} else {
 			giteaClient = client
 		}
 	}
 
+	// ========================================
+	// EXECUTION PHASE: Create repository
+	// ========================================
+
+	logger.Info("Creating repository",
+		zap.String("name", opts.Name),
+		zap.String("path", absPath),
+		zap.Bool("dry_run", dryRun))
+
 	gitWrapper := &repository.GitWrapper{Path: absPath}
 
-	creator := repository.NewCreator(rc, opts, gitWrapper, giteaClient, prefs, prefsPath)
+	creator := repository.NewCreator(rcWithHandler, opts, gitWrapper, giteaClient, prefs, prefsPath)
 	if _, err := creator.Create(); err != nil {
-		return err
+		// Classify the error for proper exit code
+		return eos_err.ClassifyError(err, "repository creation")
 	}
 
+	logger.Info("Repository creation completed successfully")
 	return nil
 }

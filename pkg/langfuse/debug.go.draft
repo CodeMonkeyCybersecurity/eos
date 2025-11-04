@@ -758,3 +758,227 @@ Looking at your infrastructure, you have multiple environments (DEV, TESTING, ST
 - Integration with your existing EOS system?
 
 What feels like the highest value next step for you? I want to make sure we're solving the right problem at the right level of abstraction.
+
+
+
+Perfect! Now I can see the full picture. Let me analyze what you have and what needs to be done.
+
+## Current State Analysis
+
+**What I'm seeing:**
+1. ✅ LangFuse is running with proper environment variables in `docker-compose.yml`
+2. ❌ **No LangFuse keys in `.env`** - The grep found nothing
+3. ❌ **LiteLLM has NO LangFuse environment variables** - The docker inspect showed nothing
+4. ✅ You're working in `/opt/moni` (not `/opt/bionicgpt` - that was throwing me off!)
+5. ✅ LangFuse is accessible internally as `langfuse-server:3000`
+
+**Key insight:** Your setup is actually `/opt/moni`, not `/opt/bionicgpt`. The directory structure is:
+- `/opt/moni/` - Your actual working directory
+- `/opt/moni/.env` - Your actual env file
+- `/opt/moni/litellm_config.yaml` - Your LiteLLM config
+- `/opt/moni/docker-compose.yml` - Your compose file
+
+## What You Need to Do
+
+### Step 1: Get Your LangFuse API Keys
+
+First, let's get your API keys from the LangFuse web UI:
+
+1. **Go to LangFuse:** Open http://localhost:3000 in your browser
+2. **Login** with the credentials you created (alice@cybermonkey.net.au)
+3. **Navigate to:** Settings → API Keys (or look for "Project Settings")
+4. **Create new API key** (if you haven't already)
+5. **Copy both keys:**
+   - Public Key (starts with `pk-lf-...`)
+   - Secret Key (starts with `sk-lf-...`)
+
+### Step 2: Add Keys to Your .env File
+
+```bash
+# Add LangFuse configuration to /opt/moni/.env
+cat >> /opt/moni/.env <<'EOF'
+
+# ============================================================================
+# LangFuse Observability (Added $(date +%Y-%m-%d))
+# ============================================================================
+LANGFUSE_PUBLIC_KEY=pk-lf-YOUR_PUBLIC_KEY_HERE
+LANGFUSE_SECRET_KEY=sk-lf-YOUR_SECRET_KEY_HERE
+LANGFUSE_HOST=http://langfuse-server:3000
+EOF
+```
+
+**Replace `YOUR_PUBLIC_KEY_HERE` and `YOUR_SECRET_KEY_HERE` with your actual keys from LangFuse!**
+
+### Step 3: Update docker-compose.yml to Pass Keys to LiteLLM
+
+You need to add the LangFuse environment variables to the `litellm-proxy` service. Here's the change:
+
+```bash
+# Edit the litellm-proxy section in docker-compose.yml
+nano /opt/moni/docker-compose.yml
+```
+
+Find the `litellm-proxy` service and add the LangFuse variables to the `environment:` section:
+
+```yaml
+  litellm-proxy:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: bionicgpt-litellm
+    platform: linux/amd64
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
+
+      # Database for Admin UI (models, keys, usage tracking)
+      DATABASE_URL: postgresql://${LITELLM_DB_USER}:${LITELLM_DB_PASSWORD}@litellm-db:5432/${LITELLM_DB_NAME}
+
+      # Enable features
+      STORE_MODEL_IN_DB: "True"
+
+      # Azure OpenAI Configuration
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      AZURE_API_BASE: ${AZURE_API_BASE}
+      AZURE_API_VERSION: ${AZURE_API_VERSION}
+
+      # Ollama Configuration
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+      
+      # LangFuse Observability - ADD THESE THREE LINES
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_HOST}
+```
+
+### Step 4: Restart LiteLLM
+
+```bash
+cd /opt/moni
+docker-compose restart litellm-proxy
+```
+
+### Step 5: Verify It's Working
+
+```bash
+# 1. Check LiteLLM picked up the LangFuse config
+docker inspect bionicgpt-litellm --format='{{range .Config.Env}}{{println .}}{{end}}' | grep LANGFUSE
+
+# 2. Check LiteLLM logs for LangFuse initialization
+docker logs bionicgpt-litellm 2>&1 | tail -50 | grep -i langfuse
+
+# 3. Make sure LiteLLM is healthy
+docker ps | grep litellm
+```
+
+### Step 6: Test the Integration
+
+Make a test request through Moni (your BionicGPT interface) and then:
+
+1. Go to LangFuse UI: http://localhost:3000
+2. Navigate to "Traces" or "Dashboard"
+3. You should see your requests appearing!
+
+## Quick Script to Do It All
+
+Here's a script that does everything (except getting the keys from the UI):
+
+```bash
+#!/bin/bash
+# Quick LangFuse integration script
+
+set -e
+
+echo "=== LangFuse Integration Setup ==="
+echo ""
+echo "First, get your API keys from LangFuse:"
+echo "1. Go to http://localhost:3000"
+echo "2. Login and go to Settings → API Keys"
+echo "3. Copy your keys"
+echo ""
+
+read -p "Enter your LangFuse PUBLIC KEY (pk-lf-...): " PUBLIC_KEY
+read -p "Enter your LangFuse SECRET KEY (sk-lf-...): " SECRET_KEY
+
+# Validate keys
+if [[ ! "$PUBLIC_KEY" =~ ^pk-lf- ]] || [[ ! "$SECRET_KEY" =~ ^sk-lf- ]]; then
+    echo "Error: Keys don't look right. They should start with pk-lf- and sk-lf-"
+    exit 1
+fi
+
+echo ""
+echo "Adding keys to .env..."
+
+# Add to .env
+cat >> /opt/moni/.env <<EOF
+
+# ============================================================================
+# LangFuse Observability (Added $(date +%Y-%m-%d))
+# ============================================================================
+LANGFUSE_PUBLIC_KEY=$PUBLIC_KEY
+LANGFUSE_SECRET_KEY=$SECRET_KEY
+LANGFUSE_HOST=http://langfuse-server:3000
+EOF
+
+echo "✓ Keys added to .env"
+echo ""
+echo "Now you need to manually add these environment variables to docker-compose.yml"
+echo "under the litellm-proxy service environment section:"
+echo ""
+echo "      LANGFUSE_PUBLIC_KEY: \${LANGFUSE_PUBLIC_KEY}"
+echo "      LANGFUSE_SECRET_KEY: \${LANGFUSE_SECRET_KEY}"
+echo "      LANGFUSE_HOST: \${LANGFUSE_HOST}"
+echo ""
+read -p "Press Enter when you've done this..."
+
+echo ""
+echo "Restarting LiteLLM..."
+cd /opt/moni
+docker-compose restart litellm-proxy
+
+echo ""
+echo "Waiting for LiteLLM to be ready..."
+sleep 10
+
+echo ""
+echo "Checking configuration..."
+if docker inspect bionicgpt-litellm --format='{{range .Config.Env}}{{println .}}{{end}}' | grep -q "LANGFUSE_PUBLIC_KEY"; then
+    echo "✓ LangFuse configuration detected in LiteLLM"
+else
+    echo "✗ Warning: LangFuse configuration not detected"
+fi
+
+echo ""
+echo "=== Setup Complete ==="
+echo ""
+echo "Test by making a request through Moni, then check:"
+echo "  http://localhost:3000"
+echo ""
+```
+
+## TL;DR - What You Need to Do Right Now
+
+1. **Get your API keys from LangFuse UI** (http://localhost:3000 → Settings → API Keys)
+2. **Add three lines to `/opt/moni/.env`:**
+   ```
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_HOST=http://langfuse-server:3000
+   ```
+3. **Add three lines to `/opt/moni/docker-compose.yml`** under `litellm-proxy → environment`:
+   ```yaml
+   LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+   LANGFUSE_HOST: ${LANGFUSE_HOST}
+   ```
+4. **Restart:** `docker-compose restart litellm-proxy`
+
+# Check if LiteLLM is healthy
+docker ps | grep litellm
+
+# Check if it finished starting up
+docker logs bionicgpt-litellm 2>&1 | tail -20
+
+# Try to access the health endpoint
+curl -s http://localhost:4000/health/readiness | jq .
+
+# Check if LangFuse variables are present
+docker inspect bionicgpt-litellm --format='{{range .Config.Env}}{{println .}}{{end}}' | grep LANGFUSE

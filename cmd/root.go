@@ -25,6 +25,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/restore"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/rollback"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/service"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/unsync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
@@ -97,6 +98,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		sync.SyncCmd,         // VERB-FIRST ARCHITECTURE (service synchronization)
 		unsync.UnsyncCmd,     // VERB-FIRST ARCHITECTURE (reverse synchronization)
 		self.SelfCmd,         // SPECIAL CASE (Eos self-management)
+		service.ServiceCmd,   // VERB-FIRST ARCHITECTURE (service lifecycle management)
 		backup.BackupCmd,     // SPECIAL CASE (Complex nomenclature)
 		restore.RestoreCmd,   // VERB-FIRST ARCHITECTURE (restore from backups)
 		rollback.RollbackCmd, // VERB-FIRST ARCHITECTURE (rollback operations)
