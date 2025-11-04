@@ -176,3 +176,42 @@ ci: deps fmt-check vet lint test build ## CI pipeline (no auto-fix)
 
 ci-cgo: deps fmt-check vet-cgo lint-cgo test-cgo build ## CI pipeline for CGO packages
 	@echo "[INFO] CGO CI pipeline complete"
+
+##@ Deployment
+
+DEPLOY_SERVERS ?= vhost2
+REMOTE_INSTALL_PATH := /usr/local/bin/eos
+
+deploy: test build ## Deploy to servers (set DEPLOY_SERVERS="host1 host2")
+	@echo "[INFO] Deploying Eos to servers: $(DEPLOY_SERVERS)"
+	@for server in $(DEPLOY_SERVERS); do \
+		echo "[INFO] → Deploying to $$server..."; \
+		scp $(BUILD_DIR)/$(BINARY_NAME) $$server:/tmp/eos-new || exit 1; \
+		ssh $$server "sudo mv /tmp/eos-new $(REMOTE_INSTALL_PATH) && sudo chmod +x $(REMOTE_INSTALL_PATH)" || exit 1; \
+		version=$$(ssh $$server "$(REMOTE_INSTALL_PATH) --version 2>/dev/null || echo 'unknown'"); \
+		echo "[INFO]   ✓ Deployed to $$server (version: $$version)"; \
+	done
+	@echo "[INFO] Deployment complete!"
+
+deploy-check: ## Verify deployment on all servers
+	@echo "[INFO] Checking Eos version on servers..."
+	@for server in $(DEPLOY_SERVERS); do \
+		echo "[INFO] → Checking $$server..."; \
+		ssh $$server "$(REMOTE_INSTALL_PATH) --version" || echo "[ERROR] Failed to get version from $$server"; \
+	done
+
+deploy-all: test build ## Deploy to all production servers
+	@$(MAKE) deploy DEPLOY_SERVERS="vhost2 vhost3 vhost4"
+
+deploy-rollback: ## Rollback to previous version (if backup exists)
+	@echo "[INFO] Rolling back Eos on servers: $(DEPLOY_SERVERS)"
+	@for server in $(DEPLOY_SERVERS); do \
+		echo "[INFO] → Rolling back $$server..."; \
+		backup=$$(ssh $$server "ls -t $(REMOTE_INSTALL_PATH).backup.* 2>/dev/null | head -1"); \
+		if [ -z "$$backup" ]; then \
+			echo "[ERROR] No backup found on $$server"; \
+			exit 1; \
+		fi; \
+		ssh $$server "sudo cp $$backup $(REMOTE_INSTALL_PATH) && sudo chmod +x $(REMOTE_INSTALL_PATH)"; \
+		echo "[INFO]   ✓ Rolled back to $$backup"; \
+	done

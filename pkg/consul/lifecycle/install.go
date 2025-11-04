@@ -44,6 +44,7 @@ type InstallConfig struct {
 	ConnectEnabled  bool
 	BindAddr        string
 	ClientAddr      string
+	GossipKey       string
 	LogLevel        string
 
 	// Integration options
@@ -79,7 +80,12 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 	}
 
 	if config.ClientAddr == "" {
-		config.ClientAddr = "0.0.0.0"
+		config.ClientAddr = "127.0.0.1"
+		logger.Info("Defaulting Consul client_addr to localhost for security")
+	} else if config.ClientAddr != "127.0.0.1" {
+		logger.Warn("Consul client_addr configured for remote access",
+			zap.String("client_addr", config.ClientAddr),
+			zap.String("recommendation", "Enable ACLs, TLS, and firewall rules before exposing the API"))
 	}
 
 	// Set binary path based on installation method
@@ -109,7 +115,7 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 	}
 
 	runner := NewCommandRunner(rc)
-	
+
 	return &ConsulInstaller{
 		rc:       rc,
 		config:   config,

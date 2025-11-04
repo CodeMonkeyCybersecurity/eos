@@ -84,6 +84,10 @@ func Generate(rc *eos_io.RuntimeContext, cfg *ConsulConfig) error {
 		bootstrapExpect = 1
 	}
 
+	if cfg.GossipKey == "" {
+		return fmt.Errorf("gossip encryption key is required (set GeneratorConfig.GossipKey)")
+	}
+
 	// Build server mode configuration
 	var serverConfig string
 	if bootstrapExpect == 1 {
@@ -94,6 +98,39 @@ bootstrap = true  # Single-node cluster`
 		// Multi-node: use bootstrap_expect
 		serverConfig = fmt.Sprintf(`server = true
 bootstrap_expect = %d  # Multi-node cluster`, bootstrapExpect)
+	}
+
+	clientAddr := cfg.ClientAddr
+	if clientAddr == "" {
+		clientAddr = "127.0.0.1"
+	}
+	if clientAddr != "127.0.0.1" {
+		log.Warn("Consul client_addr overrides secure default",
+			zap.String("client_addr", clientAddr),
+			zap.String("recommendation", "Use 127.0.0.1 unless ACLs/TLS are enforced"))
+	}
+
+	scriptCheckConfig := "enable_script_checks = false\n"
+	if cfg.EnableLocalScriptChecks {
+		scriptCheckConfig += "enable_local_script_checks = true\n"
+	}
+
+	watcherConfig := ""
+	if cfg.EnableVaultWatcher && !cfg.EnableLocalScriptChecks {
+		log.Warn("Vault watcher requires local script checks; disabling watcher for security",
+			zap.String("handler", "consul-vault-helper"),
+			zap.Bool("requested", cfg.EnableVaultWatcher))
+	}
+	if cfg.EnableVaultWatcher && cfg.EnableLocalScriptChecks {
+		watcherConfig = fmt.Sprintf(`# Watches for external integration
+watches = [
+  {
+    type = "services"
+    handler_type = "script"
+    args = ["%s", "watch"]
+  }
+]
+`, consulVaultHelperPath)
 	}
 
 	config := fmt.Sprintf(`# Consul Configuration for Scaling and Service Discovery
@@ -120,9 +157,9 @@ ports {
   server = %d    # Keep default for RPC
 }
 
-# Network configuration
-client_addr = "0.0.0.0"  # Accept connections from anywhere
-bind_addr = "%s"  # Primary interface IP
+	# Network configuration
+	client_addr = "%s"  # Default: localhost only for security
+	bind_addr = "%s"  # Primary interface IP
 
 # Advertise addresses for when you add more nodes
 advertise_addr = "%s"
@@ -177,8 +214,7 @@ autopilot {
 }
 
 # Script checks disabled for security (enable only with ACLs)
-# enable_script_checks = false  # Use enable_local_script_checks instead
-enable_local_script_checks = true
+%s
 
 # Security settings
 # ACLs enabled by default for secure token management and Vault integration
@@ -191,7 +227,7 @@ acl = {
 }
 
 # Encryption settings (prepared for production)
-# encrypt = "base64-key-here"  # Uncomment and set for production
+encrypt = "%s"  # Gossip encryption key
 
 # TLS settings (prepared for production)
 # tls {
@@ -204,17 +240,9 @@ acl = {
 #   }
 # }
 
-# Watches for external integration
-watches = [
-  {
-    type = "services"
-    handler_type = "script"
-    args = ["%s", "watch"]
-  }
-]
-`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, consulDefaultDataDir, serverConfig,
+%s`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, consulDefaultDataDir, serverConfig,
 		shared.PortConsul, portHTTP, portgRPC, portDNS, portSerfLAN, portSerfWAN, portServer,
-		iface.IP, iface.IP, iface.IP, logLevel, shared.GetInternalHostname(), consulVaultHelperPath)
+		clientAddr, iface.IP, iface.IP, iface.IP, logLevel, shared.GetInternalHostname(), cfg.GossipKey, scriptCheckConfig, watcherConfig)
 
 	configPath := consulConfigFile
 

@@ -247,11 +247,20 @@ func (ci *ConsulInstaller) configure() error {
 		EnableDebugLogging: ci.config.LogLevel == "DEBUG",
 		VaultAvailable:     ci.config.VaultIntegration,
 		BootstrapExpect:    ci.config.BootstrapExpect,
+		ClientAddr:         ci.config.ClientAddr,
+		GossipKey:          ci.config.GossipKey,
 	}
 
 	if err := ci.CheckDiskSpaceWithContext(context.Background(), "/etc", 10); err != nil {
 		return fmt.Errorf("insufficient disk space for config write: %w", err)
 	}
+
+	gossipKey, err := ensureGossipKey(ci.logger)
+	if err != nil {
+		return fmt.Errorf("failed to ensure gossip encryption key: %w", err)
+	}
+	ci.config.GossipKey = gossipKey
+	consulConfig.GossipKey = gossipKey
 
 	if err := config.Generate(ci.rc, consulConfig); err != nil {
 		return fmt.Errorf("failed to generate configuration: %w", err)
@@ -453,7 +462,7 @@ func RunCreateConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		VaultIntegration: !consulNoVault,
 		LogLevel:         GetConsulLogLevel(consulDebug),
 		BindAddr:         consulBindAddr,
-		ClientAddr:       "0.0.0.0",
+		ClientAddr:       "127.0.0.1",
 		ForceReinstall:   consulForce,
 		CleanInstall:     consulClean,
 		UseRepository:    !consulBinary,

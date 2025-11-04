@@ -47,13 +47,18 @@ func NewOrchestrator(rc *eos_io.RuntimeContext, cfg *InstallConfig) (*Orchestrat
 		cfg.BinaryPath = consul.GetConsulBinaryPath()
 	}
 	if cfg.ClientAddr == "" {
-		cfg.ClientAddr = "0.0.0.0"
+		cfg.ClientAddr = "127.0.0.1"
 	}
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = "INFO"
 	}
 
 	logger := otelzap.Ctx(rc.Ctx)
+	if cfg.ClientAddr != "127.0.0.1" {
+		logger.Warn("Consul client_addr configured for remote access",
+			zap.String("client_addr", cfg.ClientAddr),
+			zap.String("recommendation", "Restrict client_addr or enable ACLs/TLS before exposing the API"))
+	}
 
 	// Detect bind address if not specified
 	networkHelper := helpers.NewNetworkHelper(rc)
@@ -147,14 +152,22 @@ func (o *Orchestrator) Install() error {
 	if err := o.configSetup.CreateLogrotateConfig(); err != nil {
 		o.logger.Warn("Failed to create logrotate config", zap.Error(err))
 	}
-	
+
 	// Generate configuration using existing config package
 	consulConfig := &config.ConsulConfig{
 		DatacenterName:     o.config.Datacenter,
 		EnableDebugLogging: o.config.LogLevel == "DEBUG",
 		VaultAvailable:     o.config.VaultIntegration,
 		BootstrapExpect:    o.config.BootstrapExpect,
+		ClientAddr:         o.config.ClientAddr,
 	}
+
+	gossipKey, err := ensureGossipKey(o.logger)
+	if err != nil {
+		return fmt.Errorf("failed to ensure gossip encryption key: %w", err)
+	}
+	o.config.GossipKey = gossipKey
+	consulConfig.GossipKey = gossipKey
 	if err := config.Generate(o.rc, consulConfig); err != nil {
 		return fmt.Errorf("configuration generation failed: %w", err)
 	}

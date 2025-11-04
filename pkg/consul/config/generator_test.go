@@ -15,13 +15,14 @@ func TestGenerate(t *testing.T) {
 		wantErr  bool
 		checkFn  func(t *testing.T, cfg *ConsulConfig)
 	}{
-		{
-			name: "valid production config",
-			config: &ConsulConfig{
-				DatacenterName:     "production",
-				EnableDebugLogging: false,
-				VaultAvailable:     true,
-			},
+	{
+		name: "valid production config",
+		config: &ConsulConfig{
+			DatacenterName:     "production",
+			EnableDebugLogging: false,
+			VaultAvailable:     true,
+			GossipKey:          "test-gossip-key",
+		},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "production", cfg.DatacenterName)
@@ -31,11 +32,12 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "valid development config with debug",
-			config: &ConsulConfig{
-				DatacenterName:     "development",
-				EnableDebugLogging: true,
-				VaultAvailable:     false,
-			},
+		config: &ConsulConfig{
+			DatacenterName:     "development",
+			EnableDebugLogging: true,
+			VaultAvailable:     false,
+			GossipKey:          "test-gossip-key",
+		},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "development", cfg.DatacenterName)
@@ -45,11 +47,12 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "empty datacenter name",
-			config: &ConsulConfig{
-				DatacenterName:     "",
-				EnableDebugLogging: false,
-				VaultAvailable:     false,
-			},
+		config: &ConsulConfig{
+			DatacenterName:     "",
+			EnableDebugLogging: false,
+			VaultAvailable:     false,
+			GossipKey:          "test-gossip-key",
+		},
 			wantErr: false, // Should handle empty datacenter gracefully
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "", cfg.DatacenterName)
@@ -57,11 +60,12 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "datacenter with special characters",
-			config: &ConsulConfig{
-				DatacenterName:     "test-dc_1",
-				EnableDebugLogging: true,
-				VaultAvailable:     true,
-			},
+		config: &ConsulConfig{
+			DatacenterName:     "test-dc_1",
+			EnableDebugLogging: true,
+			VaultAvailable:     true,
+			GossipKey:          "test-gossip-key",
+		},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "test-dc_1", cfg.DatacenterName)
@@ -94,11 +98,12 @@ func TestGenerate(t *testing.T) {
 
 func TestConsulConfig(t *testing.T) {
 	t.Run("config creation", func(t *testing.T) {
-		cfg := &ConsulConfig{
-			DatacenterName:     "test",
-			EnableDebugLogging: true,
-			VaultAvailable:     false,
-		}
+	cfg := &ConsulConfig{
+		DatacenterName:     "test",
+		EnableDebugLogging: true,
+		VaultAvailable:     false,
+		GossipKey:          "test-gossip-key",
+	}
 		
 		assert.Equal(t, "test", cfg.DatacenterName)
 		assert.True(t, cfg.EnableDebugLogging)
@@ -116,11 +121,12 @@ func TestConsulConfig(t *testing.T) {
 		}
 		
 		for _, dc := range datacenters {
-			cfg := &ConsulConfig{
-				DatacenterName:     dc,
-				EnableDebugLogging: false,
-				VaultAvailable:     true,
-			}
+		cfg := &ConsulConfig{
+			DatacenterName:     dc,
+			EnableDebugLogging: false,
+			VaultAvailable:     true,
+			GossipKey:          "test-gossip-key",
+		}
 			
 			assert.Equal(t, dc, cfg.DatacenterName)
 		}
@@ -135,11 +141,12 @@ func TestGeneratePermissions(t *testing.T) {
 	t.Run("handles permission errors gracefully", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
 		
-		cfg := &ConsulConfig{
-			DatacenterName:     "test",
-			EnableDebugLogging: false,
-			VaultAvailable:     false,
-		}
+	cfg := &ConsulConfig{
+		DatacenterName:     "test",
+		EnableDebugLogging: false,
+		VaultAvailable:     false,
+		GossipKey:          "test-gossip-key",
+	}
 		
 		// Function should handle permission errors without panicking
 		err := Generate(rc, cfg)
