@@ -28,6 +28,7 @@ var (
 	syncTailscale bool
 	syncAuthentik bool
 	syncWazuh     bool
+	syncDocker    bool
 )
 
 func init() {
@@ -35,6 +36,7 @@ func init() {
 	sync.RegisterConnector(connectors.NewConsulVaultConnector())
 	sync.RegisterConnector(connectors.NewConsulTailscaleAutoConnector())
 	sync.RegisterConnector(connectors.NewAuthentikWazuhConnector())
+	sync.RegisterConnector(connectors.NewWazuhDockerConnector())
 }
 
 // SyncCmd is the root command for service synchronization
@@ -52,6 +54,7 @@ Currently supported service pairs:
                       register Vault in Consul service catalog (Pattern 3: Raft + Secrets Engine)
   - --consul --tailscale: Configure local Consul to bind to Tailscale IP
   - --authentik --wazuh: Configure Wazuh SSO integration with Authentik
+  - --wazuh --docker: Configure Wazuh DockerListener for container event monitoring
 
 For joining Consul nodes into a cluster:
   - eos sync consul --nodes vhost7 vhost11    # Join multiple Consul nodes together
@@ -73,6 +76,9 @@ Examples:
 
   # Configure Wazuh SSO with Authentik
   eos sync --authentik --wazuh
+
+  # Enable Wazuh Docker container monitoring
+  eos sync --wazuh --docker
 
   # Preview changes without applying (dry-run)
   eos sync --consul --vault --dry-run
@@ -100,6 +106,8 @@ func init() {
 		"Sync Authentik service")
 	SyncCmd.Flags().BoolVar(&syncWazuh, "wazuh", false,
 		"Sync Wazuh service")
+	SyncCmd.Flags().BoolVar(&syncDocker, "docker", false,
+		"Sync Docker container monitoring with Wazuh")
 
 	// Operation flags
 	SyncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false,
@@ -132,12 +140,15 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 	if syncWazuh {
 		selectedServices = append(selectedServices, "wazuh")
 	}
+	if syncDocker {
+		selectedServices = append(selectedServices, "docker")
+	}
 
 	// Validate exactly 2 services selected
 	if len(selectedServices) == 0 {
 		return eos_err.NewUserError(
 			"No services specified. Please specify exactly 2 services to sync.\n\n" +
-				"Available services: --consul, --vault, --tailscale, --authentik, --wazuh\n\n" +
+				"Available services: --consul, --vault, --tailscale, --authentik, --wazuh, --docker\n\n" +
 				"Examples:\n" +
 				"  eos sync --consul --vault\n" +
 				"  eos sync --authentik --wazuh\n" +
@@ -178,7 +189,8 @@ func runSync(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error
 			"Service pair not supported: %s ↔ %s\n\n"+
 				"Currently supported pairs:\n"+
 				"  - consul ↔ vault\n"+
-				"  - consul ↔ tailscale (auto-discovers and joins Consul nodes)\n\n"+
+				"  - consul ↔ tailscale (auto-discovers and joins Consul nodes)\n"+
+				"  - docker ↔ wazuh (configures Wazuh DockerListener)\n\n"+
 				"For explicit node targeting:\n"+
 				"  - eos sync consul --vhost7 --vhost11\n\n"+
 				"Error: %v",

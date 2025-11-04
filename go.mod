@@ -28,7 +28,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/hcl/v2 v2.24.0
-	github.com/hashicorp/nomad/api v0.0.0-20251103214437-68b5cfb5c6b9
+	github.com/hashicorp/nomad/api v0.0.0-20251104073108-6235838dbf30
 	github.com/hashicorp/terraform-exec v0.24.0
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/hashicorp/vault/api/auth/approle v0.11.0
@@ -65,6 +65,14 @@ require (
 	libvirt.org/go/libvirt v1.11006.0
 	mvdan.cc/sh/v3 v3.12.0
 	tailscale.com v1.90.6
+)
+
+exclude (
+	github.com/armon/go-metrics v0.5.0
+	github.com/armon/go-metrics v0.5.1
+	github.com/armon/go-metrics v0.5.2
+	github.com/armon/go-metrics v0.5.3
+	github.com/armon/go-metrics v0.5.4
 )
 
 require (
@@ -109,7 +117,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/ebitengine/purego v0.9.0 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/emicklei/proto v1.14.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect

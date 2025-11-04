@@ -20,30 +20,36 @@ import (
 // ExportBlueprint exports Authentik configuration as Blueprint YAML
 // VENDOR APPROACH: Uses `ak export_blueprint` command in worker container
 // BENEFITS: Automatic UUID handling, dependency resolution, official support
+// FIXED: ak export_blueprint outputs to stdout (no --output flag exists)
+// EVIDENCE: https://docs.goauthentik.io/customize/blueprints/export/
 func (c *Client) ExportBlueprint(ctx context.Context, outputPath string) error {
-	// Run ak export_blueprint command in worker container
-	// NOTE: Exports flows, stages, policies, providers as YAML
+	// CORRECTED: ak export_blueprint outputs to stdout, redirect to file
+	// BEFORE (WRONG): "ak", "export_blueprint", "--output", "/tmp/blueprint.yaml"
+	// AFTER (CORRECT): "ak", "export_blueprint" > file
 	cmd := exec.CommandContext(ctx,
 		"docker", "exec",
 		"hecate-server-1", // Authentik server container
 		"ak", "export_blueprint",
-		"--output", "/tmp/blueprint.yaml",
 	)
 
-	output, err := cmd.CombinedOutput()
+	// Capture stdout (blueprint YAML)
+	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("blueprint export failed: %w (output: %s)", err, string(output))
+		// Include stderr for diagnostics
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return fmt.Errorf("blueprint export failed: %w\nStderr: %s", err, string(exitErr.Stderr))
+		}
+		return fmt.Errorf("blueprint export failed: %w", err)
 	}
 
-	// Copy blueprint from container to host
-	copyCmd := exec.CommandContext(ctx,
-		"docker", "cp",
-		"hecate-server-1:/tmp/blueprint.yaml",
-		outputPath,
-	)
+	// Write blueprint output directly to host file
+	if err := os.WriteFile(outputPath, output, 0600); err != nil {
+		return fmt.Errorf("failed to write blueprint to %s: %w", outputPath, err)
+	}
 
-	if err := copyCmd.Run(); err != nil {
-		return fmt.Errorf("failed to copy blueprint from container: %w", err)
+	// Verify file has content
+	if len(output) == 0 {
+		return fmt.Errorf("blueprint export produced empty output")
 	}
 
 	return nil
@@ -51,25 +57,28 @@ func (c *Client) ExportBlueprint(ctx context.Context, outputPath string) error {
 
 // ExportBlueprintToDirectory exports Blueprint and saves to specified directory
 // CONVENIENCE: Wrapper around ExportBlueprint with timestamped filename
+// FIXED: ak export_blueprint outputs to stdout (no --output flag exists)
+// EVIDENCE: https://docs.goauthentik.io/customize/blueprints/export/
 func ExportBlueprintToDirectory(rc *eos_io.RuntimeContext, outputDir string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create Blueprint filename
 	blueprintPath := filepath.Join(outputDir, "23_authentik_blueprint.yaml")
 
-	// Use unified client to export
-	// NOTE: For now, use exec directly until Client consolidation complete
+	// CORRECTED: ak export_blueprint outputs to stdout, redirect to file
+	// BEFORE (WRONG): "ak", "export_blueprint", "--output", "/tmp/blueprint.yaml"
+	// AFTER (CORRECT): "ak", "export_blueprint" > file
 	cmd := exec.CommandContext(rc.Ctx,
 		"docker", "exec",
 		"hecate-server-1",
 		"ak", "export_blueprint",
-		"--output", "/tmp/blueprint.yaml",
 	)
 
 	logger.Info("Exporting Authentik Blueprint via ak command",
 		zap.String("container", "hecate-server-1"))
 
-	output, err := cmd.CombinedOutput()
+	// Capture stdout (blueprint YAML)
+	output, err := cmd.Output()
 	if err != nil {
 		// Check if container exists
 		checkCmd := exec.CommandContext(rc.Ctx, "docker", "ps", "-a", "--filter", "name=hecate-server-1", "--format", "{{.Names}}")
@@ -78,24 +87,26 @@ func ExportBlueprintToDirectory(rc *eos_io.RuntimeContext, outputDir string) (st
 			return "", fmt.Errorf("Authentik server container not found (hecate-server-1) - is docker-compose running?")
 		}
 
-		return "", fmt.Errorf("blueprint export failed: %w (output: %s)", err, string(output))
+		// Include stderr for diagnostics
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("blueprint export failed: %w\nStderr: %s", err, string(exitErr.Stderr))
+		}
+		return "", fmt.Errorf("blueprint export failed: %w", err)
 	}
 
-	// Copy blueprint from container to host
-	copyCmd := exec.CommandContext(rc.Ctx,
-		"docker", "cp",
-		"hecate-server-1:/tmp/blueprint.yaml",
-		blueprintPath,
-	)
-
-	if err := copyCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to copy blueprint from container: %w", err)
+	// Write blueprint output directly to host file
+	if err := os.WriteFile(blueprintPath, output, 0600); err != nil {
+		return "", fmt.Errorf("failed to write blueprint to %s: %w", blueprintPath, err)
 	}
 
 	// Verify file was created and has content
 	info, err := os.Stat(blueprintPath)
 	if err != nil {
 		return "", fmt.Errorf("blueprint file not created: %w", err)
+	}
+
+	if info.Size() == 0 {
+		return "", fmt.Errorf("blueprint file is empty - export may have failed silently")
 	}
 
 	logger.Info("✓ Exported Authentik Blueprint",
