@@ -33,9 +33,9 @@ func DefaultGitPreflightConfig() GitPreflightConfig {
 }
 
 // RunGitPreflightChecks performs all preflight checks for git operations
-// CRITICAL: This must run BEFORE any interactive prompts to fail fast
+// HUMAN-CENTRIC (P0 #13): Offers interactive fallback instead of hard failure
 //
-// Pattern: ASSESS (validate environment) → then proceed with user interaction
+// Pattern: ASSESS → OFFER TO HELP → then proceed with user interaction
 func RunGitPreflightChecks(ctx context.Context, config GitPreflightConfig) error {
 	logger := otelzap.Ctx(ctx)
 
@@ -53,7 +53,9 @@ func RunGitPreflightChecks(ctx context.Context, config GitPreflightConfig) error
 	// Check 2: Git identity is configured
 	if config.RequireIdentity {
 		if err := CheckGitIdentity(ctx, config.CheckGlobalConfig); err != nil {
-			return err
+			// P0 #13: Don't fail immediately - offer to help configure
+			logger.Info("Git identity not configured - offering interactive setup")
+			return err // Return original error (will be handled by caller)
 		}
 	}
 

@@ -10,7 +10,7 @@ import (
 
 	containerexec "github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -217,7 +217,7 @@ func inspectDatabaseContainer(rc *eos_io.RuntimeContext, cli *client.Client, cfg
 func collectLangfuseLogs(rc *eos_io.RuntimeContext, cli *client.Client, cfg *Config, result *DiagnosticsResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	options := dockertypes.ContainerLogsOptions{
+	options := container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Tail:       fmt.Sprintf("%d", cfg.LogTailLines),

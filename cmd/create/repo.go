@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -65,6 +66,9 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// PREFLIGHT PHASE: Fail-fast validation
 	// ========================================
 
+	// Parse --non-interactive flag early (needed for preflight fallbacks)
+	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+
 	// Check 1: Warn about sudo usage
 	eos.CheckAndWarnPrivileges(ctx, "git", false)
 
@@ -100,15 +104,38 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	})
 
 	// ========================================
-	// P0 FIX #3: Run comprehensive preflight checks
+	// P0 FIX #3: Run comprehensive preflight checks with human-centric fallback
 	// ========================================
 
 	// Check 3: Basic git environment (installed, identity configured)
+	// HUMAN-CENTRIC (P0 #13): Offer interactive setup instead of failing
 	logger.Info("Running git environment preflight checks")
 	gitPreflightConfig := git.DefaultGitPreflightConfig()
 	if err := git.RunGitPreflightChecks(ctx, gitPreflightConfig); err != nil {
-		// Error already has good formatting from preflight functions
-		return eos_err.ClassifyError(err, "git environment validation")
+		// Check if this is a git identity issue that we can help with
+		if strings.Contains(err.Error(), "git identity not configured") {
+			logger.Info("Git identity missing - offering interactive configuration")
+
+			// Offer interactive configuration (respects --non-interactive flag)
+			configured, configErr := git.ConfigureGitIdentityInteractive(ctx, nonInteractive)
+			if configErr != nil {
+				return fmt.Errorf("failed to configure git identity: %w", configErr)
+			}
+
+			if !configured {
+				// User declined or non-interactive mode
+				// Return original error with context
+				return fmt.Errorf("preflight check failed: %w\n\n"+
+					"Eos checks your environment BEFORE asking questions to avoid wasting your time.\n"+
+					"Please fix the issue above and try again.", err)
+			}
+
+			// Success! Identity is now configured, continue with repo creation
+			logger.Info("Git identity configured successfully - continuing with repository creation")
+		} else {
+			// Some other preflight error (git not installed, etc.)
+			return eos_err.ClassifyError(err, "git environment validation")
+		}
 	}
 
 	// Check 4: Filesystem validation (disk space, write permissions, path safety)
@@ -143,7 +170,7 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	branch, _ := cmd.Flags().GetString("branch")
 	noPush, _ := cmd.Flags().GetBool("no-push")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+	// nonInteractive already parsed above for preflight checks
 	saveConfig, _ := cmd.Flags().GetBool("save-config")
 
 	opts := &repository.RepoOptions{

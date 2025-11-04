@@ -189,11 +189,9 @@ func PullWithVerification(rc *eos_io.RuntimeContext, repoDir, branch string) (bo
 	}
 
 	// Log warnings from signature verification
-	if results != nil {
-		for _, result := range results {
-			for _, warning := range result.Warnings {
-				logger.Warn("SECURITY WARNING", zap.String("warning", warning))
-			}
+	for _, result := range results {
+		for _, warning := range result.Warnings {
+			logger.Warn("SECURITY WARNING", zap.String("warning", warning))
 		}
 	}
 
