@@ -110,4 +110,3 @@ func promptWithExplicitDefault(reader *bufio.Reader, label, defaultVal string) s
 	}
 	return readLine(reader)
 }
-

@@ -51,4 +51,3 @@ func SaveRepoPreferences(path string, prefs *RepoPreferences) error {
 
 	return os.WriteFile(path, payload, 0o644)
 }
-
