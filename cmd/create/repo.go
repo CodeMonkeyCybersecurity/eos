@@ -6,6 +6,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/repository"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -47,6 +48,21 @@ func init() {
 
 func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL P0: Preflight checks BEFORE interactive prompts (fail-fast principle)
+	// This prevents wasting user time on 5+ prompts only to fail on missing git config
+
+	// Step 1: Check sudo usage and warn if unnecessary
+	eos.CheckAndWarnPrivileges(rc.Ctx, "git", false)
+
+	// Step 2: Run git preflight checks
+	logger.Info("Running preflight checks for git repository creation")
+	gitPreflightConfig := git.DefaultGitPreflightConfig()
+	if err := git.RunGitPreflightChecks(rc.Ctx, gitPreflightConfig); err != nil {
+		return fmt.Errorf("preflight check failed: %w\n\n"+
+			"Eos checks your environment BEFORE asking questions to avoid wasting your time.\n"+
+			"Please fix the issue above and try again.", err)
+	}
 
 	path := "."
 	if len(args) > 0 {

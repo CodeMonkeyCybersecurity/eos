@@ -1,0 +1,760 @@
+// langfuse/debug.go
+Perfect! Now I can see the issue. Let me trace through what's happening.
+
+## Problem Identified
+
+**The issue is in your API endpoint usage.** Looking at your script:
+
+```bash
+SIGNUP_RESPONSE=$(curl -s -X POST "$LANGFUSE_URL/api/auth/signup" \
+    -H "Content-Type: application/json" \
+    -d "{
+        \"email\": \"$ADMIN_EMAIL\",
+        \"password\": \"$ADMIN_PASSWORD\",
+        \"name\": \"Admin\"
+    }" 2>&1)
+```
+
+And then:
+
+```bash
+SESSION_COOKIE=$(curl -s -c - -X POST "$LANGFUSE_URL/api/auth/callback/credentials" \
+    -H "Content-Type: application/json" \
+    -d "{
+        \"email\": \"$ADMIN_EMAIL\",
+        \"password\": \"$ADMIN_PASSWORD\",
+        \"json\": true
+    }" | grep -oP '(?<=next-auth.session-token\s)\S+' || echo "")
+```
+
+**The problems:**
+1. LangFuse uses NextAuth.js, which has specific authentication flows
+2. The `/api/auth/callback/credentials` endpoint expects form data, not JSON
+3. You're not checking the actual response content from signup
+4. The authentication flow for NextAuth is more complex than a simple POST
+
+## Let's Fix This Step by Step
+
+### Chunk 1: First, let's see what LangFuse actually responded
+
+**Action:** Check the full Docker logs to see the actual error:
+
+```bash
+docker logs bionicgpt-langfuse 2>&1 | grep -A 5 -B 5 "Error creating user"
+```
+
+This will show us the actual error message from LangFuse.
+
+### Chunk 2: Check LangFuse environment variables
+
+**Action:** Let's see how you're running LangFuse:
+
+```bash
+docker inspect bionicgpt-langfuse --format='{{range .Config.Env}}{{println .}}{{end}}' | grep -E "(NEXTAUTH|DATABASE|SALT)"
+```
+
+**Why this matters:** LangFuse requires certain environment variables to be set:
+- `NEXTAUTH_SECRET` - Required for session encryption
+- `NEXTAUTH_URL` - The canonical URL for the app
+- `SALT` - For password hashing
+- Database connection details
+
+### Chunk 3: Alternative Approach - Use LangFuse's Actual API
+
+Looking at LangFuse's documentation, they may not support programmatic user creation via their public API. Instead, we have a few options:
+
+**Option A: Manual first-time setup**
+1. Visit `http://localhost:3000`
+2. Create the first user through the web UI
+3. Then use the API to generate keys
+
+**Option B: Use the NextAuth credential provider properly**
+The authentication flow should be:
+1. GET `/api/auth/csrf` to get CSRF token
+2. POST to `/api/auth/signin/credentials` (not callback) with proper form data
+3. Handle the redirect
+
+**Option C: Direct database insertion** (least preferred but most reliable for automation)
+Create the user directly in the PostgreSQL database.
+
+## What I Need From You
+
+Please run these commands so we can determine the best path forward:
+
+```bash
+# 1. Get the actual error from LangFuse logs
+docker logs bionicgpt-langfuse 2>&1 | tail -50
+
+# 2. Check LangFuse environment variables
+docker inspect bionicgpt-langfuse --format='{{range .Config.Env}}{{println .}}{{end}}'
+
+# 3. Check if we can access the signup page
+curl -v http://localhost:3000/auth/sign-up 2>&1 | head -30
+
+# 4. Check the database to see if the user was partially created
+docker exec bionicgpt-langfuse-db psql -U postgres -d langfuse -c "SELECT email, name, created_at FROM users;"
+```
+
+## My Current Hypothesis
+
+Based on the warning "Signup: Error creating user", I suspect one of these:
+
+1. **Missing NEXTAUTH_SECRET**: LangFuse can't create sessions without this
+2. **Database constraint violation**: Email might already exist from a previous attempt
+3. **Missing required fields**: The signup might need additional fields like organization info
+4. **Wrong API endpoint**: The `/api/auth/signup` might not exist; it might be `/api/auth/register` or handled differently
+
+Once you provide those outputs, I can give you a working solution. The most pragmatic approach might be to just do the first user creation manually through the web UI (takes 30 seconds) and then use the script for API key generation afterward.
+
+Good progress! Now I can see more clearly. Let me work through this.
+
+## Key Findings
+
+1. ✅ **Environment variables are correct** - NEXTAUTH_SECRET, SALT, DATABASE_URL all present
+2. ✅ **Migrations completed successfully** - Database schema is ready
+3. ✅ **Web UI is accessible** - GET /auth/sign-up returns 200
+4. ❌ **Database user is wrong** - The postgres user is `langfuse`, not `postgres`
+
+### Let's Check the Database
+
+```bash
+docker exec bionicgpt-langfuse-db psql -U langfuse -d langfuse -c "SELECT email, name, created_at FROM users;"
+```
+
+This will tell us if:
+- A user was partially created
+- The table is empty
+- There's a constraint preventing user creation
+
+## The Real Issue: "Signup: Error creating user"
+
+That's a pretty generic error. Let's get more detailed logs. The issue is that your script isn't capturing or displaying the actual error response from the API. Let me help you debug this properly.
+
+### Debugging Approach - Let's trace the actual API call
+
+Run this manually to see what LangFuse actually returns:
+
+```bash
+# Test the signup endpoint and see the full response
+curl -v -X POST "http://localhost:3000/api/auth/signup" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "email": "test@cybermonkey.net.au",
+        "password": "TestPassword123!",
+        "name": "Test User"
+    }' 2>&1
+```
+
+This will show us:
+- The exact HTTP status code
+- The response headers
+- The response body (which probably contains the actual error)
+
+## My Hypothesis - Based on LangFuse Architecture
+
+Looking at the error pattern, I suspect one of these:
+
+**Most Likely:** LangFuse might require certain signup configuration:
+- `AUTH_DISABLE_SIGNUP=false` (or similar) to enable self-service signup
+- Or they may only allow the first user to be created via a special process
+
+**Possible:** There could be email validation issues or the email domain might need to be allowed.
+
+## Quick Win: Let's Try the Web UI First
+
+Since the web UI is working (`/auth/sign-up` returns 200), let's just create the first user manually and then automate the rest:
+
+```bash
+# Open in browser or use curl to see the signup form
+xdg-open http://localhost:3000/auth/sign-up
+```
+
+Or if you're SSH'd in without a browser, we can use curl to examine the form and submit it properly:
+
+```bash
+# Get the signup page to see what fields are actually required
+curl -s http://localhost:3000/auth/sign-up | grep -A 20 '<form'
+```
+
+## Revised Approach - Hybrid Solution
+
+Here's what I recommend:
+
+1. **Manual first user creation** (30 seconds via web UI)
+2. **Automated everything else** (API keys, project setup)
+
+This is actually more robust because:
+- First user creation often has special logic
+- API key generation is well-documented and stable
+- You avoid edge cases in signup flows
+
+Let me write you a revised script that assumes the first user exists. But first:
+
+**Please run these two commands:**
+
+```bash
+# 1. Check if any users exist
+docker exec bionicgpt-langfuse-db psql -U langfuse -d langfuse -c "SELECT email, name, created_at FROM users;"
+
+# 2. See the actual API error
+curl -v -X POST "http://localhost:3000/api/auth/signup" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "email": "alice@cybermonkey.net.au",
+        "password": "TestPassword123!",
+        "name": "Alice"
+    }' 2>&1 | grep -A 10 "HTTP/"
+```
+
+Once I see those outputs, I can either:
+- **Plan A:** Fix your signup automation if it's just a simple API issue
+- **Plan B:** Give you a hybrid script that works around signup and automates the rest
+
+**PERFECT!** Now I can see exactly what's happening! 🎯
+
+## The Mystery Solved
+
+Look at the evidence:
+
+1. **User WAS created successfully!** 
+   ```
+   alice@cybermonkey.net.au | alice_wonderland | 2025-11-04 09:22:15.631
+   ```
+
+2. **The signup worked!** The test user was also created:
+   ```
+   test@cybermonkey.net.au  | Test User        | 2025-11-04 13:09:37.927
+   ```
+
+3. **When you try to create alice again:** HTTP 422 (Unprocessable Entity) - user already exists!
+
+## What Actually Happened
+
+Your script **DID successfully create the user** on the first run! The issue is:
+
+1. ✅ Signup succeeded → User `alice@cybermonkey.net.au` was created
+2. ❌ Login failed → Because the **authentication endpoint in your script is wrong**
+
+The problem is **not** signup - it's this part:
+
+```bash
+SESSION_COOKIE=$(curl -s -c - -X POST "$LANGFUSE_URL/api/auth/callback/credentials" \
+    -H "Content-Type: application/json" \
+    -d "{
+        \"email\": \"$ADMIN_EMAIL\",
+        \"password\": \"$ADMIN_PASSWORD\",
+        \"json\": true
+    }" | grep -oP '(?<=next-auth.session-token\s)\S+' || echo "")
+```
+
+**This endpoint is wrong!** NextAuth's callback endpoint expects:
+- Form data, not JSON
+- Proper NextAuth flow (CSRF token, etc.)
+
+## Let's Fix the Login Part
+
+The login issue is that you're using `/api/auth/callback/credentials` which is NextAuth's internal redirect handler, not the signin endpoint.
+
+Let me test what the correct login flow should be:
+
+```bash
+# Step 1: Get CSRF token
+curl -s http://localhost:3000/api/auth/csrf
+```
+
+Run that and show me the output. Then we'll fix your script's login section.
+
+## In the Meantime - Quick Workaround
+
+Since the user already exists, you can just login via the web UI to get your API keys:
+
+```bash
+echo "Visit http://localhost:3000/auth/sign-in"
+echo "Login with: alice@cybermonkey.net.au"
+echo "Then go to Settings → API Keys to generate keys"
+```
+
+## The Script Fix
+
+Here's what needs to change in your script. The signup part actually **works fine**! We just need to fix the login. Let's debug the NextAuth login flow:
+
+```bash
+# Test 1: Get CSRF token
+CSRF_RESPONSE=$(curl -s http://localhost:3000/api/auth/csrf)
+echo "CSRF Response: $CSRF_RESPONSE"
+
+# Test 2: Try the correct signin endpoint with the CSRF token
+# Extract the CSRF token from the response
+CSRF_TOKEN=$(echo "$CSRF_RESPONSE" | grep -oP '(?<="csrfToken":")[^"]+')
+echo "CSRF Token: $CSRF_TOKEN"
+
+# Test 3: Try to sign in (this might be the correct approach)
+curl -v -X POST "http://localhost:3000/api/auth/signin/credentials" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "email=alice@cybermonkey.net.au" \
+    -d "password=YOUR_PASSWORD_HERE" \
+    -d "csrfToken=$CSRF_TOKEN" \
+    -d "json=true" \
+    2>&1 | head -50
+```
+
+Run those commands (replacing YOUR_PASSWORD_HERE with the actual password) and show me the output.
+
+## Summary of What We Learned
+
+✅ **Signup works perfectly** - your script creates users successfully  
+❌ **Login is broken** - wrong endpoint and wrong data format  
+✅ **User alice@cybermonkey.net.au exists** - you can login manually right now  
+
+The "Error creating user" log message was just LangFuse logging that someone tried to create a duplicate user (your second run of the script). The **first run actually worked** but then failed at login, so the script reported failure.
+
+Excellent! This is exactly the right mindset - **"solve once, systematize."** Let's break this down into manageable chunks and build a robust, maintainable solution.
+
+## Breaking Down the Problem
+
+Let me think through the layers we need to address:
+
+1. **Immediate tactical fix** - Make this script work reliably
+2. **Error handling patterns** - Prevent silent failures
+3. **Idempotency** - Handle partial completion and reruns safely
+4. **Observability** - Know what's happening and why it failed
+5. **Testing strategy** - Verify it works before production
+6. **Documentation** - Make it maintainable for future you
+
+Let's tackle these systematically.
+
+---
+
+## Chunk 1: Core Principles for Robust Scripts
+
+Based on what went wrong here, let's establish some patterns:
+
+### Principle 1: **Never Trust Silent Success**
+
+**What went wrong:**
+```bash
+SIGNUP_RESPONSE=$(curl -s -X POST "$LANGFUSE_URL/api/auth/signup" ...)
+
+if echo "$SIGNUP_RESPONSE" | grep -q "error"; then
+    log_warn "Account may already exist or signup failed"
+fi
+```
+
+**Problems:**
+- Only checks for the word "error" in response
+- Doesn't check HTTP status code
+- Doesn't validate the response structure
+- Proceeds even if signup failed
+
+**The Pattern to Use:**
+```bash
+# Always capture both response and HTTP code
+signup_http_code=$(curl -s -w "%{http_code}" -o /tmp/signup_response.json \
+    -X POST "$LANGFUSE_URL/api/auth/signup" \
+    -H "Content-Type: application/json" \
+    -d "{...}")
+
+signup_response=$(cat /tmp/signup_response.json)
+
+# Explicit validation
+case $signup_http_code in
+    200|201)
+        log_info "✓ User created successfully"
+        if echo "$signup_response" | jq -e '.message' > /dev/null 2>&1; then
+            log_info "Response: $(echo "$signup_response" | jq -r '.message')"
+        fi
+        ;;
+    422)
+        # User already exists - this is OK, we can proceed to login
+        log_warn "User already exists (HTTP 422)"
+        if echo "$signup_response" | jq -e '.message' > /dev/null 2>&1; then
+            log_info "Details: $(echo "$signup_response" | jq -r '.message')"
+        fi
+        ;;
+    *)
+        log_error "Signup failed with HTTP $signup_http_code"
+        log_error "Response: $signup_response"
+        exit 1
+        ;;
+esac
+```
+
+### Principle 2: **Idempotent Operations**
+
+**What this means:** Running the script multiple times should be safe and produce the same end state.
+
+**Pattern:**
+```bash
+# Check state before attempting operation
+check_user_exists() {
+    local email=$1
+    # Query database or API to check if user exists
+    docker exec bionicgpt-langfuse-db psql -U langfuse -d langfuse \
+        -tAc "SELECT COUNT(*) FROM users WHERE email='$email';" 2>/dev/null
+}
+
+# Only create if doesn't exist
+if [ "$(check_user_exists "$ADMIN_EMAIL")" -eq 0 ]; then
+    log_info "Creating user $ADMIN_EMAIL..."
+    create_user "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
+else
+    log_info "User $ADMIN_EMAIL already exists, skipping creation"
+fi
+```
+
+### Principle 3: **Structured Logging with Context**
+
+**Pattern:**
+```bash
+# Logging that includes context
+log_operation() {
+    local level=$1
+    local operation=$2
+    local message=$3
+    local details=${4:-""}
+    
+    timestamp=$(date -Iseconds)
+    echo "[$timestamp] [$level] [$operation] $message" | tee -a "$LOG_FILE"
+    
+    if [ -n "$details" ]; then
+        echo "  Details: $details" | tee -a "$LOG_FILE"
+    fi
+}
+
+# Usage
+log_operation "INFO" "USER_CREATION" "Creating user" "email=$ADMIN_EMAIL"
+log_operation "ERROR" "USER_CREATION" "Failed to create user" "http_code=$http_code, response=$response"
+```
+
+---
+
+## Chunk 2: Specific Edge Cases to Handle
+
+Let me enumerate the failure modes we need to handle:
+
+### Edge Case Matrix
+
+| **Scenario** | **Detection** | **Handling** | **Recovery** |
+|--------------|---------------|--------------|--------------|
+| User already exists | HTTP 422 or DB query | Log warning, proceed to login | None needed |
+| Database not ready | Connection error | Retry with backoff | Wait up to 60s |
+| Wrong password on existing user | Login fails | Prompt for correct password | Interactive retry |
+| Network timeout | Curl timeout | Retry with exponential backoff | 3 retries then fail |
+| API key already exists | API response | Use existing key | Query for existing keys |
+| LangFuse container unhealthy | Health check fails | Wait and retry | Restart container if needed |
+| Partial state (user exists, no keys) | Check both user and keys | Resume from last successful step | State machine approach |
+| Missing dependencies (jq, psql) | Command not found | Install or fail with clear message | Provide installation commands |
+| Invalid email format | Regex validation | Fail early with clear message | Re-prompt |
+| Database corruption | SQL errors | Fail loudly | Manual intervention needed |
+
+### Implementation: Retry Logic with Exponential Backoff
+
+```bash
+retry_with_backoff() {
+    local max_attempts=$1
+    local delay=$2
+    local operation=$3
+    shift 3
+    local command=("$@")
+    
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        log_info "Attempt $attempt/$max_attempts for $operation"
+        
+        if "${command[@]}"; then
+            log_info "✓ $operation succeeded"
+            return 0
+        fi
+        
+        if [ $attempt -lt $max_attempts ]; then
+            log_warn "✗ $operation failed, retrying in ${delay}s..."
+            sleep "$delay"
+            delay=$((delay * 2))  # Exponential backoff
+        fi
+        
+        attempt=$((attempt + 1))
+    done
+    
+    log_error "✗ $operation failed after $max_attempts attempts"
+    return 1
+}
+
+# Usage
+retry_with_backoff 3 2 "LangFuse health check" \
+    curl -sf "$LANGFUSE_URL/api/public/health"
+```
+
+### Implementation: State Machine for Partial Completion
+
+```bash
+# State file tracks what's been completed
+STATE_FILE="/opt/bionicgpt/.langfuse-setup-state"
+
+mark_step_complete() {
+    local step=$1
+    echo "$step:$(date -Iseconds)" >> "$STATE_FILE"
+}
+
+is_step_complete() {
+    local step=$1
+    grep -q "^$step:" "$STATE_FILE" 2>/dev/null
+}
+
+# Usage in script
+if ! is_step_complete "USER_CREATED"; then
+    create_user "$ADMIN_EMAIL" "$ADMIN_PASSWORD"
+    mark_step_complete "USER_CREATED"
+else
+    log_info "Step USER_CREATED already complete, skipping"
+fi
+
+if ! is_step_complete "PROJECT_CREATED"; then
+    create_project "$PROJECT_NAME"
+    mark_step_complete "PROJECT_CREATED"
+else
+    log_info "Step PROJECT_CREATED already complete, skipping"
+fi
+```
+
+---
+
+## Chunk 3: Improved Script Structure
+
+Let me propose a refactored architecture:
+
+```bash
+#!/bin/bash
+# ============================================================================
+# LangFuse Setup Script - Robust Edition
+# ============================================================================
+
+set -euo pipefail  # Stricter error handling
+
+# Constants
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LOG_FILE="${SCRIPT_DIR}/langfuse-setup.log"
+readonly STATE_FILE="${SCRIPT_DIR}/.langfuse-setup-state"
+readonly CREDENTIALS_FILE="${SCRIPT_DIR}/.langfuse-credentials"
+readonly TEMP_DIR="${SCRIPT_DIR}/.tmp"
+
+# Configuration
+LANGFUSE_URL="${LANGFUSE_URL:-http://localhost:3000}"
+MAX_RETRIES=3
+RETRY_DELAY=2
+
+# Ensure temp directory exists
+mkdir -p "$TEMP_DIR"
+
+# Cleanup on exit
+cleanup() {
+    local exit_code=$?
+    rm -rf "$TEMP_DIR"
+    if [ $exit_code -ne 0 ]; then
+        log_error "Script failed with exit code $exit_code"
+        log_error "Check logs at: $LOG_FILE"
+    fi
+}
+trap cleanup EXIT
+
+# [Include all the logging and retry functions here]
+
+# Pre-flight checks
+preflight_checks() {
+    log_operation "INFO" "PREFLIGHT" "Running pre-flight checks"
+    
+    local missing_deps=()
+    
+    for cmd in curl jq docker; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        log_error "Missing dependencies: ${missing_deps[*]}"
+        log_error "Install with: apt-get install -y ${missing_deps[*]}"
+        exit 1
+    fi
+    
+    # Check Docker containers
+    if ! docker ps | grep -q bionicgpt-langfuse; then
+        log_error "LangFuse container not running"
+        exit 1
+    fi
+    
+    log_operation "INFO" "PREFLIGHT" "✓ All checks passed"
+}
+
+# Main execution flow
+main() {
+    log_operation "INFO" "SETUP" "Starting LangFuse setup"
+    
+    preflight_checks
+    
+    # Step 1: Wait for service
+    if ! is_step_complete "SERVICE_READY"; then
+        wait_for_langfuse || exit 1
+        mark_step_complete "SERVICE_READY"
+    fi
+    
+    # Step 2: Create user
+    if ! is_step_complete "USER_CREATED"; then
+        create_or_verify_user || exit 1
+        mark_step_complete "USER_CREATED"
+    fi
+    
+    # Step 3: Login and get session
+    if ! is_step_complete "SESSION_OBTAINED"; then
+        obtain_session || exit 1
+        mark_step_complete "SESSION_OBTAINED"
+    fi
+    
+    # Step 4: Create project
+    if ! is_step_complete "PROJECT_CREATED"; then
+        create_project || exit 1
+        mark_step_complete "PROJECT_CREATED"
+    fi
+    
+    # Step 5: Generate API keys
+    if ! is_step_complete "KEYS_GENERATED"; then
+        generate_api_keys || exit 1
+        mark_step_complete "KEYS_GENERATED"
+    fi
+    
+    # Step 6: Update config
+    update_configuration || exit 1
+    
+    log_operation "INFO" "SETUP" "✓ Setup complete!"
+    display_summary
+}
+
+main "$@"
+```
+
+---
+
+## Chunk 4: Testing Strategy
+
+**Question for you:** How do you want to test this? Here are options:
+
+### Option 1: Manual Testing Checklist
+Create a test checklist:
+- [ ] Fresh install (no user exists)
+- [ ] Rerun with existing user
+- [ ] Rerun with existing user and project
+- [ ] Rerun with everything already configured
+- [ ] Network timeout during signup
+- [ ] Container restart mid-setup
+
+### Option 2: Automated Test Script
+```bash
+#!/bin/bash
+# test-langfuse-setup.sh
+
+test_fresh_install() {
+    # Clean state
+    docker-compose down -v
+    rm -f .langfuse-*
+    docker-compose up -d
+    
+    # Run setup
+    ./init-langfuse.sh
+    
+    # Verify
+    assert_user_exists "alice@cybermonkey.net.au"
+    assert_credentials_file_exists
+}
+
+test_idempotency() {
+    # Run twice
+    ./init-langfuse.sh
+    ./init-langfuse.sh
+    
+    # Should succeed both times
+    assert_exit_code 0
+}
+```
+
+### Option 3: Container-based Testing
+Use Docker to create isolated test environments.
+
+**Which approach fits your workflow best?**
+
+---
+
+## Chunk 5: Documentation Template
+
+I'd create a `LANGFUSE_SETUP.md` file:
+
+```markdown
+# LangFuse Setup Script
+
+## Prerequisites
+- Docker and docker-compose
+- curl, jq installed
+- LangFuse containers running
+
+## Usage
+
+### First Time Setup
+```bash
+./init-langfuse.sh
+```
+
+### Resume Failed Setup
+The script is idempotent. Just rerun:
+```bash
+./init-langfuse.sh
+```
+
+### Reset and Start Over
+```bash
+rm -f .langfuse-setup-state .langfuse-credentials
+./init-langfuse.sh
+```
+
+## Troubleshooting
+
+### "Failed to login"
+**Cause:** User exists but password is wrong  
+**Fix:** Delete user from database or use correct password
+
+### "LangFuse not ready"
+**Cause:** Container still starting  
+**Fix:** Wait 30s and retry
+
+## State Files
+- `.langfuse-setup-state` - Tracks completion steps
+- `.langfuse-credentials` - Stores credentials (DO NOT COMMIT)
+- `langfuse-setup.log` - Detailed logs
+
+## Architecture Decisions
+
+### Why idempotent?
+Multiple runs should be safe for operational simplicity.
+
+### Why state tracking?
+Allows resuming from failure point without repeating expensive operations.
+
+### Why explicit HTTP code checking?
+Silent failures are the enemy of reliable automation.
+```
+
+---
+
+## Next Steps - What Would You Like to Focus On?
+
+I've laid out the framework. Now let's prioritize:
+
+1. **Quick win:** Should I write you the fixed login flow so the script works end-to-end?
+2. **Medium-term:** Refactor the whole script with error handling and idempotency?
+3. **Long-term:** Create a testing framework and CI/CD integration?
+
+Also, **a question about your broader context:** 
+
+Looking at your infrastructure, you have multiple environments (DEV, TESTING, STAGING, PRODUCTION). Should we be thinking about:
+- A configuration management approach (Ansible, Terraform)?
+- A template-based approach where this script is generated per environment?
+- Integration with your existing EOS system?
+
+What feels like the highest value next step for you? I want to make sure we're solving the right problem at the right level of abstraction.
