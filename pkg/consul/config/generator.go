@@ -130,7 +130,28 @@ watches = [
     args = ["%s", "watch"]
   }
 ]
-`, consulVaultHelperPath)
+	`, consulVaultHelperPath)
+	}
+
+	httpsPort := -1
+	tlsBlock := "# TLS disabled - enable via eos update consul --tls\n"
+	if cfg.TLS != nil && cfg.TLS.Enabled {
+		httpsPort = 8501
+		tlsBlock = fmt.Sprintf(`tls {
+  defaults {
+    ca_file = "%s"
+    cert_file = "%s"
+    key_file = "%s"
+    verify_incoming = %t
+    verify_outgoing = %t
+  }
+  internal_rpc {
+    tls = true
+    verify_server_hostname = %t
+  }
+}
+`, cfg.TLS.CAFile, cfg.TLS.CertFile, cfg.TLS.KeyFile,
+			cfg.TLS.VerifyIncoming, cfg.TLS.VerifyOutgoing, cfg.TLS.VerifyServerHostname)
 	}
 
 	config := fmt.Sprintf(`# Consul Configuration for Scaling and Service Discovery
@@ -149,7 +170,7 @@ data_dir = "%s"
 # Custom ports configuration for Eos
 ports {
   http = %d      # HTTP API (Eos standard instead of %d)
-  https = -1       # Disabled for now
+    https = %d      # HTTPS API (enabled when TLS configured)
   grpc = %d      # Keep default for internal communication
   dns = %d       # Keep default DNS
   serf_lan = %d  # Keep default for LAN gossip
@@ -229,20 +250,12 @@ acl = {
 # Encryption settings (prepared for production)
 encrypt = "%s"  # Gossip encryption key
 
-# TLS settings (prepared for production)
-# tls {
-#   defaults {
-#     verify_incoming = true
-#     verify_outgoing = true
-#   }
-#   internal_rpc {
-#     verify_server_hostname = true
-#   }
-# }
+# TLS settings
+%s
 
 %s`, time.Now().Format(time.RFC3339), cfg.DatacenterName, nodeName, consulDefaultDataDir, serverConfig,
-		shared.PortConsul, portHTTP, portgRPC, portDNS, portSerfLAN, portSerfWAN, portServer,
-		clientAddr, iface.IP, iface.IP, iface.IP, logLevel, shared.GetInternalHostname(), cfg.GossipKey, scriptCheckConfig, watcherConfig)
+		shared.PortConsul, portHTTP, httpsPort, portgRPC, portDNS, portSerfLAN, portSerfWAN, portServer,
+		clientAddr, iface.IP, iface.IP, iface.IP, logLevel, shared.GetInternalHostname(), cfg.GossipKey, tlsBlock, scriptCheckConfig, watcherConfig)
 
 	configPath := consulConfigFile
 

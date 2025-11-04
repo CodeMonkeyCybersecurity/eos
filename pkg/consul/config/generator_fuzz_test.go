@@ -21,6 +21,16 @@ func FuzzGenerate(f *testing.F) {
 			DatacenterName:     datacenter,
 			EnableDebugLogging: enableDebugLogging,
 			VaultAvailable:     vaultAvailable,
+			GossipKey:          "test-gossip-key",
+			TLS: &TLSConfig{
+				Enabled:              true,
+				CAFile:               "/etc/consul.d/tls/ca.pem",
+				CertFile:             "/etc/consul.d/tls/server.pem",
+				KeyFile:              "/etc/consul.d/tls/server-key.pem",
+				VerifyIncoming:       true,
+				VerifyOutgoing:       true,
+				VerifyServerHostname: true,
+			},
 		}
 
 		// Test should not panic regardless of input

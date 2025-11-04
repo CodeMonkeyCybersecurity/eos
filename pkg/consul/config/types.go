@@ -16,6 +16,17 @@ type GeneratorConfig struct {
 	// EnableVaultWatcher adds the consul-vault-helper script watcher.
 	// Disabled by default because it relies on script handlers.
 	EnableVaultWatcher bool
+	TLS                *TLSConfig
+}
+
+type TLSConfig struct {
+	Enabled               bool
+	CAFile                string
+	CertFile              string
+	KeyFile               string
+	VerifyIncoming        bool
+	VerifyOutgoing        bool
+	VerifyServerHostname  bool
 }
 
 // DEPRECATED: ConsulConfig is renamed to GeneratorConfig for clarity

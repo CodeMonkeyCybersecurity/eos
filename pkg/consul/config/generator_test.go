@@ -10,19 +10,28 @@ import (
 
 func TestGenerate(t *testing.T) {
 	tests := []struct {
-		name     string
-		config   *ConsulConfig
-		wantErr  bool
-		checkFn  func(t *testing.T, cfg *ConsulConfig)
+		name    string
+		config  *ConsulConfig
+		wantErr bool
+		checkFn func(t *testing.T, cfg *ConsulConfig)
 	}{
-	{
-		name: "valid production config",
-		config: &ConsulConfig{
-			DatacenterName:     "production",
-			EnableDebugLogging: false,
-			VaultAvailable:     true,
-			GossipKey:          "test-gossip-key",
-		},
+		{
+			name: "valid production config",
+			config: &ConsulConfig{
+				DatacenterName:     "production",
+				EnableDebugLogging: false,
+				VaultAvailable:     true,
+				GossipKey:          "test-gossip-key",
+				TLS: &TLSConfig{
+					Enabled:              true,
+					CAFile:               "/etc/consul.d/tls/ca.pem",
+					CertFile:             "/etc/consul.d/tls/server.pem",
+					KeyFile:              "/etc/consul.d/tls/server-key.pem",
+					VerifyIncoming:       true,
+					VerifyOutgoing:       true,
+					VerifyServerHostname: true,
+				},
+			},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "production", cfg.DatacenterName)
@@ -32,12 +41,21 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "valid development config with debug",
-		config: &ConsulConfig{
-			DatacenterName:     "development",
-			EnableDebugLogging: true,
-			VaultAvailable:     false,
-			GossipKey:          "test-gossip-key",
-		},
+			config: &ConsulConfig{
+				DatacenterName:     "development",
+				EnableDebugLogging: true,
+				VaultAvailable:     false,
+				GossipKey:          "test-gossip-key",
+				TLS: &TLSConfig{
+					Enabled:              true,
+					CAFile:               "/etc/consul.d/tls/ca.pem",
+					CertFile:             "/etc/consul.d/tls/server.pem",
+					KeyFile:              "/etc/consul.d/tls/server-key.pem",
+					VerifyIncoming:       true,
+					VerifyOutgoing:       true,
+					VerifyServerHostname: true,
+				},
+			},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "development", cfg.DatacenterName)
@@ -47,12 +65,21 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "empty datacenter name",
-		config: &ConsulConfig{
-			DatacenterName:     "",
-			EnableDebugLogging: false,
-			VaultAvailable:     false,
-			GossipKey:          "test-gossip-key",
-		},
+			config: &ConsulConfig{
+				DatacenterName:     "",
+				EnableDebugLogging: false,
+				VaultAvailable:     false,
+				GossipKey:          "test-gossip-key",
+				TLS: &TLSConfig{
+					Enabled:              true,
+					CAFile:               "/etc/consul.d/tls/ca.pem",
+					CertFile:             "/etc/consul.d/tls/server.pem",
+					KeyFile:              "/etc/consul.d/tls/server-key.pem",
+					VerifyIncoming:       true,
+					VerifyOutgoing:       true,
+					VerifyServerHostname: true,
+				},
+			},
 			wantErr: false, // Should handle empty datacenter gracefully
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "", cfg.DatacenterName)
@@ -60,12 +87,21 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			name: "datacenter with special characters",
-		config: &ConsulConfig{
-			DatacenterName:     "test-dc_1",
-			EnableDebugLogging: true,
-			VaultAvailable:     true,
-			GossipKey:          "test-gossip-key",
-		},
+			config: &ConsulConfig{
+				DatacenterName:     "test-dc_1",
+				EnableDebugLogging: true,
+				VaultAvailable:     true,
+				GossipKey:          "test-gossip-key",
+				TLS: &TLSConfig{
+					Enabled:              true,
+					CAFile:               "/etc/consul.d/tls/ca.pem",
+					CertFile:             "/etc/consul.d/tls/server.pem",
+					KeyFile:              "/etc/consul.d/tls/server-key.pem",
+					VerifyIncoming:       true,
+					VerifyOutgoing:       true,
+					VerifyServerHostname: true,
+				},
+			},
 			wantErr: false,
 			checkFn: func(t *testing.T, cfg *ConsulConfig) {
 				assert.Equal(t, "test-dc_1", cfg.DatacenterName)
@@ -76,9 +112,9 @@ func TestGenerate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := testutil.TestRuntimeContext(t)
-			
+
 			err := Generate(rc, tt.config)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -88,7 +124,7 @@ func TestGenerate(t *testing.T) {
 					t.Logf("Generate returned error (expected in test env): %v", err)
 				}
 			}
-			
+
 			if tt.checkFn != nil {
 				tt.checkFn(t, tt.config)
 			}
@@ -98,18 +134,27 @@ func TestGenerate(t *testing.T) {
 
 func TestConsulConfig(t *testing.T) {
 	t.Run("config creation", func(t *testing.T) {
-	cfg := &ConsulConfig{
-		DatacenterName:     "test",
-		EnableDebugLogging: true,
-		VaultAvailable:     false,
-		GossipKey:          "test-gossip-key",
-	}
-		
+		cfg := &ConsulConfig{
+			DatacenterName:     "test",
+			EnableDebugLogging: true,
+			VaultAvailable:     false,
+			GossipKey:          "test-gossip-key",
+			TLS: &TLSConfig{
+				Enabled:              true,
+				CAFile:               "/etc/consul.d/tls/ca.pem",
+				CertFile:             "/etc/consul.d/tls/server.pem",
+				KeyFile:              "/etc/consul.d/tls/server-key.pem",
+				VerifyIncoming:       true,
+				VerifyOutgoing:       true,
+				VerifyServerHostname: true,
+			},
+		}
+
 		assert.Equal(t, "test", cfg.DatacenterName)
 		assert.True(t, cfg.EnableDebugLogging)
 		assert.False(t, cfg.VaultAvailable)
 	})
-	
+
 	t.Run("config with various datacenter names", func(t *testing.T) {
 		datacenters := []string{
 			"prod",
@@ -119,15 +164,24 @@ func TestConsulConfig(t *testing.T) {
 			"dc-with-hyphens",
 			"dc123",
 		}
-		
+
 		for _, dc := range datacenters {
-		cfg := &ConsulConfig{
-			DatacenterName:     dc,
-			EnableDebugLogging: false,
-			VaultAvailable:     true,
-			GossipKey:          "test-gossip-key",
-		}
-			
+			cfg := &ConsulConfig{
+				DatacenterName:     dc,
+				EnableDebugLogging: false,
+				VaultAvailable:     true,
+				GossipKey:          "test-gossip-key",
+				TLS: &TLSConfig{
+					Enabled:              true,
+					CAFile:               "/etc/consul.d/tls/ca.pem",
+					CertFile:             "/etc/consul.d/tls/server.pem",
+					KeyFile:              "/etc/consul.d/tls/server-key.pem",
+					VerifyIncoming:       true,
+					VerifyOutgoing:       true,
+					VerifyServerHostname: true,
+				},
+			}
+
 			assert.Equal(t, dc, cfg.DatacenterName)
 		}
 	})
@@ -137,17 +191,26 @@ func TestGeneratePermissions(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("Skipping permission test when running as root")
 	}
-	
+
 	t.Run("handles permission errors gracefully", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
-	cfg := &ConsulConfig{
-		DatacenterName:     "test",
-		EnableDebugLogging: false,
-		VaultAvailable:     false,
-		GossipKey:          "test-gossip-key",
-	}
-		
+
+		cfg := &ConsulConfig{
+			DatacenterName:     "test",
+			EnableDebugLogging: false,
+			VaultAvailable:     false,
+			GossipKey:          "test-gossip-key",
+			TLS: &TLSConfig{
+				Enabled:              true,
+				CAFile:               "/etc/consul.d/tls/ca.pem",
+				CertFile:             "/etc/consul.d/tls/server.pem",
+				KeyFile:              "/etc/consul.d/tls/server-key.pem",
+				VerifyIncoming:       true,
+				VerifyOutgoing:       true,
+				VerifyServerHostname: true,
+			},
+		}
+
 		// Function should handle permission errors without panicking
 		err := Generate(rc, cfg)
 		// We expect this might fail due to permissions, but should not panic
@@ -159,7 +222,7 @@ func TestGeneratePermissions(t *testing.T) {
 
 func TestGenerateWithNilConfig(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Test with nil config - currently panics (this is a bug that should be fixed)
 	defer func() {
 		if r := recover(); r != nil {

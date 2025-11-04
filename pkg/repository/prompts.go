@@ -154,7 +154,23 @@ func readLine(reader *bufio.Reader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read input: %w", err)
 	}
-	return sanitizeInput(text), nil
+
+	// FORENSICS: Debug log raw input for troubleshooting buffer artifacts
+	// This helps diagnose issues like the backslash mystery from 2025-01-28
+	if os.Getenv("EOS_DEBUG_INPUT") == "1" && len(text) > 0 {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Raw input: len=%d hex=%x quoted=%q\n",
+			len(text), []byte(text), text)
+	}
+
+	sanitized := sanitizeInput(text)
+
+	// FORENSICS: Log if sanitization removed anything
+	if os.Getenv("EOS_DEBUG_INPUT") == "1" && sanitized != strings.TrimSpace(text) {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Sanitization removed: original=%q sanitized=%q\n",
+			text, sanitized)
+	}
+
+	return sanitized, nil
 }
 
 func parseYesNo(value string, defaultVal bool) bool {

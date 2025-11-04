@@ -52,6 +52,14 @@ func NewOrchestrator(rc *eos_io.RuntimeContext, cfg *InstallConfig) (*Orchestrat
 	if cfg.LogLevel == "" {
 		cfg.LogLevel = "INFO"
 	}
+	if cfg.TLS == nil {
+		cfg.TLS = &config.TLSConfig{
+			Enabled:              true,
+			VerifyIncoming:       true,
+			VerifyOutgoing:       true,
+			VerifyServerHostname: true,
+		}
+	}
 
 	logger := otelzap.Ctx(rc.Ctx)
 	if cfg.ClientAddr != "127.0.0.1" {
@@ -160,6 +168,7 @@ func (o *Orchestrator) Install() error {
 		VaultAvailable:     o.config.VaultIntegration,
 		BootstrapExpect:    o.config.BootstrapExpect,
 		ClientAddr:         o.config.ClientAddr,
+		TLS:                o.config.TLS,
 	}
 
 	gossipKey, err := ensureGossipKey(o.logger)
@@ -168,6 +177,13 @@ func (o *Orchestrator) Install() error {
 	}
 	o.config.GossipKey = gossipKey
 	consulConfig.GossipKey = gossipKey
+
+	tlsConfig, err := ensureTLSCertificates(o.logger, o.config.BindAddr, o.config.Datacenter)
+	if err != nil {
+		return fmt.Errorf("failed to ensure TLS certificates: %w", err)
+	}
+	o.config.TLS = tlsConfig
+	consulConfig.TLS = tlsConfig
 	if err := config.Generate(o.rc, consulConfig); err != nil {
 		return fmt.Errorf("configuration generation failed: %w", err)
 	}

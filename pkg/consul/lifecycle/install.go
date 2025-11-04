@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	consulconfig "github.com/CodeMonkeyCybersecurity/eos/pkg/consul/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -45,6 +46,7 @@ type InstallConfig struct {
 	BindAddr        string
 	ClientAddr      string
 	GossipKey       string
+	TLS             *consulconfig.TLSConfig
 	LogLevel        string
 
 	// Integration options
@@ -86,6 +88,15 @@ func NewConsulInstaller(rc *eos_io.RuntimeContext, config *InstallConfig) (*Cons
 		logger.Warn("Consul client_addr configured for remote access",
 			zap.String("client_addr", config.ClientAddr),
 			zap.String("recommendation", "Enable ACLs, TLS, and firewall rules before exposing the API"))
+	}
+
+	if config.TLS == nil {
+		config.TLS = &consulconfig.TLSConfig{
+			Enabled:              true,
+			VerifyIncoming:       true,
+			VerifyOutgoing:       true,
+			VerifyServerHostname: true,
+		}
 	}
 
 	// Set binary path based on installation method

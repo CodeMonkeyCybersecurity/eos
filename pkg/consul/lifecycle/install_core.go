@@ -249,6 +249,7 @@ func (ci *ConsulInstaller) configure() error {
 		BootstrapExpect:    ci.config.BootstrapExpect,
 		ClientAddr:         ci.config.ClientAddr,
 		GossipKey:          ci.config.GossipKey,
+		TLS:                ci.config.TLS,
 	}
 
 	if err := ci.CheckDiskSpaceWithContext(context.Background(), "/etc", 10); err != nil {
@@ -261,6 +262,13 @@ func (ci *ConsulInstaller) configure() error {
 	}
 	ci.config.GossipKey = gossipKey
 	consulConfig.GossipKey = gossipKey
+
+	tlsConfig, err := ensureTLSCertificates(ci.logger, ci.config.BindAddr, ci.config.Datacenter)
+	if err != nil {
+		return fmt.Errorf("failed to ensure TLS certificates: %w", err)
+	}
+	ci.config.TLS = tlsConfig
+	consulConfig.TLS = tlsConfig
 
 	if err := config.Generate(ci.rc, consulConfig); err != nil {
 		return fmt.Errorf("failed to generate configuration: %w", err)
