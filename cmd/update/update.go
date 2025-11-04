@@ -20,6 +20,7 @@ func AddSubcommands() {
 
 	// Add service update commands
 	UpdateCmd.AddCommand(MattermostCmd)
+	UpdateCmd.AddCommand(MoniCmd)
 }
 
 // UpdateCmd is the root command for update operations

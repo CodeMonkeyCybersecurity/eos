@@ -41,7 +41,11 @@
 // Code Monkey Cybersecurity - "Cybersecurity. With humans."
 package bionicgpt
 
-import "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+import (
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+)
 
 // InstallConfig contains configuration for BionicGPT installation
 type InstallConfig struct {
@@ -171,4 +175,98 @@ const (
 	// NOTE: Actual path is secret/data/services/{environment}/bionicgpt (managed by secrets.SecretManager)
 	// This constant documents the service name used in GetOrGenerateServiceSecrets()
 	VaultServiceName = "bionicgpt" // Service name for Vault secrets (stored at secret/data/services/{env}/bionicgpt)
+
+	// Container names (additional for refresh operations)
+	ContainerNameApp        = "bionicgpt-app"
+	ContainerNamePostgres   = "bionicgpt-postgres"
+	ContainerNameLiteLLMDB  = "bionicgpt-litellm-db"
+	ContainerNameLiteLLM    = "bionicgpt-litellm-proxy"
+	ContainerNameEmbeddings = "bionicgpt-embeddings"
+	ContainerNameChunking   = "bionicgpt-chunking"
+	ContainerNameRAGEngine  = "bionicgpt-rag-engine"
+
+	// Database configuration
+	PostgresDefaultPort = "5432"
+	LiteLLMDefaultUser  = "litellm"
+	LiteLLMDefaultDB    = "litellm"
+	LiteLLMDefaultPort  = "5433"
+
+	// LiteLLM configuration
+	LiteLLMProxyPort        = 4000
+	LiteLLMDefaultMasterKey = "sk-" // Must start with sk-
+
+	// Backup configuration
+	BackupDirName          = "backups"
+	BackupTimestampFormat  = "20060102_150405"
+	BackupPrefixRefresh    = "refresh-"
+	RollbackScriptName     = "rollback.sh"
+	RollbackScriptPerm     = 0755
+
+	// File paths
+	DockerComposeFileName = "docker-compose.yml"
+	EnvFileName           = ".env"
+	LiteLLMConfigFileName = "litellm_config.yaml"
+	FixModelsFileName     = "fix-moni-models.sql"
+
+	// SQL table names (LiteLLM)
+	LiteLLMVerificationTokenTable = "LiteLLM_VerificationToken"
+
+	// SQL table names (BionicGPT)
+	TableModels  = "models"
+	TablePrompts = "prompts"
+	TableTeams   = "teams"
+
+	// Model configuration
+	ModelIDEmbeddings      = 1
+	ModelIDLLM             = 2
+	ModelNameEmbeddings    = "nomic-embed-text"
+	ModelNameMoni          = "moni" // Alias for ModelNameLLM
+	ModelNameLLM           = "moni"
+	ModelTypeEmbeddings    = "Embeddings"
+	ModelTypeLLM           = "LLM"
+	ModelBaseLiteLLM       = "http://litellm-proxy:4000"
+	ModelContextEmbeddings = 8192
+	ModelContextLLM        = 128000
+	ModelTPMLimit          = 10000 // Embeddings TPM
+	ModelRPMLimit          = 10000 // Embeddings RPM
+	ModelLLMTPMLimit       = 30000 // LLM TPM
+	ModelLLMRPMLimit       = 500   // LLM RPM
+
+	// Prompt configuration
+	PromptVisibility      = "Company"
+	PromptName            = "moni"
+	PromptMaxHistory      = 3
+	PromptMaxChunks       = 10
+	PromptMaxTokens       = 4096
+	PromptTrimRatio       = 80
+	PromptTemperature     = 0.7
+	PromptType            = "Model"
+	PromptCategoryID      = 1
+	PromptDescription     = "Moni - Powered by Azure OpenAI o3-mini"
+
+	// Docker Compose service names
+	ServiceApp      = "app"
+	ServiceLiteLLM  = "litellm-proxy"
+	ServicePostgres = "postgres"
+	ServiceLiteLLMDB = "litellm-db"
+
+	// Environment variable names (for validation)
+	EnvVarLiteLLMMasterKey = "LITELLM_MASTER_KEY"
+)
+
+// Timeouts and retry configuration (durations, not constants)
+var (
+	// PostgreSQL readiness timeout
+	PostgresReadyTimeout = 60 * time.Second
+	PostgresReadyRetry   = 2 * time.Second
+
+	// LiteLLM database readiness timeout
+	LiteLLMDBReadyTimeout = 60 * time.Second
+	LiteLLMDBReadyRetry   = 2 * time.Second
+
+	// Service stabilization delay after restart
+	ServiceStabilizationDelay = 10 * time.Second
+
+	// Initial service startup delay
+	ServiceStartupDelay = 15 * time.Second
 )
