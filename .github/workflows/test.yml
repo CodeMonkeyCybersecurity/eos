@@ -40,7 +40,7 @@ jobs:
           name: codecov-umbrella
 
       - name: Upload coverage artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         if: always()
         with:
           name: coverage-report
