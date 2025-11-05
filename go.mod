@@ -1,6 +1,6 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.25.3
+go 1.25
 
 require (
 	code.gitea.io/sdk/gitea v0.22.1

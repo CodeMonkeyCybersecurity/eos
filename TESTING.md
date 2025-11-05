@@ -576,23 +576,29 @@ gh secret set VAULT_TOKEN_TEST -b "hvs.CAESIJwZ..."
 
 ### Go Version Mismatch
 
-**Problem**: `go.mod` requires Go 1.25.3, but system has 1.24.7
+**Problem**: `go.mod` requires Go 1.25+, but system has 1.24.7
 
 **Error**:
 ```
-go: go.mod requires go >= 1.25.3; switching to go 1.24.7
+go: go.mod requires go >= 1.25; switching to go 1.24.7
+# or
+go: github.com/hashicorp/consul/api@v1.33.0 requires go >= 1.25.3
 ```
 
-**Solution**:
+**Solution**: See [GO_UPGRADE.md](GO_UPGRADE.md) for comprehensive upgrade instructions
+
+**Quick Fix** (if you have internet access):
 ```bash
-# Install Go 1.25.3
-sudo add-apt-repository ppa:longsleep/golang-backports
-sudo apt update
-sudo apt install golang-1.25
+# Download and install Go 1.25.0
+wget https://go.dev/dl/go1.25.0.linux-amd64.tar.gz
+sudo rm -rf /usr/local/go
+sudo tar -C /usr/local -xzf go1.25.0.linux-amd64.tar.gz
 
 # Verify version
-go version  # Should show go1.25.3
+go version  # Should show go1.25.0 or later
 ```
+
+**For Network-Restricted Environments**: See [GO_UPGRADE.md - Network-Restricted Environment Workarounds](GO_UPGRADE.md#network-restricted-environment-workarounds)
 
 ### Vault Not Running
 
