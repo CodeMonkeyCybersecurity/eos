@@ -298,10 +298,25 @@ func ConfigureRaftAutopilot(rc *eos_io.RuntimeContext, token string, config *Aut
 		args = append(args, fmt.Sprintf("-server-stabilization-time=%s", config.ServerStabilizationTime))
 	}
 
+	// SECURITY (P0-1 FIX): Use temporary token file instead of environment variable
+	// RATIONALE: Environment variables visible via ps/proc, token file has 0400 perms
+	// THREAT MODEL: Prevents token scraping from process list and memory dumps
+	tokenFile, err := createTemporaryTokenFile(rc, token)
+	if err != nil {
+		log.Error("Failed to create token file for Autopilot config",
+			zap.Error(err))
+		return fmt.Errorf("failed to create token file: %w", err)
+	}
+	defer os.Remove(tokenFile.Name()) // CRITICAL: Cleanup immediately after command
+
+	log.Debug("Using secure token file for Autopilot configuration",
+		zap.String("token_file", tokenFile.Name()),
+		zap.String("token_preview", sanitizeTokenForLogging(token)))
+
 	cmd := exec.CommandContext(rc.Ctx, "vault", args...)
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		fmt.Sprintf("VAULT_TOKEN=%s", token),
+		fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()), // ✓ SECURE: No token in env
 		"VAULT_SKIP_VERIFY=1")
 
 	output, err := cmd.CombinedOutput()
@@ -339,10 +354,18 @@ func GetAutopilotState(rc *eos_io.RuntimeContext, token string) (*AutopilotState
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Retrieving Autopilot state")
 
+	// SECURITY (P0-1 FIX): Use temporary token file instead of environment variable
+	tokenFile, err := createTemporaryTokenFile(rc, token)
+	if err != nil {
+		log.Error("Failed to create token file for Autopilot state retrieval", zap.Error(err))
+		return nil, fmt.Errorf("failed to create token file: %w", err)
+	}
+	defer os.Remove(tokenFile.Name())
+
 	cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "autopilot", "state", "-format=json")
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		fmt.Sprintf("VAULT_TOKEN=%s", token),
+		fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()),
 		"VAULT_SKIP_VERIFY=1")
 
 	output, err := cmd.CombinedOutput()
@@ -395,10 +418,18 @@ func RemoveRaftPeer(rc *eos_io.RuntimeContext, token string, nodeID string) erro
 	log := otelzap.Ctx(rc.Ctx)
 	log.Warn("Removing Raft peer", zap.String("node_id", nodeID))
 
+	// SECURITY (P0-1 FIX): Use temporary token file instead of environment variable
+	tokenFile, err := createTemporaryTokenFile(rc, token)
+	if err != nil {
+		log.Error("Failed to create token file for peer removal", zap.Error(err))
+		return fmt.Errorf("failed to create token file: %w", err)
+	}
+	defer os.Remove(tokenFile.Name())
+
 	cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "remove-peer", nodeID)
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		fmt.Sprintf("VAULT_TOKEN=%s", token),
+		fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()),
 		"VAULT_SKIP_VERIFY=1")
 
 	output, err := cmd.CombinedOutput()
@@ -418,10 +449,18 @@ func TakeRaftSnapshot(rc *eos_io.RuntimeContext, token string, outputPath string
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("Taking Raft snapshot", zap.String("output", outputPath))
 
+	// SECURITY (P0-1 FIX): Use temporary token file instead of environment variable
+	tokenFile, err := createTemporaryTokenFile(rc, token)
+	if err != nil {
+		log.Error("Failed to create token file for snapshot", zap.Error(err))
+		return fmt.Errorf("failed to create token file: %w", err)
+	}
+	defer os.Remove(tokenFile.Name())
+
 	cmd := exec.CommandContext(rc.Ctx, "vault", "operator", "raft", "snapshot", "save", outputPath)
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		fmt.Sprintf("VAULT_TOKEN=%s", token),
+		fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()),
 		"VAULT_SKIP_VERIFY=1")
 
 	output, err := cmd.CombinedOutput()
@@ -441,6 +480,14 @@ func RestoreRaftSnapshot(rc *eos_io.RuntimeContext, token string, snapshotPath s
 	log := otelzap.Ctx(rc.Ctx)
 	log.Warn("Restoring Raft snapshot", zap.String("snapshot", snapshotPath), zap.Bool("force", force))
 
+	// SECURITY (P0-1 FIX): Use temporary token file instead of environment variable
+	tokenFile, err := createTemporaryTokenFile(rc, token)
+	if err != nil {
+		log.Error("Failed to create token file for snapshot restore", zap.Error(err))
+		return fmt.Errorf("failed to create token file: %w", err)
+	}
+	defer os.Remove(tokenFile.Name())
+
 	args := []string{"operator", "raft", "snapshot", "restore"}
 	if force {
 		args = append(args, "-force")
@@ -450,7 +497,7 @@ func RestoreRaftSnapshot(rc *eos_io.RuntimeContext, token string, snapshotPath s
 	cmd := exec.CommandContext(rc.Ctx, "vault", args...)
 	cmd.Env = append(cmd.Env,
 		fmt.Sprintf("VAULT_ADDR=%s", shared.GetVaultAddr()),
-		fmt.Sprintf("VAULT_TOKEN=%s", token),
+		fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()),
 		"VAULT_SKIP_VERIFY=1")
 
 	output, err := cmd.CombinedOutput()

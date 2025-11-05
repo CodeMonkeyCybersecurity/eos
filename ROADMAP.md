@@ -180,6 +180,46 @@ Rollback per item; full build/vet/test suites must pass before promotion.
 
 ---
 
+## 2025-11 – Security Hardening Sprint (URGENT - Week of 2025-01-27)
+
+### CRITICAL SECURITY FIXES (P0 - BREAKING)
+
+**Context**: Adversarial security analysis (2025-01-27) identified 3 CRITICAL, 4 HIGH, 3 MEDIUM vulnerabilities requiring immediate remediation before production deployment.
+
+**Compliance Risk**: Violates PCI-DSS 3.2.1, SOC2 CC6.1, HIPAA encryption requirements.
+
+#### P0-1: Token Exposure in Environment Variables (CVSS 8.5)
+- **Issue**: Vault tokens in `VAULT_TOKEN=<value>` visible in `ps auxe`, `/proc/<pid>/environ`
+- **Location**: `pkg/vault/cluster_operations.go` (5 functions)
+- **Fix**: 2 hours - temporary token files with 0400 perms
+- **Reference**: NIST 800-53 SC-12
+
+#### P0-2: VAULT_SKIP_VERIFY=1 Globally Enabled (CVSS 9.1)
+- **Issue**: TLS validation disabled, enables MITM attacks
+- **Location**: `pkg/vault/phase2_env_setup.go:92`
+- **Fix**: 3 hours - CA certificate validation with user consent
+- **Reference**: NIST 800-53 SC-8
+
+#### P0-3: Pre-Commit Security Hooks
+- **Issue**: No automated checks prevent regressions
+- **Fix**: 1 hour - `.git/hooks/pre-commit` + CI workflow
+
+### HIGH PRIORITY (P1)
+- **P1-4**: HTTP Client Consolidation (Wazuh) - 1 hour
+- **P1-5**: Database Credential Sanitization - 30 min
+- **P1-6**: Hardcoded Permissions Migration - 30 min
+
+### MEDIUM PRIORITY (P2 - Q1 2026)
+- **P2-7**: Secrets Rotation Framework - 4 weeks
+- **P2-8**: Compliance Documentation - 2 weeks
+
+### LOW PRIORITY (P3 - Q2 2026)
+- **P3-9**: Security Observability - 2 weeks
+- **P3-10**: Threat Modeling - 1 week
+- **P3-11**: DR Testing Enhancement - Ongoing
+
+---
+
 ### Authentik Client Consolidation & Export Enhancements (2025-11 → 2026-01)
 
 #### Completed (2025-10-30)

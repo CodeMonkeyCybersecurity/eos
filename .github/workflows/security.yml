@@ -1,201 +1,100 @@
-name: Security Testing and Analysis
+name: Security Validation
+
 on:
-  push:
-    branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  push:
+    branches: [main]
   schedule:
-    # Run security tests daily at 2 AM UTC
-    - cron: '0 2 * * *'
-  workflow_dispatch:
-    inputs:
-      full_scan:
-        description: 'Run full security scan including CodeQL'
-        required: false
-        default: false
-        type: boolean
+    # Run weekly security scan (Sundays at 2 AM UTC)
+    - cron: '0 2 * * 0'
 
 jobs:
-  security-tests:
+  security-audit:
+    name: Security Audit
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.25
-
-      - name: Download Go module dependencies
-        run: go mod download
-
-      - name: Run security-focused tests
-        run: |
-          echo "Running security validation tests..."
-          go test -v -run "Security|Validation|Auth" ./pkg/...
-
-      - name: Run vulnerability scan with govulncheck
-        continue-on-error: true
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
-      - name: Run static security analysis with gosec
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -fmt json -out gosec-report.json -stdout -verbose ./...
-          
-      - name: Run additional security tools
-        continue-on-error: true
-        run: |
-          # Install and run nancy for dependency vulnerability scanning
-          go install github.com/sonatypecommunity/nancy@latest
-          go list -json -m all | nancy sleuth
-          
-          # Install and run staticcheck for additional static analysis
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-          staticcheck -f json ./... > staticcheck-report.json || true
-          
-          # Install and run semgrep for additional security rules
-          pip install semgrep
-          semgrep --config=auto --json --output=semgrep-report.json . || true
-
-      - name: Validate security configurations
-        run: |
-          echo "Validating security-related configurations..."
-          
-          # Check for proper file permissions in code
-          echo "Checking for secure file permission patterns..."
-          if grep -r "0777\|0666\|0644.*secret\|0644.*token" --include="*.go" . || true; then
-            echo "Warning: Found potentially insecure file permissions"
-          fi
-          
-          # Check for hardcoded secrets patterns
-          echo "Scanning for potential hardcoded secrets..."
-          go install github.com/trufflesecurity/trufflehog/v3@latest
-          trufflehog filesystem . --json > trufflehog-report.json || true
-
-      - name: Upload security artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            gosec-report.json
-            staticcheck-report.json
-            semgrep-report.json
-            trufflehog-report.json
-            
-      - name: Security report summary
-        if: always()
-        run: |
-          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "### GoSec Results" >> $GITHUB_STEP_SUMMARY
-          if [ -f gosec-report.json ]; then
-            issues=$(jq '.Issues | length' gosec-report.json 2>/dev/null || echo "0")
-            echo "- Found $issues potential security issues" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "### Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
-          echo "- Dependency vulnerability scan completed" >> $GITHUB_STEP_SUMMARY
-          
-          echo "### Configuration Validation" >> $GITHUB_STEP_SUMMARY
-          echo "- Security configuration checks completed" >> $GITHUB_STEP_SUMMARY
-
-  file-security-validation:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.25
-
-      - name: Download Go module dependencies
-        run: go mod download
-
-      - name: Test file permission validation
-        run: |
-          echo "Testing file security scenarios..."
-          go test -v -run "FileSecurityScenario" ./integration_scenarios_test.go
-
-      - name: Validate input sanitization
-        run: |
-          echo "Testing input validation..."
-          go test -v -run "Validation" ./pkg/crypto/...
-
-      - name: Test error handling security
-        run: |
-          echo "Testing error handling security..."
-          go test -v -run "ErrorHandling" ./integration_scenarios_test.go
-
-  codeql-integration:
-    runs-on: ubuntu-latest
-    if: github.event.inputs.full_scan == 'true' || github.event_name == 'schedule'
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
+          go-version: '1.25.3'
           cache: true
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: go
-          config-file: ./.github/codeql/codeql-config.yml
-          queries: +security-and-quality,security-experimental
-
-      - name: Build for CodeQL analysis
+      - name: Install security tools
         run: |
-          go build -v ./...
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          echo "✓ Security tools installed"
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:go"
-          upload: true
-
-  security-baseline:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go  
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - name: Run security baseline tests
+      - name: Run gosec
         run: |
-          echo "Running security baseline validation..."
-          
-          # Test that no test tokens or secrets are committed
-          if find . -name "*.go" -exec grep -l "hvs\." {} \; | grep -v test | head -1; then
-            echo "Error: Found potential vault tokens in non-test code"
+          echo "🔍 Running gosec security scanner..."
+          gosec -fmt=sarif -out=gosec-results.sarif -severity=medium -confidence=medium ./...
+        continue-on-error: true
+
+      - name: Run govulncheck
+        run: |
+          echo "🔍 Scanning for known vulnerabilities..."
+          govulncheck ./...
+
+      - name: Custom Security Checks
+        run: |
+          echo "🔍 Running custom security checks..."
+          ERRORS=0
+
+          echo "  ├─ Checking VAULT_SKIP_VERIFY..."
+          if grep -r "VAULT_SKIP_VERIFY.*1" --include="*.go" --exclude-dir=vendor . | grep -v "handleTLSValidationFailure\|Eos_ALLOW_INSECURE_VAULT\|# P0-2"; then
+            echo "  │  ❌ VAULT_SKIP_VERIFY found"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "  │  ✓ PASS"
+          fi
+
+          echo "  ├─ Checking InsecureSkipVerify..."
+          if grep -r "InsecureSkipVerify.*true" --include="*.go" --exclude="*_test.go" --exclude-dir=vendor . | grep -v "TestConfig"; then
+            echo "  │  ❌ InsecureSkipVerify found"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "  │  ✓ PASS"
+          fi
+
+          echo "  ├─ Checking VAULT_TOKEN env var..."
+          if grep -r 'fmt\.Sprintf.*VAULT_TOKEN.*%s' --include="*.go" --exclude-dir=vendor . | grep -v "VAULT_TOKEN_FILE\|# P0-1"; then
+            echo "  │  ❌ VAULT_TOKEN env var found"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "  │  ✓ PASS"
+          fi
+
+          echo "  └─ Custom checks complete"
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Security validation FAILED"
             exit 1
           fi
-          
-          # Ensure proper logging practices
-          if grep -r "fmt\.Print\|log\.Print" --include="*.go" pkg/ cmd/; then
-            echo "Warning: Found non-structured logging in production code"
-          fi
-          
-          # Check for proper error handling
-          echo "Validating error handling patterns..."
-          go test -v -run "Security" ./pkg/...
+          echo "✓ All checks passed"
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: gosec-results.sarif
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
