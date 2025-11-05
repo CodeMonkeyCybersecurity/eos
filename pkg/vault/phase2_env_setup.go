@@ -58,10 +58,11 @@ func PrepareEnvironment(rc *eos_io.RuntimeContext) error {
 
 func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	const testTimeout = 500 * time.Millisecond
+	log := otelzap.Ctx(rc.Ctx)
 
 	// 1. Return if already set
 	if cur := os.Getenv(shared.VaultAddrEnv); cur != "" {
-		otelzap.Ctx(rc.Ctx).Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
+		log.Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
 		return cur, nil
 	}
 
@@ -69,31 +70,41 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	host := shared.GetInternalHostname()
 	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
 
-	// 3. Probe TLS before setting
-	if canConnectTLS(rc, addr, testTimeout) {
-		_ = os.Setenv(shared.VaultAddrEnv, addr)
-		otelzap.Ctx(rc.Ctx).Info(" VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
-	} else {
-		otelzap.Ctx(rc.Ctx).Warn("Vault TLS probe failed (expected with self-signed certificates) - will use VAULT_SKIP_VERIFY",
+	// SECURITY (P0-2 FIX): Attempt to use proper CA certificate validation
+	// instead of unconditionally disabling TLS verification
+
+	// 3. Try to locate and load CA certificate
+	caPath, err := locateVaultCACertificate(rc)
+	if err == nil {
+		// CA certificate found - set VAULT_CACERT and test connection
+		_ = os.Setenv("VAULT_CACERT", caPath)
+		log.Info("✓ Vault CA certificate configured (TLS validation enabled)",
+			zap.String("VAULT_CACERT", caPath))
+
+		// Test connection with proper TLS validation
+		if canConnectTLS(rc, addr, testTimeout) {
+			_ = os.Setenv(shared.VaultAddrEnv, addr)
+			log.Info("✓ VAULT_ADDR validated with TLS certificate verification",
+				zap.String(shared.VaultAddrEnv, addr),
+				zap.String("ca_cert", caPath))
+			return addr, nil
+		}
+
+		log.Warn("TLS connection failed even with CA certificate - may indicate network or certificate issue",
 			zap.String("addr", addr),
-			zap.String("note", "Vault connection will work with skip_verify enabled"))
-		_ = os.Setenv(shared.VaultAddrEnv, addr)
+			zap.String("ca_path", caPath))
+	} else {
+		log.Warn("No Vault CA certificate found in standard locations",
+			zap.Error(err),
+			zap.Strings("searched", []string{
+				"/etc/vault/tls/ca.crt",
+				"/etc/eos/ca.crt",
+				"/etc/ssl/certs/vault-ca.pem",
+			}))
 	}
 
-	// CRITICAL: Set VAULT_SKIP_VERIFY=1 for self-signed certificates
-	// This is required for API clients to trust self-signed TLS certificates
-	// during installation and initial setup. The Vault API SDK reads this
-	// environment variable via api.Config.ReadEnvironment().
-	//
-	// Note: VAULT_CACERT not set here - we use VAULT_SKIP_VERIFY=1 for self-signed certs
-	// The ca.crt file path was causing "Error loading CA File" failures because the file
-	// doesn't exist at the expected location. For self-signed certificates, we skip
-	// verification in CLI commands AND API clients.
-	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
-	otelzap.Ctx(rc.Ctx).Info(" VAULT_SKIP_VERIFY set for self-signed certificates (Vault connection working)",
-		zap.String("VAULT_SKIP_VERIFY", "1"))
-
-	return addr, nil
+	// 4. CA certificate not found or connection failed - handle TLS validation failure
+	return handleTLSValidationFailure(rc, addr)
 }
 
 func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool {
@@ -151,6 +162,213 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 	}
 	_ = conn.Close()
 	return true
+}
+
+// locateVaultCACertificate attempts to find a Vault CA certificate in standard locations
+//
+// SECURITY (P0-2 FIX): Proper CA certificate discovery prevents MITM attacks
+// RATIONALE: Using VAULT_CACERT enables certificate validation without skip_verify
+// THREAT MODEL: Prevents attacker from intercepting Vault connections with fake certs
+//
+// Search order (highest priority first):
+//  1. /etc/vault/tls/ca.crt - Vault standard location
+//  2. /etc/eos/ca.crt - Eos general CA
+//  3. /etc/ssl/certs/vault-ca.pem - Alternative location
+//
+// Returns:
+//   - string: Path to valid CA certificate file
+//   - error: If no valid CA certificate found in any location
+//
+// COMPLIANCE: NIST 800-53 SC-8, SC-13
+func locateVaultCACertificate(rc *eos_io.RuntimeContext) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	// Try standard locations in priority order
+	caPaths := []string{
+		"/etc/vault/tls/ca.crt",       // Vault standard location (HIGHEST PRIORITY)
+		"/etc/eos/ca.crt",             // Eos general CA
+		"/etc/ssl/certs/vault-ca.pem", // Alternative location
+	}
+
+	for _, caPath := range caPaths {
+		info, err := os.Stat(caPath)
+		if err != nil {
+			log.Debug("CA certificate not found",
+				zap.String("path", caPath),
+				zap.Error(err))
+			continue // Try next path
+		}
+
+		// Verify it's a regular file and readable
+		if !info.Mode().IsRegular() {
+			log.Debug("CA certificate path is not a regular file",
+				zap.String("path", caPath))
+			continue
+		}
+
+		if info.Size() == 0 {
+			log.Debug("CA certificate file is empty",
+				zap.String("path", caPath))
+			continue
+		}
+
+		// Verify it's actually a valid PEM certificate
+		if err := validateCACertificate(caPath); err != nil {
+			log.Warn("Found CA file but validation failed",
+				zap.String("path", caPath),
+				zap.Error(err))
+			continue
+		}
+
+		log.Info("Found valid Vault CA certificate",
+			zap.String("path", caPath),
+			zap.Int64("size", info.Size()))
+		return caPath, nil
+	}
+
+	return "", fmt.Errorf("no valid Vault CA certificate found in standard locations: %v", caPaths)
+}
+
+// validateCACertificate validates that a file contains a valid PEM-encoded certificate
+//
+// SECURITY: Ensures CA certificate is properly formatted before use
+// RATIONALE: Prevents using corrupted or malformed certificates
+//
+// Parameters:
+//   - caPath: Path to CA certificate file
+//
+// Returns:
+//   - error: If certificate is invalid or cannot be read
+func validateCACertificate(caPath string) error {
+	certPEM, err := os.ReadFile(caPath)
+	if err != nil {
+		return fmt.Errorf("failed to read CA file: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(certPEM) {
+		return fmt.Errorf("failed to parse PEM certificate")
+	}
+
+	// Successfully parsed - certificate is valid PEM format
+	return nil
+}
+
+// handleTLSValidationFailure handles TLS validation failures with informed user consent
+//
+// SECURITY (P0-2 FIX): Implements informed consent before disabling TLS validation
+// RATIONALE: User must explicitly accept risk of MITM attacks
+// THREAT MODEL: Prevents accidental use of insecure connections
+//
+// This function is called when:
+//   - No CA certificate found in standard locations, OR
+//   - TLS connection failed even with CA certificate
+//
+// Behavior:
+//   - Interactive mode (TTY): Prompts user with security warning, requires "yes"
+//   - Non-interactive mode (CI/CD): Fails with clear remediation steps
+//   - Development mode (Eos_ALLOW_INSECURE_VAULT=true): Allows with warning
+//
+// Parameters:
+//   - rc: RuntimeContext for logging
+//   - addr: Vault address that failed validation
+//
+// Returns:
+//   - string: Vault address (if user consents or dev mode)
+//   - error: If user declines or non-interactive mode
+//
+// COMPLIANCE: NIST 800-53 SC-8 (requires user acknowledgment of insecure connections)
+func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	// Check for development mode override
+	if os.Getenv("Eos_ALLOW_INSECURE_VAULT") == "true" {
+		log.Warn("⚠️  VAULT_SKIP_VERIFY enabled via Eos_ALLOW_INSECURE_VAULT (INSECURE - DEV MODE)",
+			zap.String("VAULT_SKIP_VERIFY", "1"),
+			zap.String("reason", "dev_mode_environment_variable"),
+			zap.String("env_var", "Eos_ALLOW_INSECURE_VAULT=true"))
+
+		_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
+		_ = os.Setenv(shared.VaultAddrEnv, addr)
+		return addr, nil
+	}
+
+	log.Warn("⚠️  Vault TLS certificate validation failed",
+		zap.String("addr", addr),
+		zap.String("reason", "CA certificate not found or connection failed"))
+
+	// Check if we're in non-interactive mode
+	if !isInteractiveTerminal() {
+		return "", fmt.Errorf("TLS validation failed and cannot prompt in non-interactive mode\n\n"+
+			"Remediation:\n"+
+			"  1. RECOMMENDED: Install proper CA certificate to /etc/vault/tls/ca.crt\n"+
+			"     Example: sudo cp /path/to/vault-ca.crt /etc/vault/tls/ca.crt\n"+
+			"  2. OR set VAULT_CACERT=/path/to/ca.crt environment variable\n"+
+			"  3. OR for development only: set Eos_ALLOW_INSECURE_VAULT=true (INSECURE)\n"+
+			"\n"+
+			"Verify CA certificate:\n"+
+			"  openssl s_client -connect %s -CAfile /etc/vault/tls/ca.crt\n"+
+			"\n"+
+			"Security warning: Disabling TLS validation enables MITM attacks", addr)
+	}
+
+	// Interactive mode: Ask for informed consent
+	fmt.Println("\n⚠️  SECURITY WARNING: Vault TLS Certificate Validation Failed")
+	fmt.Println("────────────────────────────────────────────────────────────")
+	fmt.Println("Cannot verify Vault server identity. This could indicate:")
+	fmt.Println("  • Vault is using a self-signed certificate (expected during setup)")
+	fmt.Println("  • CA certificate is not in the system trust store")
+	fmt.Println("  • OR a man-in-the-middle attack is in progress")
+	fmt.Println()
+	fmt.Println("Proceeding WITHOUT certificate validation is INSECURE.")
+	fmt.Println("An attacker could intercept your connection and steal secrets.")
+	fmt.Println()
+	fmt.Println("Recommended actions:")
+	fmt.Println("  1. Install Vault's CA certificate to /etc/vault/tls/ca.crt")
+	fmt.Println("  2. Verify with: openssl s_client -connect", addr, "-CAfile /etc/vault/tls/ca.crt")
+	fmt.Println()
+	fmt.Print("Do you want to proceed WITHOUT certificate validation? (yes/NO): ")
+
+	var response string
+	fmt.Scanln(&response)
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response != "yes" {
+		log.Info("User declined to proceed without TLS validation (security-conscious choice)",
+			zap.String("response", response))
+		return "", fmt.Errorf("TLS validation failed and user declined to proceed insecurely")
+	}
+
+	// User explicitly consented - enable skip_verify with logging
+	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
+	_ = os.Setenv(shared.VaultAddrEnv, addr)
+
+	log.Warn("⚠️  VAULT_SKIP_VERIFY enabled with user consent - INSECURE",
+		zap.String("VAULT_SKIP_VERIFY", "1"),
+		zap.String("reason", "user_consent_interactive"),
+		zap.String("session_user", os.Getenv("USER")),
+		zap.Time("consent_time", time.Now()),
+		zap.String("vault_addr", addr))
+
+	return addr, nil
+}
+
+// isInteractiveTerminal checks if stdin is connected to an interactive terminal
+//
+// Returns:
+//   - true if running in interactive terminal (user can be prompted)
+//   - false if running in CI/CD, script, or non-TTY environment
+func isInteractiveTerminal() bool {
+	// Check if stdin is a terminal
+	fileInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	// Check if it's a character device (terminal)
+	// On Unix systems, terminals are character devices
+	mode := fileInfo.Mode()
+	return (mode & os.ModeCharDevice) != 0
 }
 
 func EnsureVaultDirs(rc *eos_io.RuntimeContext) error {
