@@ -1,6 +1,6 @@
 # Upgrading Go to 1.25+
 
-**Last Updated**: 2025-11-05
+**Last Updated**: 2025-01-28
 
 This document provides instructions for manually upgrading Go to version 1.25+ to run Eos tests and build the project.
 
