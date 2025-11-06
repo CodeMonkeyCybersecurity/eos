@@ -1,0 +1,62 @@
+# Test Coverage Configuration for Eos
+# Last Updated: 2025-11-05
+#
+# Tool: vladopajic/go-test-coverage
+# Docs: https://github.com/vladopajic/go-test-coverage
+#
+# Usage:
+#   go test -coverprofile=coverage.out -covermode=atomic ./...
+#   go-test-coverage --config=.testcoverage.yml
+
+# Coverage thresholds
+threshold:
+  # Overall minimum coverage across all packages
+  total: 80
+
+  # Per-file minimum coverage
+  file: 70
+
+# Files to exclude from coverage requirements
+exclude:
+  # Generated code (protobuf, codegen, etc.)
+  - ".*\\.pb\\.go$"
+  - ".*\\.gen\\.go$"
+  - ".*_generated\\.go$"
+
+  # Mock files
+  - "mock_.*\\.go$"
+  - ".*_mock\\.go$"
+
+  # Platform compatibility stubs (intentionally minimal)
+  - ".*_stub\\.go$"
+
+  # Test utilities themselves
+  - "pkg/testutil/.*"
+  - "test/e2e/framework\\.go$"
+
+  # Main functions (hard to test without full binary execution)
+  - "cmd/.*/main\\.go$"
+
+  # Vendor directory (external dependencies)
+  - "vendor/.*"
+
+  # Documentation/examples that don't need coverage
+  - ".*_example\\.go$"
+
+# Badge configuration (optional - generates coverage badge)
+badge:
+  # File name for coverage badge SVG
+  file-name: coverage.svg
+
+  # Badge styling
+  badge-color: green  # Color when coverage is good
+
+# Output format
+output:
+  format: text  # Options: text, github-actions
+
+# Exclusion rules by package
+package:
+  # Example: Exclude entire packages if needed
+  # exclude:
+  #   - "github.com/CodeMonkeyCybersecurity/eos/pkg/deprecated"

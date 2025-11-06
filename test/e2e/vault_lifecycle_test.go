@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-End Test: Vault Lifecycle
 // Tests complete Vault workflow: create → update → fix → delete
 package e2e

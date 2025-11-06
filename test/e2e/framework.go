@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-End Testing Framework for Eos
 // Provides utilities for testing complete user workflows
 package e2e

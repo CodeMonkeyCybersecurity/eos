@@ -1,3 +1,5 @@
+//go:build e2e
+
 // End-to-End Test: Service Deployment Workflows
 // Tests deploying various services through Eos
 package e2e
