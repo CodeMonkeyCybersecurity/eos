@@ -238,7 +238,8 @@ func (eeu *EnhancedEosUpdater) verifySourceDirectory() error {
 	return git.VerifyRepository(eeu.rc, eeu.config.SourceDir)
 }
 
-// checkGitRepositoryState checks for uncommitted changes
+// checkGitRepositoryState checks for uncommitted changes and prompts for informed consent
+// P0-3 FIX: Human-centric validation - don't proceed blindly with uncommitted changes
 func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	eeu.logger.Info("Checking git repository state")
 
@@ -248,13 +249,86 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	}
 
 	if state.HasChanges {
+		// P0-3 FIX: If RequireCleanWorkingTree is explicitly set, fail immediately
 		if eeu.enhancedConfig.RequireCleanWorkingTree {
 			return fmt.Errorf("repository has uncommitted changes and clean working tree is required")
 		}
 
-		eeu.logger.Warn("Repository has uncommitted changes, will use git pull --autostash")
-		// Note: We don't stash here - we let git pull --autostash handle it
-		// This is more reliable and doesn't leave orphaned stashes
+		// P0-3 FIX: Human-centric informed consent
+		// Explain risks and let user decide
+		eeu.logger.Warn("Uncommitted changes detected in source repository",
+			zap.String("repo", eeu.config.SourceDir))
+
+		// Check if we're in non-interactive mode (no TTY)
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return fmt.Errorf("cannot proceed with uncommitted changes in non-interactive mode\n\n"+
+				"Repository: %s\n\n"+
+				"Options:\n"+
+				"  1. Commit your changes: git -C %s commit -am \"your message\"\n"+
+				"  2. Stash your changes: git -C %s stash\n"+
+				"  3. Discard your changes: git -C %s reset --hard\n\n"+
+				"Then re-run: eos self update",
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir)
+		}
+
+		// Interactive mode - prompt for informed consent
+		fmt.Println()
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println("⚠️  WARNING: Uncommitted Changes Detected")
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println()
+		fmt.Printf("Repository: %s\n", eeu.config.SourceDir)
+		fmt.Println()
+		fmt.Println("You have uncommitted changes in your Eos source directory.")
+		fmt.Println()
+		fmt.Println("RISKS:")
+		fmt.Println("  • If the update fails, your changes will be preserved BUT")
+		fmt.Println("  • The repository will be in an inconsistent state")
+		fmt.Println("  • Rollback will restore your changes, but this adds complexity")
+		fmt.Println()
+		fmt.Println("SAFER OPTIONS:")
+		fmt.Println("  1. Cancel now, commit your changes, then re-run update")
+		fmt.Println("  2. Cancel now, stash your changes, then re-run update")
+		fmt.Println("  3. Cancel now, discard your changes, then re-run update")
+		fmt.Println()
+		fmt.Println("OR:")
+		fmt.Println("  4. Continue at your own risk (changes will be auto-stashed)")
+		fmt.Println()
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println()
+
+		// Use interaction package for consistent prompting
+		// Default to NO (safer option)
+		proceed, err := interaction.PromptYesNo(eeu.rc, "Continue with uncommitted changes?", false)
+		if err != nil {
+			return fmt.Errorf("failed to get user input: %w", err)
+		}
+
+		if !proceed {
+			eeu.logger.Info("Update cancelled by user - uncommitted changes need attention")
+			return fmt.Errorf("update cancelled by user\n\n"+
+				"Please handle uncommitted changes before updating:\n"+
+				"  • Commit: git -C %s commit -am \"your message\"\n"+
+				"  • Stash:  git -C %s stash\n"+
+				"  • Reset:  git -C %s reset --hard\n\n"+
+				"Then re-run: eos self update",
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir)
+		}
+
+		// User chose to continue - warn and proceed
+		eeu.logger.Warn("User chose to proceed with uncommitted changes",
+			zap.String("repo", eeu.config.SourceDir))
+		fmt.Println()
+		fmt.Println("Proceeding with update (uncommitted changes will be auto-stashed)...")
+		fmt.Println()
+
+		// Note: P0-2 already implemented stash tracking, so this is now safe
+		// Changes will be stashed before pull and restored if rollback needed
 	} else {
 		eeu.logger.Info(" Working tree is clean")
 	}

@@ -142,35 +142,69 @@ ERROR CRITICAL: Required rollback step failed {"step": "revert_git"
 
 ---
 
-### Fix P0-3: Stricter Pre-Update Validation (RECOMMENDED)
+### ✅ Fix P0-3: Stricter Pre-Update Validation (IMPLEMENTED)
 
-**Option A** (Strict): Require clean working tree by default
-```go
-// cmd/self/update.go
-enhancedConfig := &self.EnhancedUpdateConfig{
-    UpdateConfig:            updateConfig,
-    RequireCleanWorkingTree: true,  // Changed from false
-    // ...
-}
+**File Modified**: `pkg/self/updater_enhanced.go`
+**Function Updated**: `checkGitRepositoryState()`
+
+**What It Does**:
+
+**Interactive Mode (TTY available)**:
+1. Detects uncommitted changes during pre-update safety checks
+2. Displays clear warning with visual formatting
+3. Explains specific risks of proceeding
+4. Offers safer alternatives (commit/stash/discard)
+5. Prompts for informed consent (default: NO)
+6. If user declines: exits cleanly with remediation steps
+7. If user accepts: proceeds (P0-2 makes this safe via stash tracking)
+
+**Non-Interactive Mode (no TTY - CI/CD, scripts)**:
+1. Detects uncommitted changes
+2. Fails immediately with clear error
+3. Provides remediation steps
+4. Cannot proceed without manual intervention
+
+**Warning Display**:
+```
+═══════════════════════════════════════════════════════════════
+⚠️  WARNING: Uncommitted Changes Detected
+═══════════════════════════════════════════════════════════════
+
+Repository: /opt/eos
+
+You have uncommitted changes in your Eos source directory.
+
+RISKS:
+  • If the update fails, your changes will be preserved BUT
+  • The repository will be in an inconsistent state
+  • Rollback will restore your changes, but this adds complexity
+
+SAFER OPTIONS:
+  1. Cancel now, commit your changes, then re-run update
+  2. Cancel now, stash your changes, then re-run update
+  3. Cancel now, discard your changes, then re-run update
+
+OR:
+  4. Continue at your own risk (changes will be auto-stashed)
+
+═══════════════════════════════════════════════════════════════
+
+Continue with uncommitted changes? [y/N]:
 ```
 
-**Option B** (Informed Consent): Prompt user if uncommitted changes detected
-```go
-if state.HasChanges {
-    fmt.Println("WARNING: You have uncommitted changes in /opt/eos")
-    fmt.Println("If the update fails, rollback may not be able to restore these changes.")
-    fmt.Println("Options:")
-    fmt.Println("  1. Commit or stash changes manually, then re-run update")
-    fmt.Println("  2. Continue at your own risk")
+**Key Features**:
+- **Human-centric**: Clear explanation, informed consent, safe default (NO)
+- **Non-interactive safe**: Fails with remediation steps in CI/CD
+- **Integrated with P0-2**: If user proceeds, stash tracking ensures safety
+- **Respects RequireCleanWorkingTree**: If flag set, fails immediately (strict mode)
 
-    response, err := interaction.PromptYesNo(rc, "Continue with uncommitted changes?", false)
-    if !response {
-        return fmt.Errorf("update cancelled by user - commit or stash changes first")
-    }
-}
-```
+**Benefits**:
+- **Prevents blind proceeding**: User must explicitly acknowledge risks
+- **Educates users**: Clear explanation of what could go wrong
+- **Safe default**: Defaulting to NO encourages safer workflow
+- **CI/CD safe**: Cannot proceed in non-interactive mode
 
-**Benefit**: User makes informed decision about risk
+**Status**: ✅ Ready to commit
 
 ---
 
