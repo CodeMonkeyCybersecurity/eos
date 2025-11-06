@@ -220,7 +220,7 @@ func BenchmarkIsSecretNotFound(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = IsSecretNotFound(errors[i%len(errors)])
 	}
 }
@@ -230,7 +230,7 @@ func BenchmarkIsSecretNotFoundWorstCase(b *testing.B) {
 	longError := errors.New(string(make([]byte, 10000))) // 10KB error message
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = IsSecretNotFound(longError)
 	}
 }

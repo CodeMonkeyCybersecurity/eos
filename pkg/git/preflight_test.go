@@ -239,14 +239,14 @@ func TestEmailValidation(t *testing.T) {
 // Benchmark tests
 func BenchmarkCheckGitInstalled(b *testing.B) {
 	ctx := context.Background()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = CheckGitInstalled(ctx)
 	}
 }
 
 func BenchmarkGetGitConfig(b *testing.B) {
 	ctx := context.Background()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = getGitConfig(ctx, "user.name", false)
 	}
 }

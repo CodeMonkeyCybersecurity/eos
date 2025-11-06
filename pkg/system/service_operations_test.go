@@ -740,7 +740,7 @@ func BenchmarkServiceOperation_Assess(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Client.CmdRunCalls = nil // Reset calls - TODO: Nomad client
 		_, err := operation.Assess(ctx)
 		if err != nil {

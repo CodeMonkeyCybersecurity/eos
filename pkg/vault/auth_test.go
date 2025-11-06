@@ -640,7 +640,7 @@ func BenchmarkAuthn(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = Authn(rc)
 	}
 
@@ -689,7 +689,7 @@ func BenchmarkTryAppRole(b *testing.B) {
 	client, _ := api.NewClient(nil)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = tryAppRole(rc, client)
 	}
 }

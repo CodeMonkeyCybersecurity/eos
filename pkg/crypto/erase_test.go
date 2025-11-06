@@ -176,7 +176,8 @@ func BenchmarkSecureErase(b *testing.B) {
 			ctx := context.Background()
 
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			i := 0
+			for b.Loop() {
 				b.StopTimer()
 
 				// Create file
@@ -189,6 +190,7 @@ func BenchmarkSecureErase(b *testing.B) {
 
 				b.StartTimer()
 				_ = SecureErase(ctx, filePath)
+				i++
 			}
 		})
 	}

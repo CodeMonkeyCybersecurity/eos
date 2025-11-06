@@ -168,7 +168,7 @@ func TestBootstrapStateTransitions(t *testing.T) {
 
 // BenchmarkMustAtoi benchmarks the helper function
 func BenchmarkMustAtoi(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = mustAtoi("64045")
 	}
 }

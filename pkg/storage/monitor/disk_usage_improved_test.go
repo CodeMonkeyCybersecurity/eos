@@ -387,7 +387,7 @@ func BenchmarkCheckDiskUsage(b *testing.B) {
 	paths := []string{"/tmp"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := checker.CheckDiskUsage(ctx, paths)
 		if err != nil {
 			b.Fatalf("CheckDiskUsage failed: %v", err)

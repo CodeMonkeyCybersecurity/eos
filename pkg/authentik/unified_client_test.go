@@ -780,7 +780,7 @@ func BenchmarkUnifiedClient_DoRequest(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := client.DoRequest(ctx, "GET", "/api/v3/core/users/", nil)
 		if err != nil {
 			b.Fatalf("DoRequest failed: %v", err)
@@ -798,7 +798,7 @@ func BenchmarkUnifiedClient_DoRequest_WithRetry(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Reset responses for each iteration
 		mockTransport.responses = []mockResponse{
 			{statusCode: 500, body: []byte(`{"error": "internal error"}`)},

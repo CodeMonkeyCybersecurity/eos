@@ -195,13 +195,13 @@ func TestInstallToolInputValidation(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkIsToolSupported(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		IsToolSupported("terraform")
 	}
 }
 
 func BenchmarkGetSupportedToolsString(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		GetSupportedToolsString()
 	}
 }

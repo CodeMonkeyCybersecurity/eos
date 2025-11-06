@@ -326,7 +326,7 @@ func BenchmarkRedact(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_ = Redact(tc.input)
 			}
 		})
@@ -348,7 +348,7 @@ func BenchmarkRedactVeryLong(b *testing.B) {
 	longInput := strings.Repeat("secret", 10000) // ~60KB string
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = Redact(longInput)
 	}
 }

@@ -471,19 +471,19 @@ func TestSecurityGetShellInitFile(t *testing.T) {
 
 // Benchmark Tests
 func BenchmarkGetOSPlatform(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		GetOSPlatform()
 	}
 }
 
 func BenchmarkIsCommandAvailable(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		IsCommandAvailable("go")
 	}
 }
 
 func BenchmarkGetShellType(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		GetShellType()
 	}
 }

@@ -456,7 +456,7 @@ func BenchmarkExecutor_Execute(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		operation.CallSequence = nil // Reset for each iteration
 		err := executor.Execute(ctx, operation, "benchmark_operation")
 		if err != nil {

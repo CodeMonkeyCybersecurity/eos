@@ -544,7 +544,7 @@ func BenchmarkMLKEMOperations(b *testing.B) {
 	}
 
 	b.Run("GenerateKeypair", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = GenerateMLKEMKeypair(rc)
 		}
 	})
@@ -554,26 +554,26 @@ func BenchmarkMLKEMOperations(b *testing.B) {
 	require.NoError(b, err)
 
 	b.Run("Encapsulate", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = EncapsulateSecret(rc, keypair.PublicKey)
 		}
 	})
 
 	b.Run("ValidatePublicKey", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = ValidateMLKEMPublicKey(rc, keypair.PublicKey)
 		}
 	})
 
 	b.Run("RawMLKEM768Generate", func(b *testing.B) {
 		// Benchmark raw library performance for comparison
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = mlkem768.GenerateKey()
 		}
 	})
 
 	b.Run("RawMLKEM768Encapsulate", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _, _ = mlkem768.Encapsulate(keypair.PublicKey)
 		}
 	})

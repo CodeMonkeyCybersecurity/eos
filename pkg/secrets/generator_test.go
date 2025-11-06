@@ -437,7 +437,7 @@ func TestBase64Padding(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkGenerateHex16(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := GenerateHex(16)
 		if err != nil {
 			b.Fatal(err)
@@ -446,7 +446,7 @@ func BenchmarkGenerateHex16(b *testing.B) {
 }
 
 func BenchmarkGenerateHex32(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := GenerateHex(32)
 		if err != nil {
 			b.Fatal(err)
@@ -455,7 +455,7 @@ func BenchmarkGenerateHex32(b *testing.B) {
 }
 
 func BenchmarkGenerateBase64_32(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := GenerateBase64(32)
 		if err != nil {
 			b.Fatal(err)

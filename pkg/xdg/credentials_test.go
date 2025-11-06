@@ -421,14 +421,14 @@ func BenchmarkSaveCredential(b *testing.B) {
 	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	b.Run("small_password", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), "smallpass")
 		}
 	})
 
 	b.Run("large_password", func(b *testing.B) {
 		largePassword := strings.Repeat("x", 1024)
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), largePassword)
 		}
 	})

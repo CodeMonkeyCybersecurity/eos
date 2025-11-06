@@ -599,7 +599,7 @@ func BenchmarkRun(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = Run(ctx, opts)
 	}
 }
@@ -608,7 +608,7 @@ func BenchmarkRunSimple(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RunSimple(ctx, "echo", "benchmark")
 	}
 }
@@ -617,7 +617,7 @@ func BenchmarkJoinArgs(b *testing.B) {
 	args := []string{"arg1", "arg2", "arg3", "arg4"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		joinArgs(args)
 	}
 }
@@ -626,7 +626,7 @@ func BenchmarkShellQuote(b *testing.B) {
 	args := []string{"arg1", "arg2 with spaces", "arg3"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		shellQuote(args)
 	}
 }

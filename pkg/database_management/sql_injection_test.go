@@ -296,7 +296,7 @@ func BenchmarkSQLValidation(b *testing.B) {
 	testQuery := "SELECT name, email FROM users WHERE active = true AND created_at > NOW() - INTERVAL '30 days'"
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = validateSQLQuerySafety(testQuery)
 	}
 }
@@ -306,7 +306,7 @@ func BenchmarkSQLValidationMalicious(b *testing.B) {
 	maliciousQuery := "SELECT * FROM users WHERE id = 1' OR '1'='1' UNION SELECT password FROM admin --"
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = validateSQLQuerySafety(maliciousQuery)
 	}
 }

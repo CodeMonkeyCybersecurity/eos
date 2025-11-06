@@ -571,7 +571,7 @@ func BenchmarkSanitizeInput(b *testing.B) {
 	input := "normal text with some\x1b[31mcolors\x1b[0m and unicode: "
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = sanitizer.SanitizeInput(input)
 	}
 }
@@ -581,7 +581,7 @@ func BenchmarkSanitizeInputWithCSI(b *testing.B) {
 	input := "text with CSI" + string(rune(0x9b)) + "characters"
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = sanitizer.SanitizeInput(input)
 	}
 }
@@ -590,7 +590,7 @@ func BenchmarkEscapeOutput(b *testing.B) {
 	input := "output with\x1b[31mcolor\x1b[0m and CSI" + string(rune(0x9b))
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = EscapeOutput(input)
 	}
 }

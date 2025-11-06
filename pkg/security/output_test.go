@@ -308,7 +308,7 @@ func BenchmarkSecureOutput_Info(b *testing.B) {
 	fields := []zap.Field{zap.String("user", "test\x9buser")}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		output.Info(message, fields...)
 	}
 }
@@ -325,7 +325,7 @@ func BenchmarkSecureOutput_Result(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		output.Result("test_operation", data)
 	}
 }
@@ -334,7 +334,7 @@ func BenchmarkSecureEscapeOutput(b *testing.B) {
 	input := "test message with \x1b[31mdangerous\x1b[0m content and CSI " + string(rune(0x9b))
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = EscapeOutput(input)
 	}
 }
