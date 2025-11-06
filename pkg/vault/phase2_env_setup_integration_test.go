@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package vault
@@ -6,7 +7,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -546,13 +546,13 @@ func TestVaultAddrHTTPSEnforcement(t *testing.T) {
 	// RATIONALE: HTTP is unencrypted, should be rejected in production
 
 	testCases := []struct {
-		addr      string
+		addr       string
 		shouldWarn bool
 	}{
 		{"https://localhost:8200", false},
-		{"http://localhost:8200", true},  // Insecure
+		{"http://localhost:8200", true}, // Insecure
 		{"https://vault.example.com", false},
-		{"http://vault.example.com", true},  // Insecure
+		{"http://vault.example.com", true}, // Insecure
 	}
 
 	for _, tc := range testCases {

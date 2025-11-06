@@ -25,12 +25,12 @@
 package vault
 
 import (
-	"fmt"
-	"os"
+    "fmt"
+    "os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+    "github.com/uptrace/opentelemetry-go-extra/otelzap"
+    "go.uber.org/zap"
 )
 
 // TempTokenFilePerm is the permission for temporary token files (owner-read-only)
@@ -132,35 +132,4 @@ func createTemporaryTokenFile(rc *eos_io.RuntimeContext, token string) (*os.File
 		zap.String("cleanup", "caller must defer os.Remove()"))
 
 	return tokenFile, nil
-}
-
-// sanitizeTokenForLogging returns a safe version of a token for logging
-// that doesn't expose the actual token value.
-//
-// SECURITY: Tokens must NEVER be logged in full, even at DEBUG level.
-// This helper shows enough information for diagnostics without exposing secrets.
-//
-// Example:
-//
-//	token := "hvs.CAESIJ1..."
-//	safe := sanitizeTokenForLogging(token)
-//	// Returns: "hvs.***" (prefix visible, value hidden)
-//
-// Parameters:
-//   - token: Full token string
-//
-// Returns:
-//   - string: Sanitized token showing only prefix
-func sanitizeTokenForLogging(token string) string {
-	if len(token) <= 4 {
-		return "***"
-	}
-
-	// Show prefix to distinguish token types (hvs. = service token, s. = legacy)
-	prefix := token[:4]
-	if prefix == "hvs." || prefix == "s.12" {
-		return prefix + "***"
-	}
-
-	return "***"
 }

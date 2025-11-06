@@ -278,18 +278,18 @@ func runConsulUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 			return fmt.Errorf("failed to check existing environment in Consul: %w", err)
 		}
 
-		if existing != nil {
-			existingEnv := string(existing.Value)
-			return eos_err.NewUserError(
-				fmt.Sprintf("Environment already set to '%s' for node '%s'\n\n"+
-					"Changing environment requires privilege escalation for security.\n"+
-					"This prevents accidental environment changes that could expose production secrets.\n\n"+
-					"To change environment:\n"+
-					"  1. Delete existing key: consul kv delete %s\n"+
-					"  2. Re-run: eos update consul --environment %s\n\n"+
-					"WARNING: This is a security-critical operation. Ensure you understand the implications.",
-					existingEnv, hostname, kvPath, consulEnvironment))
-		}
+        if existing != nil {
+            existingEnv := string(existing.Value)
+            return eos_err.NewUserError(
+                "Environment already set to '%s' for node '%s'\n\n"+
+                    "Changing environment requires privilege escalation for security.\n"+
+                    "This prevents accidental environment changes that could expose production secrets.\n\n"+
+                    "To change environment:\n"+
+                    "  1. Delete existing key: consul kv delete %s\n"+
+                    "  2. Re-run: eos update consul --environment %s\n\n"+
+                    "WARNING: This is a security-critical operation. Ensure you understand the implications.",
+                existingEnv, hostname, kvPath, consulEnvironment)
+        }
 
 		// Confirm production changes
 		if consulEnvironment == string(sharedvault.EnvironmentProduction) {
