@@ -272,6 +272,7 @@ func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 
 // verifyBuildDependencies checks that we can build eos
 // HUMAN-CENTRIC: Guides user through installing missing dependencies with informed consent
+// P0-1 FIX: Verify Go toolchain availability BEFORE pulling updates
 func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	eeu.logger.Info("Verifying build dependencies")
 
@@ -303,6 +304,22 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 			"https://github.com/CodeMonkeyCybersecurity/eos/issues",
 			result.MissingCephLibs)
 	}
+
+	// P0-1 FIX: Verify Go toolchain is available for current architecture
+	// CRITICAL: Check BEFORE pulling updates to avoid failed build + broken rollback
+	// RATIONALE: Prevents "go: download go1.25 for linux/arm64: toolchain not available" errors
+	eeu.logger.Info("Verifying Go toolchain availability for current architecture")
+	requiredVer, currentVer, err := build.VerifyGoToolchainAvailability(eeu.rc, eeu.goPath, eeu.config.SourceDir)
+	if err != nil {
+		return fmt.Errorf("Go toolchain pre-check failed: %w\n\n"+
+			"IMPORTANT: Cannot proceed with update because required Go version\n"+
+			"is not available for your system architecture.\n\n"+
+			"This check runs BEFORE pulling updates to prevent build failures.", err)
+	}
+
+	eeu.logger.Info("✓ Go toolchain verified",
+		zap.String("required_version", requiredVer),
+		zap.String("current_version", currentVer))
 
 	eeu.logger.Info(" Build dependencies verified and ready")
 	return nil
