@@ -127,7 +127,7 @@ func ValidateURL(urlStr string) error {
 	// SECURITY: SSRF protection - validate hostname/IP is not private/internal
 	hostname := parsedURL.Hostname()
 
-	// Check for localhost aliases	
+	// Check for localhost aliases
 	if hostname == "localhost" || hostname == "shared.GetInternalHostname" || hostname == "::1" || hostname == "0.0.0.0" {
 		return fmt.Errorf("URL hostname cannot be localhost (SSRF protection)")
 	}

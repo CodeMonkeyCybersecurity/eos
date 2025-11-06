@@ -313,8 +313,8 @@ func createBackup(rc *eos_io.RuntimeContext, opts *ConfigureOptions) (string, er
 
 	// Backup config files
 	filesToBackup := map[string]string{
-		wazuh.OpenSearchConfig:        "config.yml",
-		wazuh.OpenSearchRoleMappings:  "roles_mapping.yml",
+		wazuh.OpenSearchConfig:       "config.yml",
+		wazuh.OpenSearchRoleMappings: "roles_mapping.yml",
 		wazuh.OpenSearchDashboardYml: "opensearch_dashboards.yml",
 	}
 

@@ -21,7 +21,7 @@ func DiscoverOptimalConnection(rc *eos_io.RuntimeContext, backend *Backend) (*Tu
 
 	// Try methods in order of preference
 	methods := []string{ConnectionTypeConsulConnect, ConnectionTypeWireGuard, ConnectionTypeCloudflare}
-	
+
 	for _, method := range methods {
 		logger.Info("Testing connection method",
 			zap.String("method", method),
@@ -44,7 +44,7 @@ func DiscoverOptimalConnection(rc *eos_io.RuntimeContext, backend *Backend) (*Tu
 					PrimaryDatacenter: backend.FrontendDC,
 				}
 				config.Status.State = TunnelStateConnected
-				
+
 				logger.Info("Consul Connect connection method selected",
 					zap.String("backend_id", backend.ID))
 				return config, nil
@@ -54,7 +54,7 @@ func DiscoverOptimalConnection(rc *eos_io.RuntimeContext, backend *Backend) (*Tu
 			if wgConfig, err := setupWireGuard(rc, backend); err == nil {
 				config.WireGuard = wgConfig
 				config.Status.State = TunnelStateConnected
-				
+
 				logger.Info("WireGuard connection method selected",
 					zap.String("backend_id", backend.ID))
 				return config, nil
@@ -64,7 +64,7 @@ func DiscoverOptimalConnection(rc *eos_io.RuntimeContext, backend *Backend) (*Tu
 			if cfConfig, err := setupCloudflare(rc, backend); err == nil {
 				config.CloudflareTunnel = cfConfig
 				config.Status.State = TunnelStateConnected
-				
+
 				logger.Info("Cloudflare Tunnel connection method selected",
 					zap.String("backend_id", backend.ID))
 				return config, nil
@@ -111,7 +111,7 @@ func TeardownHybridLink(rc *eos_io.RuntimeContext, linkID string) error {
 	// 3. Remove network configurations
 	// 4. Clean up certificates
 	// 5. Remove from state store
-	
+
 	return nil
 }
 
@@ -129,7 +129,7 @@ func testConsulConnect(rc *eos_io.RuntimeContext, backend *Backend) error {
 	// 2. Test mesh gateway connectivity
 	// 3. Verify service registration capabilities
 	// 4. Test cross-DC communication
-	
+
 	return nil
 }
 
@@ -146,7 +146,7 @@ func setupWireGuard(rc *eos_io.RuntimeContext, backend *Backend) (*WireGuardDef,
 	// 3. Set up routing
 	// 4. Configure peers
 	// 5. Start WireGuard service
-	
+
 	wgConfig := &WireGuardDef{
 		InterfaceName:       "wg-hecate",
 		ListenPort:          51820,
@@ -170,7 +170,7 @@ func setupCloudflare(rc *eos_io.RuntimeContext, backend *Backend) (*CloudflareDe
 	// 2. Configure credentials
 	// 3. Set up ingress rules
 	// 4. Start cloudflared service
-	
+
 	cfConfig := &CloudflareDef{
 		TunnelName: fmt.Sprintf("hecate-%s", backend.ID),
 		Ingresses: []CloudflareIngress{
@@ -219,7 +219,7 @@ func establishMeshGateway(rc *eos_io.RuntimeContext, link *HybridLink) error {
 	// 2. Deploy mesh gateway services
 	// 3. Configure networking
 	// 4. Set up federation
-	
+
 	logger.Info("Mesh gateway configuration prepared",
 		zap.Any("backend_config", backendConfig),
 		zap.Any("frontend_config", frontendConfig))
@@ -240,7 +240,7 @@ func establishWireGuard(rc *eos_io.RuntimeContext, link *HybridLink) error {
 	// 3. Set up routing tables
 	// 4. Configure firewall rules
 	// 5. Start WireGuard services
-	
+
 	return nil
 }
 
@@ -256,7 +256,7 @@ func establishCloudflare(rc *eos_io.RuntimeContext, link *HybridLink) error {
 	// 2. Configure DNS records
 	// 3. Set up ingress rules
 	// 4. Start cloudflared daemon
-	
+
 	return nil
 }
 
@@ -275,7 +275,7 @@ func HandleDynamicIP(rc *eos_io.RuntimeContext, backend *Backend) error {
 		if err != nil {
 			return fmt.Errorf("failed to resolve DNS name %s: %w", backend.DNSName, err)
 		}
-		
+
 		if len(ips) > 0 {
 			backend.LocalAddress = fmt.Sprintf("%s:%d", ips[0], backend.Port)
 			logger.Info("Updated backend address via DNS",
@@ -304,7 +304,7 @@ func SetupNATTraversal(rc *eos_io.RuntimeContext, link *HybridLink) error {
 	if err != nil {
 		logger.Warn("Failed to discover public IP via STUN",
 			zap.Error(err))
-		
+
 		// Option 2: Use Tailscale for NAT traversal
 		return setupTailscale(rc, link)
 	}
@@ -317,7 +317,7 @@ func SetupNATTraversal(rc *eos_io.RuntimeContext, link *HybridLink) error {
 	if err := setupUPnP(rc, requiredPorts); err != nil {
 		logger.Warn("Failed to configure UPnP",
 			zap.Error(err))
-		
+
 		// Fallback to relay
 		return setupRelay(rc, link)
 	}
@@ -421,7 +421,7 @@ func GetConnectionStatus(rc *eos_io.RuntimeContext, linkID string) (*ConnectionS
 	// 2. Measure latency
 	// 3. Check health checks
 	// 4. Get bandwidth metrics
-	
+
 	status := &ConnectionStatus{
 		Connected:    false,
 		LastSeen:     time.Now(),

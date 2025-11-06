@@ -283,21 +283,21 @@ func (m *Manager) createNginxJob() *api.Job {
 func (m *Manager) getN8nEnvironment() map[string]string {
 	return map[string]string{
 		// Database
-		"DB_TYPE":                    "postgresdb",
-		"DB_POSTGRESDB_HOST":         m.config.PostgresHost,
-		"DB_POSTGRESDB_PORT":         fmt.Sprintf("%d", m.config.PostgresPort),
-		"DB_POSTGRESDB_DATABASE":     m.config.PostgresDB,
-		"DB_POSTGRESDB_USER":         m.config.PostgresUser,
-		"DB_POSTGRESDB_PASSWORD":     m.config.PostgresPassword,
+		"DB_TYPE":                "postgresdb",
+		"DB_POSTGRESDB_HOST":     m.config.PostgresHost,
+		"DB_POSTGRESDB_PORT":     fmt.Sprintf("%d", m.config.PostgresPort),
+		"DB_POSTGRESDB_DATABASE": m.config.PostgresDB,
+		"DB_POSTGRESDB_USER":     m.config.PostgresUser,
+		"DB_POSTGRESDB_PASSWORD": m.config.PostgresPassword,
 
 		// n8n Configuration
-		"N8N_BASIC_AUTH_ACTIVE":      "true",
-		"N8N_BASIC_AUTH_USER":        m.config.BasicAuthUser,
-		"N8N_BASIC_AUTH_PASSWORD":    m.config.BasicAuthPassword,
-		"N8N_HOST":                   m.config.Domain,
-		"N8N_PORT":                   fmt.Sprintf("%d", m.config.Port),
-		"N8N_PROTOCOL":               m.config.Protocol,
-		"WEBHOOK_URL":                fmt.Sprintf("%s://%s/", m.config.Protocol, m.config.Domain),
+		"N8N_BASIC_AUTH_ACTIVE":   "true",
+		"N8N_BASIC_AUTH_USER":     m.config.BasicAuthUser,
+		"N8N_BASIC_AUTH_PASSWORD": m.config.BasicAuthPassword,
+		"N8N_HOST":                m.config.Domain,
+		"N8N_PORT":                fmt.Sprintf("%d", m.config.Port),
+		"N8N_PROTOCOL":            m.config.Protocol,
+		"WEBHOOK_URL":             fmt.Sprintf("%s://%s/", m.config.Protocol, m.config.Domain),
 
 		// Security
 		"N8N_JWT_AUTH_HEADER":              "authorization",
@@ -305,14 +305,14 @@ func (m *Manager) getN8nEnvironment() map[string]string {
 		"N8N_ENCRYPTION_KEY":               m.config.EncryptionKey,
 
 		// Scaling & Performance
-		"QUEUE_BULL_REDIS_HOST":    m.config.RedisHost,
-		"QUEUE_BULL_REDIS_PORT":    fmt.Sprintf("%d", m.config.RedisPort),
-		"EXECUTIONS_MODE":          "queue",
+		"QUEUE_BULL_REDIS_HOST":     m.config.RedisHost,
+		"QUEUE_BULL_REDIS_PORT":     fmt.Sprintf("%d", m.config.RedisPort),
+		"EXECUTIONS_MODE":           "queue",
 		"QUEUE_HEALTH_CHECK_ACTIVE": "true",
 
 		// Logging
-		"N8N_LOG_LEVEL":     "info",
-		"N8N_LOG_OUTPUT":    "console,file",
+		"N8N_LOG_LEVEL":         "info",
+		"N8N_LOG_OUTPUT":        "console,file",
 		"N8N_LOG_FILE_LOCATION": "/home/node/.n8n/logs/n8n.log",
 
 		// User Management
@@ -320,7 +320,7 @@ func (m *Manager) getN8nEnvironment() map[string]string {
 		"N8N_PUBLIC_API_DISABLED":      fmt.Sprintf("%t", !m.config.EnablePublicAPI),
 
 		// Security Headers
-		"N8N_SECURE_COOKIE": fmt.Sprintf("%t", m.config.SecureCookies),
+		"N8N_SECURE_COOKIE":  fmt.Sprintf("%t", m.config.SecureCookies),
 		"N8N_COOKIES_SECURE": fmt.Sprintf("%t", m.config.SecureCookies),
 
 		// Timezone

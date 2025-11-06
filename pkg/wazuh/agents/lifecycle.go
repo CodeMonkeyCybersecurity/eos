@@ -89,7 +89,6 @@ func UninstallRpm(rc *eos_io.RuntimeContext) {
 	}
 }
 
-
 func UninstallWindows(rc *eos_io.RuntimeContext) {
 	otelzap.Ctx(rc.Ctx).Info("Querying WMIC for Wazuh agent")
 	query := `wmic product where "Name like '%%Wazuh%%'" get IdentifyingNumber,Name`

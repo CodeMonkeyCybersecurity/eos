@@ -14,49 +14,49 @@ import (
 
 // ServiceState represents the state of a systemd service
 type ServiceState struct {
-	Name       string    `json:"name"`
-	Active     bool      `json:"active"`
-	Enabled    bool      `json:"enabled"`
-	Failed     bool      `json:"failed"`
-	Status     string    `json:"status"`
-	Since      time.Time `json:"since,omitempty"`
-	MainPID    int       `json:"main_pid,omitempty"`
-	Memory     string    `json:"memory,omitempty"`
-	LoadState  string    `json:"load_state,omitempty"`
-	SubState   string    `json:"sub_state,omitempty"`
+	Name      string    `json:"name"`
+	Active    bool      `json:"active"`
+	Enabled   bool      `json:"enabled"`
+	Failed    bool      `json:"failed"`
+	Status    string    `json:"status"`
+	Since     time.Time `json:"since,omitempty"`
+	MainPID   int       `json:"main_pid,omitempty"`
+	Memory    string    `json:"memory,omitempty"`
+	LoadState string    `json:"load_state,omitempty"`
+	SubState  string    `json:"sub_state,omitempty"`
 }
 
 // ServiceOperation represents different service operations
 type ServiceOperation string
 
 const (
-	OperationStart    ServiceOperation = "start"
-	OperationStop     ServiceOperation = "stop"
-	OperationRestart  ServiceOperation = "restart"
-	OperationReload   ServiceOperation = "reload"
-	OperationEnable   ServiceOperation = "enable"
-	OperationDisable  ServiceOperation = "disable"
-	OperationStatus   ServiceOperation = "status"
-	OperationIsActive ServiceOperation = "is-active"
+	OperationStart     ServiceOperation = "start"
+	OperationStop      ServiceOperation = "stop"
+	OperationRestart   ServiceOperation = "restart"
+	OperationReload    ServiceOperation = "reload"
+	OperationEnable    ServiceOperation = "enable"
+	OperationDisable   ServiceOperation = "disable"
+	OperationStatus    ServiceOperation = "status"
+	OperationIsActive  ServiceOperation = "is-active"
 	OperationIsEnabled ServiceOperation = "is-enabled"
 )
 
 // ServiceConfig holds configuration for service operations
 type ServiceConfig struct {
-	Name          string        `json:"name"`
-	Description   string        `json:"description"`
-	ServiceFile   string        `json:"service_file,omitempty"`
-	User          string        `json:"user,omitempty"`
-	Group         string        `json:"group,omitempty"`
-	WorkingDir    string        `json:"working_dir,omitempty"`
-	ExecStart     string        `json:"exec_start,omitempty"`
-	ExecStop      string        `json:"exec_stop,omitempty"`
-	Environment   []string      `json:"environment,omitempty"`
-	Restart       string        `json:"restart,omitempty"`
-	RestartDelay  time.Duration `json:"restart_sec,omitempty"` // Keep JSON tag for compatibility
-	WantedBy      string        `json:"wanted_by,omitempty"`
-	After         []string      `json:"after,omitempty"`
-	Requires      []string      `json:"requires,omitempty"`
+	Name         string        `json:"name"`
+	Description  string        `json:"description"`
+	ServiceFile  string        `json:"service_file,omitempty"`
+	User         string        `json:"user,omitempty"`
+	Group        string        `json:"group,omitempty"`
+	WorkingDir   string        `json:"working_dir,omitempty"`
+	ExecStart    string        `json:"exec_start,omitempty"`
+	ExecStop     string        `json:"exec_stop,omitempty"`
+	Environment  []string      `json:"environment,omitempty"`
+	Restart      string        `json:"restart,omitempty"`
+	RestartDelay time.Duration `json:"restart_sec,omitempty"` // Keep JSON tag for compatibility
+	WantedBy     string        `json:"wanted_by,omitempty"`
+	After        []string      `json:"after,omitempty"`
+	Requires     []string      `json:"requires,omitempty"`
 }
 
 // SystemdServiceManager provides standardized systemd service management
@@ -359,8 +359,8 @@ func (sm *SystemdServiceManager) RemoveService(serviceName string) error {
 		zap.String("service", serviceName))
 
 	// Stop and disable service first
-	_ = sm.Stop(serviceName)     // Ignore errors - service might not be running
-	_ = sm.Disable(serviceName)  // Ignore errors - service might not be enabled
+	_ = sm.Stop(serviceName)    // Ignore errors - service might not be running
+	_ = sm.Disable(serviceName) // Ignore errors - service might not be enabled
 
 	// Remove service file
 	serviceFile := fmt.Sprintf("/etc/systemd/system/%s.service", serviceName)
@@ -410,55 +410,55 @@ func (sm *SystemdServiceManager) generateServiceFile(config *ServiceConfig) stri
 	if config.Description != "" {
 		content.WriteString(fmt.Sprintf("Description=%s\n", config.Description))
 	}
-	
+
 	for _, after := range config.After {
 		content.WriteString(fmt.Sprintf("After=%s\n", after))
 	}
-	
+
 	for _, requires := range config.Requires {
 		content.WriteString(fmt.Sprintf("Requires=%s\n", requires))
 	}
-	
+
 	content.WriteString("\n")
 
 	// [Service] section
 	content.WriteString("[Service]\n")
 	content.WriteString("Type=simple\n")
-	
+
 	if config.User != "" {
 		content.WriteString(fmt.Sprintf("User=%s\n", config.User))
 	}
-	
+
 	if config.Group != "" {
 		content.WriteString(fmt.Sprintf("Group=%s\n", config.Group))
 	}
-	
+
 	if config.WorkingDir != "" {
 		content.WriteString(fmt.Sprintf("WorkingDirectory=%s\n", config.WorkingDir))
 	}
-	
+
 	if config.ExecStart != "" {
 		content.WriteString(fmt.Sprintf("ExecStart=%s\n", config.ExecStart))
 	}
-	
+
 	if config.ExecStop != "" {
 		content.WriteString(fmt.Sprintf("ExecStop=%s\n", config.ExecStop))
 	}
-	
+
 	for _, env := range config.Environment {
 		content.WriteString(fmt.Sprintf("Environment=%s\n", env))
 	}
-	
+
 	if config.Restart != "" {
 		content.WriteString(fmt.Sprintf("Restart=%s\n", config.Restart))
 	} else {
 		content.WriteString("Restart=always\n")
 	}
-	
+
 	if config.RestartDelay > 0 {
 		content.WriteString(fmt.Sprintf("RestartSec=%ds\n", int(config.RestartDelay.Seconds())))
 	}
-	
+
 	content.WriteString("\n")
 
 	// [Install] section

@@ -16,12 +16,12 @@ import (
 // ConfigureHecateStaticRoute configures the Hecate reverse proxy for static Helen deployment
 func ConfigureHecateStaticRoute(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create Hecate configuration
 	hecateConfig := &hecate.HecateConfig{
 		// Use default configuration
 	}
-	
+
 	// Create route for static site
 	route := &hecate.Route{
 		ID:     fmt.Sprintf("helen-static-%s", config.Namespace),
@@ -48,11 +48,11 @@ func ConfigureHecateStaticRoute(rc *eos_io.RuntimeContext, config *Config) error
 			Health: "healthy",
 		},
 	}
-	
+
 	logger.Info("Configuring Hecate route for static Helen",
 		zap.String("domain", config.Domain),
 		zap.String("upstream", route.Upstream.URL))
-	
+
 	return hecate.CreateRoute(rc, hecateConfig, route)
 }
 
@@ -65,12 +65,12 @@ func ConfigureHecateRoute(rc *eos_io.RuntimeContext, config *Config) error {
 // ConfigureHecateGhostRoute configures the Hecate reverse proxy for Ghost deployment
 func ConfigureHecateGhostRoute(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create Hecate configuration
 	hecateConfig := &hecate.HecateConfig{
 		// Use default configuration
 	}
-	
+
 	// Create route for Ghost CMS
 	route := &hecate.Route{
 		ID:     fmt.Sprintf("helen-ghost-%s", config.Environment),
@@ -98,7 +98,7 @@ func ConfigureHecateGhostRoute(rc *eos_io.RuntimeContext, config *GhostConfig) e
 			Health: "healthy",
 		},
 	}
-	
+
 	// Add authentication if enabled
 	if config.EnableAuth {
 		route.AuthPolicy = &hecate.AuthPolicy{
@@ -108,7 +108,7 @@ func ConfigureHecateGhostRoute(rc *eos_io.RuntimeContext, config *GhostConfig) e
 			SessionTTL: 24 * time.Hour,
 		}
 	}
-	
+
 	// Add rate limiting for API endpoints
 	route.RateLimit = &hecate.RateLimit{
 		RequestsPerSecond: 100,
@@ -117,11 +117,11 @@ func ConfigureHecateGhostRoute(rc *eos_io.RuntimeContext, config *GhostConfig) e
 		KeyBy:             "ip",
 		Enabled:           true,
 	}
-	
+
 	logger.Info("Configuring Hecate route for Ghost",
 		zap.String("domain", config.Domain),
 		zap.String("upstream", route.Upstream.URL),
 		zap.Bool("auth_enabled", config.EnableAuth))
-	
+
 	return hecate.CreateRoute(rc, hecateConfig, route)
 }

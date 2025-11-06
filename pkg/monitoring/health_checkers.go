@@ -18,23 +18,23 @@ func NewHTTPHealthChecker() *HTTPHealthChecker {
 // Check performs an HTTP health check
 func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) (*HealthResult, error) {
 	startTime := time.Now()
-	
+
 	// Parse configuration
 	path := "/health"
 	if p, ok := config["path"].(string); ok {
 		path = p
 	}
-	
+
 	timeout := 30 * time.Second
 	if t, ok := config["timeout"].(time.Duration); ok {
 		timeout = t
 	}
-	
+
 	protocol := "http"
 	if p, ok := config["protocol"].(string); ok {
 		protocol = p
 	}
-	
+
 	expectedStatus := 200
 	if s, ok := config["expected_status"].(int); ok {
 		expectedStatus = s
@@ -42,16 +42,16 @@ func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) 
 
 	// Build URL
 	url := fmt.Sprintf("%s://%s%s", protocol, target, path)
-	
+
 	// Create HTTP client with timeout
 	client := &http.Client{
 		Timeout: timeout,
 	}
-	
+
 	// Perform HTTP request
 	resp, err := client.Get(url)
 	duration := time.Since(startTime)
-	
+
 	result := &HealthResult{
 		Target:    target,
 		Timestamp: time.Now(),
@@ -60,7 +60,7 @@ func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) 
 		Details:   make(map[string]interface{}),
 		Metadata:  make(map[string]string),
 	}
-	
+
 	if err != nil {
 		result.Healthy = false
 		result.Status = HealthStatusUnhealthy
@@ -69,13 +69,13 @@ func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) 
 		result.Details["url"] = url
 		return result, nil
 	}
-	
+
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
 			// Log error but don't fail the health check
 		}
 	}()
-	
+
 	// Check status code
 	if resp.StatusCode == expectedStatus {
 		result.Healthy = true
@@ -86,11 +86,11 @@ func (h *HTTPHealthChecker) Check(target string, config map[string]interface{}) 
 		result.Status = HealthStatusUnhealthy
 		result.Message = fmt.Sprintf("HTTP status code %d, expected %d", resp.StatusCode, expectedStatus)
 	}
-	
+
 	result.Details["status_code"] = resp.StatusCode
 	result.Details["url"] = url
 	result.Details["response_time_ms"] = duration.Milliseconds()
-	
+
 	return result, nil
 }
 
@@ -115,17 +115,17 @@ func NewTCPHealthChecker() *TCPHealthChecker {
 // Check performs a TCP health check
 func (t *TCPHealthChecker) Check(target string, config map[string]interface{}) (*HealthResult, error) {
 	startTime := time.Now()
-	
+
 	// Parse configuration
 	timeout := 10 * time.Second
 	if to, ok := config["timeout"].(time.Duration); ok {
 		timeout = to
 	}
-	
+
 	// Attempt TCP connection
 	conn, err := net.DialTimeout("tcp", target, timeout)
 	duration := time.Since(startTime)
-	
+
 	result := &HealthResult{
 		Target:    target,
 		Timestamp: time.Now(),
@@ -134,7 +134,7 @@ func (t *TCPHealthChecker) Check(target string, config map[string]interface{}) (
 		Details:   make(map[string]interface{}),
 		Metadata:  make(map[string]string),
 	}
-	
+
 	if err != nil {
 		result.Healthy = false
 		result.Status = HealthStatusUnhealthy
@@ -142,15 +142,15 @@ func (t *TCPHealthChecker) Check(target string, config map[string]interface{}) (
 		result.Details["error"] = err.Error()
 		return result, nil
 	}
-	
+
 	// Connection successful
 	_ = conn.Close()
-	
+
 	result.Healthy = true
 	result.Status = HealthStatusHealthy
 	result.Message = "TCP connection successful"
 	result.Details["connection_time_ms"] = duration.Milliseconds()
-	
+
 	return result, nil
 }
 
@@ -175,7 +175,7 @@ func NewNomadHealthChecker() *NomadHealthChecker {
 // Check performs a Nomad job health check
 func (n *NomadHealthChecker) Check(target string, config map[string]interface{}) (*HealthResult, error) {
 	startTime := time.Now()
-	
+
 	result := &HealthResult{
 		Target:    target,
 		Timestamp: time.Now(),
@@ -184,10 +184,10 @@ func (n *NomadHealthChecker) Check(target string, config map[string]interface{})
 		Details:   make(map[string]interface{}),
 		Metadata:  make(map[string]string),
 	}
-	
+
 	// Implementation would check Nomad job status via API
 	// For now, simulate a check
-	
+
 	// Mock implementation - always healthy for demo
 	result.Healthy = true
 	result.Status = HealthStatusHealthy
@@ -195,7 +195,7 @@ func (n *NomadHealthChecker) Check(target string, config map[string]interface{})
 	result.Details["job_status"] = "running"
 	result.Details["allocations"] = 3
 	result.Details["desired"] = 3
-	
+
 	return result, nil
 }
 
@@ -220,7 +220,7 @@ func NewConsulHealthChecker() *ConsulHealthChecker {
 // Check performs a Consul service health check
 func (c *ConsulHealthChecker) Check(target string, config map[string]interface{}) (*HealthResult, error) {
 	startTime := time.Now()
-	
+
 	result := &HealthResult{
 		Target:    target,
 		Timestamp: time.Now(),
@@ -229,10 +229,10 @@ func (c *ConsulHealthChecker) Check(target string, config map[string]interface{}
 		Details:   make(map[string]interface{}),
 		Metadata:  make(map[string]string),
 	}
-	
+
 	// Implementation would check Consul service health via API
 	// For now, simulate a check
-	
+
 	// Mock implementation - always healthy for demo
 	result.Healthy = true
 	result.Status = HealthStatusHealthy
@@ -242,7 +242,7 @@ func (c *ConsulHealthChecker) Check(target string, config map[string]interface{}
 	result.Details["passing_checks"] = 4
 	result.Details["warning_checks"] = 0
 	result.Details["critical_checks"] = 0
-	
+
 	return result, nil
 }
 
@@ -267,7 +267,7 @@ func NewDatabaseHealthChecker() *DatabaseHealthChecker {
 // Check performs a database health check
 func (d *DatabaseHealthChecker) Check(target string, config map[string]interface{}) (*HealthResult, error) {
 	startTime := time.Now()
-	
+
 	result := &HealthResult{
 		Target:    target,
 		Timestamp: time.Now(),
@@ -276,19 +276,19 @@ func (d *DatabaseHealthChecker) Check(target string, config map[string]interface
 		Details:   make(map[string]interface{}),
 		Metadata:  make(map[string]string),
 	}
-	
+
 	// Implementation would perform actual database health check
 	// For now, simulate a check
-	
+
 	// Mock implementation - check connection
 	dbType := "postgres"
 	if dt, ok := config["type"].(string); ok {
 		dbType = dt
 	}
-	
+
 	// Simulate database connection check
 	time.Sleep(50 * time.Millisecond) // Simulate connection time
-	
+
 	result.Healthy = true
 	result.Status = HealthStatusHealthy
 	result.Message = fmt.Sprintf("%s database is healthy", dbType)
@@ -296,7 +296,7 @@ func (d *DatabaseHealthChecker) Check(target string, config map[string]interface
 	result.Details["connection_time_ms"] = time.Since(startTime).Milliseconds()
 	result.Details["active_connections"] = 15
 	result.Details["max_connections"] = 100
-	
+
 	return result, nil
 }
 

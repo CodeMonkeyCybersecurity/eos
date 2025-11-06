@@ -23,7 +23,7 @@ import (
 // validateHetznerProvider checks Hetzner Cloud provider authentication and permissions
 func validateHetznerProvider(rc *eos_io.RuntimeContext, validation *ProviderValidation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check for Hetzner API token
 	apiToken := os.Getenv("HCLOUD_TOKEN")
 	if apiToken == "" {
@@ -72,7 +72,7 @@ func validateHetznerProvider(rc *eos_io.RuntimeContext, validation *ProviderVali
 // validateConsulProvider checks Consul provider connectivity and permissions
 func validateConsulProvider(rc *eos_io.RuntimeContext, validation *ProviderValidation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if Consul is accessible
 	consulAddr := shared.GetConsulAddrWithEnv()
 
@@ -149,7 +149,7 @@ func validateVaultProvider(rc *eos_io.RuntimeContext, validation *ProviderValida
 // checkHetznerQuotas validates Hetzner DNS quotas and rate limits
 func checkHetznerQuotas(rc *eos_io.RuntimeContext, validation *QuotaValidation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	apiToken := os.Getenv("HCLOUD_TOKEN")
 	if apiToken == "" {
 		return fmt.Errorf("HCLOUD_TOKEN not available for quota check")
@@ -177,7 +177,7 @@ func checkHetznerQuotas(rc *eos_io.RuntimeContext, validation *QuotaValidation) 
 	var response struct {
 		Zones []interface{} `json:"zones"`
 	}
-	
+
 	if err := json.Unmarshal([]byte(output), &response); err != nil {
 		return fmt.Errorf("failed to parse DNS zones response: %w", err)
 	}
@@ -234,11 +234,11 @@ func isVersionInRange(current, min, max string) bool {
 func parseVersion(version string) []int {
 	// Remove 'v' prefix if present
 	version = strings.TrimPrefix(version, "v")
-	
+
 	// Split by dots and parse integers
 	parts := strings.Split(version, ".")
 	result := make([]int, len(parts))
-	
+
 	for i, part := range parts {
 		// Remove any non-numeric suffixes (like -beta, -rc1)
 		re := regexp.MustCompile(`^(\d+)`)
@@ -249,7 +249,7 @@ func parseVersion(version string) []int {
 			}
 		}
 	}
-	
+
 	return result
 }
 

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -14,13 +14,13 @@ import (
 
 // Safe storage operation flags
 var (
-	safeMode        bool
-	safeDryRun      bool
-	skipSnapshots   bool
-	safeSize        string
-	safeVG          string
-	safeLV          string
-	confirmChanges  bool
+	safeMode       bool
+	safeDryRun     bool
+	skipSnapshots  bool
+	safeSize       string
+	safeVG         string
+	safeLV         string
+	confirmChanges bool
 )
 
 // UpdateStorageSafeCmd provides safe storage operations with comprehensive safety checks
@@ -139,7 +139,7 @@ func runUpdateStorageSafe(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	fmt.Printf("Target: %s\n", result.Target)
 	fmt.Printf("Status: %s\n", getStatusIcon(result.Success))
 	fmt.Printf("Duration: %s\n", result.Duration.Round(100*1000000)) // Round to 100ms
-	
+
 	if result.JournalID != "" {
 		fmt.Printf("Journal ID: %s\n", result.JournalID)
 	}
@@ -176,7 +176,7 @@ func getOperationConfirmation(req *storage.ExtendLVRequest) error {
 	fmt.Printf("5. Verify the operation succeeded\n")
 
 	fmt.Printf("\nDo you want to proceed? (yes/no): ")
-	
+
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
 		return fmt.Errorf("failed to read response: %w", err)

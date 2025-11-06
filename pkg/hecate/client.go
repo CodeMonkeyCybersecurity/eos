@@ -61,7 +61,6 @@ func (c *CaddyClient) GetRoutes(ctx context.Context) ([]*Route, error) {
 	return []*Route{}, nil
 }
 
-
 // GenerateRouteID generates a unique ID for a route
 func GenerateRouteID(domain string) string {
 	// Simple ID generation - could be improved with UUIDs

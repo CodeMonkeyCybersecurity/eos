@@ -510,4 +510,3 @@ func displayResults(rc *eos_io.RuntimeContext, results []FixResult, dryRun bool)
 		logger.Info("  • Check logs: sudo journalctl -u consul -f")
 	}
 }
-

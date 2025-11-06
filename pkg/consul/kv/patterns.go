@@ -117,13 +117,13 @@ func EnvironmentPath(environment string, service string, key string) string {
 
 // StandardCategories defines well-known config categories
 var StandardCategories = []string{
-	"feature_flags",  // Boolean feature toggles
-	"timeouts",       // Duration values (request, connection, etc.)
-	"endpoints",      // External service URLs
-	"limits",         // Rate limits, quotas, thresholds
-	"policies",       // Configuration for policies (retry, backoff, etc.)
-	"observability",  // Logging, metrics, tracing config
-	"security",       // Non-sensitive security settings
+	"feature_flags", // Boolean feature toggles
+	"timeouts",      // Duration values (request, connection, etc.)
+	"endpoints",     // External service URLs
+	"limits",        // Rate limits, quotas, thresholds
+	"policies",      // Configuration for policies (retry, backoff, etc.)
+	"observability", // Logging, metrics, tracing config
+	"security",      // Non-sensitive security settings
 }
 
 // PathType represents the type of config path
@@ -257,10 +257,10 @@ func ValidatePathStructure(path string) error {
 
 // ConfigTemplate represents a reusable configuration template
 type ConfigTemplate struct {
-	Service     string
-	Category    string
-	Key         string
-	Description string
+	Service      string
+	Category     string
+	Key          string
+	Description  string
 	DefaultValue string
 	Type         string // "string", "int", "bool", "duration"
 }

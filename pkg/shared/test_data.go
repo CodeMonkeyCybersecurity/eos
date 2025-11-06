@@ -24,7 +24,7 @@ func GenerateTestData() map[string]interface{} {
 		"groups": []string{"users", "admins", "nextcloud", "hera", "ldap", "scim"},
 		"services": map[string]string{
 			"wazuh_api_url": "https://wazuh.cybermonkey.dev",
-			"hera_url":  "https://hera.cybermonkey.dev",
+			"hera_url":      "https://hera.cybermonkey.dev",
 			"nextcloud_url": "https://nextcloud.cybermonkey.dev",
 		},
 	}

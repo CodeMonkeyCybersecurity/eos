@@ -30,7 +30,7 @@ func (e *ActionExecutor) Execute(action Action, mountPoint string) error {
 	logger.Info("Executing storage action",
 		zap.String("action", string(action)),
 		zap.String("mount_point", mountPoint))
-	
+
 	switch action {
 	case ActionNone:
 		return nil
@@ -56,12 +56,12 @@ func (e *ActionExecutor) executeMonitor(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Info("Activating enhanced monitoring",
 		zap.String("mount_point", mountPoint))
-	
+
 	// In a real implementation, this would:
 	// - Increase metric collection frequency
 	// - Enable additional logging
 	// - Send notifications
-	
+
 	return nil
 }
 
@@ -70,14 +70,14 @@ func (e *ActionExecutor) executeCompress(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Info("Starting compression of old files",
 		zap.String("mount_point", mountPoint))
-	
+
 	// Compress old logs
 	logDirs := []string{"/var/log", "/var/log/journal"}
 	for _, dir := range logDirs {
 		if !strings.HasPrefix(dir, mountPoint) && mountPoint != "/" {
 			continue
 		}
-		
+
 		// Find and compress logs older than 7 days
 		output, err := execute.Run(e.rc.Ctx, execute.Options{
 			Command: "find",
@@ -96,12 +96,12 @@ func (e *ActionExecutor) executeCompress(mountPoint string) error {
 				zap.Error(err))
 			continue
 		}
-		
+
 		logger.Info("Compressed old logs",
 			zap.String("directory", dir),
 			zap.String("output", output))
 	}
-	
+
 	return nil
 }
 
@@ -110,7 +110,7 @@ func (e *ActionExecutor) executeCleanup(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Info("Starting cleanup of expendable files",
 		zap.String("mount_point", mountPoint))
-	
+
 	// Clean package manager cache
 	if mountPoint == "/" {
 		// APT cache cleanup
@@ -121,7 +121,7 @@ func (e *ActionExecutor) executeCleanup(mountPoint string) error {
 		}); err != nil {
 			logger.Warn("Failed to clean APT cache", zap.Error(err))
 		}
-		
+
 		// Clean old kernels
 		if output, err := execute.Run(e.rc.Ctx, execute.Options{
 			Command: "apt-get",
@@ -133,14 +133,14 @@ func (e *ActionExecutor) executeCleanup(mountPoint string) error {
 			logger.Info("Removed old packages", zap.String("output", output))
 		}
 	}
-	
+
 	// Clean temporary files
 	tempDirs := []string{"/tmp", "/var/tmp"}
 	for _, dir := range tempDirs {
 		if !strings.HasPrefix(dir, mountPoint) && mountPoint != "/" {
 			continue
 		}
-		
+
 		// Remove files older than 7 days
 		if _, err := execute.Run(e.rc.Ctx, execute.Options{
 			Command: "find",
@@ -157,7 +157,7 @@ func (e *ActionExecutor) executeCleanup(mountPoint string) error {
 				zap.Error(err))
 		}
 	}
-	
+
 	// Docker cleanup if applicable
 	if mountPoint == "/" || strings.Contains(mountPoint, "docker") {
 		if _, err := execute.Run(e.rc.Ctx, execute.Options{
@@ -168,7 +168,7 @@ func (e *ActionExecutor) executeCleanup(mountPoint string) error {
 			logger.Debug("Docker cleanup skipped or failed", zap.Error(err))
 		}
 	}
-	
+
 	return nil
 }
 
@@ -177,14 +177,14 @@ func (e *ActionExecutor) executeDegrade(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Warn("Degrading non-critical services",
 		zap.String("mount_point", mountPoint))
-	
+
 	// Services to stop in degraded mode (would be configurable)
 	nonCriticalServices := []string{
 		"jenkins",
 		"gitlab-runner",
 		"elasticsearch",
 	}
-	
+
 	for _, service := range nonCriticalServices {
 		// Check if service exists
 		if _, err := execute.Run(e.rc.Ctx, execute.Options{
@@ -207,7 +207,7 @@ func (e *ActionExecutor) executeDegrade(mountPoint string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -216,20 +216,20 @@ func (e *ActionExecutor) executeEmergency(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Error("Executing emergency storage recovery",
 		zap.String("mount_point", mountPoint))
-	
+
 	// First, try all previous actions
 	if err := e.executeCompress(mountPoint); err != nil {
 		logger.Warn("Compression failed during emergency", zap.Error(err))
 	}
-	
+
 	if err := e.executeCleanup(mountPoint); err != nil {
 		logger.Warn("Cleanup failed during emergency", zap.Error(err))
 	}
-	
+
 	if err := e.executeDegrade(mountPoint); err != nil {
 		logger.Warn("Service degradation failed during emergency", zap.Error(err))
 	}
-	
+
 	// Emergency-specific actions
 	// Clear all logs older than 1 day
 	if _, err := execute.Run(e.rc.Ctx, execute.Options{
@@ -245,7 +245,7 @@ func (e *ActionExecutor) executeEmergency(mountPoint string) error {
 	}); err != nil {
 		logger.Error("Failed to delete old logs", zap.Error(err))
 	}
-	
+
 	// Clear journal logs
 	if _, err := execute.Run(e.rc.Ctx, execute.Options{
 		Command: "journalctl",
@@ -254,7 +254,7 @@ func (e *ActionExecutor) executeEmergency(mountPoint string) error {
 	}); err != nil {
 		logger.Error("Failed to vacuum journal", zap.Error(err))
 	}
-	
+
 	return nil
 }
 
@@ -263,7 +263,7 @@ func (e *ActionExecutor) executeCritical(mountPoint string) error {
 	logger := otelzap.Ctx(e.rc.Ctx)
 	logger.Error("CRITICAL: Storage at critical levels",
 		zap.String("mount_point", mountPoint))
-	
+
 	// Create emergency marker file
 	markerPath := filepath.Join("/tmp", fmt.Sprintf("storage_critical_%d", time.Now().Unix()))
 	if _, err := execute.Run(e.rc.Ctx, execute.Options{
@@ -273,11 +273,11 @@ func (e *ActionExecutor) executeCritical(mountPoint string) error {
 	}); err != nil {
 		logger.Error("Failed to create critical marker", zap.Error(err))
 	}
-	
+
 	// In a real implementation, this would:
 	// - Send emergency alerts
 	// - Potentially reboot services
 	// - Activate emergency backup procedures
-	
+
 	return fmt.Errorf("critical storage condition on %s requires immediate manual intervention", mountPoint)
 }

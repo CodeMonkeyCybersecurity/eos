@@ -38,15 +38,15 @@ func (rm *RollbackManager) CreateRollbackPlan(ctx context.Context, journalID str
 		zap.String("operation_type", entry.OperationType))
 
 	plan := &RollbackPlan{
-		Description: fmt.Sprintf("Rollback for %s operation on %s", 
+		Description: fmt.Sprintf("Rollback for %s operation on %s",
 			entry.OperationType, entry.Target.GetDevice()),
 	}
 
 	// Check if we have a snapshot available
 	if entry.Snapshot != nil {
-		logger.Debug("Snapshot available for rollback", 
+		logger.Debug("Snapshot available for rollback",
 			zap.String("snapshot_name", entry.Snapshot.Name))
-		
+
 		plan.Method = RollbackSnapshot
 		plan.SnapshotID = entry.Snapshot.GetID()
 		plan.EstimatedTime = 30 * time.Second // Snapshot rollback is fast
@@ -66,7 +66,7 @@ func (rm *RollbackManager) CreateRollbackPlan(ctx context.Context, journalID str
 	if err == nil && len(reverseCommands) > 0 {
 		logger.Debug("Generated reverse commands for rollback",
 			zap.Int("command_count", len(reverseCommands)))
-		
+
 		plan.Method = RollbackReverse
 		plan.Commands = reverseCommands
 		plan.EstimatedTime = rm.estimateReverseDuration(reverseCommands)
@@ -188,11 +188,11 @@ func (rm *RollbackManager) rollbackViaReverse(ctx context.Context, plan *Rollbac
 			logger.Error("Reverse command failed",
 				zap.Error(err),
 				zap.String("output", string(output)))
-			
+
 			if rollbackCmd.Critical {
 				return fmt.Errorf("critical reverse command failed: %s: %w", string(output), err)
 			}
-			
+
 			logger.Warn("Non-critical reverse command failed, continuing",
 				zap.String("command", rollbackCmd.Command))
 		} else {
@@ -340,7 +340,7 @@ func (rm *RollbackManager) ValidateRollbackSafety(ctx context.Context, plan *Rol
 		}
 
 		// Check if snapshot still exists in LVM
-		cmd := exec.CommandContext(ctx, "lvs", "--noheadings", 
+		cmd := exec.CommandContext(ctx, "lvs", "--noheadings",
 			fmt.Sprintf("%s/%s", entry.Snapshot.SourceVG, entry.Snapshot.Name))
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("snapshot %s no longer exists", entry.Snapshot.Name)

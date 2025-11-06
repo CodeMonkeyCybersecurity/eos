@@ -106,7 +106,7 @@ func runHomebrewInstaller() error {
 		"rm -rf /",
 		"dd if=/dev/zero",
 		":(){ :|:& };:", // Fork bomb
-		"wget http://", // Should use HTTPS
+		"wget http://",  // Should use HTTPS
 		"curl http://",  // Should use HTTPS
 	}
 

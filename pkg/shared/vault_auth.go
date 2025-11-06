@@ -66,11 +66,11 @@ var AdminAppRolePaths = AppRolePathsStruct{
 // 4. With token_period, Agent auto-renews token before expiry FOREVER
 //
 // Why token_max_ttl is REMOVED:
-// - HashiCorp docs: "When a period and an explicit max TTL were both set on a token,
-//   it behaves as a periodic token. However, once the explicit max TTL is reached,
-//   the token will be revoked."
-// - Setting token_max_ttl with token_period defeats the purpose of periodic tokens
-// - For periodic tokens, TTL is reset on each renewal (no max limit needed)
+//   - HashiCorp docs: "When a period and an explicit max TTL were both set on a token,
+//     it behaves as a periodic token. However, once the explicit max TTL is reached,
+//     the token will be revoked."
+//   - Setting token_max_ttl with token_period defeats the purpose of periodic tokens
+//   - For periodic tokens, TTL is reset on each renewal (no max limit needed)
 //
 // Security Trade-off:
 // - Risk: Compromised token could be renewed indefinitely
@@ -87,9 +87,9 @@ var AdminAppRolePaths = AppRolePathsStruct{
 // to work WITHOUT root token, following HashiCorp's recommendation to minimize root token usage.
 // Admin policy is still bounded (not unlimited like root) and all operations are audited.
 var DefaultAppRoleData = map[string]interface{}{
-	"policies":      []string{EosDefaultPolicyName, EosAdminPolicyName}, // Default + Admin for operational commands
-	"token_ttl":     VaultDefaultTokenTTL,                                // 4h - Initial TTL after authentication
-	"token_period":  VaultDefaultTokenTTL,                                // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
+	"policies":     []string{EosDefaultPolicyName, EosAdminPolicyName}, // Default + Admin for operational commands
+	"token_ttl":    VaultDefaultTokenTTL,                               // 4h - Initial TTL after authentication
+	"token_period": VaultDefaultTokenTTL,                               // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
 	// token_max_ttl REMOVED - conflicts with token_period (would limit periodic tokens to max_ttl)
 	"secret_id_ttl": VaultDefaultSecretIDTTL, // 24h - SecretID expires (requires new authentication)
 }
@@ -141,11 +141,11 @@ func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      AppRoleName, // "eos-approle"
 		Policies:      []string{EosDefaultPolicyName, EosAdminPolicyName},
-		TokenTTL:      "4h",        // IGNORED: Actual value from DefaultAppRoleData
-		TokenMaxTTL:   "",          // REMOVED: Conflicts with token_period (see DefaultAppRoleData)
-		SecretIDTTL:   "24h",       // IGNORED: Actual value from DefaultAppRoleData
-		ForceRecreate: false,       // Operational flag: whether to force recreation
-		RefreshCreds:  false,       // Operational flag: whether to refresh credentials
+		TokenTTL:      "4h",  // IGNORED: Actual value from DefaultAppRoleData
+		TokenMaxTTL:   "",    // REMOVED: Conflicts with token_period (see DefaultAppRoleData)
+		SecretIDTTL:   "24h", // IGNORED: Actual value from DefaultAppRoleData
+		ForceRecreate: false, // Operational flag: whether to force recreation
+		RefreshCreds:  false, // Operational flag: whether to refresh credentials
 	}
 }
 

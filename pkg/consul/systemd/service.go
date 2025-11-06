@@ -175,7 +175,6 @@ WantedBy=multi-user.target`, consulBinaryPath, consulBinaryPath, shared.GetInter
 	return nil
 }
 
-
 // backupFile creates a copy of a file
 func backupFile(src, dst string) error {
 	sourceFile, err := os.Open(src)

@@ -305,7 +305,7 @@ func (dsm *DNSSecurityManager) checkSuspiciousPatterns(domain, target, clientID 
 
 	for _, pattern := range suspiciousDomainPatterns {
 		if strings.Contains(domain, pattern) {
-			dsm.recordSecurityViolation("suspicious_domain_pattern", domain, clientID, 
+			dsm.recordSecurityViolation("suspicious_domain_pattern", domain, clientID,
 				fmt.Sprintf("Domain contains suspicious pattern: %s", pattern))
 			return fmt.Errorf("domain contains suspicious pattern: %s", pattern)
 		}
@@ -313,9 +313,9 @@ func (dsm *DNSSecurityManager) checkSuspiciousPatterns(domain, target, clientID 
 
 	// Check for suspicious IP ranges (simplified)
 	suspiciousIPPrefixes := []string{
-		"0.",      // Broadcast/network
-		"127.",    // Loopback
-		"255.",    // Broadcast
+		"0.",   // Broadcast/network
+		"127.", // Loopback
+		"255.", // Broadcast
 	}
 
 	for _, prefix := range suspiciousIPPrefixes {
@@ -333,7 +333,7 @@ func (dsm *DNSSecurityManager) checkSuspiciousPatterns(domain, target, clientID 
 func (dsm *DNSSecurityManager) checkDomainReputation(domain, clientID string) error {
 	// This is a simplified implementation
 	// In production, you'd integrate with threat intelligence services
-	
+
 	// Check against a simple blocklist
 	blockedDomains := []string{
 		"malicious.example.com",
@@ -374,12 +374,12 @@ func (dsm *DNSSecurityManager) recordSecurityViolation(violationType, domain, cl
 // GetSecurityStatus returns the current security status
 func (dsm *DNSSecurityManager) GetSecurityStatus() *DNSSecurityStatus {
 	events := dsm.monitor.GetSecurityEvents()
-	
+
 	status := &DNSSecurityStatus{
-		TotalEvents:      len(events),
+		TotalEvents:        len(events),
 		HighSeverityEvents: 0,
-		LastEventTime:    time.Time{},
-		RateLimitActive:  false,
+		LastEventTime:      time.Time{},
+		RateLimitActive:    false,
 	}
 
 	for _, event := range events {

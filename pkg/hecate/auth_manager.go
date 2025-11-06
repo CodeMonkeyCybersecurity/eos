@@ -12,16 +12,19 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 // TODO: refactor
 // AuthManager handles authentication policy operations
 type AuthManager struct {
 	client *HecateClient
 }
+
 // TODO: refactor
 // NewAuthManager creates a new auth manager
 func NewAuthManager(client *HecateClient) *AuthManager {
 	return &AuthManager{client: client}
 }
+
 // TODO: refactor
 // AuthentikPolicy represents an Authentik authentication policy
 type AuthentikPolicy struct {
@@ -36,6 +39,7 @@ type AuthentikPolicy struct {
 	Expression string            `json:"expression"`
 	Attributes map[string]string `json:"attributes"`
 }
+
 // TODO: refactor
 // AuthPolicyCreateRequest represents a request to create an auth policy
 type AuthPolicyCreateRequest struct {
@@ -46,6 +50,7 @@ type AuthPolicyCreateRequest struct {
 	RequireMFA bool              `json:"require_mfa"`
 	Metadata   map[string]string `json:"metadata"`
 }
+
 // TODO: refactor
 // UpdateAuthPolicyRequest represents a request to update an auth policy
 type UpdateAuthPolicyRequest struct {
@@ -53,6 +58,7 @@ type UpdateAuthPolicyRequest struct {
 	RequireMFA *bool             `json:"require_mfa,omitempty"`
 	Metadata   map[string]string `json:"metadata,omitempty"`
 }
+
 // TODO: refactor
 // AuthPolicyInfo represents extended auth policy information
 type AuthPolicyInfo struct {
@@ -65,6 +71,7 @@ type AuthPolicyInfo struct {
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 }
+
 // TODO: refactor
 // CreateAuthPolicy creates a new authentication policy
 func (am *AuthManager) CreateAuthPolicy(ctx context.Context, req *AuthPolicyCreateRequest) (*AuthPolicyInfo, error) {
@@ -112,6 +119,7 @@ func (am *AuthManager) CreateAuthPolicy(ctx context.Context, req *AuthPolicyCrea
 
 	return policy, nil
 }
+
 // TODO: refactor
 // UpdateAuthPolicy updates an existing policy
 func (am *AuthManager) UpdateAuthPolicy(ctx context.Context, name string, updates *UpdateAuthPolicyRequest) (*AuthPolicyInfo, error) {
@@ -155,6 +163,7 @@ func (am *AuthManager) UpdateAuthPolicy(ctx context.Context, name string, update
 
 	return policy, nil
 }
+
 // TODO: refactor
 // DeleteAuthPolicy deletes an authentication policy
 func (am *AuthManager) DeleteAuthPolicy(ctx context.Context, name string) error {
@@ -185,6 +194,7 @@ func (am *AuthManager) DeleteAuthPolicy(ctx context.Context, name string) error 
 
 	return nil
 }
+
 // TODO: refactor
 // GetAuthPolicy retrieves a policy by name
 func (am *AuthManager) GetAuthPolicy(ctx context.Context, name string) (*AuthPolicyInfo, error) {
@@ -208,6 +218,7 @@ func (am *AuthManager) GetAuthPolicy(ctx context.Context, name string) (*AuthPol
 
 	return &policy, nil
 }
+
 // TODO: refactor
 // ListAuthPolicies lists all authentication policies
 func (am *AuthManager) ListAuthPolicies(ctx context.Context) ([]*AuthPolicyInfo, error) {
@@ -242,6 +253,7 @@ func (am *AuthManager) ListAuthPolicies(ctx context.Context) ([]*AuthPolicyInfo,
 
 	return policies, nil
 }
+
 // TODO: refactor
 // CreateOIDCProvider creates an OIDC provider configuration
 func (am *AuthManager) CreateOIDCProvider(ctx context.Context, req *CreateOIDCProviderRequest) error {
@@ -349,6 +361,7 @@ func (am *AuthManager) applyState(ctx context.Context, policy *AuthPolicyInfo) e
 
 	return nil
 }
+
 // TODO: refactor
 // generateVaultPolicy creates a Vault policy based on the auth policy
 func (am *AuthManager) generateVaultPolicy(policy *AuthPolicyInfo) string {
@@ -433,6 +446,7 @@ func (am *AuthManager) applyVaultPolicy(ctx context.Context, policyName, policyH
 
 	return nil
 }
+
 // TODO: refactor
 // CreateOIDCProviderRequest represents a request to create an OIDC provider
 type CreateOIDCProviderRequest struct {
@@ -442,6 +456,7 @@ type CreateOIDCProviderRequest struct {
 	ClientSecret string   `json:"client_secret"`
 	Scopes       []string `json:"scopes"`
 }
+
 // TODO: refactor
 // CreateSAMLProviderRequest represents a request to create a SAML provider
 type CreateSAMLProviderRequest struct {
@@ -450,6 +465,7 @@ type CreateSAMLProviderRequest struct {
 	SSOUrl      string `json:"sso_url"`
 	Certificate string `json:"certificate"`
 }
+
 // TODO: refactor
 // CreateLDAPProviderRequest represents a request to create an LDAP provider
 type CreateLDAPProviderRequest struct {

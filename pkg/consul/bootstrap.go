@@ -323,9 +323,10 @@ func bootstrapACLSystem(rc *eos_io.RuntimeContext, _ *ConsulConfig) (string, err
 
 // parseACLBootstrapOutput parses the consul acl bootstrap output to extract SecretID
 // Example output:
-//   AccessorID:       e5f93a48-e7c5-4f1e-9f9e-8b8e1c9e0a1d
-//   SecretID:         3b9c3c0a-1234-5678-9abc-def123456789
-//   ...
+//
+//	AccessorID:       e5f93a48-e7c5-4f1e-9f9e-8b8e1c9e0a1d
+//	SecretID:         3b9c3c0a-1234-5678-9abc-def123456789
+//	...
 func parseACLBootstrapOutput(output string) (string, error) {
 	lines := splitLines(output)
 	for _, line := range lines {

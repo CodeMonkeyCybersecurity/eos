@@ -43,10 +43,10 @@ func TestValidateNodeCapacity(t *testing.T) {
 	validator := NewValidator(result)
 
 	tests := []struct {
-		name          string
-		node          NodeSpecification
-		expectErrors  bool
-		errorCount    int
+		name         string
+		node         NodeSpecification
+		expectErrors bool
+		errorCount   int
 	}{
 		{
 			name: "node meets requirements",
@@ -137,9 +137,9 @@ func TestValidateServicePlacement(t *testing.T) {
 			},
 			string(ServiceTypeDatabase): {
 				PerInstance: ResourceRequirements{
-					CPU:    CPURequirements{Cores: 4},
-					Memory: MemoryRequirements{GB: 16},
-					Disk:   DiskRequirements{GB: 100, IOPS: 10000},
+					CPU:     CPURequirements{Cores: 4},
+					Memory:  MemoryRequirements{GB: 16},
+					Disk:    DiskRequirements{GB: 100, IOPS: 10000},
 					Network: NetworkRequirements{BandwidthMbps: 100},
 				},
 			},
@@ -149,11 +149,11 @@ func TestValidateServicePlacement(t *testing.T) {
 	validator := NewValidator(result)
 
 	tests := []struct {
-		name         string
-		serviceType  ServiceType
+		name          string
+		serviceType   ServiceType
 		nodeResources ResourceRequirements
-		wantErr      bool
-		errContains  string
+		wantErr       bool
+		errContains   string
 	}{
 		{
 			name:        "sufficient resources for web server",

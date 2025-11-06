@@ -54,9 +54,9 @@ from masterless mode to a fully managed node.`,
 		RunE: eos.Wrap(enrollSystem),
 	}
 
-	updateSystemPackages  bool
-	updateGoVersion       bool
-	forcePackageErrors    bool
+	updateSystemPackages bool
+	updateGoVersion      bool
+	forcePackageErrors   bool
 )
 
 func init() {

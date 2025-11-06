@@ -21,8 +21,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/docker/docker/api/types/filters"
 	containertypes "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -38,25 +38,25 @@ type Validator struct {
 
 // ValidationResult contains the results of all validation checks
 type ValidationResult struct {
-	OverallHealth       bool                      // True if all critical checks pass
-	ResourceCheck       *ResourceCheckResult      // Docker resources
-	ContainerCheck      *ContainerCheckResult     // Container status
-	PostgreSQLCheck     *PostgreSQLCheckResult    // Database and RLS
-	MultiTenancyCheck   *MultiTenancyCheckResult  // Team isolation
-	AuditLogCheck       *AuditLogCheckResult      // Audit logging
-	RAGPipelineCheck    *RAGPipelineCheckResult   // RAG functionality
-	Errors              []string                  // Critical errors
-	Warnings            []string                  // Non-critical issues
+	OverallHealth     bool                     // True if all critical checks pass
+	ResourceCheck     *ResourceCheckResult     // Docker resources
+	ContainerCheck    *ContainerCheckResult    // Container status
+	PostgreSQLCheck   *PostgreSQLCheckResult   // Database and RLS
+	MultiTenancyCheck *MultiTenancyCheckResult // Team isolation
+	AuditLogCheck     *AuditLogCheckResult     // Audit logging
+	RAGPipelineCheck  *RAGPipelineCheckResult  // RAG functionality
+	Errors            []string                 // Critical errors
+	Warnings          []string                 // Non-critical issues
 }
 
 // ResourceCheckResult contains Docker resource availability checks
 type ResourceCheckResult struct {
-	CPUCores         int     // Available CPU cores
-	MemoryTotalGB    float64 // Total memory in GB
+	CPUCores          int     // Available CPU cores
+	MemoryTotalGB     float64 // Total memory in GB
 	MemoryAvailableGB float64 // Available memory in GB
-	DiskAvailableGB  float64 // Available disk space in GB
-	MeetsMinimum     bool    // True if meets minimum requirements
-	Issues           []string
+	DiskAvailableGB   float64 // Available disk space in GB
+	MeetsMinimum      bool    // True if meets minimum requirements
+	Issues            []string
 }
 
 // ContainerCheckResult contains container health status
@@ -72,12 +72,12 @@ type ContainerCheckResult struct {
 
 // PostgreSQLCheckResult contains database validation results
 type PostgreSQLCheckResult struct {
-	Connected        bool
-	RLSEnabled       bool     // Row-Level Security enabled
-	RLSPolicies      []string // List of RLS policies found
-	PgVectorInstalled bool    // pgVector extension for embeddings
-	DatabaseVersion  string
-	Issues           []string
+	Connected         bool
+	RLSEnabled        bool     // Row-Level Security enabled
+	RLSPolicies       []string // List of RLS policies found
+	PgVectorInstalled bool     // pgVector extension for embeddings
+	DatabaseVersion   string
+	Issues            []string
 }
 
 // MultiTenancyCheckResult contains team isolation validation
@@ -108,11 +108,11 @@ type RAGPipelineCheckResult struct {
 
 // Minimum resource requirements for BionicGPT
 const (
-	MinCPUCores      = 2
-	MinMemoryGB      = 4.0
-	MinDiskSpaceGB   = 20.0
-	RecommendedCPU   = 4
-	RecommendedMemGB = 8.0
+	MinCPUCores       = 2
+	MinMemoryGB       = 4.0
+	MinDiskSpaceGB    = 20.0
+	RecommendedCPU    = 4
+	RecommendedMemGB  = 8.0
 	RecommendedDiskGB = 100.0
 )
 

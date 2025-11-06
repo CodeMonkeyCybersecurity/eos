@@ -61,7 +61,7 @@ func TestSystemDiskChecker_CheckDiskUsage(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
-				
+
 				expectedPaths := tt.paths
 				if len(expectedPaths) == 0 {
 					expectedPaths = []string{"/"}
@@ -245,16 +245,16 @@ func TestGenerateAlertsForUsage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		usage          *DiskUsage
-		expectedAlerts int
+		name             string
+		usage            *DiskUsage
+		expectedAlerts   int
 		expectedSeverity AlertSeverity
 	}{
 		{
 			name: "usage below warning",
 			usage: &DiskUsage{
-				Path:        "/test",
-				UsedPercent: 50.0,
+				Path:              "/test",
+				UsedPercent:       50.0,
 				InodesUsedPercent: 50.0,
 			},
 			expectedAlerts: 0,
@@ -262,38 +262,38 @@ func TestGenerateAlertsForUsage(t *testing.T) {
 		{
 			name: "usage at warning level",
 			usage: &DiskUsage{
-				Path:        "/test",
-				UsedPercent: 75.0,
+				Path:              "/test",
+				UsedPercent:       75.0,
 				InodesUsedPercent: 50.0,
 			},
-			expectedAlerts: 1,
+			expectedAlerts:   1,
 			expectedSeverity: AlertSeverityWarning,
 		},
 		{
 			name: "usage at critical level",
 			usage: &DiskUsage{
-				Path:        "/test",
-				UsedPercent: 85.0,
+				Path:              "/test",
+				UsedPercent:       85.0,
 				InodesUsedPercent: 50.0,
 			},
-			expectedAlerts: 1,
+			expectedAlerts:   1,
 			expectedSeverity: AlertSeverityCritical,
 		},
 		{
 			name: "high inode usage",
 			usage: &DiskUsage{
-				Path:        "/test",
-				UsedPercent: 50.0,
+				Path:              "/test",
+				UsedPercent:       50.0,
 				InodesUsedPercent: 95.0,
 			},
-			expectedAlerts: 1,
+			expectedAlerts:   1,
 			expectedSeverity: AlertSeverityCritical,
 		},
 		{
 			name: "both disk and inode critical",
 			usage: &DiskUsage{
-				Path:        "/test",
-				UsedPercent: 85.0,
+				Path:              "/test",
+				UsedPercent:       85.0,
 				InodesUsedPercent: 95.0,
 			},
 			expectedAlerts: 2,
@@ -305,7 +305,7 @@ func TestGenerateAlertsForUsage(t *testing.T) {
 			alerts := checker.generateAlertsForUsage(tt.usage, config)
 
 			assert.Len(t, alerts, tt.expectedAlerts)
-			
+
 			if tt.expectedAlerts > 0 && tt.expectedSeverity != "" {
 				assert.Equal(t, tt.expectedSeverity, alerts[0].Severity)
 				assert.Equal(t, tt.usage.Path, alerts[0].Path)
@@ -369,7 +369,7 @@ invalid_line
 
 			require.NoError(t, err)
 			assert.Len(t, result, len(tt.expected))
-			
+
 			for i, expected := range tt.expected {
 				if i < len(result) {
 					assert.Equal(t, expected.Path, result[i].Path)

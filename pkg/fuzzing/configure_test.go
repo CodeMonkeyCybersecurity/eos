@@ -20,20 +20,20 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: &Config{
-				Duration:      5 * time.Second,
-				ParallelJobs:  4,
-				LogDir:        "/tmp/fuzzing",
-				ReportFormat:  ReportFormatMarkdown,
+				Duration:     5 * time.Second,
+				ParallelJobs: 4,
+				LogDir:       "/tmp/fuzzing",
+				ReportFormat: ReportFormatMarkdown,
 			},
 			wantErr: false,
 		},
 		{
 			name: "zero duration",
 			config: &Config{
-				Duration:      0,
-				ParallelJobs:  4,
-				LogDir:        "/tmp/fuzzing",
-				ReportFormat:  ReportFormatMarkdown,
+				Duration:     0,
+				ParallelJobs: 4,
+				LogDir:       "/tmp/fuzzing",
+				ReportFormat: ReportFormatMarkdown,
 			},
 			wantErr: true,
 			errMsg:  "duration must be positive",
@@ -41,10 +41,10 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "zero parallel jobs",
 			config: &Config{
-				Duration:      5 * time.Second,
-				ParallelJobs:  0,
-				LogDir:        "/tmp/fuzzing",
-				ReportFormat:  ReportFormatMarkdown,
+				Duration:     5 * time.Second,
+				ParallelJobs: 0,
+				LogDir:       "/tmp/fuzzing",
+				ReportFormat: ReportFormatMarkdown,
 			},
 			wantErr: true,
 			errMsg:  "parallel_jobs must be positive",
@@ -52,10 +52,10 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "invalid report format",
 			config: &Config{
-				Duration:      5 * time.Second,
-				ParallelJobs:  4,
-				LogDir:        "/tmp/fuzzing",
-				ReportFormat:  "invalid",
+				Duration:     5 * time.Second,
+				ParallelJobs: 4,
+				LogDir:       "/tmp/fuzzing",
+				ReportFormat: "invalid",
 			},
 			wantErr: true,
 			errMsg:  "invalid report format",
@@ -80,28 +80,28 @@ func TestValidateConfig(t *testing.T) {
 func TestConfigureEnvironment(t *testing.T) {
 	// Create test runtime context
 	rc := NewTestContext(t)
-	
+
 	// Create temporary directory for testing
 	tempDir := t.TempDir()
-	
+
 	config := &Config{
-		Duration:      5 * time.Second,
-		ParallelJobs:  2,
-		LogDir:        filepath.Join(tempDir, "fuzzing"),
-		ReportFormat:  ReportFormatMarkdown,
+		Duration:     5 * time.Second,
+		ParallelJobs: 2,
+		LogDir:       filepath.Join(tempDir, "fuzzing"),
+		ReportFormat: ReportFormatMarkdown,
 	}
-	
+
 	// Run configuration
 	err := Configure(rc, config)
 	require.NoError(t, err)
-	
+
 	// Verify directories were created
 	assert.DirExists(t, config.LogDir)
 	assert.DirExists(t, filepath.Join(config.LogDir, "sessions"))
 	assert.DirExists(t, filepath.Join(config.LogDir, "reports"))
 	assert.DirExists(t, filepath.Join(config.LogDir, "corpus"))
 	assert.DirExists(t, filepath.Join(config.LogDir, "crashes"))
-	
+
 	// Verify TMPDIR was set
 	assert.Equal(t, filepath.Join(config.LogDir, "tmp"), os.Getenv("TMPDIR"))
 }
@@ -128,16 +128,16 @@ func TestValidateReportFormat(t *testing.T) {
 		{"html", true},
 		{"xml", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.format, func(t *testing.T) {
 			config := &Config{
-				Duration:      5 * time.Second,
-				ParallelJobs:  1,
-				LogDir:        "/tmp",
-				ReportFormat:  tt.format,
+				Duration:     5 * time.Second,
+				ParallelJobs: 1,
+				LogDir:       "/tmp",
+				ReportFormat: tt.format,
 			}
-			
+
 			err := validateConfig(config)
 			if tt.wantErr {
 				assert.Error(t, err)

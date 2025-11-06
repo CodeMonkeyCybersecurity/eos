@@ -13,13 +13,13 @@ import (
 
 // Status represents the current state of Consul installation
 type Status struct {
-	Installed      bool
-	Running        bool
-	Failed         bool
-	ConfigValid    bool
-	Version        string
-	ServiceStatus  string
-	LastError      string
+	Installed     bool
+	Running       bool
+	Failed        bool
+	ConfigValid   bool
+	Version       string
+	ServiceStatus string
+	LastError     string
 }
 
 // CheckStatus performs a comprehensive check of Consul's current state
@@ -31,7 +31,7 @@ func CheckStatus(rc *eos_io.RuntimeContext) (*Status, error) {
 	if consulPath, err := exec.LookPath("consul"); err == nil {
 		status.Installed = true
 		logger.Debug("Consul binary found", zap.String("path", consulPath))
-		
+
 		// Get version
 		if output, err := exec.Command("consul", "version").Output(); err == nil {
 			lines := strings.Split(string(output), "\n")
@@ -50,7 +50,7 @@ func CheckStatus(rc *eos_io.RuntimeContext) (*Status, error) {
 		if exec.Command("systemctl", "is-failed", "consul").Run() == nil {
 			status.Failed = true
 			status.ServiceStatus = "failed"
-			
+
 			// Get last error from journal
 			if output, err := exec.Command("journalctl", "-u", "consul", "-n", "10", "--no-pager").Output(); err == nil {
 				status.LastError = string(output)
@@ -71,7 +71,7 @@ func CheckStatus(rc *eos_io.RuntimeContext) (*Status, error) {
 // ShouldProceedWithInstallation determines if installation should proceed based on current status and flags
 func ShouldProceedWithInstallation(rc *eos_io.RuntimeContext, status *Status, force, clean bool) (bool, string) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// If Consul is running successfully and no force flags
 	if status.Running && status.ConfigValid && !force && !clean {
 		logger.Info("Consul is already running successfully",
@@ -79,13 +79,13 @@ func ShouldProceedWithInstallation(rc *eos_io.RuntimeContext, status *Status, fo
 			zap.String("status", status.ServiceStatus))
 		return false, "Consul is already installed and running. Use --force to reconfigure or --clean for a fresh install."
 	}
-	
+
 	// If Consul is in failed state and no force flags
 	if status.Failed && !force && !clean {
 		logger.Error("Consul service is in failed state",
 			zap.String("last_error", status.LastError))
 		return false, "Consul is installed but in a failed state. Check logs with 'journalctl -xeu consul.service'. Use --force to reconfigure or --clean for a fresh install."
 	}
-	
+
 	return true, ""
 }

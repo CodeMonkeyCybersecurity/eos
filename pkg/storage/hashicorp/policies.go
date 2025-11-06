@@ -20,13 +20,13 @@ type StoragePolicyEngine struct {
 
 // StoragePolicy defines storage governance rules
 type StoragePolicy struct {
-	MaxVolumeSize      int64             `json:"max_volume_size"`
-	RequireEncryption  bool              `json:"require_encryption"`
-	AllowedProviders   []string          `json:"allowed_providers"`
-	DefaultTags        map[string]string `json:"default_tags"`
-	RetentionDays      int               `json:"retention_days"`
-	BackupRequired     bool              `json:"backup_required"`
-	AllowedRegions     []string          `json:"allowed_regions"`
+	MaxVolumeSize     int64             `json:"max_volume_size"`
+	RequireEncryption bool              `json:"require_encryption"`
+	AllowedProviders  []string          `json:"allowed_providers"`
+	DefaultTags       map[string]string `json:"default_tags"`
+	RetentionDays     int               `json:"retention_days"`
+	BackupRequired    bool              `json:"backup_required"`
+	AllowedRegions    []string          `json:"allowed_regions"`
 }
 
 // QuotaInfo represents storage quota information

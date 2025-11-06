@@ -18,23 +18,23 @@ import (
 // PackageUpgradeConfig configures package upgrade behavior
 type PackageUpgradeConfig struct {
 	// Upgrade behavior
-	UpdateOnly      bool          // Only update package lists, don't upgrade
-	SecurityOnly    bool          // Only security updates (Ubuntu only)
-	AutoRemove      bool          // Run apt autoremove after upgrade
-	AutoClean       bool          // Run apt autoclean after upgrade
+	UpdateOnly   bool // Only update package lists, don't upgrade
+	SecurityOnly bool // Only security updates (Ubuntu only)
+	AutoRemove   bool // Run apt autoremove after upgrade
+	AutoClean    bool // Run apt autoclean after upgrade
 
 	// Safety
-	DryRun          bool          // Show what would be upgraded
-	AssumeYes       bool          // Non-interactive mode (default: true)
+	DryRun    bool // Show what would be upgraded
+	AssumeYes bool // Non-interactive mode (default: true)
 
 	// Timeout
-	UpdateTimeout   time.Duration // Timeout for apt update (default: 5min)
-	UpgradeTimeout  time.Duration // Timeout for apt upgrade (default: 30min)
+	UpdateTimeout  time.Duration // Timeout for apt update (default: 5min)
+	UpgradeTimeout time.Duration // Timeout for apt upgrade (default: 30min)
 
 	// Retry
-	RetryOnLock     bool          // Retry if dpkg/apt is locked
-	LockRetries     int           // Max retries for lock (default: 3)
-	LockRetryDelay  time.Duration // Delay between retries (default: 30s)
+	RetryOnLock    bool          // Retry if dpkg/apt is locked
+	LockRetries    int           // Max retries for lock (default: 3)
+	LockRetryDelay time.Duration // Delay between retries (default: 30s)
 }
 
 // DefaultPackageUpgradeConfig returns sensible defaults
@@ -53,15 +53,15 @@ func DefaultPackageUpgradeConfig() *PackageUpgradeConfig {
 
 // PackageUpgradeResult contains upgrade operation results
 type PackageUpgradeResult struct {
-	Success           bool          `json:"success"`
-	PackagesUpdated   int           `json:"packages_updated"`
-	PackagesUpgraded  int           `json:"packages_upgraded"`
-	PackagesRemoved   int           `json:"packages_removed"`
-	UpdateOutput      string        `json:"update_output"`
-	UpgradeOutput     string        `json:"upgrade_output"`
-	ErrorMessage      string        `json:"error_message,omitempty"`
-	Duration          time.Duration `json:"duration"`
-	RebootRequired    bool          `json:"reboot_required"`
+	Success          bool          `json:"success"`
+	PackagesUpdated  int           `json:"packages_updated"`
+	PackagesUpgraded int           `json:"packages_upgraded"`
+	PackagesRemoved  int           `json:"packages_removed"`
+	UpdateOutput     string        `json:"update_output"`
+	UpgradeOutput    string        `json:"upgrade_output"`
+	ErrorMessage     string        `json:"error_message,omitempty"`
+	Duration         time.Duration `json:"duration"`
+	RebootRequired   bool          `json:"reboot_required"`
 }
 
 // UpgradeVMPackages performs package upgrade inside a VM

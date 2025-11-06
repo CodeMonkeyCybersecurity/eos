@@ -480,7 +480,7 @@ func (mm *MonitoringManager) processHealthResult(rc *eos_io.RuntimeContext, targ
 				"target_type": string(target.Type),
 			},
 		}
-		
+
 		if err := mm.alertManager.TriggerAlert(rc, alert); err != nil {
 			// Log error but don't fail the processing
 		}
@@ -496,11 +496,11 @@ func (mm *MonitoringManager) processMetricResult(rc *eos_io.RuntimeContext, targ
 
 // OverallHealthResult represents the overall health of an environment
 type OverallHealthResult struct {
-	Environment   string                     `json:"environment"`
-	OverallStatus HealthStatus               `json:"overall_status"`
-	Summary       HealthSummary              `json:"summary"`
-	Targets       map[string]*HealthResult   `json:"targets"`
-	Timestamp     time.Time                  `json:"timestamp"`
+	Environment   string                   `json:"environment"`
+	OverallStatus HealthStatus             `json:"overall_status"`
+	Summary       HealthSummary            `json:"summary"`
+	Targets       map[string]*HealthResult `json:"targets"`
+	Timestamp     time.Time                `json:"timestamp"`
 }
 
 // HealthSummary provides a summary of health check results

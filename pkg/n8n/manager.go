@@ -25,7 +25,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 	if config.NomadAddr != "" {
 		nomadConfig.Address = config.NomadAddr
 	}
-	
+
 	nomadClient, err := api.NewClient(nomadConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
@@ -36,7 +36,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 	if config.VaultAddr != "" {
 		vaultConfig := vault.DefaultConfig()
 		vaultConfig.Address = config.VaultAddr
-		
+
 		vaultClient, err = vault.NewClient(vaultConfig)
 		if err != nil {
 			logger.Warn("Failed to create Vault client, continuing without Vault", zap.Error(err))
@@ -56,7 +56,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 // Deploy executes the complete n8n deployment process
 func (m *Manager) Deploy(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Starting n8n deployment",
 		zap.String("environment", m.config.Environment),
 		zap.String("datacenter", m.config.Datacenter),
@@ -66,46 +66,46 @@ func (m *Manager) Deploy(ctx context.Context) error {
 	// Define deployment steps following Assess → Intervene → Evaluate pattern
 	steps := []DeploymentStep{
 		{
-			Name:        "prerequisites",
-			Description: "Check system prerequisites and dependencies",
-			AssessFunc:  m.assessPrerequisites,
+			Name:          "prerequisites",
+			Description:   "Check system prerequisites and dependencies",
+			AssessFunc:    m.assessPrerequisites,
 			InterventFunc: m.ensurePrerequisites,
-			EvaluateFunc: m.evaluatePrerequisites,
+			EvaluateFunc:  m.evaluatePrerequisites,
 		},
 		{
-			Name:        "secrets",
-			Description: "Generate and store secrets",
-			AssessFunc:  m.assessSecrets,
+			Name:          "secrets",
+			Description:   "Generate and store secrets",
+			AssessFunc:    m.assessSecrets,
 			InterventFunc: m.generateSecrets,
-			EvaluateFunc: m.evaluateSecrets,
+			EvaluateFunc:  m.evaluateSecrets,
 		},
 		{
-			Name:        "infrastructure",
-			Description: "Deploy supporting infrastructure (PostgreSQL, Redis)",
-			AssessFunc:  m.assessInfrastructure,
+			Name:          "infrastructure",
+			Description:   "Deploy supporting infrastructure (PostgreSQL, Redis)",
+			AssessFunc:    m.assessInfrastructure,
 			InterventFunc: m.deployInfrastructure,
-			EvaluateFunc: m.evaluateInfrastructure,
+			EvaluateFunc:  m.evaluateInfrastructure,
 		},
 		{
-			Name:        "n8n_service",
-			Description: "Deploy n8n main service and workers",
-			AssessFunc:  m.assessN8nService,
+			Name:          "n8n_service",
+			Description:   "Deploy n8n main service and workers",
+			AssessFunc:    m.assessN8nService,
 			InterventFunc: m.deployN8nService,
-			EvaluateFunc: m.evaluateN8nService,
+			EvaluateFunc:  m.evaluateN8nService,
 		},
 		{
-			Name:        "nginx_proxy",
-			Description: "Configure nginx reverse proxy",
-			AssessFunc:  m.assessNginxProxy,
+			Name:          "nginx_proxy",
+			Description:   "Configure nginx reverse proxy",
+			AssessFunc:    m.assessNginxProxy,
 			InterventFunc: m.deployNginxProxy,
-			EvaluateFunc: m.evaluateNginxProxy,
+			EvaluateFunc:  m.evaluateNginxProxy,
 		},
 	}
 
 	// Execute each step
 	for _, step := range steps {
 		logger.Info("Executing deployment step", zap.String("step", step.Name))
-		
+
 		// Assess
 		if err := step.AssessFunc(ctx, m); err != nil {
 			return fmt.Errorf("assessment failed for step %s: %w", step.Name, err)
@@ -136,41 +136,41 @@ func (m *Manager) Deploy(ctx context.Context) error {
 func (m *Manager) assessPrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing prerequisites")
-	
+
 	// Check Nomad connectivity
 	_, err := m.nomadClient.Status().Leader()
 	if err != nil {
 		return fmt.Errorf("cannot connect to Nomad: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing secrets")
-	
+
 	// Check if required secrets exist
 	if m.config.EncryptionKey == "" || m.config.AdminPassword == "" {
 		return fmt.Errorf("required secrets not configured")
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing infrastructure")
-	
+
 	// Check if PostgreSQL and Redis jobs exist
 	jobs, _, err := m.nomadClient.Jobs().List(&api.QueryOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list jobs: %w", err)
 	}
-	
+
 	hasPostgres := false
 	hasRedis := false
-	
+
 	for _, job := range jobs {
 		if job.Name == "n8n-postgres" {
 			hasPostgres = true
@@ -179,38 +179,38 @@ func (m *Manager) assessInfrastructure(ctx context.Context, mgr *Manager) error 
 			hasRedis = true
 		}
 	}
-	
+
 	if !hasPostgres || !hasRedis {
 		logger.Info("Infrastructure services need deployment",
 			zap.Bool("postgres_exists", hasPostgres),
 			zap.Bool("redis_exists", hasRedis))
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessN8nService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing n8n service")
-	
+
 	// Check if n8n job exists and is running
 	job, _, err := m.nomadClient.Jobs().Info("n8n", &api.QueryOptions{})
 	if err != nil {
 		// Job doesn't exist, needs deployment
 		return nil
 	}
-	
+
 	if job.Status == nil || *job.Status != "running" {
 		logger.Info("n8n service exists but not running", zap.String("status", *job.Status))
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing nginx proxy")
-	
+
 	// Check if nginx proxy configuration exists
 	// This would typically check the nginx configuration files
 	return nil
@@ -220,7 +220,7 @@ func (m *Manager) assessNginxProxy(ctx context.Context, mgr *Manager) error {
 func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Ensuring prerequisites")
-	
+
 	// Prerequisites are already checked in assess phase
 	return nil
 }
@@ -228,7 +228,7 @@ func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 func (m *Manager) generateSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Generating secrets")
-	
+
 	// Secrets are already provided in config
 	// In a real implementation, this would generate missing secrets
 	return nil
@@ -237,21 +237,21 @@ func (m *Manager) generateSecrets(ctx context.Context, mgr *Manager) error {
 func (m *Manager) deployInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying infrastructure services")
-	
+
 	// Deploy PostgreSQL job
 	postgresJob := m.createPostgresJob()
 	_, _, err := m.nomadClient.Jobs().Register(postgresJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy PostgreSQL: %w", err)
 	}
-	
+
 	// Deploy Redis job
 	redisJob := m.createRedisJob()
 	_, _, err = m.nomadClient.Jobs().Register(redisJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy Redis: %w", err)
 	}
-	
+
 	// Register services with Consul and configure reverse proxy
 	if err := m.registerConsulServices(ctx); err != nil {
 		return fmt.Errorf("failed to register consul services: %w", err)
@@ -261,40 +261,40 @@ func (m *Manager) deployInfrastructure(ctx context.Context, mgr *Manager) error 
 	if err := m.configureReverseProxy(ctx); err != nil {
 		return fmt.Errorf("failed to configure reverse proxy: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) deployN8nService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying n8n service")
-	
+
 	// Deploy n8n job
 	n8nJob := m.createN8nJob()
 	_, _, err := m.nomadClient.Jobs().Register(n8nJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy n8n: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) deployNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying local nginx proxy (Layer 2 - Backend)")
-	
+
 	// Deploy local nginx proxy job
 	nginxJob := m.createNginxJob()
 	_, _, err := m.nomadClient.Jobs().Register(nginxJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy local nginx proxy: %w", err)
 	}
-	
+
 	// Register route with Hecate frontend (Layer 1 - Cloud)
 	if err := m.registerHecateRoute(ctx); err != nil {
 		return fmt.Errorf("failed to register Hecate route: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -302,7 +302,7 @@ func (m *Manager) deployNginxProxy(ctx context.Context, mgr *Manager) error {
 func (m *Manager) evaluatePrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating prerequisites")
-	
+
 	// Re-check Nomad connectivity
 	return m.assessPrerequisites(ctx, mgr)
 }
@@ -310,7 +310,7 @@ func (m *Manager) evaluatePrerequisites(ctx context.Context, mgr *Manager) error
 func (m *Manager) evaluateSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating secrets")
-	
+
 	// Verify all required secrets are available
 	return m.assessSecrets(ctx, mgr)
 }
@@ -318,51 +318,51 @@ func (m *Manager) evaluateSecrets(ctx context.Context, mgr *Manager) error {
 func (m *Manager) evaluateInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating infrastructure")
-	
+
 	// Check that infrastructure services are running
 	jobs := []string{"n8n-postgres", "n8n-redis"}
-	
+
 	for _, jobName := range jobs {
 		job, _, err := m.nomadClient.Jobs().Info(jobName, &api.QueryOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get job info for %s: %w", jobName, err)
 		}
-		
+
 		if job.Status == nil || *job.Status != "running" {
 			return fmt.Errorf("job %s is not running: %s", jobName, *job.Status)
 		}
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) evaluateN8nService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating n8n service")
-	
+
 	// Check that n8n service is running
 	job, _, err := m.nomadClient.Jobs().Info("n8n", &api.QueryOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get n8n job info: %w", err)
 	}
-	
+
 	if job.Status == nil || *job.Status != "running" {
 		return fmt.Errorf("n8n job is not running: %s", *job.Status)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) evaluateNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating Hecate route registration")
-	
+
 	// Check that route was registered successfully
 	// In a real implementation, this would verify the route exists in Hecate
 	logger.Info("Hecate route registration completed",
 		zap.String("domain", m.config.Domain),
 		zap.Int("backend_port", m.config.Port))
-	
+
 	return nil
 }
 
@@ -382,7 +382,7 @@ func (m *Manager) registerHecateRoute(ctx context.Context) error {
 	logger.Info("Registering n8n route with Hecate frontend (Layer 1 - Cloud)",
 		zap.String("domain", m.config.Domain),
 		zap.String("local_nginx", "n8n-nginx.service.consul:80"))
-	
+
 	// Two-layer architecture:
 	// Layer 1 (Cloud): Hetzner Caddy + Authentik → Layer 2 (Local): nginx → n8n service
 	//
@@ -391,65 +391,65 @@ func (m *Manager) registerHecateRoute(ctx context.Context) error {
 	// 2. Create a Route struct pointing to LOCAL nginx container (not directly to n8n)
 	// 3. Call hecate.CreateRoute() to register with Caddy/Authentik in Hetzner Cloud
 	// 4. Configure DNS via Hetzner provider
-	
+
 	// Example of what the integration would look like:
 	/*
-	route := &hecate.Route{
-		ID:     fmt.Sprintf("n8n-%s", m.config.Environment),
-		Domain: m.config.Domain,
-		Upstream: &hecate.Upstream{
-			// Points to LOCAL nginx container, not directly to n8n
-			URL:             "http://n8n-nginx.service.consul:80",
-			HealthCheckPath: "/health",
-			Timeout:         30 * time.Second,
-		},
-		AuthPolicy: &hecate.AuthPolicy{
-			Name:     "n8n-access",
-			Provider: "authentik",
-			Flow:     "default-authentication-flow",
-			Groups:   []string{"n8n-users", "admins"},
-		},
-		HealthCheck: &hecate.HealthCheck{
-			Path:             "/health",
-			Interval:         30 * time.Second,
-			Timeout:          10 * time.Second,
-			FailureThreshold: 3,
-			SuccessThreshold: 1,
-			Enabled:          true,
-		},
-		TLS: &hecate.TLSConfig{
-			Enabled: true,
-			HSTS: &hecate.HSTS{
-				MaxAge:            31536000,
-				IncludeSubdomains: true,
-				Preload:           true,
+		route := &hecate.Route{
+			ID:     fmt.Sprintf("n8n-%s", m.config.Environment),
+			Domain: m.config.Domain,
+			Upstream: &hecate.Upstream{
+				// Points to LOCAL nginx container, not directly to n8n
+				URL:             "http://n8n-nginx.service.consul:80",
+				HealthCheckPath: "/health",
+				Timeout:         30 * time.Second,
 			},
-		},
-		Headers: map[string]string{
-			"X-Frame-Options":           "DENY",
-			"X-Content-Type-Options":    "nosniff", 
-			"X-XSS-Protection":          "1; mode=block",
-			"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-		},
-		Metadata: map[string]string{
-			"service":     "n8n",
-			"environment": m.config.Environment,
-			"managed_by":  "eos",
-			"layer":       "frontend",
-		},
-	}
-	
-	// Register with Hecate frontend
-	if err := hecate.CreateRoute(rc, hecateConfig, route); err != nil {
-		return fmt.Errorf("failed to create Hecate route: %w", err)
-	}
+			AuthPolicy: &hecate.AuthPolicy{
+				Name:     "n8n-access",
+				Provider: "authentik",
+				Flow:     "default-authentication-flow",
+				Groups:   []string{"n8n-users", "admins"},
+			},
+			HealthCheck: &hecate.HealthCheck{
+				Path:             "/health",
+				Interval:         30 * time.Second,
+				Timeout:          10 * time.Second,
+				FailureThreshold: 3,
+				SuccessThreshold: 1,
+				Enabled:          true,
+			},
+			TLS: &hecate.TLSConfig{
+				Enabled: true,
+				HSTS: &hecate.HSTS{
+					MaxAge:            31536000,
+					IncludeSubdomains: true,
+					Preload:           true,
+				},
+			},
+			Headers: map[string]string{
+				"X-Frame-Options":           "DENY",
+				"X-Content-Type-Options":    "nosniff",
+				"X-XSS-Protection":          "1; mode=block",
+				"Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+			},
+			Metadata: map[string]string{
+				"service":     "n8n",
+				"environment": m.config.Environment,
+				"managed_by":  "eos",
+				"layer":       "frontend",
+			},
+		}
+
+		// Register with Hecate frontend
+		if err := hecate.CreateRoute(rc, hecateConfig, route); err != nil {
+			return fmt.Errorf("failed to create Hecate route: %w", err)
+		}
 	*/
-	
+
 	logger.Info("n8n route registered with Hecate frontend successfully",
 		zap.String("domain", m.config.Domain),
 		zap.String("architecture", "two-layer"),
 		zap.String("frontend", "hetzner-caddy-authentik"),
 		zap.String("backend", "local-nginx-n8n"))
-	
+
 	return nil
 }

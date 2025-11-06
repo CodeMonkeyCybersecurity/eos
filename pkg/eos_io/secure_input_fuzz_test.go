@@ -14,85 +14,85 @@ func FuzzPromptInput(f *testing.F) {
 		// Terminal escape sequences
 		"\x1b[31mmalicious\x1b[0m",
 		"\x1b]0;evil title\x07",
-		"\x9b[A", // CSI sequences
+		"\x9b[A",        // CSI sequences
 		"\x1b[2J\x1b[H", // Clear screen
-		
+
 		// Control characters
 		"input\x00with\x00nulls",
 		"input\rwith\rcarriage\rreturns",
 		"input\nwith\nnewlines",
 		"input\twith\ttabs",
 		"\x08\x08\x08backspace",
-		
+
 		// Unicode attacks
-		"café", // Basic Unicode
-		"💀skull", // Emoji
-		"\u202e\u202d", // Unicode direction override
-		"\ufeff", // BOM
+		"café",                // Basic Unicode
+		"💀skull",              // Emoji
+		"\u202e\u202d",        // Unicode direction override
+		"\ufeff",              // BOM
 		"A\u0300\u0301\u0302", // Combining characters
-		
+
 		// Buffer overflow attempts
 		strings.Repeat("A", 1024),
 		strings.Repeat("A", 4096),
 		strings.Repeat("A", 65536),
-		
+
 		// Format string attacks
 		"%s%s%s%s",
 		"%n%n%n%n",
 		"%x%x%x%x",
-		
+
 		// Command injection attempts
 		"; rm -rf /",
 		"| cat /etc/passwd",
 		"$(whoami)",
 		"`id`",
-		
+
 		// Empty and edge cases
 		"",
 		" ",
 		"\x00",
 		strings.Repeat("\x00", 100),
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, input string) {
 		// Create test context with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		
+
 		_ = &RuntimeContext{
 			Ctx: ctx,
 		}
-		
+
 		// Test prompt input handling - should not panic or crash
 		// Note: We can't easily test interactive input in fuzz tests,
 		// but we can test the validation and sanitization logic
-		
+
 		// Test input validation
 		if len(input) > 0 {
 			// Should handle any input gracefully
 			_ = validateUserInput(input, "test-field")
 		}
-		
+
 		// Test prompt message construction - should not allow injection
 		promptMsg := constructPromptMessage("Enter value", input)
-		
+
 		// Verify prompt message doesn't contain dangerous sequences
 		if strings.Contains(promptMsg, "\x1b") && !strings.HasPrefix(input, "\x1b") {
 			t.Error("Prompt message contains escape sequences not from input")
 		}
-		
+
 		// Test input sanitization
 		sanitized := sanitizeUserInput(input)
-		
+
 		// Verify sanitization removes dangerous characters
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized input contains null bytes")
 		}
-		
+
 		if strings.Contains(sanitized, "\x1b") {
 			t.Error("Sanitized input contains escape sequences")
 		}
@@ -104,44 +104,44 @@ func FuzzPromptSecurePassword(f *testing.F) {
 	seeds := []string{
 		// Terminal control sequences that could expose password
 		"\x1b[8mhidden\x1b[28m", // Hidden text
-		"\x1b[?25l", // Hide cursor
-		"\x1b[?25h", // Show cursor
-		"\x1b[s\x1b[u", // Save/restore cursor
-		
+		"\x1b[?25l",             // Hide cursor
+		"\x1b[?25h",             // Show cursor
+		"\x1b[s\x1b[u",          // Save/restore cursor
+
 		// Clipboard attacks
 		"\x1b]52;c;\x07", // OSC 52 clipboard
-		
+
 		// History attacks
 		"\x1b[A\x1b[A", // Up arrow keys
-		
+
 		// Special characters that might break input
 		"password\x03", // Ctrl+C
 		"password\x04", // Ctrl+D
 		"password\x1a", // Ctrl+Z
-		
+
 		// Unicode passwords
 		"pássw🔒rd",
 		"пароль", // Cyrillic
-		"密码", // Chinese
-		
+		"密码",     // Chinese
+
 		// Edge cases
 		"",
 		strings.Repeat("a", 1024), // Very long password
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, password string) {
 		// Test password validation
 		_ = validatePasswordInput(password, "test-password")
-		
+
 		// Even invalid passwords should not cause crashes
 		if len(password) > 0 {
 			// Test that password sanitization works
 			sanitized := sanitizePasswordInputTest(password)
-			
+
 			// Verify no control characters remain
 			for _, char := range sanitized {
 				if char < 32 && char != '\t' && char != '\n' && char != '\r' {
@@ -149,7 +149,7 @@ func FuzzPromptSecurePassword(f *testing.F) {
 				}
 			}
 		}
-		
+
 		// Test password strength validation
 		strength := calculatePasswordStrength(password)
 		if strength < 0 || strength > 100 {
@@ -170,19 +170,19 @@ func FuzzPromptYesNo(f *testing.F) {
 		"\x1b[A", "yes\x00", "no\r\n",
 		strings.Repeat("y", 1000),
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, input string) {
 		// Test yes/no parsing
 		result, valid := parseYesNoInputTest(input)
-		
+
 		// Should always return a boolean result and validity flag
 		_ = result
 		_ = valid
-		
+
 		// Test case insensitive parsing
 		normalized := normalizeYesNoInput(input)
 		if len(normalized) > 10 {
@@ -200,33 +200,33 @@ func FuzzPromptValidatedInput(f *testing.F) {
 		"test@",
 		"@example.com",
 		"user@example..com",
-		
+
 		// Path-like inputs
 		"/valid/path",
 		"../../../etc/passwd",
 		"C:\\Windows\\System32",
 		"//server/share",
 		"\\\\server\\share",
-		
+
 		// Number-like inputs
 		"123", "0", "-1", "3.14",
 		"1e10", "Infinity", "NaN",
-		
+
 		// JSON-like inputs
 		"{\"key\":\"value\"}",
 		"{'key':'value'}",
 		"malformed{json",
-		
+
 		// Command injection in validation
 		"valid; rm -rf /",
 		"valid | cat /etc/passwd",
 		"$(malicious)",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, input string) {
 		// Test various validation functions
 		validators := []func(string) error{
@@ -236,13 +236,13 @@ func FuzzPromptValidatedInput(f *testing.F) {
 			validateJSONInput,
 			validateUsernameInput,
 		}
-		
+
 		for _, validator := range validators {
 			// Validators should never panic
 			err := validator(input)
 			_ = err // Error is expected for most fuzz inputs
 		}
-		
+
 		// Test input normalization
 		normalized := normalizeValidationInput(input)
 		if len(normalized) > len(input)*2 {
@@ -253,7 +253,6 @@ func FuzzPromptValidatedInput(f *testing.F) {
 
 // Helper functions that should exist in the actual implementation
 // These represent the validation logic that needs to be implemented
-
 
 func constructPromptMessage(prompt, defaultValue string) string {
 	// Safe prompt message construction for testing
@@ -270,7 +269,6 @@ func sanitizeUserInputTest(input string) string {
 	result = strings.ReplaceAll(result, "\x1b", "")
 	return result
 }
-
 
 func sanitizePasswordInputTest(password string) string {
 	// Test version of password sanitization

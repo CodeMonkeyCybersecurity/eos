@@ -42,7 +42,7 @@ func ValidateUsername(input string) error {
 }
 
 // ValidateEmail uses net/mail to check email format.
-// DEPRECATED: Use shared.ValidateEmail instead  
+// DEPRECATED: Use shared.ValidateEmail instead
 func ValidateEmail(input string) error {
 	return shared.ValidateEmail(input)
 }

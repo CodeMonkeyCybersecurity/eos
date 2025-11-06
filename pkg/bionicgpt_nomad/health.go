@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	consulapi "github.com/hashicorp/consul/api"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/nomad"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )

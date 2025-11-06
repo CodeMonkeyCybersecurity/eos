@@ -16,63 +16,63 @@ func FuzzConfigParsing(f *testing.F) {
 		`{"key": "$(whoami)"}`,
 		`{"key": "value\"; system('rm -rf /'); //"}`,
 		`{"key": "value\n\nmalicious: injection"}`,
-		
+
 		// YAML injection attacks
 		"key: !!python/object/apply:os.system ['rm -rf /']",
 		"key: !!map {? : }",
 		"key: &anchor\n  <<: *anchor",
 		"key: |\n  #!/bin/bash\n  rm -rf /",
 		"key: value\n# malicious: $(whoami)",
-		
+
 		// TOML injection attacks
 		`key = "value"\n[malicious]\ncommand = "rm -rf /"`,
 		`key = """value\n[override]\nevil = true"""`,
-		
+
 		// ENV injection attacks
 		"KEY=value\nMALICIOUS=$(whoami)",
 		"KEY=value; rm -rf /",
 		"KEY=value\x00INJECTED=evil",
 		"KEY=value\nPATH=/malicious:$PATH",
-		
+
 		// Path traversal in config keys/values
 		"../../../etc/passwd=value",
 		"key=../../../etc/shadow",
 		"..\\..\\..\\windows\\system32\\config\\sam=value",
-		
+
 		// Script injection in values
 		"key=<script>alert(1)</script>",
 		"key=javascript:alert(document.cookie)",
 		"key='><script>alert(1)</script>",
-		
+
 		// Command substitution
 		"key=`id`",
 		"key=$(cat /etc/passwd)",
 		"key=${malicious}",
 		"key=%{evil}",
-		
+
 		// Buffer overflow attempts
 		"key=" + strings.Repeat("A", 10000),
 		strings.Repeat("k", 1000) + "=value",
-		
+
 		// Unicode attacks
-		"kéy=válue", // Unicode in keys
-		"key=vаlue", // Cyrillic 'а' instead of Latin 'a'
+		"kéy=válue",       // Unicode in keys
+		"key=vаlue",       // Cyrillic 'а' instead of Latin 'a'
 		"key=value\u202e", // Right-to-left override
 		"key=value\ufeff", // BOM
-		
+
 		// Null byte injection
 		"key=value\x00malicious",
 		"key\x00malicious=value",
-		
+
 		// Multi-line injection
 		"key=value\ninjected_key=malicious_value",
 		"key=value\r\ninjected=evil",
-		
+
 		// Template injection
 		"key={{.malicious}}",
 		"key=${env:malicious}",
 		"key=%{runtime:evil}",
-		
+
 		// Valid configurations (should pass)
 		`{"valid": "json"}`,
 		"valid: yaml",
@@ -80,11 +80,11 @@ func FuzzConfigParsing(f *testing.F) {
 		"VALID=env",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, configData string) {
 		// Test JSON parsing
 		if isJSONFormat(configData) {
@@ -93,7 +93,7 @@ func FuzzConfigParsing(f *testing.F) {
 				validateConfigData(t, parsed, "JSON")
 			}
 		}
-		
+
 		// Test YAML parsing
 		if isYAMLFormat(configData) {
 			parsed, err := parseYAMLConfig(configData)
@@ -101,7 +101,7 @@ func FuzzConfigParsing(f *testing.F) {
 				validateConfigData(t, parsed, "YAML")
 			}
 		}
-		
+
 		// Test TOML parsing
 		if isTOMLFormat(configData) {
 			parsed, err := parseTOMLConfig(configData)
@@ -109,23 +109,23 @@ func FuzzConfigParsing(f *testing.F) {
 				validateConfigData(t, parsed, "TOML")
 			}
 		}
-		
+
 		// Test ENV parsing
 		parsed, err := parseENVConfig(configData)
 		if err == nil {
 			validateConfigData(t, parsed, "ENV")
 		}
-		
+
 		// Test configuration sanitization
 		sanitized := sanitizeConfigData(configData)
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized config contains null bytes")
 		}
-		
+
 		// Test configuration validation
 		isValid := validateConfigFormat(configData)
 		_ = isValid
-		
+
 		// Test key/value extraction
 		if len(configData) > 0 {
 			keys := extractConfigKeys(configData)
@@ -146,75 +146,75 @@ func FuzzEnvironmentVariables(f *testing.F) {
 		"HOME=/tmp; rm -rf /",
 		"USER=$(whoami)",
 		"SHELL=/bin/bash -c 'malicious'",
-		
+
 		// Variable substitution attacks
 		"VAR=${PATH}/malicious",
 		"VAR=$HOME/../../../etc/passwd",
 		"VAR=%PATH%\\malicious",
-		
+
 		// Path traversal
 		"CONFIG_PATH=../../../etc/passwd",
 		"LOG_PATH=..\\..\\..\\windows\\system32",
-		
+
 		// Script injection
 		"SCRIPT=#!/bin/bash\nrm -rf /",
 		"COMMAND=<script>alert(1)</script>",
-		
+
 		// Unicode attacks
 		"UNICОДE=value", // Cyrillic characters
-		"VAR=vаlue", // Mixed scripts
-		
+		"VAR=vаlue",     // Mixed scripts
+
 		// Control characters
 		"VAR=value\x00injected",
 		"VAR=value\r\nINJECTED=evil",
 		"VAR=value\nMALICIOUS=true",
-		
+
 		// Long values (DoS)
 		"VAR=" + strings.Repeat("A", 100000),
 		strings.Repeat("V", 10000) + "=value",
-		
+
 		// Valid env vars
 		"PATH=/usr/bin:/bin",
 		"HOME=/home/user",
 		"USER=validuser",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, envVar string) {
 		// Test environment variable parsing
 		key, value, err := parseEnvVar(envVar)
 		if err != nil {
 			return // Invalid format should be rejected
 		}
-		
+
 		// Test key validation
 		if !validateEnvVarKey(key) {
 			return // Invalid keys should be rejected
 		}
-		
+
 		// Test value validation
 		isValidValue := validateEnvVarValue(value)
 		_ = isValidValue
-		
+
 		// Test environment variable sanitization
 		sanitizedKey := sanitizeEnvVarKey(key)
 		sanitizedValue := sanitizeEnvVarValue(value)
-		
+
 		// Verify sanitization
 		if strings.Contains(sanitizedKey, "\x00") || strings.Contains(sanitizedValue, "\x00") {
 			t.Error("Sanitized env var contains null bytes")
 		}
-		
+
 		// Test variable expansion safety
 		expanded := expandEnvVarSafely(envVar)
 		if containsCommandInjection(expanded) {
 			t.Error("Environment variable expansion resulted in command injection")
 		}
-		
+
 		// Test shell safety
 		shellSafe := makeShellSafe(envVar)
 		if !isShellSafe(shellSafe) {
@@ -231,71 +231,71 @@ func FuzzTemplateProcessing(f *testing.F) {
 		"{{range .evil}}{{.}}{{end}}",
 		"{{with .dangerous}}{{.}}{{end}}",
 		"{{template \"evil\" .}}",
-		
+
 		// Code execution attempts
 		"{{.os.system \"rm -rf /\"}}",
 		"{{exec \"malicious command\"}}",
 		"{{eval \"dangerous code\"}}",
-		
+
 		// File access attempts
 		"{{.file.read \"/etc/passwd\"}}",
 		"{{include \"../../../etc/shadow\"}}",
 		"{{template \"file:///etc/hosts\" .}}",
-		
+
 		// Variable injection
 		"${malicious}",
 		"%{runtime:command}",
 		"#{dangerous}",
 		"@{evil}",
-		
+
 		// Script tag injection
 		"<script>alert(1)</script>",
 		"javascript:alert(document.cookie)",
 		"'><script>evil()</script>",
-		
+
 		// SQL injection in templates
 		"'; DROP TABLE users; --",
 		"' OR '1'='1",
 		"UNION SELECT password FROM users",
-		
+
 		// Buffer overflow
 		"{{" + strings.Repeat("A", 10000) + "}}",
 		strings.Repeat("{{.field}}", 1000),
-		
+
 		// Valid templates
 		"{{.username}}",
 		"{{.config.value}}",
 		"Hello {{.name}}!",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, template string) {
 		// Test template parsing
 		parsed, err := parseTemplate(template)
 		if err != nil {
 			return // Invalid templates should be rejected
 		}
-		
+
 		// Test template validation
 		isValid := validateTemplate(parsed)
 		_ = isValid
-		
+
 		// Test template sanitization
 		sanitized := sanitizeTemplate(template)
 		if containsScriptTags(sanitized) {
 			t.Error("Sanitized template contains script tags")
 		}
-		
+
 		// Test template execution safety
 		result := executeTemplateSafely(template, getSampleData())
 		if containsDangerousOutput(result) {
 			t.Error("Template execution produced dangerous output")
 		}
-		
+
 		// Test template function restrictions
 		if containsRestrictedFunctions(template) {
 			restricted := restrictTemplateFunctions(template)
@@ -312,28 +312,28 @@ func FuzzConfigurationMerging(f *testing.F) {
 		// Prototype pollution attempts
 		`{"__proto__": {"evil": true}}`,
 		`{"constructor": {"prototype": {"malicious": true}}}`,
-		
+
 		// Key override attacks
 		`{"admin": true, "admin": false}`,
 		`{"config.override": "malicious"}`,
-		
+
 		// Path traversal in keys
 		`{"../config": "value"}`,
 		`{"config/../override": "evil"}`,
-		
+
 		// Deep nesting attacks (DoS)
 		strings.Repeat(`{"nested":`, 1000) + `"value"` + strings.Repeat(`}`, 1000),
-		
+
 		// Valid configurations
 		`{"normal": "config"}`,
 		`{"nested": {"valid": "value"}}`,
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, configJSON string) {
 		// Test configuration merging
 		baseConfig := getBaseConfig()
@@ -341,16 +341,16 @@ func FuzzConfigurationMerging(f *testing.F) {
 		if err != nil {
 			return
 		}
-		
+
 		// Validate merged configuration
 		if hasPrototypePollutionConfig(merged) {
 			t.Error("Configuration merge resulted in prototype pollution")
 		}
-		
+
 		if hasUnauthorizedOverrides(merged) {
 			t.Error("Configuration merge allowed unauthorized overrides")
 		}
-		
+
 		// Test deep merge safety
 		depth := calculateConfigDepth(merged)
 		if depth > 50 {

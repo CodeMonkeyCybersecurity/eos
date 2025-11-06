@@ -29,14 +29,14 @@ func (af *AutomatedFixer) FixIssues(report *SystemReport) (*FixReport, error) {
 		Actions:   []FixAction{},
 		Success:   true,
 	}
-	
+
 	// Group issues by category and severity
 	criticalDiskIssues := af.filterIssues(report.Issues, CategoryDisk, SeverityCritical)
 	highDiskIssues := af.filterIssues(report.Issues, CategoryDisk, SeverityHigh)
 	memoryIssues := af.filterIssues(report.Issues, CategoryMemory, "")
 	serviceIssues := af.filterIssues(report.Issues, "service", "")
 	logIssues := af.filterIssues(report.Issues, "logs", "")
-	
+
 	// Fix critical disk issues first
 	if len(criticalDiskIssues) > 0 {
 		action := af.fixCriticalDiskSpace(report)
@@ -45,33 +45,33 @@ func (af *AutomatedFixer) FixIssues(report *SystemReport) (*FixReport, error) {
 			fixReport.Success = false
 		}
 	}
-	
+
 	// Fix high priority disk issues
 	if len(highDiskIssues) > 0 {
 		action := af.fixHighDiskUsage(report)
 		fixReport.Actions = append(fixReport.Actions, action)
 	}
-	
+
 	// Fix memory issues
 	if len(memoryIssues) > 0 {
 		action := af.fixMemoryIssues(report)
 		fixReport.Actions = append(fixReport.Actions, action)
 	}
-	
+
 	// Fix service issues
 	for _, issue := range serviceIssues {
 		action := af.fixServiceIssue(issue)
 		fixReport.Actions = append(fixReport.Actions, action)
 	}
-	
+
 	// Fix log issues
 	if len(logIssues) > 0 {
 		action := af.fixLogIssues(report)
 		fixReport.Actions = append(fixReport.Actions, action)
 	}
-	
+
 	fixReport.Duration = time.Since(fixReport.StartTime)
-	
+
 	// Generate summary message
 	successCount := 0
 	for _, action := range fixReport.Actions {
@@ -79,7 +79,7 @@ func (af *AutomatedFixer) FixIssues(report *SystemReport) (*FixReport, error) {
 			successCount++
 		}
 	}
-	
+
 	if successCount == len(fixReport.Actions) {
 		fixReport.Message = fmt.Sprintf("Successfully completed all %d fix actions", len(fixReport.Actions))
 	} else {
@@ -88,7 +88,7 @@ func (af *AutomatedFixer) FixIssues(report *SystemReport) (*FixReport, error) {
 			fixReport.Success = false
 		}
 	}
-	
+
 	return fixReport, nil
 }
 
@@ -98,14 +98,14 @@ func (af *AutomatedFixer) fixCriticalDiskSpace(report *SystemReport) FixAction {
 		Name:      "Emergency disk cleanup",
 		StartTime: time.Now(),
 	}
-	
+
 	if af.dryRun {
 		action.Success = true
 		action.Message = "DRY RUN - Would perform emergency disk cleanup"
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	// Series of cleanup operations in order of safety and impact
 	cleanupOps := []struct {
 		name    string
@@ -143,10 +143,10 @@ func (af *AutomatedFixer) fixCriticalDiskSpace(report *SystemReport) FixAction {
 			1024 * 1024 * 1024, // 1GB estimate
 		},
 	}
-	
+
 	totalFreed := int64(0)
 	var results []string
-	
+
 	for _, op := range cleanupOps {
 		_, err := af.client.ExecuteCommand(op.command, true)
 		if err == nil {
@@ -156,14 +156,14 @@ func (af *AutomatedFixer) fixCriticalDiskSpace(report *SystemReport) FixAction {
 			results = append(results, fmt.Sprintf("✗ %s: %v", op.name, err))
 		}
 	}
-	
+
 	// Kill processes holding deleted files if significant space
 	if len(report.DeletedButOpenFiles) > 0 {
 		deletedSize := int64(0)
 		for _, file := range report.DeletedButOpenFiles {
 			deletedSize += file.Size
 		}
-		
+
 		if deletedSize > 500*1024*1024 { // 500MB
 			// Get unique PIDs
 			pids := make(map[string]bool)
@@ -172,23 +172,23 @@ func (af *AutomatedFixer) fixCriticalDiskSpace(report *SystemReport) FixAction {
 					pids[file.PID] = true
 				}
 			}
-			
+
 			// Try to restart services instead of killing
 			restartCmd := "systemctl restart rsyslog systemd-journald 2>/dev/null"
 			if _, err := af.client.ExecuteCommand(restartCmd, true); err == nil {
 				totalFreed += deletedSize
-				results = append(results, fmt.Sprintf("✓ Restarted services holding deleted files (freed ~%.2f GB)", 
+				results = append(results, fmt.Sprintf("✓ Restarted services holding deleted files (freed ~%.2f GB)",
 					float64(deletedSize)/(1024*1024*1024)))
 			}
 		}
 	}
-	
+
 	action.Success = true
 	action.SpaceFreed = totalFreed
-	action.Message = fmt.Sprintf("Freed approximately %.2f GB\nOperations:\n%s", 
+	action.Message = fmt.Sprintf("Freed approximately %.2f GB\nOperations:\n%s",
 		float64(totalFreed)/(1024*1024*1024), strings.Join(results, "\n"))
 	action.Duration = time.Since(action.StartTime)
-	
+
 	return action
 }
 
@@ -198,14 +198,14 @@ func (af *AutomatedFixer) fixHighDiskUsage(report *SystemReport) FixAction {
 		Name:      "Standard disk cleanup",
 		StartTime: time.Now(),
 	}
-	
+
 	if af.dryRun {
 		action.Success = true
 		action.Message = "DRY RUN - Would perform standard disk cleanup"
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	cleanupOps := []struct {
 		name    string
 		command string
@@ -216,10 +216,10 @@ func (af *AutomatedFixer) fixHighDiskUsage(report *SystemReport) FixAction {
 		{"Old compressed logs", "find /var/log -name '*.gz' -mtime +7 -delete 2>/dev/null"},
 		{"Thumbnail cache", "find ~/.cache/thumbnails -type f -atime +7 -delete 2>/dev/null"},
 	}
-	
+
 	var results []string
 	successCount := 0
-	
+
 	for _, op := range cleanupOps {
 		_, err := af.client.ExecuteCommand(op.command, true)
 		if err == nil {
@@ -229,12 +229,12 @@ func (af *AutomatedFixer) fixHighDiskUsage(report *SystemReport) FixAction {
 			results = append(results, fmt.Sprintf("✗ %s: %v", op.name, err))
 		}
 	}
-	
+
 	action.Success = successCount > 0
-	action.Message = fmt.Sprintf("Completed %d of %d cleanup operations\n%s", 
+	action.Message = fmt.Sprintf("Completed %d of %d cleanup operations\n%s",
 		successCount, len(cleanupOps), strings.Join(results, "\n"))
 	action.Duration = time.Since(action.StartTime)
-	
+
 	return action
 }
 
@@ -244,22 +244,22 @@ func (af *AutomatedFixer) fixMemoryIssues(report *SystemReport) FixAction {
 		Name:      "Memory optimization",
 		StartTime: time.Now(),
 	}
-	
+
 	if af.dryRun {
 		action.Success = true
 		action.Message = "DRY RUN - Would perform memory optimization"
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	var results []string
-	
+
 	// Clear caches
 	cacheCmd := "sync && echo 3 > /proc/sys/vm/drop_caches"
 	if _, err := af.client.ExecuteCommand(cacheCmd, true); err == nil {
 		results = append(results, "✓ Cleared system caches")
 	}
-	
+
 	// Restart memory-heavy services if safe
 	heavyServices := []string{"mysql", "mariadb", "postgresql", "mongodb", "elasticsearch"}
 	for _, service := range heavyServices {
@@ -278,13 +278,13 @@ func (af *AutomatedFixer) fixMemoryIssues(report *SystemReport) FixAction {
 			}
 		}
 	}
-	
+
 	// Kill zombie processes
 	zombieCmd := "ps aux | grep '<defunct>' | grep -v grep | awk '{print $2}' | xargs -r kill -9 2>/dev/null"
 	if _, err := af.client.ExecuteCommand(zombieCmd, true); err == nil {
 		results = append(results, "✓ Cleaned up zombie processes")
 	}
-	
+
 	action.Success = len(results) > 0
 	if len(results) == 0 {
 		action.Message = "No memory optimization actions were applicable"
@@ -292,7 +292,7 @@ func (af *AutomatedFixer) fixMemoryIssues(report *SystemReport) FixAction {
 		action.Message = fmt.Sprintf("Memory optimization completed:\n%s", strings.Join(results, "\n"))
 	}
 	action.Duration = time.Since(action.StartTime)
-	
+
 	return action
 }
 
@@ -309,35 +309,35 @@ func (af *AutomatedFixer) fixServiceIssue(issue Issue) FixAction {
 			}
 		}
 	}
-	
+
 	action := FixAction{
 		Name:      fmt.Sprintf("Fix service: %s", serviceName),
 		StartTime: time.Now(),
 	}
-	
+
 	if serviceName == "" {
 		action.Success = false
 		action.Message = "Could not extract service name from issue"
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	if af.dryRun {
 		action.Success = true
 		action.Message = fmt.Sprintf("DRY RUN - Would attempt to start service %s", serviceName)
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	// Try to start the service
 	startCmd := fmt.Sprintf("systemctl start %s", serviceName)
 	_, err := af.client.ExecuteCommand(startCmd, true)
-	
+
 	if err != nil {
 		// Check if it failed due to a condition
 		statusCmd := fmt.Sprintf("systemctl status %s", serviceName)
 		statusOutput, _ := af.client.ExecuteCommand(statusCmd, true)
-		
+
 		action.Success = false
 		action.Message = fmt.Sprintf("Failed to start %s: %v\nStatus: %s", serviceName, err, statusOutput)
 	} else {
@@ -351,7 +351,7 @@ func (af *AutomatedFixer) fixServiceIssue(issue Issue) FixAction {
 			action.Message = fmt.Sprintf("Started %s but verification failed", serviceName)
 		}
 	}
-	
+
 	action.Duration = time.Since(action.StartTime)
 	return action
 }
@@ -362,17 +362,17 @@ func (af *AutomatedFixer) fixLogIssues(report *SystemReport) FixAction {
 		Name:      "Log cleanup and rotation",
 		StartTime: time.Now(),
 	}
-	
+
 	if af.dryRun {
 		action.Success = true
 		action.Message = "DRY RUN - Would perform log cleanup and rotation"
 		action.Duration = time.Since(action.StartTime)
 		return action
 	}
-	
+
 	var results []string
 	totalFreed := int64(0)
-	
+
 	// Vacuum journal if large
 	if report.JournalSize > 1*1024*1024*1024 { // 1GB
 		vacuumCmd := "journalctl --vacuum-size=500M"
@@ -384,19 +384,19 @@ func (af *AutomatedFixer) fixLogIssues(report *SystemReport) FixAction {
 			}
 		}
 	}
-	
+
 	// Rotate and compress large logs
 	rotateCmd := "logrotate -f /etc/logrotate.conf 2>/dev/null"
 	if _, err := af.client.ExecuteCommand(rotateCmd, true); err == nil {
 		results = append(results, "✓ Forced log rotation")
 	}
-	
+
 	// Clean old rotated logs
 	cleanCmd := "find /var/log -name '*.gz' -o -name '*.1' -o -name '*.old' -mtime +30 | xargs -r rm -f"
 	if _, err := af.client.ExecuteCommand(cleanCmd, true); err == nil {
 		results = append(results, "✓ Cleaned old rotated logs (>30 days)")
 	}
-	
+
 	// Truncate specific large logs
 	for logPath, size := range report.LogSizes {
 		if size > 1*1024*1024*1024 { // 1GB
@@ -407,24 +407,24 @@ func (af *AutomatedFixer) fixLogIssues(report *SystemReport) FixAction {
 			}
 		}
 	}
-	
+
 	action.Success = len(results) > 0
 	action.SpaceFreed = totalFreed
 	if len(results) == 0 {
 		action.Message = "No log cleanup actions were necessary"
 	} else {
-		action.Message = fmt.Sprintf("Log cleanup completed (freed ~%.2f GB):\n%s", 
+		action.Message = fmt.Sprintf("Log cleanup completed (freed ~%.2f GB):\n%s",
 			float64(totalFreed)/(1024*1024*1024), strings.Join(results, "\n"))
 	}
 	action.Duration = time.Since(action.StartTime)
-	
+
 	return action
 }
 
 // filterIssues filters issues by category and/or severity
 func (af *AutomatedFixer) filterIssues(issues []Issue, category, severity string) []Issue {
 	var filtered []Issue
-	
+
 	for _, issue := range issues {
 		if category != "" && issue.Category != category {
 			continue
@@ -434,6 +434,6 @@ func (af *AutomatedFixer) filterIssues(issues []Issue, category, severity string
 		}
 		filtered = append(filtered, issue)
 	}
-	
+
 	return filtered
 }

@@ -47,22 +47,22 @@ func TestValidateCommandName(t *testing.T) {
 
 	t.Run("invalid command names", func(t *testing.T) {
 		invalidNames := []string{
-			"",                    // empty
-			"cmd with spaces",     // spaces
-			"cmd;injection",       // semicolon
-			"cmd&background",      // ampersand
-			"cmd|pipe",           // pipe
-			"cmd<redirection",    // less than
-			"cmd>redirection",    // greater than
-			"cmd()subshell",      // parentheses
-			"cmd{}brace",         // braces
-			"cmd[]bracket",       // brackets
-			"cmd\\escape",        // backslash
-			"cmd\"quote",         // double quote
-			"cmd'quote",          // single quote
-			"cmd*glob",           // asterisk
-			"cmd?wildcard",       // question mark
-			"cmd~tilde",          // tilde
+			"",                // empty
+			"cmd with spaces", // spaces
+			"cmd;injection",   // semicolon
+			"cmd&background",  // ampersand
+			"cmd|pipe",        // pipe
+			"cmd<redirection", // less than
+			"cmd>redirection", // greater than
+			"cmd()subshell",   // parentheses
+			"cmd{}brace",      // braces
+			"cmd[]bracket",    // brackets
+			"cmd\\escape",     // backslash
+			"cmd\"quote",      // double quote
+			"cmd'quote",       // single quote
+			"cmd*glob",        // asterisk
+			"cmd?wildcard",    // question mark
+			"cmd~tilde",       // tilde
 		}
 
 		for _, name := range invalidNames {
@@ -204,7 +204,7 @@ func TestGenerateScript(t *testing.T) {
 
 		// Should contain a timestamp in RFC3339 format
 		assert.Contains(t, script, "Created:")
-		
+
 		// Extract timestamp line and verify format
 		lines := strings.Split(script, "\n")
 		var timestampLine string
@@ -214,14 +214,14 @@ func TestGenerateScript(t *testing.T) {
 				break
 			}
 		}
-		
+
 		require.NotEmpty(t, timestampLine)
-		
+
 		// Extract timestamp part
 		parts := strings.Split(timestampLine, "Created: ")
 		require.Len(t, parts, 2)
 		timestamp := parts[1]
-		
+
 		// Verify it's a valid RFC3339 timestamp
 		_, err := time.Parse(time.RFC3339, timestamp)
 		assert.NoError(t, err, "Timestamp should be valid RFC3339: %s", timestamp)
@@ -230,7 +230,7 @@ func TestGenerateScript(t *testing.T) {
 
 func TestCommandExists(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "test-commands-*")
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ echo hello`
 	t.Run("eos marker beyond scan limit", func(t *testing.T) {
 		var content strings.Builder
 		content.WriteString("#!/bin/bash\n")
-		
+
 		// Add more than 10 lines of comments
 		for i := 0; i < 15; i++ {
 			content.WriteString("# Comment line\n")
@@ -418,7 +418,7 @@ echo hello`
 
 func TestListCustomCommands(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "test-commands-*")
 	require.NoError(t, err)

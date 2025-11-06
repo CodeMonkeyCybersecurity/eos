@@ -27,13 +27,10 @@ func NewRouteManager(client *HecateClient) *RouteManager {
 
 // Note: Types are defined in api_types.go and types.go
 
-
 // UpstreamConfig represents an upstream configuration
 type UpstreamConfig struct {
 	Dial string `json:"dial"`
 }
-
-
 
 // RouteFilter represents filters for listing routes
 type RouteFilter struct {
@@ -111,13 +108,13 @@ func (rm *RouteManager) CreateRoute(ctx context.Context, req *CreateRouteRequest
 	// Step 1: Configure DNS if requested
 	if req.ManageDNS {
 		logger.Info("Configuring DNS for route", zap.String("domain", req.Domain))
-		
+
 		// Use DNS manager for proper DNS lifecycle management
 		dnsManager := NewDNSManager(rm.client)
 		if err := dnsManager.CreateDNSRecord(ctx, req.Domain, req.DNSTarget); err != nil {
 			return nil, fmt.Errorf("failed to configure DNS: %w", err)
 		}
-		
+
 		// Set DNS fields in route
 		route.ManageDNS = true
 		route.IngressIP = req.DNSTarget
@@ -138,7 +135,7 @@ func (rm *RouteManager) CreateRoute(ctx context.Context, req *CreateRouteRequest
 
 	// Step 3: Configure authentication if specified
 	if req.AuthPolicy != "" {
-		logger.Info("Configuring authentication", 
+		logger.Info("Configuring authentication",
 			zap.String("domain", req.Domain),
 			zap.String("policy", req.AuthPolicy))
 		if err := rm.configureAuth(ctx, route); err != nil {
@@ -172,7 +169,7 @@ func (rm *RouteManager) CreateRoute(ctx context.Context, req *CreateRouteRequest
 			zap.Error(err))
 	}
 
-	// Step 6: Apply via 
+	// Step 6: Apply via
 	logger.Info("Applying  state for route", zap.String("domain", req.Domain))
 	if err := rm.applyState(ctx, route); err != nil {
 		logger.Warn("Failed to apply  state",
@@ -391,11 +388,11 @@ func (rm *RouteManager) buildCaddyRoute(route *RouteInfo) *CaddyRoute {
 func (rm *RouteManager) buildAuthHandler(route *RouteInfo) CaddyHandler {
 	return &CaddyForwardAuth{
 		Handler: "forward_auth",
-		URI: "http://authentik:9000/outpost.goauthentik.io/auth/caddy",
+		URI:     "http://authentik:9000/outpost.goauthentik.io/auth/caddy",
 		Headers: map[string][]string{
-			"X-Authentik-Meta-Outpost": {"authentik-embedded-outpost"},
+			"X-Authentik-Meta-Outpost":  {"authentik-embedded-outpost"},
 			"X-Authentik-Meta-Provider": {route.AuthPolicy},
-			"X-Authentik-Meta-App": {route.Domain},
+			"X-Authentik-Meta-App":      {route.Domain},
 		},
 	}
 }
@@ -445,7 +442,6 @@ func (rm *RouteManager) configureCertificate(ctx context.Context, domain string)
 	// Just ensure the domain is accessible
 	return rm.verifyDNS(ctx, domain)
 }
-
 
 func (rm *RouteManager) configureAuth(_ context.Context, _ *RouteInfo) error {
 	// Auth configuration is handled by the Caddy configuration
@@ -512,7 +508,6 @@ func (rm *RouteManager) cloneRoute(route *RouteInfo) *RouteInfo {
 
 	return clone
 }
-
 
 func generateRouteID(domain string) string {
 	// Simple ID generation - could be improved with UUIDs

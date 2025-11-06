@@ -240,19 +240,19 @@ func runDatabaseCreate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 
 	// Create backup configuration
 	backupConfig := &database_management.DatabaseBackupConfig{
-		DatabaseConfig:   dbConfig,
-		BackupDir:        backupDir,
-		BackupName:       backupName,
-		Compression:      compression,
-		IncludeSchema:    includeSchema,
-		IncludeData:      includeData,
-		IncludeTriggers:  includeTriggers,
-		IncludeRoutines:  includeRoutines,
-		ExcludeTables:    excludeTables,
-		IncludeTables:    includeTables,
-		Timeout:          timeout,
-		UseVaultCreds:    useVaultCreds,
-		VaultCredPath:    vaultCredPath,
+		DatabaseConfig:  dbConfig,
+		BackupDir:       backupDir,
+		BackupName:      backupName,
+		Compression:     compression,
+		IncludeSchema:   includeSchema,
+		IncludeData:     includeData,
+		IncludeTriggers: includeTriggers,
+		IncludeRoutines: includeRoutines,
+		ExcludeTables:   excludeTables,
+		IncludeTables:   includeTables,
+		Timeout:         timeout,
+		UseVaultCreds:   useVaultCreds,
+		VaultCredPath:   vaultCredPath,
 	}
 
 	// Create backup manager

@@ -43,14 +43,14 @@ type CephMonConfig struct {
 
 // CephOSDConfig represents the [osd] section
 type CephOSDConfig struct {
-	OSDMkfsType           string
-	OSDMkfsOptionsXFS     string
-	OSDMountOptionsXFS    string
+	OSDMkfsType        string
+	OSDMkfsOptionsXFS  string
+	OSDMountOptionsXFS string
 }
 
 // CephClientConfig represents the [client] section
 type CephClientConfig struct {
-	RBDCache                      string
+	RBDCache                       string
 	RBDCacheWritethroughUntilFlush string
 }
 

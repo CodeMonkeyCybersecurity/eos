@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	integrationPattern string
-	integrationVerbose bool
-	integrationTimeout string
+	integrationPattern  string
+	integrationVerbose  bool
+	integrationTimeout  string
 	integrationCoverage bool
 )
 
@@ -63,7 +63,7 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	// ASSESS - Check if integration tests exist
 	logger.Info("Checking for integration tests")
-	
+
 	// Find the project root
 	workDir, err := os.Getwd()
 	if err != nil {
@@ -91,20 +91,20 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	// Build test command
 	args = []string{"test"}
-	
+
 	if integrationVerbose {
 		args = append(args, "-v")
 	}
-	
+
 	args = append(args, "-tags=integration")
 	args = append(args, fmt.Sprintf("-timeout=%s", integrationTimeout))
-	
+
 	if integrationCoverage {
 		coverFile := filepath.Join(workDir, "coverage-integration.out")
 		args = append(args, "-coverprofile="+coverFile)
 		args = append(args, "-covermode=atomic")
 	}
-	
+
 	// Add test pattern if provided
 	if integrationPattern != "" {
 		args = append(args, "-run", integrationPattern)
@@ -112,7 +112,7 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		// Support pattern as positional argument
 		args = append(args, "-run", cmd.Flags().Args()[0])
 	}
-	
+
 	// Add test files or directories
 	args = append(args, "./...")
 
@@ -124,8 +124,8 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	// Set environment variables for better test output
 	testCmd := exec.CommandContext(rc.Ctx, "go", args...)
-	testCmd.Env = append(os.Environ(), 
-		"CGO_ENABLED=1",  // Some tests may need CGO
+	testCmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",   // Some tests may need CGO
 		"LOG_LEVEL=DEBUG", // Enable debug logging for tests
 	)
 	testCmd.Stdout = os.Stdout
@@ -137,7 +137,7 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		zap.String("command", strings.Join(append([]string{"go"}, args...), " ")))
 
 	err = testCmd.Run()
-	
+
 	// EVALUATE - Check results
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -151,19 +151,19 @@ func runIntegrationTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	}
 
 	logger.Info("Integration tests completed successfully")
-	
+
 	// Generate coverage report if requested
 	if integrationCoverage {
 		coverFile := filepath.Join(workDir, "coverage-integration.out")
 		htmlFile := filepath.Join(workDir, "coverage-integration.html")
-		
-		logger.Info("Generating coverage report", 
+
+		logger.Info("Generating coverage report",
 			zap.String("output", htmlFile))
-		
-		coverCmd := exec.CommandContext(rc.Ctx, "go", "tool", "cover", 
+
+		coverCmd := exec.CommandContext(rc.Ctx, "go", "tool", "cover",
 			"-html="+coverFile, "-o", htmlFile)
 		coverCmd.Dir = workDir
-		
+
 		if err := coverCmd.Run(); err != nil {
 			logger.Warn("Failed to generate HTML coverage report", zap.Error(err))
 		} else {

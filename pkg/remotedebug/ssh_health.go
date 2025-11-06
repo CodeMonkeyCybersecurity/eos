@@ -33,10 +33,10 @@ func (shc *SSHHealthChecker) CheckSSHHealth() *SSHHealthResult {
 	shc.checkSystemConfiguration()
 	shc.checkSSHDaemonHealth()
 	shc.checkSecurityMeasures()
-	
+
 	// Determine overall health
 	healthy := len(shc.issues) == 0
-	
+
 	return &SSHHealthResult{
 		Healthy:  healthy,
 		Issues:   shc.issues,
@@ -48,10 +48,10 @@ func (shc *SSHHealthChecker) CheckSSHHealth() *SSHHealthResult {
 func (shc *SSHHealthChecker) checkResourceExhaustion() {
 	// Check memory pressure
 	shc.checkMemoryPressure()
-	
+
 	// Check process limits
 	shc.checkProcessLimits()
-	
+
 	// Check file descriptor limits
 	shc.checkFileDescriptors()
 }
@@ -59,16 +59,16 @@ func (shc *SSHHealthChecker) checkResourceExhaustion() {
 // checkMemoryPressure detects memory exhaustion
 func (shc *SSHHealthChecker) checkMemoryPressure() {
 	cmd := `free -b && echo "---" && cat /proc/meminfo | grep -E "(MemAvailable|SwapFree)" && echo "---" && ps aux --sort=-%mem | head -5`
-	
+
 	output, err := shc.client.ExecuteCommand(cmd, false)
 	if err != nil {
 		return
 	}
-	
+
 	// Parse memory info
 	lines := strings.Split(output, "\n")
 	var memTotal, memAvailable int64
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "Mem:") && strings.Fields(line)[0] == "Mem:" {
 			fields := strings.Fields(line)
@@ -78,10 +78,10 @@ func (shc *SSHHealthChecker) checkMemoryPressure() {
 			}
 		}
 	}
-	
+
 	if memTotal > 0 && memAvailable > 0 {
 		memPressure := float64(memTotal-memAvailable) / float64(memTotal) * 100
-		
+
 		if memPressure > 95 {
 			shc.issues = append(shc.issues, Issue{
 				Severity:    SeverityCritical,
@@ -99,7 +99,7 @@ func (shc *SSHHealthChecker) checkMemoryPressure() {
 			})
 		}
 	}
-	
+
 	// Check for OOM killer activity
 	oomCheck := `dmesg | grep -i "killed process" | tail -3`
 	oomOutput, _ := shc.client.ExecuteCommand(oomCheck, true)
@@ -119,26 +119,26 @@ func (shc *SSHHealthChecker) checkMemoryPressure() {
 func (shc *SSHHealthChecker) checkProcessLimits() {
 	// Get current process count and limits
 	cmds := map[string]string{
-		"pid_max":      "cat /proc/sys/kernel/pid_max",
-		"proc_count":   "ps aux | wc -l",
-		"thread_max":   "cat /proc/sys/kernel/threads-max",
-		"user_limit":   "ulimit -u",
-		"fork_bombs":   `ps aux | awk '{print $1}' | sort | uniq -c | sort -rn | head -5`,
+		"pid_max":    "cat /proc/sys/kernel/pid_max",
+		"proc_count": "ps aux | wc -l",
+		"thread_max": "cat /proc/sys/kernel/threads-max",
+		"user_limit": "ulimit -u",
+		"fork_bombs": `ps aux | awk '{print $1}' | sort | uniq -c | sort -rn | head -5`,
 	}
-	
+
 	results := make(map[string]string)
 	for name, cmd := range cmds {
 		output, _ := shc.client.ExecuteCommand(cmd, false)
 		results[name] = strings.TrimSpace(output)
 	}
-	
+
 	// Check process utilization
 	pidMax, _ := strconv.Atoi(results["pid_max"])
 	currentProcs, _ := strconv.Atoi(results["proc_count"])
-	
+
 	if pidMax > 0 && currentProcs > 0 {
 		procUtilization := float64(currentProcs) / float64(pidMax) * 100
-		
+
 		if procUtilization > 80 {
 			shc.issues = append(shc.issues, Issue{
 				Severity:    SeverityHigh,
@@ -156,7 +156,7 @@ func (shc *SSHHealthChecker) checkProcessLimits() {
 			})
 		}
 	}
-	
+
 	// Check for potential fork bombs
 	if results["fork_bombs"] != "" {
 		lines := strings.Split(results["fork_bombs"], "\n")
@@ -188,7 +188,7 @@ func (shc *SSHHealthChecker) checkFileDescriptors() {
 	if err != nil {
 		return
 	}
-	
+
 	parts := strings.Split(output, "---")
 	if len(parts) >= 1 {
 		// Parse system-wide file descriptors
@@ -196,10 +196,10 @@ func (shc *SSHHealthChecker) checkFileDescriptors() {
 		if len(fields) >= 3 {
 			used, _ := strconv.Atoi(fields[0])
 			max, _ := strconv.Atoi(fields[2])
-			
+
 			if max > 0 && used > 0 {
 				utilization := float64(used) / float64(max) * 100
-				
+
 				if utilization > 80 {
 					shc.issues = append(shc.issues, Issue{
 						Severity:    SeverityHigh,
@@ -219,10 +219,10 @@ func (shc *SSHHealthChecker) checkFileDescriptors() {
 func (shc *SSHHealthChecker) checkNetworkHealth() {
 	// Check SSH connection limits
 	shc.checkConnectionLimits()
-	
+
 	// Check for firewall/security tool interference
 	shc.checkFirewallRateLimits()
-	
+
 	// Check for network saturation
 	shc.checkNetworkSaturation()
 }
@@ -235,9 +235,9 @@ func (shc *SSHHealthChecker) checkConnectionLimits() {
 	if err != nil {
 		return
 	}
-	
+
 	currentConnections, _ := strconv.Atoi(strings.TrimSpace(output))
-	
+
 	if currentConnections > 100 {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityHigh,
@@ -254,12 +254,12 @@ func (shc *SSHHealthChecker) checkConnectionLimits() {
 			Suggestion:  "Monitor for connection exhaustion",
 		})
 	}
-	
+
 	// Check for SYN flood
 	synCmd := `ss -ant | grep SYN | grep ":22" | wc -l`
 	synOutput, _ := shc.client.ExecuteCommand(synCmd, false)
 	synCount, _ := strconv.Atoi(strings.TrimSpace(synOutput))
-	
+
 	if synCount > 50 {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityHigh,
@@ -277,7 +277,7 @@ func (shc *SSHHealthChecker) checkFirewallRateLimits() {
 	// Check fail2ban
 	f2bCmd := `fail2ban-client status sshd 2>/dev/null | grep -E "(Currently banned|Total banned)"`
 	f2bOutput, err := shc.client.ExecuteCommand(f2bCmd, true)
-	
+
 	if err == nil && f2bOutput != "" {
 		if strings.Contains(f2bOutput, "Currently banned") {
 			// Extract number of banned IPs
@@ -288,11 +288,11 @@ func (shc *SSHHealthChecker) checkFirewallRateLimits() {
 			})
 		}
 	}
-	
+
 	// Check iptables for SSH rules
 	iptablesCmd := `iptables -L -n -v 2>/dev/null | grep -E "dpt:22|ssh" | grep -E "(DROP|REJECT)"`
 	iptablesOutput, _ := shc.client.ExecuteCommand(iptablesCmd, true)
-	
+
 	if iptablesOutput != "" {
 		lines := strings.Split(iptablesOutput, "\n")
 		if len(lines) > 5 {
@@ -311,7 +311,7 @@ func (shc *SSHHealthChecker) checkNetworkSaturation() {
 	timeWaitCmd := `ss -ant | grep TIME_WAIT | wc -l`
 	timeWaitOutput, _ := shc.client.ExecuteCommand(timeWaitCmd, false)
 	timeWaitCount, _ := strconv.Atoi(strings.TrimSpace(timeWaitOutput))
-	
+
 	if timeWaitCount > 10000 {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityMedium,
@@ -328,10 +328,10 @@ func (shc *SSHHealthChecker) checkNetworkSaturation() {
 func (shc *SSHHealthChecker) checkAuthenticationHealth() {
 	// Check systemd-logind
 	shc.checkSystemdLogind()
-	
+
 	// Check for stale mounts that can hang PAM
 	shc.checkStaleMounts()
-	
+
 	// Check LDAP/AD if configured
 	shc.checkLDAPHealth()
 }
@@ -340,7 +340,7 @@ func (shc *SSHHealthChecker) checkAuthenticationHealth() {
 func (shc *SSHHealthChecker) checkSystemdLogind() {
 	cmd := `systemctl is-active systemd-logind`
 	output, err := shc.client.ExecuteCommand(cmd, false)
-	
+
 	if err != nil || !strings.Contains(output, "active") {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityHigh,
@@ -360,9 +360,9 @@ func (shc *SSHHealthChecker) checkStaleMounts() {
 		mp=$(echo $line | awk '{print $3}'); 
 		timeout 2 ls $mp >/dev/null 2>&1 || echo "STALE: $mp"; 
 	done`
-	
+
 	output, _ := shc.client.ExecuteCommand(cmd, false)
-	
+
 	if strings.Contains(output, "STALE:") {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityCritical,
@@ -380,12 +380,12 @@ func (shc *SSHHealthChecker) checkLDAPHealth() {
 	// Check if LDAP is in use
 	checkCmd := `grep -l "pam_ldap\|pam_sss" /etc/pam.d/* 2>/dev/null | head -1`
 	ldapConfig, _ := shc.client.ExecuteCommand(checkCmd, true)
-	
+
 	if ldapConfig != "" {
 		// Test LDAP response time
 		testCmd := `time timeout 5 getent passwd 2>&1 | grep real`
 		output, err := shc.client.ExecuteCommand(testCmd, false)
-		
+
 		if err != nil || strings.Contains(output, "timeout") {
 			shc.issues = append(shc.issues, Issue{
 				Severity:    SeverityHigh,
@@ -403,10 +403,10 @@ func (shc *SSHHealthChecker) checkLDAPHealth() {
 func (shc *SSHHealthChecker) checkSystemConfiguration() {
 	// Check SELinux
 	shc.checkSELinux()
-	
+
 	// Check entropy
 	shc.checkEntropy()
-	
+
 	// Check DNS
 	shc.checkDNS()
 }
@@ -415,12 +415,12 @@ func (shc *SSHHealthChecker) checkSystemConfiguration() {
 func (shc *SSHHealthChecker) checkSELinux() {
 	cmd := `getenforce 2>/dev/null`
 	output, err := shc.client.ExecuteCommand(cmd, false)
-	
+
 	if err == nil && strings.TrimSpace(output) == "Enforcing" {
 		// Check for SSH-related denials
 		auditCmd := `ausearch -m avc -ts recent 2>/dev/null | grep -i ssh | head -5`
 		auditOutput, _ := shc.client.ExecuteCommand(auditCmd, true)
-		
+
 		if strings.Contains(auditOutput, "denied") {
 			shc.issues = append(shc.issues, Issue{
 				Severity:    SeverityHigh,
@@ -438,10 +438,10 @@ func (shc *SSHHealthChecker) checkSELinux() {
 func (shc *SSHHealthChecker) checkEntropy() {
 	cmd := `cat /proc/sys/kernel/random/entropy_avail`
 	output, err := shc.client.ExecuteCommand(cmd, false)
-	
+
 	if err == nil {
 		entropy, _ := strconv.Atoi(strings.TrimSpace(output))
-		
+
 		if entropy < 200 {
 			shc.issues = append(shc.issues, Issue{
 				Severity:    SeverityMedium,
@@ -460,7 +460,7 @@ func (shc *SSHHealthChecker) checkDNS() {
 	// Test DNS resolution time
 	cmd := `time timeout 5 nslookup google.com 2>&1 | grep real`
 	output, err := shc.client.ExecuteCommand(cmd, false)
-	
+
 	if err != nil || strings.Contains(output, "timeout") {
 		shc.warnings = append(shc.warnings, Warning{
 			Category:    "dns",
@@ -475,7 +475,7 @@ func (shc *SSHHealthChecker) checkSSHDaemonHealth() {
 	// Check SSH daemon status
 	statusCmd := `systemctl is-active sshd || systemctl is-active ssh`
 	status, _ := shc.client.ExecuteCommand(statusCmd, false)
-	
+
 	if !strings.Contains(status, "active") {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityCritical,
@@ -487,11 +487,11 @@ func (shc *SSHHealthChecker) checkSSHDaemonHealth() {
 		})
 		return
 	}
-	
+
 	// Check configuration validity
 	configTestCmd := `sshd -t 2>&1`
 	configOutput, err := shc.client.ExecuteCommand(configTestCmd, true)
-	
+
 	if err != nil || configOutput != "" {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityHigh,
@@ -502,11 +502,11 @@ func (shc *SSHHealthChecker) checkSSHDaemonHealth() {
 			Remediation: "Fix errors in /etc/ssh/sshd_config",
 		})
 	}
-	
+
 	// Check for port conflicts
 	portCmd := `ss -tlnp | grep ":22 " 2>/dev/null | grep -v sshd`
 	portOutput, _ := shc.client.ExecuteCommand(portCmd, true)
-	
+
 	if portOutput != "" {
 		shc.issues = append(shc.issues, Issue{
 			Severity:    SeverityCritical,
@@ -524,7 +524,7 @@ func (shc *SSHHealthChecker) checkSecurityMeasures() {
 	// Check hosts.deny
 	denyCmd := `test -f /etc/hosts.deny && wc -l < /etc/hosts.deny`
 	denyOutput, _ := shc.client.ExecuteCommand(denyCmd, false)
-	
+
 	if denyOutput != "" {
 		denyCount, _ := strconv.Atoi(strings.TrimSpace(denyOutput))
 		if denyCount > 100 {
@@ -535,11 +535,11 @@ func (shc *SSHHealthChecker) checkSecurityMeasures() {
 			})
 		}
 	}
-	
+
 	// Check for DenyUsers/DenyGroups in sshd_config
 	sshConfigCmd := `grep -E "^(DenyUsers|DenyGroups|AllowUsers|AllowGroups)" /etc/ssh/sshd_config 2>/dev/null`
 	configOutput, _ := shc.client.ExecuteCommand(sshConfigCmd, true)
-	
+
 	if configOutput != "" {
 		shc.warnings = append(shc.warnings, Warning{
 			Category:    CategorySecurity,

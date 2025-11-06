@@ -203,7 +203,7 @@ func (f *ServiceFacade) ListSecrets(ctx context.Context, path string) ([]string,
 // ReadCompat provides backward compatibility for the old ReadCompat function
 func ReadCompat(rc *eos_io.RuntimeContext, client *api.Client, name string, out any) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Use existing vault read functionality with KV v2 support
 	secret, err := client.Logical().ReadWithContext(rc.Ctx, "secret/data/"+name)
 	if err != nil {

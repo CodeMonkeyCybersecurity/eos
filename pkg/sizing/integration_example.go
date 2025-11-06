@@ -48,7 +48,7 @@ func init() {
 		"Environment profile: development, staging, production")
 	readSizingCmd.Flags().StringVar(&sizingWorkload, "workload", "medium",
 		"Workload profile: small, medium, large")
-	readSizingCmd.Flags().StringSliceVar(&sizingServices, "services", 
+	readSizingCmd.Flags().StringSliceVar(&sizingServices, "services",
 		[]string{"web_server", "database", "cache"},
 		"Services to include in sizing calculation")
 	readSizingCmd.Flags().BoolVar(&sizingOutputJSON, "json", false,
@@ -151,12 +151,12 @@ func runReadValidateSizing(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	// First calculate requirements (simplified - might load from file)
 	config := sizing.EnvironmentConfigs["production"]
 	workload := sizing.DefaultWorkloadProfiles["medium"]
-	
+
 	calc := sizing.NewCalculator(config, workload)
 	calc.AddService(sizing.ServiceTypeWebServer)
 	calc.AddService(sizing.ServiceTypeDatabase)
 	calc.AddService(sizing.ServiceTypeCache)
-	
+
 	result, err := calc.Calculate(rc)
 	if err != nil {
 		return fmt.Errorf("failed to calculate requirements: %w", err)
@@ -207,7 +207,7 @@ NEW: Simple integration using RunWithSizingChecks:
 // In cmd/create/postgres.go - Database with sizing
 func runCreatePostgres(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	config := parsePostgresConfig(cmd)
-	
+
 	// Database deployments automatically get sizing checks
 	return sizing.RunWithSizingChecks(rc, "postgres", func(rc *eos_io.RuntimeContext) error {
 		return postgres.Deploy(rc, config)
@@ -230,7 +230,7 @@ func runCreateCustomService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 			sizing.ServiceTypeQueue,
 		),
 	))
-	
+
 	// Use the registered mapping
 	return sizing.RunWithSizingChecks(rc, "myapp", func(rc *eos_io.RuntimeContext) error {
 		return deployMyApp(rc)
@@ -240,12 +240,12 @@ func runCreateCustomService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 // Optional: Skip sizing for development environments
 func runCreateService(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	env, _ := cmd.Flags().GetString("environment")
-	
+
 	// Skip sizing in dev environments
 	if env == "development" {
 		return deployService(rc, config)
 	}
-	
+
 	// Use sizing for staging/production
 	return sizing.RunWithSizingChecks(rc, "service", func(rc *eos_io.RuntimeContext) error {
 		return deployService(rc, config)
@@ -259,50 +259,50 @@ Example integration with deployment commands:
 // In cmd/create_infrastructure.go
 func validateSizingBeforeDeployment(rc *eos_io.RuntimeContext, services []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Load sizing requirements
 	config := sizing.EnvironmentConfigs[deployEnvironment]
 	workload := sizing.DefaultWorkloadProfiles[deployWorkloadSize]
-	
+
 	calc := sizing.NewCalculator(config, workload)
-	
+
 	// Add requested services
 	for _, svc := range services {
 		if err := calc.AddService(sizing.ServiceType(svc)); err != nil {
 			return fmt.Errorf("invalid service %s: %w", svc, err)
 		}
 	}
-	
+
 	// Calculate requirements
 	result, err := calc.Calculate(rc)
 	if err != nil {
 		return fmt.Errorf("sizing calculation failed: %w", err)
 	}
-	
+
 	// Show requirements to user
 	validator := sizing.NewValidator(result)
 	report := validator.GenerateReport(rc)
-	
+
 	logger.Info("Infrastructure requirements calculated")
 	fmt.Println(report)
-	
+
 	// Prompt for confirmation
 	fmt.Print("\nDo you want to proceed with deployment? (yes/no): ")
 	response, err := eos_io.ReadInput(rc)
 	if err != nil {
 		return err
 	}
-	
+
 	if response != "yes" {
 		return fmt.Errorf("deployment cancelled by user")
 	}
-	
+
 	// Store sizing requirements for later validation
 	sizingData, _ := json.Marshal(result)
 	if err := os.WriteFile("/tmp/eos-sizing-requirements.json", sizingData, 0644); err != nil {
 		logger.Warn("Failed to save sizing requirements", "error", err)
 	}
-	
+
 	return nil
 }
 */

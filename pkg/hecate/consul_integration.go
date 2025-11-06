@@ -16,13 +16,13 @@ import (
 
 // BackendServiceRegistration contains parameters for registering a backend service
 type BackendServiceRegistration struct {
-	ID            string
-	Name          string
-	LocalAddress  string
-	PublicDomain  string
-	Port          int
-	Tags          []string
-	HealthCheckHTTP string
+	ID                  string
+	Name                string
+	LocalAddress        string
+	PublicDomain        string
+	Port                int
+	Tags                []string
+	HealthCheckHTTP     string
 	HealthCheckInterval time.Duration
 	HealthCheckTimeout  time.Duration
 }
@@ -86,13 +86,13 @@ func (csd *ConsulServiceDiscovery) DiscoverBackend(ctx context.Context, serviceN
 	// INTERVENE - Use first healthy instance
 	service := services[0]
 	upstream := &Upstream{
-		URL:              fmt.Sprintf("http://%s:%d", service.Service.Address, service.Service.Port),
-		TLSSkipVerify:    false,
-		HealthCheckPath:  "/health",
-		Timeout:          30 * time.Second,
-		MaxIdleConns:     100,
-		MaxConnsPerHost:  10,
-		KeepAlive:        90 * time.Second,
+		URL:             fmt.Sprintf("http://%s:%d", service.Service.Address, service.Service.Port),
+		TLSSkipVerify:   false,
+		HealthCheckPath: "/health",
+		Timeout:         30 * time.Second,
+		MaxIdleConns:    100,
+		MaxConnsPerHost: 10,
+		KeepAlive:       90 * time.Second,
 	}
 
 	// Check service metadata for TLS
@@ -195,10 +195,10 @@ func (csd *ConsulServiceDiscovery) RegisterBackendService(ctx context.Context, b
 		Port:    backend.Port,
 		Tags:    backend.Tags,
 		Meta: map[string]string{
-			"managed_by":     "eos-hecate",
-			"public_domain":  backend.PublicDomain,
-			"datacenter":     csd.datacenter,
-			"environment":    csd.datacenter,
+			"managed_by":    "eos-hecate",
+			"public_domain": backend.PublicDomain,
+			"datacenter":    csd.datacenter,
+			"environment":   csd.datacenter,
 		},
 		Check: &api.AgentServiceCheck{
 			HTTP:     backend.HealthCheckHTTP,

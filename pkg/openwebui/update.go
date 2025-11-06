@@ -565,11 +565,11 @@ func (owu *OpenWebUIUpdater) backupData(ctx context.Context) (string, error) {
 	dockerArgs := []string{
 		"run", "--rm",
 		"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
-		"--cap-drop", "ALL",                        // Drop all capabilities
-		"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed for tar
-		"--read-only",                              // Read-only root filesystem
-		"--network", "none",                        // No network access needed
-		"-v", "open-webui-data:/data:ro",           // Mount data volume read-only during backup
+		"--cap-drop", "ALL", // Drop all capabilities
+		"--cap-add", "DAC_OVERRIDE", // Only add minimal capability needed for tar
+		"--read-only",       // Read-only root filesystem
+		"--network", "none", // No network access needed
+		"-v", "open-webui-data:/data:ro", // Mount data volume read-only during backup
 		"-v", fmt.Sprintf("%s:/backup", owu.config.BackupDir),
 		"alpine",
 		"tar", "czf", fmt.Sprintf("/backup/%s", backupName),
@@ -934,11 +934,11 @@ func (owu *OpenWebUIUpdater) RestoreBackup(ctx context.Context, backupPath strin
 		Args: []string{
 			"run", "--rm",
 			"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
-			"--cap-drop", "ALL",                        // Drop all capabilities
-			"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed
-			"--cap-add", "CHOWN",                       // Need chown for tar extract
-			"--cap-add", "FOWNER",                      // Need fowner for tar extract
-			"--network", "none",                        // No network access needed
+			"--cap-drop", "ALL", // Drop all capabilities
+			"--cap-add", "DAC_OVERRIDE", // Only add minimal capability needed
+			"--cap-add", "CHOWN", // Need chown for tar extract
+			"--cap-add", "FOWNER", // Need fowner for tar extract
+			"--network", "none", // No network access needed
 			"-v", "open-webui-data:/data",
 			"-v", fmt.Sprintf("%s:/backup:ro", backupDir), // Mount backup directory read-only
 			"alpine",

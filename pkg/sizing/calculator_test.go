@@ -63,7 +63,7 @@ func TestAddService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			calc := NewCalculator(EnvironmentConfigs["development"], DefaultWorkloadProfiles["small"])
-			
+
 			err := calc.AddService(tt.serviceType)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -92,7 +92,7 @@ func TestAddCustomService(t *testing.T) {
 	}
 
 	calc.AddCustomService(customService)
-	
+
 	// Should be able to add the custom service now
 	err := calc.AddService(ServiceType("custom"))
 	assert.NoError(t, err)
@@ -100,9 +100,9 @@ func TestAddCustomService(t *testing.T) {
 
 func TestCalculateSmallWorkload(t *testing.T) {
 	rc := testContext(t)
-	
+
 	calc := NewCalculator(EnvironmentConfigs["development"], DefaultWorkloadProfiles["small"])
-	
+
 	// Add a basic web stack
 	require.NoError(t, calc.AddService(ServiceTypeWebServer))
 	require.NoError(t, calc.AddService(ServiceTypeDatabase))
@@ -132,9 +132,9 @@ func TestCalculateSmallWorkload(t *testing.T) {
 
 func TestCalculateLargeWorkload(t *testing.T) {
 	rc := testContext(t)
-	
+
 	calc := NewCalculator(EnvironmentConfigs["production"], DefaultWorkloadProfiles["large"])
-	
+
 	// Add a comprehensive stack
 	services := []ServiceType{
 		ServiceTypeWebServer,
@@ -203,28 +203,28 @@ func TestCalculateDiskGrowth(t *testing.T) {
 	calc := NewCalculator(EnvironmentConfigs["development"], DefaultWorkloadProfiles["medium"])
 
 	tests := []struct {
-		name        string
-		service     *ServiceDefinition
+		name         string
+		service      *ServiceDefinition
 		expectGrowth bool
 	}{
 		{
-			name:        "database should have disk growth",
-			service:     getServiceDef(ServiceTypeDatabase),
+			name:         "database should have disk growth",
+			service:      getServiceDef(ServiceTypeDatabase),
 			expectGrowth: true,
 		},
 		{
-			name:        "storage should have disk growth",
-			service:     getServiceDef(ServiceTypeStorage),
+			name:         "storage should have disk growth",
+			service:      getServiceDef(ServiceTypeStorage),
 			expectGrowth: true,
 		},
 		{
-			name:        "logging should have disk growth with compression",
-			service:     getServiceDef(ServiceTypeLogging),
+			name:         "logging should have disk growth with compression",
+			service:      getServiceDef(ServiceTypeLogging),
 			expectGrowth: true,
 		},
 		{
-			name:        "web server should not have disk growth",
-			service:     getServiceDef(ServiceTypeWebServer),
+			name:         "web server should not have disk growth",
+			service:      getServiceDef(ServiceTypeWebServer),
 			expectGrowth: false,
 		},
 	}
@@ -329,11 +329,11 @@ func TestRoundToStandardSize(t *testing.T) {
 
 func TestEstimateCosts(t *testing.T) {
 	rc := testContext(t)
-	
+
 	// Test with Hetzner provider
 	config := EnvironmentConfigs["development"]
 	config.Provider = "hetzner"
-	
+
 	calc := NewCalculator(config, DefaultWorkloadProfiles["small"])
 	require.NoError(t, calc.AddService(ServiceTypeWebServer))
 	require.NoError(t, calc.AddService(ServiceTypeDatabase))
@@ -353,11 +353,11 @@ func TestEstimateCosts(t *testing.T) {
 
 func TestGenerateWarningsAndRecommendations(t *testing.T) {
 	rc := testContext(t)
-	
+
 	// Create a scenario that will generate warnings
 	config := EnvironmentConfigs["production"]
 	calc := NewCalculator(config, DefaultWorkloadProfiles["large"])
-	
+
 	// Add services but not monitoring (should generate recommendation)
 	require.NoError(t, calc.AddService(ServiceTypeWebServer))
 	require.NoError(t, calc.AddService(ServiceTypeDatabase))

@@ -48,7 +48,7 @@ type ThresholdConfig struct {
 // GetStorageProfile returns the appropriate storage profile for the environment
 func (e *Environment) GetStorageProfile() StorageProfile {
 	scale := e.GetScale()
-	
+
 	profiles := map[EnvironmentScale]StorageProfile{
 		ScaleSingle: {
 			Scale: ScaleSingle,
@@ -107,6 +107,6 @@ func (e *Environment) GetStorageProfile() StorageProfile {
 			MonitoringInterval: "1m",
 		},
 	}
-	
+
 	return profiles[scale]
 }

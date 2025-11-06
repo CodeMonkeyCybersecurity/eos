@@ -19,12 +19,12 @@ var (
 	cephUseConsul  bool
 
 	// Volume flags
-	cephVolumeName       string
-	cephVolumeSize       int64
-	cephVolumeDataPool   string
-	cephVolumeMetaPool   string
+	cephVolumeName        string
+	cephVolumeSize        int64
+	cephVolumeDataPool    string
+	cephVolumeMetaPool    string
 	cephVolumeReplication int
-	cephVolumePGNum      int
+	cephVolumePGNum       int
 
 	// Snapshot flags
 	cephSnapshotName   string

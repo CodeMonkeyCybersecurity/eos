@@ -178,7 +178,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 
 	fmt.Println("════════════════════════════════════════════════════════════════")
 	fmt.Println()
-	
+
 	// Check for running processes - use existing pattern
 	if eeu.enhancedConfig.CheckRunningProcesses {
 		// Use WarnAboutRunningProcesses which already checks and logs
@@ -330,11 +330,11 @@ func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 	// This prevents underestimation that would cause "no space left on device" errors
 	// P0 FIX: Include backup directory for filesystem boundary detection
 	reqs := system.UpdateRequirementsWithBinarySize(
-		"/tmp",                             // Temp directory for build
+		"/tmp",                              // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
-		eeu.config.SourceDir,               // Source directory
-		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
-		binarySize,                         // Actual binary size
+		eeu.config.SourceDir,                // Source directory
+		eeu.config.BackupDir,                // Backup directory (for filesystem detection)
+		binarySize,                          // Actual binary size
 	)
 
 	// Verify disk space with enforcement
@@ -348,7 +348,7 @@ func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 		eeu.logger.Warn("Disk space below recommended levels",
 			zap.Strings("warnings", result.Warnings))
 		for _, warning := range result.Warnings {
-			eeu.logger.Warn("⚠️  "+warning)
+			eeu.logger.Warn("⚠️  " + warning)
 		}
 	}
 
@@ -420,11 +420,11 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 		return "", fmt.Errorf("failed to stat binary for disk space re-verification: %w", err)
 	}
 	reqs := system.UpdateRequirementsWithBinarySize(
-		"/tmp",                             // Temp directory for build
+		"/tmp",                              // Temp directory for build
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory
-		eeu.config.SourceDir,               // Source directory
-		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
-		binaryInfo.Size(),                  // Actual binary size
+		eeu.config.SourceDir,                // Source directory
+		eeu.config.BackupDir,                // Backup directory (for filesystem detection)
+		binaryInfo.Size(),                   // Actual binary size
 	)
 	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
 		return "", fmt.Errorf("disk space insufficient at build time: %w\n\n"+
@@ -604,12 +604,12 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 // This eliminates the entire class of TOCTOU vulnerabilities.
 //
 // TRANSACTION FLOW:
-//   1. Open binary with O_RDONLY and acquire shared flock
-//   2. fstat(fd) to get size - NO RACE, we're reading the locked FD
-//   3. Read data from FD - NO RACE, same FD we just fstat'd
-//   4. Hash the in-memory data - NO RACE, never touches filesystem
-//   5. Write backup from in-memory data - NO RACE, atomic write
-//   6. Open backup with O_RDONLY and fstat(fd) to verify - NO RACE, verifying what we wrote
+//  1. Open binary with O_RDONLY and acquire shared flock
+//  2. fstat(fd) to get size - NO RACE, we're reading the locked FD
+//  3. Read data from FD - NO RACE, same FD we just fstat'd
+//  4. Hash the in-memory data - NO RACE, never touches filesystem
+//  5. Write backup from in-memory data - NO RACE, atomic write
+//  6. Open backup with O_RDONLY and fstat(fd) to verify - NO RACE, verifying what we wrote
 //
 // SECURITY GUARANTEE: Binary cannot change during this process because we hold a shared flock.
 // Even if attacker tries to modify it, kernel prevents writes while we hold the lock.
@@ -789,11 +789,11 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 		return fmt.Errorf("failed to stat binary for disk space re-verification: %w", err)
 	}
 	reqs := system.UpdateRequirementsWithBinarySize(
-		"/tmp",                             // Temp directory
+		"/tmp",                              // Temp directory
 		filepath.Dir(eeu.config.BinaryPath), // Binary directory (critical for install)
-		eeu.config.SourceDir,               // Source directory
-		eeu.config.BackupDir,               // Backup directory (for filesystem detection)
-		binaryInfo.Size(),                  // Actual binary size
+		eeu.config.SourceDir,                // Source directory
+		eeu.config.BackupDir,                // Backup directory (for filesystem detection)
+		binaryInfo.Size(),                   // Actual binary size
 	)
 	if _, err = system.VerifyDiskSpace(eeu.rc, reqs); err != nil {
 		return fmt.Errorf("disk space insufficient at install time: %w\n\n"+

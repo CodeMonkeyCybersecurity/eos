@@ -80,4 +80,3 @@ func (s *SecureOperationsImpl) SanitizeInput(ctx context.Context, input string, 
 
 	return sanitized, nil
 }
-

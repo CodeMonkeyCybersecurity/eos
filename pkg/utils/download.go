@@ -24,12 +24,12 @@ func DownloadFile(filepath string, url string) error {
 	// Create HTTP client with timeout to prevent indefinite hangs
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute) // Allow longer timeout for large downloads
 	defer cancel()
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
-	
+
 	client := &http.Client{
 		Timeout: 5 * time.Minute, // Match context timeout
 	}

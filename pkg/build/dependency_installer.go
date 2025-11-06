@@ -95,12 +95,12 @@ func checkGitWithGuidance(rc *eos_io.RuntimeContext, result *DependencyInstallRe
 
 	pkgMgr := system.DetectPackageManager()
 	if pkgMgr == system.PackageManagerNone {
-		return fmt.Errorf("Git is required but not installed, and no supported package manager found.\n\n"+
-			"Eos requires Git to pull updates from GitHub.\n\n"+
-			"Install Git manually:\n"+
-			"  Ubuntu/Debian: sudo apt install git\n"+
-			"  RHEL/CentOS:   sudo yum install git\n"+
-			"  Fedora:        sudo dnf install git\n\n"+
+		return fmt.Errorf("Git is required but not installed, and no supported package manager found.\n\n" +
+			"Eos requires Git to pull updates from GitHub.\n\n" +
+			"Install Git manually:\n" +
+			"  Ubuntu/Debian: sudo apt install git\n" +
+			"  RHEL/CentOS:   sudo yum install git\n" +
+			"  Fedora:        sudo dnf install git\n\n" +
 			"After installing, re-run: eos self update")
 	}
 
@@ -155,12 +155,12 @@ func checkPkgConfigWithGuidance(rc *eos_io.RuntimeContext, result *DependencyIns
 
 	pkgMgr := system.DetectPackageManager()
 	if pkgMgr == system.PackageManagerNone {
-		return fmt.Errorf("pkg-config is required but not installed.\n\n"+
-			"pkg-config is used to detect C library headers (libvirt, ceph).\n\n"+
-			"Install pkg-config manually:\n"+
-			"  Ubuntu/Debian: sudo apt install pkg-config\n"+
-			"  RHEL/CentOS:   sudo yum install pkgconfig\n"+
-			"  Fedora:        sudo dnf install pkgconfig\n\n"+
+		return fmt.Errorf("pkg-config is required but not installed.\n\n" +
+			"pkg-config is used to detect C library headers (libvirt, ceph).\n\n" +
+			"Install pkg-config manually:\n" +
+			"  Ubuntu/Debian: sudo apt install pkg-config\n" +
+			"  RHEL/CentOS:   sudo yum install pkgconfig\n" +
+			"  Fedora:        sudo dnf install pkgconfig\n\n" +
 			"After installing, re-run: eos self update")
 	}
 
@@ -215,12 +215,12 @@ func checkLibvirtWithGuidance(rc *eos_io.RuntimeContext, pkgConfigPath string, r
 
 	pkgMgr := system.DetectPackageManager()
 	if pkgMgr == system.PackageManagerNone {
-		return fmt.Errorf("libvirt development libraries are required but not installed.\n\n"+
-			"Eos uses libvirt to manage virtual machines (KVM).\n\n"+
-			"Install libvirt development libraries manually:\n"+
-			"  Ubuntu/Debian: sudo apt install libvirt-dev\n"+
-			"  RHEL/CentOS:   sudo yum install libvirt-devel\n"+
-			"  Fedora:        sudo dnf install libvirt-devel\n\n"+
+		return fmt.Errorf("libvirt development libraries are required but not installed.\n\n" +
+			"Eos uses libvirt to manage virtual machines (KVM).\n\n" +
+			"Install libvirt development libraries manually:\n" +
+			"  Ubuntu/Debian: sudo apt install libvirt-dev\n" +
+			"  RHEL/CentOS:   sudo yum install libvirt-devel\n" +
+			"  Fedora:        sudo dnf install libvirt-devel\n\n" +
 			"After installing, re-run: eos self update")
 	}
 

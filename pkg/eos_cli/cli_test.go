@@ -17,7 +17,7 @@ import (
 func newTestContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t)
 	ctx := context.Background()
-	
+
 	return &eos_io.RuntimeContext{
 		Ctx:        ctx,
 		Log:        logger,
@@ -79,5 +79,5 @@ func TestCLI_WithTimeout(t *testing.T) {
 	// Create a CLI with custom timeout
 	customCLI := cli.WithTimeout(5 * time.Second)
 	assert.NotNil(t, customCLI)
-	assert.Equal(t, 5 * time.Second, customCLI.timeout)
+	assert.Equal(t, 5*time.Second, customCLI.timeout)
 }

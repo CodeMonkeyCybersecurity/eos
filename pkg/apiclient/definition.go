@@ -32,9 +32,9 @@ var (
 // LoadDefinition loads an API definition from YAML file
 // CACHING: Definitions cached after first load (call ClearCache() to reload)
 // SEARCH ORDER:
-//   1. pkg/[service]/api_definition.yaml (embedded in binary)
-//   2. /etc/eos/api_definitions/[service].yaml (user overrides)
-//   3. ~/.eos/api_definitions/[service].yaml (user overrides)
+//  1. pkg/[service]/api_definition.yaml (embedded in binary)
+//  2. /etc/eos/api_definitions/[service].yaml (user overrides)
+//  3. ~/.eos/api_definitions/[service].yaml (user overrides)
 //
 // Parameters:
 //   - service: Service name (e.g., "authentik", "wazuh", "caddy")

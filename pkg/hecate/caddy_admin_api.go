@@ -26,16 +26,18 @@ type CaddyAdminClient struct {
 // AUTO-DETECTS container IP via Docker SDK to bypass localhost IPv4/IPv6 resolution issues
 //
 // ARCHITECTURE: Three-tier fallback strategy
-//   1. Use provided host if explicitly given (e.g., "192.168.1.100")
-//   2. Auto-detect Caddy container IP via Docker SDK (bypasses localhost issues)
-//   3. Fall back to localhost:2019 (legacy behavior, may fail with IPv6)
+//  1. Use provided host if explicitly given (e.g., "192.168.1.100")
+//  2. Auto-detect Caddy container IP via Docker SDK (bypasses localhost issues)
+//  3. Fall back to localhost:2019 (legacy behavior, may fail with IPv6)
 //
 // ROOT CAUSE FIXED: Caddy binds to 127.0.0.1 (IPv4) inside container
-//                    Host's `localhost` resolves to ::1 (IPv6) first → connection refused
-//                    Docker SDK provides container's bridge IP (172.x.x.x) → direct connection
+//
+//	Host's `localhost` resolves to ::1 (IPv6) first → connection refused
+//	Docker SDK provides container's bridge IP (172.x.x.x) → direct connection
 //
 // SECURITY: Docker SDK requires socket access (same as `docker ps`)
-//           Connection pooling prevents resource exhaustion
+//
+//	Connection pooling prevents resource exhaustion
 func NewCaddyAdminClient(host string) *CaddyAdminClient {
 	// Connection pooling configuration
 	// RATIONALE: Explicit transport for HTTP/1.1 connection reuse

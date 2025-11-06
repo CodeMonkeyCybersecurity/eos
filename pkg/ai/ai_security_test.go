@@ -124,9 +124,9 @@ func TestAISecurityValidation(t *testing.T) {
 
 	t.Run("prompt injection protection", func(t *testing.T) {
 		tests := []struct {
-			name        string
-			userInput   string
-			expectSafe  bool
+			name       string
+			userInput  string
+			expectSafe bool
 		}{
 			{
 				name:       "normal user input",
@@ -184,7 +184,7 @@ func TestAISecurityValidation(t *testing.T) {
 func TestAIConfigSecurity(t *testing.T) {
 	t.Run("provider validation", func(t *testing.T) {
 		validProviders := []string{"openai", "azure-openai", "anthropic"}
-		
+
 		for _, provider := range validProviders {
 			config := &AIConfig{
 				Provider: provider,
@@ -216,7 +216,7 @@ func TestAIConfigSecurity(t *testing.T) {
 
 		// Verify API key is stored but should be treated as sensitive
 		assert.Equal(t, "sk-very-secret-key-12345", config.APIKey)
-		
+
 		// In real implementation, logging should redact API keys
 		assert.Contains(t, config.APIKey, "sk-")
 	})
@@ -274,9 +274,9 @@ func TestConversationContextSecurity(t *testing.T) {
 func TestAIRequestValidation(t *testing.T) {
 	t.Run("request structure validation", func(t *testing.T) {
 		tests := []struct {
-			name     string
-			request  AIRequest
-			isValid  bool
+			name    string
+			request AIRequest
+			isValid bool
 		}{
 			{
 				name: "valid request",
@@ -336,14 +336,17 @@ func TestAIRequestValidation(t *testing.T) {
 func TestAIErrorHandling(t *testing.T) {
 	t.Run("chat with empty API key", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		assistant := &AIAssistant{
 			provider:  "anthropic",
 			apiKey:    "", // Empty API key
 			baseURL:   "https://api.anthropic.com/v1",
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		ctx := &ConversationContext{
@@ -358,14 +361,17 @@ func TestAIErrorHandling(t *testing.T) {
 
 	t.Run("chat with invalid URL", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		assistant := &AIAssistant{
 			provider:  "anthropic",
 			apiKey:    "sk-test123",
 			baseURL:   "invalid-url", // Invalid URL
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		ctx := &ConversationContext{

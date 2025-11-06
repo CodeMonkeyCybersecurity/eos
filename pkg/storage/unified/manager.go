@@ -22,25 +22,25 @@ type UnifiedStorageManager struct {
 
 // StorageRequest represents a unified storage request
 type StorageRequest struct {
-	Type        string                 `json:"type"`         // "disk", "vm", "volume"
-	Name        string                 `json:"name"`
-	Size        uint64                 `json:"size"`
-	Filesystem  string                 `json:"filesystem"`
-	Encrypted   bool                   `json:"encrypted"`
-	MountPoint  string                 `json:"mount_point"`
-	VMConfig    *VMStorageConfig       `json:"vm_config,omitempty"`
-	Metadata    map[string]string      `json:"metadata"`
+	Type       string            `json:"type"` // "disk", "vm", "volume"
+	Name       string            `json:"name"`
+	Size       uint64            `json:"size"`
+	Filesystem string            `json:"filesystem"`
+	Encrypted  bool              `json:"encrypted"`
+	MountPoint string            `json:"mount_point"`
+	VMConfig   *VMStorageConfig  `json:"vm_config,omitempty"`
+	Metadata   map[string]string `json:"metadata"`
 }
 
 // VMStorageConfig represents VM-specific storage configuration
 type VMStorageConfig struct {
-	Memory      uint                   `json:"memory"`
-	VCPUs       uint                   `json:"vcpus"`
-	Network     string                 `json:"network"`
-	OSVariant   string                 `json:"os_variant"`
-	SSHKeys     []string               `json:"ssh_keys"`
-	CloudInit   string                 `json:"cloud_init"`
-	Volumes     []VolumeSpec           `json:"volumes"`
+	Memory    uint         `json:"memory"`
+	VCPUs     uint         `json:"vcpus"`
+	Network   string       `json:"network"`
+	OSVariant string       `json:"os_variant"`
+	SSHKeys   []string     `json:"ssh_keys"`
+	CloudInit string       `json:"cloud_init"`
+	Volumes   []VolumeSpec `json:"volumes"`
 }
 
 // VolumeSpec represents additional volume specification
@@ -52,18 +52,18 @@ type VolumeSpec struct {
 
 // StorageInfo represents unified storage information
 type StorageInfo struct {
-	Type        string                 `json:"type"`
-	Name        string                 `json:"name"`
-	Status      string                 `json:"status"`
-	Size        uint64                 `json:"size"`
-	Used        uint64                 `json:"used"`
-	Available   uint64                 `json:"available"`
-	Health      string                 `json:"health"`
-	Location    string                 `json:"location"`
-	Metadata    map[string]string      `json:"metadata"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	Details     interface{}            `json:"details,omitempty"`
+	Type      string            `json:"type"`
+	Name      string            `json:"name"`
+	Status    string            `json:"status"`
+	Size      uint64            `json:"size"`
+	Used      uint64            `json:"used"`
+	Available uint64            `json:"available"`
+	Health    string            `json:"health"`
+	Location  string            `json:"location"`
+	Metadata  map[string]string `json:"metadata"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Details   interface{}       `json:"details,omitempty"`
 }
 
 // NewUnifiedStorageManager creates a new unified storage manager
@@ -112,7 +112,7 @@ func (u *UnifiedStorageManager) Close() error {
 
 // CreateStorage creates storage based on the request type
 func (u *UnifiedStorageManager) CreateStorage(ctx context.Context, req *StorageRequest) (*StorageInfo, error) {
-	u.logger.Info("Creating storage", 
+	u.logger.Info("Creating storage",
 		zap.String("type", req.Type),
 		zap.String("name", req.Name),
 		zap.Uint64("size", req.Size))
@@ -129,7 +129,7 @@ func (u *UnifiedStorageManager) CreateStorage(ctx context.Context, req *StorageR
 
 // DeleteStorage deletes storage based on type
 func (u *UnifiedStorageManager) DeleteStorage(ctx context.Context, storageType, name string, force bool) error {
-	u.logger.Info("Deleting storage", 
+	u.logger.Info("Deleting storage",
 		zap.String("type", storageType),
 		zap.String("name", name),
 		zap.Bool("force", force))
@@ -185,7 +185,7 @@ func (u *UnifiedStorageManager) GetStorageInfo(ctx context.Context, storageType,
 
 // ResizeStorage resizes storage
 func (u *UnifiedStorageManager) ResizeStorage(ctx context.Context, storageType, name string, newSize uint64) error {
-	u.logger.Info("Resizing storage", 
+	u.logger.Info("Resizing storage",
 		zap.String("type", storageType),
 		zap.String("name", name),
 		zap.Uint64("new_size", newSize))
@@ -210,10 +210,10 @@ func (u *UnifiedStorageManager) CheckHealth(ctx context.Context, storageType, na
 		}
 
 		return &StorageInfo{
-			Type:   "disk",
-			Name:   name,
-			Health: health.Status,
-			Status: "healthy",
+			Type:    "disk",
+			Name:    name,
+			Health:  health.Status,
+			Status:  "healthy",
 			Details: health,
 		}, nil
 	case "vm":
@@ -244,13 +244,13 @@ func (u *UnifiedStorageManager) CheckHealth(ctx context.Context, storageType, na
 
 func (u *UnifiedStorageManager) createDiskVolume(ctx context.Context, req *StorageRequest) (*StorageInfo, error) {
 	volumeReq := &udisks2.VolumeRequest{
-		Device:      req.Name, // Assuming name is device path for disks
-		Size:        req.Size,
-		Filesystem:  req.Filesystem,
-		Label:       fmt.Sprintf("eos-%s", req.Name),
-		MountPoint:  req.MountPoint,
-		Encrypted:   req.Encrypted,
-		Metadata:    req.Metadata,
+		Device:     req.Name, // Assuming name is device path for disks
+		Size:       req.Size,
+		Filesystem: req.Filesystem,
+		Label:      fmt.Sprintf("eos-%s", req.Name),
+		MountPoint: req.MountPoint,
+		Encrypted:  req.Encrypted,
+		Metadata:   req.Metadata,
 	}
 
 	volumeInfo, err := u.diskMgr.CreateVolume(ctx, volumeReq)
@@ -288,18 +288,18 @@ func (u *UnifiedStorageManager) createVMWithStorage(ctx context.Context, req *St
 	}
 
 	vmConfig := &kvm.VMConfig{
-		Name:         req.Name,
-		Memory:       req.VMConfig.Memory,
-		VCPUs:        req.VMConfig.VCPUs,
-		DiskSize:     req.Size,
-		NetworkName:  req.VMConfig.Network,
-		OSVariant:    req.VMConfig.OSVariant,
-		SSHKeys:      req.VMConfig.SSHKeys,
-		UserData:     req.VMConfig.CloudInit,
-		Volumes:      volumes,
-		Tags:         req.Metadata,
-		StoragePool:  "default",
-		AutoStart:    false,
+		Name:        req.Name,
+		Memory:      req.VMConfig.Memory,
+		VCPUs:       req.VMConfig.VCPUs,
+		DiskSize:    req.Size,
+		NetworkName: req.VMConfig.Network,
+		OSVariant:   req.VMConfig.OSVariant,
+		SSHKeys:     req.VMConfig.SSHKeys,
+		UserData:    req.VMConfig.CloudInit,
+		Volumes:     volumes,
+		Tags:        req.Metadata,
+		StoragePool: "default",
+		AutoStart:   false,
 	}
 
 	vmInfo, err := u.kvmMgr.CreateVM(ctx, vmConfig)
@@ -337,14 +337,14 @@ func (u *UnifiedStorageManager) listDiskStorage(ctx context.Context) ([]*Storage
 	storage := make([]*StorageInfo, len(disks))
 	for i, disk := range disks {
 		storage[i] = &StorageInfo{
-			Type:      "disk",
-			Name:      disk.Device,
-			Status:    "available",
-			Size:      uint64(disk.Size),
-			Health:    disk.Health.Status,
-			Location:  disk.Device,
-			Metadata:  disk.Metadata,
-			Details:   disk,
+			Type:     "disk",
+			Name:     disk.Device,
+			Status:   "available",
+			Size:     uint64(disk.Size),
+			Health:   disk.Health.Status,
+			Location: disk.Device,
+			Metadata: disk.Metadata,
+			Details:  disk,
 		}
 	}
 
@@ -384,14 +384,14 @@ func (u *UnifiedStorageManager) getDiskStorageInfo(ctx context.Context, device s
 	for _, disk := range disks {
 		if disk.Device == device {
 			return &StorageInfo{
-				Type:      "disk",
-				Name:      disk.Device,
-				Status:    "available",
-				Size:      uint64(disk.Size),
-				Health:    disk.Health.Status,
-				Location:  disk.Device,
-				Metadata:  disk.Metadata,
-				Details:   disk,
+				Type:     "disk",
+				Name:     disk.Device,
+				Status:   "available",
+				Size:     uint64(disk.Size),
+				Health:   disk.Health.Status,
+				Location: disk.Device,
+				Metadata: disk.Metadata,
+				Details:  disk,
 			}, nil
 		}
 	}

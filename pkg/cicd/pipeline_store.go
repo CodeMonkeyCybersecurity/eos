@@ -211,7 +211,7 @@ func (s *FilePipelineStore) SaveStageExecution(executionID string, stage *StageE
 // updateExecutionIndex updates the execution index for a pipeline
 func (s *FilePipelineStore) updateExecutionIndex(pipelineID, executionID string) error {
 	indexFile := filepath.Join(s.basePath, "executions", pipelineID, "index.json")
-	
+
 	var index executionIndex
 	if _, err := os.Stat(indexFile); err == nil {
 		data, err := os.ReadFile(indexFile)

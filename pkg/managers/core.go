@@ -35,13 +35,13 @@ type ResourceManager[T any] interface {
 
 // OperationResult represents the result of a management operation
 type OperationResult struct {
-	Success   bool          `json:"success"`
-	Message   string        `json:"message"`
-	Duration  time.Duration `json:"duration"`
-	DryRun    bool          `json:"dry_run"`
-	Error     string        `json:"error,omitempty"`
+	Success   bool                   `json:"success"`
+	Message   string                 `json:"message"`
+	Duration  time.Duration          `json:"duration"`
+	DryRun    bool                   `json:"dry_run"`
+	Error     string                 `json:"error,omitempty"`
 	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-	Timestamp time.Time     `json:"timestamp"`
+	Timestamp time.Time              `json:"timestamp"`
 }
 
 // ResourceStatus represents the current status of a managed resource
@@ -81,30 +81,30 @@ const (
 
 // HealthCheckResult represents the result of a health check operation
 type HealthCheckResult struct {
-	Overall    HealthState               `json:"overall"`
-	Checks     map[string]CheckResult    `json:"checks"`
-	Duration   time.Duration             `json:"duration"`
-	Timestamp  time.Time                 `json:"timestamp"`
-	Errors     []string                  `json:"errors,omitempty"`
-	Warnings   []string                  `json:"warnings,omitempty"`
+	Overall   HealthState            `json:"overall"`
+	Checks    map[string]CheckResult `json:"checks"`
+	Duration  time.Duration          `json:"duration"`
+	Timestamp time.Time              `json:"timestamp"`
+	Errors    []string               `json:"errors,omitempty"`
+	Warnings  []string               `json:"warnings,omitempty"`
 }
 
 // CheckResult represents the result of an individual health check
 type CheckResult struct {
-	Name     string      `json:"name"`
-	Status   HealthState `json:"status"`
-	Message  string      `json:"message"`
+	Name     string        `json:"name"`
+	Status   HealthState   `json:"status"`
+	Message  string        `json:"message"`
 	Duration time.Duration `json:"duration"`
-	Value    interface{} `json:"value,omitempty"`
+	Value    interface{}   `json:"value,omitempty"`
 }
 
 // ListOptions provides options for listing operations
 type ListOptions struct {
-	Limit   int               `json:"limit,omitempty"`
-	Offset  int               `json:"offset,omitempty"`
-	Filter  map[string]string `json:"filter,omitempty"`
-	Sort    string            `json:"sort,omitempty"`
-	Fields  []string          `json:"fields,omitempty"`
+	Limit  int               `json:"limit,omitempty"`
+	Offset int               `json:"offset,omitempty"`
+	Filter map[string]string `json:"filter,omitempty"`
+	Sort   string            `json:"sort,omitempty"`
+	Fields []string          `json:"fields,omitempty"`
 }
 
 // BaseManager provides common functionality for all resource managers
@@ -116,12 +116,12 @@ type BaseManager struct {
 
 // ManagerConfig provides configuration options for managers
 type ManagerConfig struct {
-	DryRun      bool          `json:"dry_run"`
-	Timeout     time.Duration `json:"timeout"`
-	RetryCount  int           `json:"retry_count"`
-	RetryDelay  time.Duration `json:"retry_delay"`
-	LogLevel    string        `json:"log_level"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	DryRun     bool                   `json:"dry_run"`
+	Timeout    time.Duration          `json:"timeout"`
+	RetryCount int                    `json:"retry_count"`
+	RetryDelay time.Duration          `json:"retry_delay"`
+	LogLevel   string                 `json:"log_level"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NewBaseManager creates a new base manager with the given configuration
@@ -129,7 +129,7 @@ func NewBaseManager(name string, config *ManagerConfig) *BaseManager {
 	if config == nil {
 		config = DefaultManagerConfig()
 	}
-	
+
 	return &BaseManager{
 		name:   name,
 		config: config,
@@ -168,12 +168,12 @@ func (bm *BaseManager) CreateOperationResult(success bool, message string, durat
 		Timestamp: time.Now(),
 		Metadata:  make(map[string]interface{}),
 	}
-	
+
 	if err != nil {
 		result.Error = err.Error()
 		result.Success = false
 	}
-	
+
 	return result
 }
 
@@ -181,6 +181,6 @@ func (bm *BaseManager) CreateOperationResult(success bool, message string, durat
 func (bm *BaseManager) ExecuteWithTimeout(ctx context.Context, operation func(context.Context) error) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, bm.config.Timeout)
 	defer cancel()
-	
+
 	return operation(timeoutCtx)
 }

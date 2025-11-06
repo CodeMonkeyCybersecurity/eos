@@ -239,7 +239,7 @@ func runVaultUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		// Delegate to pkg/vault/fix - same logic as 'eos fix vault'
 		config := &vaultfix.Config{
 			DryRun:    vaultDryRun,
-			RepairMFA: vaultFixMFA, // If --mfa specified, only fix MFA
+			RepairMFA: vaultFixMFA,  // If --mfa specified, only fix MFA
 			All:       !vaultFixMFA, // If --mfa NOT specified, fix everything
 		}
 

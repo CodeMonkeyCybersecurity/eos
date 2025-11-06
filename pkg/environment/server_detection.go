@@ -23,21 +23,21 @@ type ServerRole struct {
 	IsNomadServer  bool // Nomad server
 
 	// Detected services (more granular)
-	HasCaddy         bool
-	HasAuthentik     bool
-	HasNginx         bool
-	HasWazuh         bool
-	HasWazuhIndexer  bool
+	HasCaddy          bool
+	HasAuthentik      bool
+	HasNginx          bool
+	HasWazuh          bool
+	HasWazuhIndexer   bool
 	HasWazuhDashboard bool
-	HasConsul        bool
-	HasVault         bool
-	HasNomad         bool
+	HasConsul         bool
+	HasVault          bool
+	HasNomad          bool
 
 	// Network detection
-	Hostname       string
-	TailscaleIP    string
-	PublicIP       string
-	HasTailscale   bool
+	Hostname     string
+	TailscaleIP  string
+	PublicIP     string
+	HasTailscale bool
 
 	// Detection confidence
 	DetectionMethod string // "filesystem", "process", "network", "consul"

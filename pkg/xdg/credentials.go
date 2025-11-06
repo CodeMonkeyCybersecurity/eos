@@ -130,22 +130,22 @@ func validateCredentialInputs(app, username, password string) error {
 	if password == "" {
 		return fmt.Errorf("password is required")
 	}
-	
+
 	// Check for path traversal attempts
 	if strings.Contains(app, "..") || strings.Contains(username, "..") {
 		return fmt.Errorf("path traversal detected")
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(app, "\x00") || strings.Contains(username, "\x00") || strings.Contains(password, "\x00") {
 		return fmt.Errorf("null bytes not allowed")
 	}
-	
+
 	// Check for other dangerous characters
 	if strings.ContainsAny(app+username, "/\\") {
 		return fmt.Errorf("invalid characters in app or username")
 	}
-	
+
 	return nil
 }
 
@@ -157,10 +157,10 @@ func SanitizePathComponent(component string) string {
 	safe = strings.ReplaceAll(safe, "\\", "-")
 	safe = strings.ReplaceAll(safe, "\x00", "")
 	safe = strings.TrimSpace(safe)
-	
+
 	// Replace other problematic characters
 	safe = strings.ReplaceAll(safe, " ", "-")
 	safe = strings.ReplaceAll(safe, "@", "-at-")
-	
+
 	return safe
 }

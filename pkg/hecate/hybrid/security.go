@@ -256,7 +256,7 @@ func distributeCertificates(rc *eos_io.RuntimeContext, link *HybridLink, ca, fro
 	// Store CA certificate
 	caKeyPath := fmt.Sprintf("hecate/hybrid/%s/ca", link.ID)
 	caPem := encodeCertificatePEM(ca)
-	
+
 	if _, err := client.KV().Put(&api.KVPair{
 		Key:   caKeyPath,
 		Value: caPem,
@@ -267,7 +267,7 @@ func distributeCertificates(rc *eos_io.RuntimeContext, link *HybridLink, ca, fro
 	// Store frontend certificate
 	frontendKeyPath := fmt.Sprintf("hecate/hybrid/%s/frontend", link.ID)
 	frontendPem := encodeCertificatePEM(frontendCert)
-	
+
 	if _, err := client.KV().Put(&api.KVPair{
 		Key:   frontendKeyPath,
 		Value: frontendPem,
@@ -278,7 +278,7 @@ func distributeCertificates(rc *eos_io.RuntimeContext, link *HybridLink, ca, fro
 	// Store backend certificate
 	backendKeyPath := fmt.Sprintf("hecate/hybrid/%s/backend", link.ID)
 	backendPem := encodeCertificatePEM(backendCert)
-	
+
 	if _, err := client.KV().Put(&api.KVPair{
 		Key:   backendKeyPath,
 		Value: backendPem,
@@ -553,12 +553,12 @@ func validateCertificateChain(cert, ca *x509.Certificate) error {
 	// Create certificate pool with CA
 	roots := x509.NewCertPool()
 	roots.AddCert(ca)
-	
+
 	// Verify certificate
 	opts := x509.VerifyOptions{
 		Roots: roots,
 	}
-	
+
 	_, err := cert.Verify(opts)
 	return err
 }

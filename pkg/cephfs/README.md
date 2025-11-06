@@ -1,10 +1,53 @@
 # CephFS SDK Implementation
 
-*Last Updated: 2025-10-20*
+*Last Updated: 2025-11-05*
 
 ## Overview
 
 Eos CephFS implementation uses the official **go-ceph SDK** (`github.com/ceph/go-ceph`) for type-safe, high-performance Ceph operations. This replaces the previous CLI-based approach with native C bindings via cgo.
+
+## Platform Support
+
+**CephFS is Linux-only** due to dependencies on Ceph libraries and kernel modules. Eos uses Go build tags to provide cross-platform compilation with graceful error handling.
+
+### Build Tag Architecture
+
+| Platform | Files Used | Behavior |
+|----------|------------|----------|
+| **Linux** (`!darwin`) | `*.go` (non-stub) | Full CephFS via go-ceph SDK + CGO |
+| **macOS** (`darwin`) | `*_stub.go` | Compiles successfully, returns platform errors at runtime |
+| **Other** | `*_stub.go` | Interface compatibility with clear error messages |
+
+### File Organization
+
+**Linux Implementations** (`//go:build !darwin`):
+- `client.go`, `install.go`, `create.go`, `pools.go`, `snapshots.go`, etc.
+- Full go-ceph SDK integration with CGO
+
+**Platform Stubs** (`//go:build darwin`):
+- `client_stub.go`, `install_stub.go`, `create_stub.go`, etc.
+- Same function signatures, return actionable errors
+- Example: `"CephFS not available on macOS - deploy to Linux to use this feature"`
+
+**Cross-Platform**:
+- `types.go`, `constants.go` - Shared definitions (no build tags)
+- `*_test.go` - Tests run on all platforms, verify what's available
+- `platform_compatibility_test.go` - Verifies stub behavior
+
+### Why Stubs?
+
+Stubs enable:
+1. **Cross-platform development** - Build Eos on macOS without Ceph libraries
+2. **Clear error messages** - Users get actionable errors, not compilation failures
+3. **Interface compatibility** - All platforms have identical API surface
+4. **Testing** - Non-Ceph-specific tests run on any platform
+
+### Example Errors (macOS)
+
+```bash
+$ eos create ceph --volume my-volume
+Error: CephFS volume creation not available on macOS - deploy to Ubuntu Linux to use this feature
+```
 
 ## Architecture
 

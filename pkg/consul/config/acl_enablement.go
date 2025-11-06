@@ -28,10 +28,10 @@ const (
 
 // ACLEnablementConfig holds configuration for ACL enablement operation
 type ACLEnablementConfig struct {
-	ConfigPath    string // Path to consul.hcl (usually /etc/consul.d/consul.hcl)
-	BackupEnabled bool   // Create backup before modification
-	ValidateSyntax bool  // Validate HCL syntax after modification
-	DefaultPolicy string // ACL default policy ("allow" or "deny")
+	ConfigPath     string // Path to consul.hcl (usually /etc/consul.d/consul.hcl)
+	BackupEnabled  bool   // Create backup before modification
+	ValidateSyntax bool   // Validate HCL syntax after modification
+	DefaultPolicy  string // ACL default policy ("allow" or "deny")
 }
 
 // ACLEnablementResult contains the result of ACL enablement operation

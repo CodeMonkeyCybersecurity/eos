@@ -331,11 +331,11 @@ func CheckRouteHealth(rc *eos_io.RuntimeContext, route *hecate.Route) (*hecate.R
 	req, err := http.NewRequestWithContext(rc.Ctx, "GET", healthURL, nil)
 	if err != nil {
 		return &hecate.RouteStatus{
-			State:        hecate.RouteStateError,
-			Health:       hecate.RouteHealthUnhealthy,
-			LastChecked:  time.Now(),
-			ErrorCount:   1,
-			Message:      fmt.Sprintf("Failed to create request: %v", err),
+			State:       hecate.RouteStateError,
+			Health:      hecate.RouteHealthUnhealthy,
+			LastChecked: time.Now(),
+			ErrorCount:  1,
+			Message:     fmt.Sprintf("Failed to create request: %v", err),
 		}, nil
 	}
 

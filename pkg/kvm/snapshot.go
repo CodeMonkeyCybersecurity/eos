@@ -22,16 +22,16 @@ import (
 
 // SnapshotConfig defines configuration for KVM snapshot operations
 type SnapshotConfig struct {
-	VMName          string            `yaml:"vm_name" json:"vm_name"`
-	SnapshotName    string            `yaml:"snapshot_name" json:"snapshot_name"`
-	Description     string            `yaml:"description" json:"description"`
-	BackupDir       string            `yaml:"backup_dir" json:"backup_dir"`
-	IncludeMemory   bool              `yaml:"include_memory" json:"include_memory"`
-	IncludeDisk     bool              `yaml:"include_disk" json:"include_disk"`
-	Compression     string            `yaml:"compression" json:"compression"` // gzip, xz, none
-	Metadata        map[string]string `yaml:"metadata" json:"metadata"`
-	LiveSnapshot    bool              `yaml:"live_snapshot" json:"live_snapshot"`
-	Timeout         time.Duration     `yaml:"timeout" json:"timeout"`
+	VMName        string            `yaml:"vm_name" json:"vm_name"`
+	SnapshotName  string            `yaml:"snapshot_name" json:"snapshot_name"`
+	Description   string            `yaml:"description" json:"description"`
+	BackupDir     string            `yaml:"backup_dir" json:"backup_dir"`
+	IncludeMemory bool              `yaml:"include_memory" json:"include_memory"`
+	IncludeDisk   bool              `yaml:"include_disk" json:"include_disk"`
+	Compression   string            `yaml:"compression" json:"compression"` // gzip, xz, none
+	Metadata      map[string]string `yaml:"metadata" json:"metadata"`
+	LiveSnapshot  bool              `yaml:"live_snapshot" json:"live_snapshot"`
+	Timeout       time.Duration     `yaml:"timeout" json:"timeout"`
 }
 
 // SnapshotInfo represents information about a VM snapshot
@@ -258,13 +258,13 @@ func (sm *SnapshotManager) ListSnapshots(rc *eos_io.RuntimeContext) ([]*Snapshot
 	// Parse snapshot list output
 	snapshots := []*SnapshotInfo{}
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-	
+
 	// Skip header lines
 	for i, line := range lines {
 		if i < 2 || strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		// Parse snapshot line format: Name State Creation Time
 		fields := strings.Fields(line)
 		if len(fields) >= 3 {
@@ -272,14 +272,14 @@ func (sm *SnapshotManager) ListSnapshots(rc *eos_io.RuntimeContext) ([]*Snapshot
 				Name:  fields[0],
 				State: fields[1],
 			}
-			
+
 			// Parse creation time
 			if timeStr := strings.Join(fields[2:], " "); timeStr != "" {
 				if t, err := time.Parse("2006-01-02 15:04:05 -0700", timeStr); err == nil {
 					snapshot.CreationTime = t
 				}
 			}
-			
+
 			// Get detailed info for each snapshot
 			if detailedInfo, err := sm.getSnapshotInfo(rc, snapshot.Name); err == nil {
 				snapshot.Description = detailedInfo.Description
@@ -287,12 +287,12 @@ func (sm *SnapshotManager) ListSnapshots(rc *eos_io.RuntimeContext) ([]*Snapshot
 				snapshot.MemoryPath = detailedInfo.MemoryPath
 				snapshot.Size = detailedInfo.Size
 			}
-			
+
 			snapshots = append(snapshots, snapshot)
 		}
 	}
 
-	logger.Info("Found KVM snapshots", 
+	logger.Info("Found KVM snapshots",
 		zap.String("vm_name", sm.config.VMName),
 		zap.Int("count", len(snapshots)))
 
@@ -331,7 +331,7 @@ func (sm *SnapshotManager) DeleteSnapshot(rc *eos_io.RuntimeContext, snapshotNam
 
 func (sm *SnapshotManager) assessVMState(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if VM exists
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "virsh",
@@ -353,7 +353,7 @@ func (sm *SnapshotManager) assessVMState(rc *eos_io.RuntimeContext) error {
 	}
 
 	state := strings.TrimSpace(output)
-	logger.Info("VM state assessed", 
+	logger.Info("VM state assessed",
 		zap.String("vm_name", sm.config.VMName),
 		zap.String("state", state))
 
@@ -439,7 +439,7 @@ func (sm *SnapshotManager) assessSnapshotBackup(rc *eos_io.RuntimeContext, snaps
 func (sm *SnapshotManager) backupSnapshotIntervention(rc *eos_io.RuntimeContext, snapshotName string, result *SnapshotBackupResult) error {
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(sm.config.BackupDir, fmt.Sprintf("%s_%s_%s", sm.config.VMName, snapshotName, timestamp))
-	
+
 	if err := os.MkdirAll(backupPath, 0755); err != nil {
 		return fmt.Errorf("failed to create backup path: %w", err)
 	}

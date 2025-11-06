@@ -47,7 +47,7 @@ type StorageStatus struct {
 
 // Alert represents a storage alert
 type Alert struct {
-	Level     string    // info, warning, error, critical
+	Level     string // info, warning, error, critical
 	Message   string
 	Timestamp time.Time
 	Action    threshold.Action
@@ -68,27 +68,27 @@ func New(rc *eos_io.RuntimeContext, config Config, thresholdMgr *threshold.Manag
 func (a *Analyzer) Analyze() ([]*StorageStatus, error) {
 	logger := otelzap.Ctx(a.rc.Ctx)
 	logger.Info("Starting storage analysis")
-	
+
 	// Get current usage for all mount points
 	statuses, err := a.getCurrentUsage()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current usage: %w", err)
 	}
-	
+
 	// Analyze each mount point
 	for _, status := range statuses {
 		// Calculate growth rate (would need historical data in production)
 		status.GrowthRate = a.calculateGrowthRate(status)
-		
+
 		// Check thresholds and determine actions
 		actions := a.thresholds.DetermineActions(status.UsagePercent)
-		
+
 		// Execute actions if needed
 		for _, action := range actions {
 			if action == threshold.ActionNone {
 				continue
 			}
-			
+
 			alert := Alert{
 				Level:     a.getAlertLevel(action),
 				Message:   threshold.GetActionDescription(action),
@@ -96,13 +96,13 @@ func (a *Analyzer) Analyze() ([]*StorageStatus, error) {
 				Action:    action,
 			}
 			status.Alerts = append(status.Alerts, alert)
-			
+
 			if err := a.executor.Execute(action, status.MountPoint); err != nil {
 				logger.Error("Failed to execute action",
 					zap.String("action", string(action)),
 					zap.String("mount_point", status.MountPoint),
 					zap.Error(err))
-				
+
 				status.Alerts = append(status.Alerts, Alert{
 					Level:     "error",
 					Message:   fmt.Sprintf("Failed to execute %s: %v", action, err),
@@ -111,7 +111,7 @@ func (a *Analyzer) Analyze() ([]*StorageStatus, error) {
 			}
 		}
 	}
-	
+
 	return statuses, nil
 }
 
@@ -120,21 +120,21 @@ func (a *Analyzer) Monitor(ctx context.Context) error {
 	logger := otelzap.Ctx(a.rc.Ctx)
 	logger.Info("Starting storage monitoring",
 		zap.Duration("interval", a.config.Interval))
-	
+
 	ticker := time.NewTicker(a.config.Interval)
 	defer ticker.Stop()
-	
+
 	// Initial analysis
 	if _, err := a.Analyze(); err != nil {
 		logger.Error("Initial analysis failed", zap.Error(err))
 	}
-	
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("Storage monitoring stopped")
 			return ctx.Err()
-			
+
 		case <-ticker.C:
 			if _, err := a.Analyze(); err != nil {
 				logger.Error("Analysis failed", zap.Error(err))
@@ -146,7 +146,7 @@ func (a *Analyzer) Monitor(ctx context.Context) error {
 // getCurrentUsage retrieves current disk usage information
 func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 	logger := otelzap.Ctx(a.rc.Ctx)
-	
+
 	// Use df to get disk usage
 	output, err := execute.Run(a.rc.Ctx, execute.Options{
 		Command: "df",
@@ -156,14 +156,14 @@ func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to run df: %w", err)
 	}
-	
+
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	if len(lines) < 2 {
 		return nil, fmt.Errorf("unexpected df output")
 	}
-	
+
 	var statuses []*StorageStatus
-	
+
 	// Skip header line
 	for i := 1; i < len(lines); i++ {
 		fields := strings.Fields(lines[i])
@@ -171,7 +171,7 @@ func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 			logger.Warn("Skipping malformed df line", zap.String("line", lines[i]))
 			continue
 		}
-		
+
 		// Parse fields
 		device := fields[0]
 		filesystem := fields[1]
@@ -181,7 +181,7 @@ func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 		usagePercentStr := strings.TrimSuffix(fields[5], "%")
 		usagePercent, _ := strconv.ParseFloat(usagePercentStr, 64)
 		mountPoint := fields[6]
-		
+
 		// Skip system filesystems
 		if strings.HasPrefix(mountPoint, "/dev") ||
 			strings.HasPrefix(mountPoint, "/sys") ||
@@ -189,7 +189,7 @@ func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 			strings.HasPrefix(mountPoint, "/run") && mountPoint != "/run/shm" {
 			continue
 		}
-		
+
 		status := &StorageStatus{
 			MountPoint:   mountPoint,
 			Device:       device,
@@ -200,15 +200,15 @@ func (a *Analyzer) getCurrentUsage() ([]*StorageStatus, error) {
 			UsagePercent: usagePercent,
 			LastChecked:  time.Now(),
 		}
-		
+
 		statuses = append(statuses, status)
-		
+
 		logger.Debug("Analyzed mount point",
 			zap.String("mount_point", mountPoint),
 			zap.Float64("usage_percent", usagePercent),
 			zap.Uint64("free_bytes", freeBytes))
 	}
-	
+
 	return statuses, nil
 }
 

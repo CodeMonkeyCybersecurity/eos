@@ -59,8 +59,8 @@ func runCreateStorageHashiCorp(rc *eos_io.RuntimeContext, cmd *cobra.Command, ar
 	// Initialize HashiCorp storage manager
 	manager, err := hashicorp.NewHashiCorpStorageManager(
 		rc,
-		"http://localhost:4646",                                 // Nomad
-		"http://localhost:8500",                                 // Consul
+		"http://localhost:4646", // Nomad
+		"http://localhost:8500", // Consul
 		fmt.Sprintf("http://localhost:%d", shared.PortVault), // Vault
 	)
 	if err != nil {

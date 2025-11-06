@@ -321,7 +321,7 @@ func parseBackupName(backupName string, config *FileBackupConfig) (string, time.
 	if len(parts) == 2 {
 		originalName := parts[0]
 		timestampPart := strings.TrimSuffix(parts[1], filepath.Ext(parts[1]))
-		
+
 		if backupTime, err := time.Parse(config.TimestampFormat, timestampPart); err == nil {
 			return originalName + filepath.Ext(backupName), backupTime
 		}

@@ -13,10 +13,10 @@ import (
 
 // OutpostResponse represents an Authentik outpost
 type OutpostResponse struct {
-	PK        string `json:"pk"`
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Providers []int  `json:"providers"`
+	PK        string                 `json:"pk"`
+	Name      string                 `json:"name"`
+	Type      string                 `json:"type"`
+	Providers []int                  `json:"providers"`
 	Config    map[string]interface{} `json:"config"`
 }
 

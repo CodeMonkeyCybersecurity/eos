@@ -5,10 +5,10 @@ import "time"
 
 // PlatformStatus represents the overall status of the Wazuh MSSP platform.
 type PlatformStatus struct {
-	Platform   ComponentStatus     `json:"platform"`
-	Components []ComponentStatus   `json:"components"`
-	Customers  CustomersSummary    `json:"customers"`
-	Timestamp  time.Time           `json:"timestamp"`
+	Platform   ComponentStatus   `json:"platform"`
+	Components []ComponentStatus `json:"components"`
+	Customers  CustomersSummary  `json:"customers"`
+	Timestamp  time.Time         `json:"timestamp"`
 }
 
 // ComponentStatus represents the status of a platform component.
@@ -49,8 +49,8 @@ type ResourceUsage struct {
 
 // ResourceMetric represents a specific resource metric.
 type ResourceMetric struct {
-	Used  string `json:"used"`
-	Total string `json:"total"`
+	Used    string  `json:"used"`
+	Total   string  `json:"total"`
 	Percent float64 `json:"percent"`
 }
 
@@ -90,10 +90,10 @@ type CustomerCredentials struct {
 
 // PlatformHealth represents overall platform health status.
 type PlatformHealth struct {
-	Overall string        `json:"overall"`
-	Checks  []HealthCheck `json:"checks"`
-	Issues  int           `json:"issues"`
-	Timestamp time.Time   `json:"timestamp"`
+	Overall   string        `json:"overall"`
+	Checks    []HealthCheck `json:"checks"`
+	Issues    int           `json:"issues"`
+	Timestamp time.Time     `json:"timestamp"`
 }
 
 // HealthCheck represents an individual health check result.

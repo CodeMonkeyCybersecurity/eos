@@ -26,12 +26,12 @@ type TestableComponent interface {
 
 // ServiceTestCase represents a standardized service test case
 type ServiceTestCase struct {
-	Name           string
-	ServiceName    string
-	ShouldBeActive bool
+	Name            string
+	ServiceName     string
+	ShouldBeActive  bool
 	ShouldBeEnabled bool
-	SetupFunc      func(t *testing.T) error
-	CleanupFunc    func(t *testing.T) error
+	SetupFunc       func(t *testing.T) error
+	CleanupFunc     func(t *testing.T) error
 }
 
 // InstallationTestCase represents a standardized installation test case
@@ -53,8 +53,8 @@ type ConfigTestCase struct {
 
 // TestServiceManager provides utilities for testing service operations
 type TestServiceManager struct {
-	rc            *eos_io.RuntimeContext
-	serviceManager *shared.SystemdServiceManager
+	rc              *eos_io.RuntimeContext
+	serviceManager  *shared.SystemdServiceManager
 	createdServices []string // Track services created during tests
 }
 
@@ -63,8 +63,8 @@ func NewTestServiceManager(t *testing.T) *TestServiceManager {
 	t.Helper()
 	rc := TestRuntimeContext(t)
 	return &TestServiceManager{
-		rc:            rc,
-		serviceManager: serviceutil.NewServiceManager(rc),
+		rc:              rc,
+		serviceManager:  serviceutil.NewServiceManager(rc),
 		createdServices: make([]string, 0),
 	}
 }
@@ -72,47 +72,47 @@ func NewTestServiceManager(t *testing.T) *TestServiceManager {
 // CreateTestService creates a test service and tracks it for cleanup
 func (tsm *TestServiceManager) CreateTestService(t *testing.T, config *shared.ServiceConfig) error {
 	t.Helper()
-	
+
 	if err := tsm.serviceManager.InstallService(config); err != nil {
 		return err
 	}
-	
+
 	// Track for cleanup
 	tsm.createdServices = append(tsm.createdServices, config.Name)
-	
+
 	// Register cleanup function
 	t.Cleanup(func() {
 		_ = tsm.serviceManager.RemoveService(config.Name)
 	})
-	
+
 	return nil
 }
 
 // RunServiceTests runs standardized service tests
 func (tsm *TestServiceManager) RunServiceTests(t *testing.T, testCases []ServiceTestCase) {
 	t.Helper()
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Setup
 			if tc.SetupFunc != nil {
 				require.NoError(t, tc.SetupFunc(t), "Setup should not fail")
 			}
-			
+
 			// Cleanup
 			if tc.CleanupFunc != nil {
 				t.Cleanup(func() {
 					_ = tc.CleanupFunc(t)
 				})
 			}
-			
+
 			// Test service state
 			state, err := tsm.serviceManager.GetServiceState(tc.ServiceName)
 			require.NoError(t, err, "Should be able to get service state")
-			
-			assert.Equal(t, tc.ShouldBeActive, state.Active, 
+
+			assert.Equal(t, tc.ShouldBeActive, state.Active,
 				"Service active state should match expected")
-			assert.Equal(t, tc.ShouldBeEnabled, state.Enabled, 
+			assert.Equal(t, tc.ShouldBeEnabled, state.Enabled,
 				"Service enabled state should match expected")
 		})
 	}
@@ -129,10 +129,10 @@ type TestConfigManager struct {
 // NewTestConfigManager creates a config manager for testing
 func NewTestConfigManager(t *testing.T) *TestConfigManager {
 	t.Helper()
-	
+
 	rc := TestRuntimeContext(t)
 	tempDir := t.TempDir() // Automatically cleaned up
-	
+
 	return &TestConfigManager{
 		rc:            rc,
 		configManager: serviceutil.NewConfigManager(rc),
@@ -144,27 +144,27 @@ func NewTestConfigManager(t *testing.T) *TestConfigManager {
 // CreateTestConfigFile creates a temporary config file for testing
 func (tcm *TestConfigManager) CreateTestConfigFile(t *testing.T, filename string, content interface{}) string {
 	t.Helper()
-	
+
 	path := filepath.Join(tcm.tempDir, filename)
-	
+
 	opts := &shared.ConfigOptions{
 		Path:   path,
 		Format: shared.FormatJSON, // Default to JSON for tests
 	}
-	
+
 	err := tcm.configManager.SaveConfig(opts, content)
 	require.NoError(t, err, "Should be able to create test config file")
-	
+
 	// Track for potential cleanup
 	tcm.createdFiles = append(tcm.createdFiles, path)
-	
+
 	return path
 }
 
 // RunConfigTests runs standardized configuration tests
 func (tcm *TestConfigManager) RunConfigTests(t *testing.T, testCases []ConfigTestCase) {
 	t.Helper()
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Create test config file
@@ -172,19 +172,19 @@ func (tcm *TestConfigManager) RunConfigTests(t *testing.T, testCases []ConfigTes
 			if configPath == "" {
 				configPath = tcm.CreateTestConfigFile(t, "test_config.json", tc.ConfigData)
 			}
-			
+
 			// Load configuration
 			var loaded interface{}
 			opts := &shared.ConfigOptions{Path: configPath}
 			err := tcm.configManager.LoadConfig(opts, &loaded)
-			
+
 			if tc.ExpectError {
 				assert.Error(t, err, "Should expect an error")
 				return
 			}
-			
+
 			require.NoError(t, err, "Should be able to load config")
-			
+
 			// Validate if provided
 			if tc.ValidateFunc != nil {
 				err := tc.ValidateFunc(t, loaded)
@@ -196,23 +196,23 @@ func (tcm *TestConfigManager) RunConfigTests(t *testing.T, testCases []ConfigTes
 
 // TestInstallationFramework provides utilities for testing installations
 type TestInstallationFramework struct {
-	rc          *eos_io.RuntimeContext
-	framework   *installation.InstallationFramework
-	tempDir     string
+	rc             *eos_io.RuntimeContext
+	framework      *installation.InstallationFramework
+	tempDir        string
 	installedItems []string // Track items installed during tests
 }
 
 // NewTestInstallationFramework creates an installation framework for testing
 func NewTestInstallationFramework(t *testing.T) *TestInstallationFramework {
 	t.Helper()
-	
+
 	rc := TestRuntimeContext(t)
 	tempDir := t.TempDir()
-	
+
 	return &TestInstallationFramework{
-		rc:          rc,
-		framework:   installation.NewInstallationFramework(rc),
-		tempDir:     tempDir,
+		rc:             rc,
+		framework:      installation.NewInstallationFramework(rc),
+		tempDir:        tempDir,
 		installedItems: make([]string, 0),
 	}
 }
@@ -220,34 +220,34 @@ func NewTestInstallationFramework(t *testing.T) *TestInstallationFramework {
 // RunInstallationTests runs standardized installation tests
 func (tif *TestInstallationFramework) RunInstallationTests(t *testing.T, testCases []InstallationTestCase) {
 	t.Helper()
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			// Convert config to InstallationConfig
 			config, ok := tc.Config.(*installation.InstallationConfig)
 			require.True(t, ok, "Config should be InstallationConfig")
-			
+
 			// Modify paths to use temp directory
 			if config.InstallPath == "" {
 				config.InstallPath = tif.tempDir
 			}
-			
+
 			// Run installation
 			result, err := tif.framework.Install(config)
-			
+
 			if tc.ExpectError {
 				assert.Error(t, err, "Should expect an error")
 				return
 			}
-			
+
 			require.NoError(t, err, "Installation should succeed")
 			assert.True(t, result.Success, "Installation result should be successful")
-			
+
 			// Track for cleanup
 			if result.InstalledTo != "" {
 				tif.installedItems = append(tif.installedItems, result.InstalledTo)
 			}
-			
+
 			// Validate if provided
 			if tc.ValidateFunc != nil {
 				err := tc.ValidateFunc(t, result)
@@ -264,7 +264,7 @@ func AssertServiceRunning(t *testing.T, serviceName string) {
 	t.Helper()
 	rc := TestRuntimeContext(t)
 	sm := serviceutil.NewServiceManager(rc)
-	
+
 	active, err := sm.IsActive(serviceName)
 	require.NoError(t, err, "Should be able to check service status")
 	assert.True(t, active, "Service %s should be running", serviceName)
@@ -275,7 +275,7 @@ func AssertServiceStopped(t *testing.T, serviceName string) {
 	t.Helper()
 	rc := TestRuntimeContext(t)
 	sm := serviceutil.NewServiceManager(rc)
-	
+
 	active, err := sm.IsActive(serviceName)
 	require.NoError(t, err, "Should be able to check service status")
 	assert.False(t, active, "Service %s should be stopped", serviceName)
@@ -286,7 +286,7 @@ func AssertConfigValue(t *testing.T, configPath, key string, expected interface{
 	t.Helper()
 	rc := TestRuntimeContext(t)
 	cm := serviceutil.NewConfigManager(rc)
-	
+
 	value, err := cm.GetConfigValue(configPath, key)
 	require.NoError(t, err, "Should be able to get config value")
 	assert.Equal(t, expected, value, "Config value for key %s should match", key)
@@ -297,7 +297,7 @@ func AssertPackageInstalled(t *testing.T, packageName string) {
 	t.Helper()
 	// Implementation would check if package is installed
 	// This is a placeholder for the actual implementation
-	assert.True(t, shared.FileExists("/usr/bin/"+packageName) || 
+	assert.True(t, shared.FileExists("/usr/bin/"+packageName) ||
 		shared.FileExists("/usr/local/bin/"+packageName),
 		"Package %s should be installed", packageName)
 }
@@ -307,13 +307,13 @@ func AssertPackageInstalled(t *testing.T, packageName string) {
 // WithTimeout runs a test function with a timeout
 func WithTimeout(t *testing.T, timeout time.Duration, testFunc func()) {
 	t.Helper()
-	
+
 	done := make(chan bool, 1)
 	go func() {
 		testFunc()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Test completed within timeout
@@ -325,7 +325,7 @@ func WithTimeout(t *testing.T, timeout time.Duration, testFunc func()) {
 // EventuallyTrue polls a condition until it becomes true or times out
 func EventuallyTrue(t *testing.T, condition func() bool, timeout time.Duration, interval time.Duration, msg string) {
 	t.Helper()
-	
+
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if condition() {
@@ -333,7 +333,7 @@ func EventuallyTrue(t *testing.T, condition func() bool, timeout time.Duration, 
 		}
 		time.Sleep(interval)
 	}
-	
+
 	t.Fatalf("Condition was not true within %v: %s", timeout, msg)
 }
 
@@ -407,11 +407,11 @@ func GenerateTestInstallationConfig(name string) *installation.InstallationConfi
 // ValidateJSONStructure validates that data has expected JSON structure
 func ValidateJSONStructure(t *testing.T, data interface{}, expectedKeys []string) {
 	t.Helper()
-	
+
 	// Convert to map for validation
 	dataMap, ok := data.(map[string]interface{})
 	require.True(t, ok, "Data should be a map")
-	
+
 	for _, key := range expectedKeys {
 		assert.Contains(t, dataMap, key, "Should contain key: %s", key)
 	}
@@ -420,11 +420,11 @@ func ValidateJSONStructure(t *testing.T, data interface{}, expectedKeys []string
 // ValidateFilePermissions validates file permissions
 func ValidateFilePermissions(t *testing.T, path string, expectedPerm os.FileMode) {
 	t.Helper()
-	
+
 	info, err := os.Stat(path)
 	require.NoError(t, err, "Should be able to stat file")
-	
+
 	actualPerm := info.Mode().Perm()
-	assert.Equal(t, expectedPerm, actualPerm, 
+	assert.Equal(t, expectedPerm, actualPerm,
 		"File %s should have permissions %o, got %o", path, expectedPerm, actualPerm)
 }

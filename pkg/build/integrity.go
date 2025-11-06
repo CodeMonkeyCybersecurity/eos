@@ -20,23 +20,23 @@ import (
 
 // BuildIntegrityCheck contains results of build environment verification
 type BuildIntegrityCheck struct {
-	GoCompilerVerified    bool     // Go compiler permissions and existence verified
-	GoCompilerPath        string   // Path to go compiler
-	SourceDirVerified     bool     // Source directory is not a symlink
-	EnvironmentSanitized  bool     // Dangerous env vars removed
-	GoModulesVerified     bool     // go.mod and go.sum exist
-	Warnings              []string // Non-fatal warnings
+	GoCompilerVerified   bool     // Go compiler permissions and existence verified
+	GoCompilerPath       string   // Path to go compiler
+	SourceDirVerified    bool     // Source directory is not a symlink
+	EnvironmentSanitized bool     // Dangerous env vars removed
+	GoModulesVerified    bool     // go.mod and go.sum exist
+	Warnings             []string // Non-fatal warnings
 }
 
 // DangerousEnvironmentVars are environment variables that could be exploited
 // to inject malicious code during build
 var DangerousEnvironmentVars = []string{
-	"LD_PRELOAD",      // Can inject malicious shared libraries
-	"LD_LIBRARY_PATH", // Can redirect library loads to attacker-controlled paths
-	"DYLD_INSERT_LIBRARIES",      // macOS equivalent of LD_PRELOAD
-	"DYLD_LIBRARY_PATH",          // macOS equivalent of LD_LIBRARY_PATH
-	"GOPATH",          // Could redirect go module cache to malicious code
-	"GOCACHE",         // Could use poisoned build cache
+	"LD_PRELOAD",            // Can inject malicious shared libraries
+	"LD_LIBRARY_PATH",       // Can redirect library loads to attacker-controlled paths
+	"DYLD_INSERT_LIBRARIES", // macOS equivalent of LD_PRELOAD
+	"DYLD_LIBRARY_PATH",     // macOS equivalent of LD_LIBRARY_PATH
+	"GOPATH",                // Could redirect go module cache to malicious code
+	"GOCACHE",               // Could use poisoned build cache
 }
 
 // VerifyBuildIntegrity performs comprehensive build environment verification
@@ -106,7 +106,7 @@ func verifyGoCompilerIntegrity(rc *eos_io.RuntimeContext, goPath string, check *
 	if goInfo.Mode().Perm()&0020 != 0 {
 		// Get file group
 		stat, ok := goInfo.Sys().(*syscall.Stat_t)
-		if ok && stat.Gid != 0 {  // If group is not root (GID 0)
+		if ok && stat.Gid != 0 { // If group is not root (GID 0)
 			warning := fmt.Sprintf("Go compiler is group-writable (GID %d): %s", stat.Gid, goPath)
 			check.Warnings = append(check.Warnings, warning)
 			logger.Warn("SECURITY WARNING: Go compiler is group-writable",

@@ -86,9 +86,9 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 		Port:      22, // SSH port
 		Tags:      []string{"kvm", "ubuntu", "orchestrated"},
 		Meta: map[string]string{
-			"created_at":  time.Now().Format(time.RFC3339),
-			"ssh_key":     privateKeyPath,
-			"consul_ip":   ip,
+			"created_at": time.Now().Format(time.RFC3339),
+			"ssh_key":    privateKeyPath,
+			"consul_ip":  ip,
 		},
 		HealthCheck: &HealthCheck{
 			TCP:                            fmt.Sprintf("%s:22", ip),
@@ -114,9 +114,9 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 			Priority:    50,
 			Datacenters: []string{"dc1"},
 			Meta: map[string]string{
-				"vm_name":  vmName,
-				"vm_ip":    ip,
-				"created":  time.Now().Format(time.RFC3339),
+				"vm_name": vmName,
+				"vm_ip":   ip,
+				"created": time.Now().Format(time.RFC3339),
 			},
 		}
 

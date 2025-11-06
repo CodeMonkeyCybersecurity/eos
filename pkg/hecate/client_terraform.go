@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/consul/api"
 	nomad "github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -96,13 +96,13 @@ func createNomadClient(nomadAddr string) *nomad.Client {
 	if nomadAddr != "" {
 		config.Address = nomadAddr
 	}
-	
+
 	client, err := nomad.NewClient(config)
 	if err != nil {
 		// Return nil client if creation fails - operations will handle gracefully
 		return nil
 	}
-	
+
 	return client
 }
 
@@ -214,7 +214,7 @@ func NewExtendedAuthentikClient(rc *eos_io.RuntimeContext) (*ExtendedAuthentikCl
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ExtendedAuthentikClient{
 		AuthentikClient: base,
 		resty: resty.New().
@@ -316,7 +316,6 @@ func NewNginxClient(configPath string) *NginxClient {
 	}
 }
 
-
 // TerraformClient handles Terraform operations
 type TerraformClient struct {
 	rc        *eos_io.RuntimeContext
@@ -398,8 +397,8 @@ func (t *TerraformClient) Destroy(ctx context.Context, module string) error {
 
 // CaddyRoute represents a Caddy route configuration
 type CaddyRoute struct {
-	ID     string          `json:"@id,omitempty"`
-	Match  []CaddyMatcher  `json:"match"`
+	ID     string         `json:"@id,omitempty"`
+	Match  []CaddyMatcher `json:"match"`
 	Handle []CaddyHandler `json:"handle"`
 }
 

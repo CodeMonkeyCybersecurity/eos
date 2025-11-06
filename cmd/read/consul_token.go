@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	consulTokenExport  bool
+	consulTokenExport   bool
 	consulTokenValidate bool
 )
 

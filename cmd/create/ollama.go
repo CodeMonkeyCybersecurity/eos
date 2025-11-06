@@ -46,7 +46,7 @@ var CreateOllamaCmd = &cobra.Command{
 			Port:          port,
 			NoGPU:         noGPU,
 		}
-		
+
 		if err := ollama.SetupOllama(rc, config); err != nil {
 			return err
 		}

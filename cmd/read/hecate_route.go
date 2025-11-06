@@ -117,7 +117,7 @@ func runReadHecateRoute(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	}
 }
 
-func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *hecate.RouteStatus, 
+func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *hecate.RouteStatus,
 	metrics *hecate.RouteMetrics, connectionTest *hecate.ConnectionTestResult, showConfig bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -213,7 +213,7 @@ func displayRouteTable(rc *eos_io.RuntimeContext, route *hecate.Route, status *h
 			logger.Info(fmt.Sprintf("terminal prompt:   Response Time: %s", connectionTest.ResponseTime))
 			if connectionTest.SSL != nil {
 				logger.Info(fmt.Sprintf("terminal prompt:   SSL Valid: %v", connectionTest.SSL.Valid))
-				logger.Info(fmt.Sprintf("terminal prompt:   Certificate Valid Until: %s", 
+				logger.Info(fmt.Sprintf("terminal prompt:   Certificate Valid Until: %s",
 					connectionTest.SSL.NotAfter.Format("2006-01-02")))
 			}
 		} else {

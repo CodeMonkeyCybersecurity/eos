@@ -1078,9 +1078,9 @@ func configureHecateFirewall(rc *eos_io.RuntimeContext) error {
 	// Define required ports for Hecate
 	// CRITICAL: UDP/443 required for QUIC/HTTP3 support (enabled by sysctl UDP buffer tuning)
 	ports := []string{
-		"80/tcp",   // HTTP (redirects to HTTPS)
-		"443/tcp",  // HTTPS (TLS 1.2/1.3)
-		"443/udp",  // QUIC/HTTP3
+		"80/tcp",  // HTTP (redirects to HTTPS)
+		"443/tcp", // HTTPS (TLS 1.2/1.3)
+		"443/udp", // QUIC/HTTP3
 	}
 
 	logger.Debug("Opening firewall ports",

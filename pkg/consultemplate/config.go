@@ -25,11 +25,11 @@ type ServiceConfig struct {
 	ServiceName string // Name of the service (e.g., "bionicgpt", "eos-global")
 
 	// Connection settings
-	ConsulAddr     string // Consul address (default: http://localhost:8500)
-	VaultAddr      string // Vault address (default: https://localhost:8200)
-	VaultTokenPath string // Path to Vault token (default: /run/eos/vault_agent_eos.token)
-	VaultRenewToken bool  // Whether to renew Vault token (default: true)
-	VaultUnwrapToken bool // Whether to unwrap Vault token (default: false)
+	ConsulAddr       string // Consul address (default: http://localhost:8500)
+	VaultAddr        string // Vault address (default: https://localhost:8200)
+	VaultTokenPath   string // Path to Vault token (default: /run/eos/vault_agent_eos.token)
+	VaultRenewToken  bool   // Whether to renew Vault token (default: true)
+	VaultUnwrapToken bool   // Whether to unwrap Vault token (default: false)
 
 	// Template configurations
 	Templates []TemplateConfig
@@ -51,26 +51,26 @@ type ServiceConfig struct {
 
 // TemplateConfig defines a template to render
 type TemplateConfig struct {
-	Source      string        // Template source file path
-	Destination string        // Rendered file destination
-	Perms       os.FileMode   // File permissions for rendered file
-	Command     string        // Command to run after rendering (optional)
+	Source         string        // Template source file path
+	Destination    string        // Rendered file destination
+	Perms          os.FileMode   // File permissions for rendered file
+	Command        string        // Command to run after rendering (optional)
 	CommandTimeout time.Duration // Timeout for command execution
-	Wait        *WaitConfig   // Custom wait config for this template
-	Backup      bool          // Backup existing file before overwriting
-	LeftDelim   string        // Left template delimiter (default: "{{")
-	RightDelim  string        // Right template delimiter (default: "}}")
+	Wait           *WaitConfig   // Custom wait config for this template
+	Backup         bool          // Backup existing file before overwriting
+	LeftDelim      string        // Left template delimiter (default: "{{")
+	RightDelim     string        // Right template delimiter (default: "}}")
 }
 
 // ExecConfig defines a command to exec after template rendering
 type ExecConfig struct {
-	Command     string   // Command to execute
-	Args        []string // Command arguments
-	Splay       time.Duration // Random delay before exec (default: 0)
-	Enabled     bool     // Whether exec is enabled
-	ReloadSignal string  // Signal to send on template change (instead of restart)
-	KillSignal  string   // Signal to send on shutdown
-	KillTimeout time.Duration // Timeout before sending SIGKILL
+	Command      string        // Command to execute
+	Args         []string      // Command arguments
+	Splay        time.Duration // Random delay before exec (default: 0)
+	Enabled      bool          // Whether exec is enabled
+	ReloadSignal string        // Signal to send on template change (instead of restart)
+	KillSignal   string        // Signal to send on shutdown
+	KillTimeout  time.Duration // Timeout before sending SIGKILL
 }
 
 // WaitConfig defines wait behavior for template rendering
@@ -89,21 +89,21 @@ type LifecycleConfig struct {
 // DefaultServiceConfig returns default service configuration
 func DefaultServiceConfig(serviceName string) *ServiceConfig {
 	return &ServiceConfig{
-		ServiceName:     serviceName,
-		ConsulAddr:      DefaultConsulAddr,
-		VaultAddr:       DefaultVaultAddr,
-		VaultTokenPath:  DefaultVaultTokenPath,
-		VaultRenewToken: true,
+		ServiceName:      serviceName,
+		ConsulAddr:       DefaultConsulAddr,
+		VaultAddr:        DefaultVaultAddr,
+		VaultTokenPath:   DefaultVaultTokenPath,
+		VaultRenewToken:  true,
 		VaultUnwrapToken: false,
-		Templates:       []TemplateConfig{},
-		MaxStale:        DefaultMaxStale,
-		WaitMin:         DefaultMinWait,
-		WaitMax:         DefaultMaxWait,
-		RetryInterval:   DefaultRetryInterval,
-		KillSignal:      "SIGTERM",
-		KillTimeout:     DefaultKillTimeout,
-		CreateDestDirs:  DefaultCreateDestDirs,
-		LogLevel:        DefaultLogLevel,
+		Templates:        []TemplateConfig{},
+		MaxStale:         DefaultMaxStale,
+		WaitMin:          DefaultMinWait,
+		WaitMax:          DefaultMaxWait,
+		RetryInterval:    DefaultRetryInterval,
+		KillSignal:       "SIGTERM",
+		KillTimeout:      DefaultKillTimeout,
+		CreateDestDirs:   DefaultCreateDestDirs,
+		LogLevel:         DefaultLogLevel,
 	}
 }
 

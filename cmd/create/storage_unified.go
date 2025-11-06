@@ -156,7 +156,6 @@ func createStorageUnified(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	return nil
 }
 
-
 func parseVolumeSpecs(volumeSpecs []string) ([]unified.VolumeSpec, error) {
 	volumes := make([]unified.VolumeSpec, 0, len(volumeSpecs))
 

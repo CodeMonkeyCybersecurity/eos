@@ -22,20 +22,20 @@ type BackendSummary struct {
 
 // BackendDetails provides detailed information about a backend
 type BackendDetails struct {
-	ID             string                  `json:"id"`
-	Name           string                  `json:"name"`
-	PublicDomain   string                  `json:"public_domain"`
-	LocalAddress   string                  `json:"local_address"`
-	FrontendDC     string                  `json:"frontend_dc"`
-	BackendDC      string                  `json:"backend_dc"`
-	ConnectionType string                  `json:"connection_type"`
-	Status         string                  `json:"status"`
-	Tunnel         *hybrid.TunnelConfig    `json:"tunnel,omitempty"`
-	Security       *hybrid.SecurityConfig  `json:"security,omitempty"`
-	HealthCheck    *hybrid.HealthCheckDef  `json:"health_check,omitempty"`
-	Metrics        *BackendMetrics         `json:"metrics,omitempty"`
-	Created        time.Time               `json:"created"`
-	Updated        time.Time               `json:"updated"`
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	PublicDomain   string                 `json:"public_domain"`
+	LocalAddress   string                 `json:"local_address"`
+	FrontendDC     string                 `json:"frontend_dc"`
+	BackendDC      string                 `json:"backend_dc"`
+	ConnectionType string                 `json:"connection_type"`
+	Status         string                 `json:"status"`
+	Tunnel         *hybrid.TunnelConfig   `json:"tunnel,omitempty"`
+	Security       *hybrid.SecurityConfig `json:"security,omitempty"`
+	HealthCheck    *hybrid.HealthCheckDef `json:"health_check,omitempty"`
+	Metrics        *BackendMetrics        `json:"metrics,omitempty"`
+	Created        time.Time              `json:"created"`
+	Updated        time.Time              `json:"updated"`
 }
 
 // BackendMetrics contains performance metrics for a backend

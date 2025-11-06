@@ -130,11 +130,11 @@ func SafeWalk(root string, maxDepth int, walkFn SafeWalkFunc) error {
 // WorkerPool manages a pool of safe goroutines with bounded concurrency
 // SECURITY: Prevents goroutine leaks and resource exhaustion
 type WorkerPool struct {
-	workers   int
-	taskCh    chan func()
-	logger    *zap.Logger
-	ctx       context.Context
-	cancelFn  context.CancelFunc
+	workers  int
+	taskCh   chan func()
+	logger   *zap.Logger
+	ctx      context.Context
+	cancelFn context.CancelFunc
 }
 
 // NewWorkerPool creates a new worker pool with bounded concurrency

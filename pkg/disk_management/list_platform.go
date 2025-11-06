@@ -375,7 +375,7 @@ func parseMountOutput(output string) []MountedVolume {
 		if len(parts) >= 4 && parts[1] == "on" {
 			device := parts[0]
 			mountPoint := parts[2]
-			
+
 			// Find filesystem type (after "type")
 			var filesystem string
 			for i, part := range parts {
@@ -389,7 +389,7 @@ func parseMountOutput(output string) []MountedVolume {
 				Device:     device,
 				MountPoint: mountPoint,
 				Filesystem: filesystem,
-				Options:    "",  // Could parse options from the line if needed
+				Options:    "", // Could parse options from the line if needed
 			}
 			volumes = append(volumes, volume)
 		}

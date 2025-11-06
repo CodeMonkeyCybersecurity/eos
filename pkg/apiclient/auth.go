@@ -31,12 +31,12 @@ import (
 
 // DiscoverAuthToken discovers API authentication token using fallback chain
 // PRIORITY ORDER (.env first for next 6 months):
-//   1. .env file (if auth.token_env_file + auth.token_env_var set)
-//   2. Consul KV (if auth.token_consul_key set)
-//   3. Vault (if auth.token_vault_path set)
-//   4. Environment variable (if auth.token_env_var set)
-//   5. Interactive prompt (if TTY available)
-//   6. Error with remediation (if non-interactive)
+//  1. .env file (if auth.token_env_file + auth.token_env_var set)
+//  2. Consul KV (if auth.token_consul_key set)
+//  3. Vault (if auth.token_vault_path set)
+//  4. Environment variable (if auth.token_env_var set)
+//  5. Interactive prompt (if TTY available)
+//  6. Error with remediation (if non-interactive)
 //
 // Parameters:
 //   - rc: RuntimeContext for logging, secrets access
@@ -164,12 +164,12 @@ func DiscoverAuthToken(rc *eos_io.RuntimeContext, auth AuthConfig, service strin
 
 // DiscoverBaseURL discovers API base URL using fallback chain
 // PRIORITY ORDER (same as token):
-//   1. .env file (if auth.base_url_env_file + auth.base_url_env_var set)
-//   2. Consul KV (if auth.base_url_consul_key set)
-//   3. Direct URL (if def.BaseURL set in YAML)
-//   4. Environment variable (if auth.base_url_env_var set)
-//   5. Interactive prompt (if TTY available)
-//   6. Error with remediation (if non-interactive)
+//  1. .env file (if auth.base_url_env_file + auth.base_url_env_var set)
+//  2. Consul KV (if auth.base_url_consul_key set)
+//  3. Direct URL (if def.BaseURL set in YAML)
+//  4. Environment variable (if auth.base_url_env_var set)
+//  5. Interactive prompt (if TTY available)
+//  6. Error with remediation (if non-interactive)
 //
 // Example:
 //

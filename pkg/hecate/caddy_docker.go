@@ -30,17 +30,20 @@ import (
 // GetCaddyContainerIP retrieves the IP address of the Caddy container on the hecate-net bridge network
 //
 // RATIONALE: Caddy Admin API binds to 127.0.0.1 inside container, but that's not accessible from host
-//            Docker SDK provides container's bridge network IP, which IS accessible from host
+//
+//	Docker SDK provides container's bridge network IP, which IS accessible from host
 //
 // ARCHITECTURE:
-//   Host (Eos) → Docker Bridge (172.x.x.x) → Container (hecate-caddy)
-//   Container has BOTH:
-//     - Internal localhost (127.0.0.1) - only accessible inside container
-//     - Bridge IP (172.x.x.x) - accessible from host and other containers
+//
+//	Host (Eos) → Docker Bridge (172.x.x.x) → Container (hecate-caddy)
+//	Container has BOTH:
+//	  - Internal localhost (127.0.0.1) - only accessible inside container
+//	  - Bridge IP (172.x.x.x) - accessible from host and other containers
 //
 // SECURITY: Docker socket access required (/var/run/docker.sock)
-//           Same permissions as `docker inspect hecate-caddy`
-//           Safe: Read-only operation, no container modification
+//
+//	Same permissions as `docker inspect hecate-caddy`
+//	Safe: Read-only operation, no container modification
 //
 // RETURNS:
 //   - Container's IP on hecate-net network (e.g., "172.21.0.5")

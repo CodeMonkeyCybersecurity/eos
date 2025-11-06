@@ -28,9 +28,10 @@ import (
 //   - Post-deployment verification
 //
 // ASSESS → INTERVENE → EVALUATE pattern:
-//   ASSESS: Validate config, check prerequisites, discover environment
-//   INTERVENE: Deploy agent via target-specific method
-//   EVALUATE: Verify deployment, register services, check health
+//
+//	ASSESS: Validate config, check prerequisites, discover environment
+//	INTERVENE: Deploy agent via target-specific method
+//	EVALUATE: Verify deployment, register services, check health
 //
 // Parameters:
 //   - rc: RuntimeContext for logging and cancellation
@@ -286,11 +287,11 @@ func deployViaCloudInit(rc *eos_io.RuntimeContext, config AgentConfig, secretMan
 	// For cloud-init, we return the configuration
 	// The actual deployment happens when the VM boots
 	return &DeploymentResult{
-		Success:      true,
-		AgentID:      config.NodeName,
-		ConfigPath:   "", // Set by caller after writing to disk
-		Message:      "Cloud-init generated successfully (deployment will occur on VM boot)",
-		Warnings:     []string{},
+		Success:    true,
+		AgentID:    config.NodeName,
+		ConfigPath: "", // Set by caller after writing to disk
+		Message:    "Cloud-init generated successfully (deployment will occur on VM boot)",
+		Warnings:   []string{},
 	}, nil
 }
 

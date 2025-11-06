@@ -18,16 +18,16 @@ import (
 // FindComposeProjects searches for Docker Compose projects in specified directories following Assess → Intervene → Evaluate pattern
 func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, searchPaths []string) (*ComposeSearchResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultComposeConfig()
 	}
-	
+
 	if len(searchPaths) == 0 {
 		searchPaths = expandSearchPaths(config)
 	}
-	
+
 	logger.Info("Assessing Docker Compose project search",
 		zap.Strings("search_paths", searchPaths),
 		zap.Int("max_depth", config.MaxDepth))
@@ -51,8 +51,8 @@ func FindComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, searc
 
 		projects, err := searchDirectory(rc, config, rootPath, 0)
 		if err != nil {
-			logger.Warn("Error searching directory", 
-				zap.String("path", rootPath), 
+			logger.Warn("Error searching directory",
+				zap.String("path", rootPath),
 				zap.Error(err))
 			continue
 		}
@@ -109,7 +109,7 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeConfig) (*C
 	}
 
 	// EVALUATE
-	logger.Info("Container listing completed successfully", 
+	logger.Info("Container listing completed successfully",
 		zap.Int("container_count", result.Total))
 
 	return result, nil
@@ -118,16 +118,16 @@ func ListRunningContainers(rc *eos_io.RuntimeContext, config *ComposeConfig) (*C
 // StopAllComposeProjects stops all Docker Compose projects following Assess → Intervene → Evaluate pattern
 func StopAllComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, options *ComposeStopOptions) (*ComposeMultiStopResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultComposeConfig()
 	}
-	
+
 	if options == nil {
 		options = &ComposeStopOptions{}
 	}
-	
+
 	logger.Info("Assessing compose project stop operation",
 		zap.Bool("force", options.Force),
 		zap.Bool("dry_run", options.DryRun))
@@ -156,7 +156,7 @@ func StopAllComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, op
 		logger.Info("Stopping compose projects", zap.Int("project_count", len(searchResult.Projects)))
 	}
 
-	// Handle running containers if configured  
+	// Handle running containers if configured
 	if options.StopContainers {
 		if err := handleRunningContainers(rc, config, options); err != nil {
 			logger.Warn("Failed to handle running containers", zap.Error(err))
@@ -174,7 +174,7 @@ func StopAllComposeProjects(rc *eos_io.RuntimeContext, config *ComposeConfig, op
 
 		operation, err := StopComposeProject(rc, config, project, options)
 		if err != nil {
-			result.Summary.Errors = append(result.Summary.Errors, 
+			result.Summary.Errors = append(result.Summary.Errors,
 				fmt.Sprintf("Failed to stop %s: %v", project.Path, err))
 			result.Summary.ProjectsFailed++
 		} else if operation.Success {
@@ -208,11 +208,11 @@ func StopComposeProject(rc *eos_io.RuntimeContext, config *ComposeConfig, projec
 		_ = config // Prevent ineffassign warning
 		config = DefaultComposeConfig()
 	}
-	
+
 	if options == nil {
 		options = &ComposeStopOptions{}
 	}
-	
+
 	logger.Info("Assessing compose project stop",
 		zap.String("project_path", project.Path),
 		zap.Bool("dry_run", options.DryRun))
@@ -256,8 +256,8 @@ func StopComposeProject(rc *eos_io.RuntimeContext, config *ComposeConfig, projec
 	if err != nil {
 		operation.Success = false
 		operation.Message = fmt.Sprintf("Failed to stop project: %v", err)
-		logger.Error("Compose project stop failed", 
-			zap.String("path", project.Path), 
+		logger.Error("Compose project stop failed",
+			zap.String("path", project.Path),
 			zap.Error(err))
 		return operation, err
 	}
@@ -265,8 +265,8 @@ func StopComposeProject(rc *eos_io.RuntimeContext, config *ComposeConfig, projec
 	// EVALUATE
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully stopped project at %s", project.Path)
-	
-	logger.Info("Compose project stopped successfully", 
+
+	logger.Info("Compose project stopped successfully",
 		zap.String("project_path", project.Path),
 		zap.Duration("duration", operation.Duration))
 
@@ -347,7 +347,6 @@ func searchDirectory(rc *eos_io.RuntimeContext, config *ComposeConfig, rootPath 
 	return projects, nil
 }
 
-
 func isComposeFile(filename string) bool {
 	composeFiles := []string{
 		"docker-compose.yml",
@@ -375,10 +374,10 @@ func isExcluded(config *ComposeConfig, name string) bool {
 
 func getProjectStatus(rc *eos_io.RuntimeContext, project ComposeProject) string {
 	composeFilePath := filepath.Join(project.Path, project.ComposeFile)
-	
+
 	cmd := exec.CommandContext(rc.Ctx, "docker-compose", "-f", composeFilePath, "ps", "-q")
 	cmd.Dir = project.Path
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return "unknown"
@@ -410,7 +409,7 @@ func getProjectStatus(rc *eos_io.RuntimeContext, project ComposeProject) string 
 func parseContainerList(output string) ([]ContainerInfo, error) {
 	var containers []ContainerInfo
 	scanner := bufio.NewScanner(strings.NewReader(output))
-	
+
 	// Skip header line
 	if scanner.Scan() {
 		// Header: CONTAINER ID   NAMES   IMAGE   STATUS   PORTS   LABELS

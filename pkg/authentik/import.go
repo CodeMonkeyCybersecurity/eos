@@ -65,7 +65,6 @@ This helps identify differences before migration or to audit changes.`,
 	RunE: runCompare,
 }
 
-
 func init() {
 	// Import command flags
 	importCmd.Flags().String("url", "", "Target Authentik API URL (required)")

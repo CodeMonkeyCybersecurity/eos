@@ -63,8 +63,6 @@ func (m *MockClient) Get(ctx context.Context, target string, key string) (map[st
 	return nil, errors.New("not implemented in mock")
 }
 
-
-
 func (m *MockClient) IsAPIAvailable(ctx context.Context) bool {
 	return false // Default to local mode for tests
 }

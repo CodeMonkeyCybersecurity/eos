@@ -28,8 +28,8 @@ import (
 // ARCHITECTURE: Loads YAML definition → Discovers auth → Delegates to HTTPClient
 // RESPONSIBILITY: Business logic ONLY - HTTP transport delegated to service clients
 type Executor struct {
-	definition *APIDefinition       // Loaded from YAML
-	httpClient HTTPClient            // Service-specific transport (e.g., authentik.UnifiedClient)
+	definition *APIDefinition         // Loaded from YAML
+	httpClient HTTPClient             // Service-specific transport (e.g., authentik.UnifiedClient)
 	rc         *eos_io.RuntimeContext // For logging, tracing, secrets
 }
 

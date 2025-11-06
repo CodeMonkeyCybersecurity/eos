@@ -72,19 +72,19 @@ const (
 
 // DistributionInfo contains detailed distribution information
 type DistributionInfo struct {
-	ID              string              `json:"id"`
-	Name            string              `json:"name"`
-	Version         string              `json:"version"`
-	VersionID       string              `json:"version_id"`
-	PrettyName      string              `json:"pretty_name"`
-	VersionCodename string              `json:"version_codename"`
-	HomeURL          string              `json:"home_url"`
-	SupportURL       string              `json:"support_url"`
-	BugReportURL     string              `json:"bug_report_url"`
-	PrivacyPolicyURL string              `json:"privacy_policy_url"`
-	Family           DistroFamily        `json:"family"`
-	PackageManager   PackageManagerType  `json:"package_manager"`
-	ServiceManager   ServiceManagerType  `json:"service_manager"`
+	ID               string             `json:"id"`
+	Name             string             `json:"name"`
+	Version          string             `json:"version"`
+	VersionID        string             `json:"version_id"`
+	PrettyName       string             `json:"pretty_name"`
+	VersionCodename  string             `json:"version_codename"`
+	HomeURL          string             `json:"home_url"`
+	SupportURL       string             `json:"support_url"`
+	BugReportURL     string             `json:"bug_report_url"`
+	PrivacyPolicyURL string             `json:"privacy_policy_url"`
+	Family           DistroFamily       `json:"family"`
+	PackageManager   PackageManagerType `json:"package_manager"`
+	ServiceManager   ServiceManagerType `json:"service_manager"`
 }
 
 // ArchitectureInfo contains architecture information

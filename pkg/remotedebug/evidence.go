@@ -17,39 +17,39 @@ import (
 type EvidenceType string
 
 const (
-	EvidenceTypeFile      EvidenceType = "file"       // File system evidence
-	EvidenceTypeCommand   EvidenceType = "command"    // Command output
-	EvidenceTypeLogEntry  EvidenceType = "log"        // Log file entry
-	EvidenceTypeMetric    EvidenceType = "metric"     // System metric
-	EvidenceTypeConfig    EvidenceType = "config"     // Configuration file
-	EvidenceTypeProcess   EvidenceType = "process"    // Process information
-	EvidenceTypeNetwork   EvidenceType = "network"    // Network state
-	EvidenceTypeSnapshot  EvidenceType = "snapshot"   // System snapshot
+	EvidenceTypeFile     EvidenceType = "file"     // File system evidence
+	EvidenceTypeCommand  EvidenceType = "command"  // Command output
+	EvidenceTypeLogEntry EvidenceType = "log"      // Log file entry
+	EvidenceTypeMetric   EvidenceType = "metric"   // System metric
+	EvidenceTypeConfig   EvidenceType = "config"   // Configuration file
+	EvidenceTypeProcess  EvidenceType = "process"  // Process information
+	EvidenceTypeNetwork  EvidenceType = "network"  // Network state
+	EvidenceTypeSnapshot EvidenceType = "snapshot" // System snapshot
 )
 
 // StructuredEvidence represents a single piece of evidence with metadata
 type StructuredEvidence struct {
-	Type      EvidenceType      `json:"type"`                // Type of evidence
-	Timestamp time.Time         `json:"timestamp"`           // When collected
-	Source    string            `json:"source"`              // Where from (hostname/IP)
-	Collector string            `json:"collector"`           // Who collected (user@host)
-	Data      json.RawMessage   `json:"data"`                // Actual evidence (structured JSON)
-	Checksum  string            `json:"checksum"`            // SHA256 for integrity verification
-	Metadata  map[string]string `json:"metadata,omitempty"`  // Additional context
+	Type      EvidenceType      `json:"type"`               // Type of evidence
+	Timestamp time.Time         `json:"timestamp"`          // When collected
+	Source    string            `json:"source"`             // Where from (hostname/IP)
+	Collector string            `json:"collector"`          // Who collected (user@host)
+	Data      json.RawMessage   `json:"data"`               // Actual evidence (structured JSON)
+	Checksum  string            `json:"checksum"`           // SHA256 for integrity verification
+	Metadata  map[string]string `json:"metadata,omitempty"` // Additional context
 }
 
 // EvidenceSession represents a complete evidence collection session
 type EvidenceSession struct {
-	SessionID   string               `json:"session_id"`   // Unique session identifier
-	StartTime   time.Time            `json:"start_time"`   // Session start
-	EndTime     time.Time            `json:"end_time"`     // Session end
-	Host        string               `json:"host"`         // Target hostname
-	Collector   string               `json:"collector"`    // Who ran the collection
-	Command     string               `json:"command"`      // Command that triggered collection
-	Evidence    []StructuredEvidence `json:"evidence"`     // All collected evidence
-	Issues      []Issue              `json:"issues"`       // Detected issues
-	Warnings    []Warning            `json:"warnings"`     // Warnings
-	Report      *SystemReport        `json:"report"`       // Complete system report
+	SessionID string               `json:"session_id"` // Unique session identifier
+	StartTime time.Time            `json:"start_time"` // Session start
+	EndTime   time.Time            `json:"end_time"`   // Session end
+	Host      string               `json:"host"`       // Target hostname
+	Collector string               `json:"collector"`  // Who ran the collection
+	Command   string               `json:"command"`    // Command that triggered collection
+	Evidence  []StructuredEvidence `json:"evidence"`   // All collected evidence
+	Issues    []Issue              `json:"issues"`     // Detected issues
+	Warnings  []Warning            `json:"warnings"`   // Warnings
+	Report    *SystemReport        `json:"report"`     // Complete system report
 }
 
 // EvidenceRepository manages evidence storage and retrieval
@@ -90,12 +90,12 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	// Write manifest.json (session metadata)
 	manifestPath := filepath.Join(sessionDir, "manifest.json")
 	manifestData, err := json.MarshalIndent(map[string]interface{}{
-		"session_id":  session.SessionID,
-		"start_time":  session.StartTime,
-		"end_time":    session.EndTime,
-		"host":        session.Host,
-		"collector":   session.Collector,
-		"command":     session.Command,
+		"session_id":     session.SessionID,
+		"start_time":     session.StartTime,
+		"end_time":       session.EndTime,
+		"host":           session.Host,
+		"collector":      session.Collector,
+		"command":        session.Command,
 		"evidence_count": len(session.Evidence),
 		"issue_count":    len(session.Issues),
 		"warning_count":  len(session.Warnings),

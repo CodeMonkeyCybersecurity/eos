@@ -24,14 +24,14 @@ type ValidatorConfig struct {
 
 // ValidationResult holds the result of a validation operation
 type ValidationResult struct {
-	Component    string             `json:"component"`
-	Valid        bool               `json:"valid"`
-	ChecksPassed int                `json:"checks_passed"`
-	Errors       []string           `json:"errors"`
-	Warnings     []string           `json:"warnings"`
-	Suggestions  []string           `json:"suggestions"`
-	Checks       []ValidationCheck  `json:"checks"`
-	Duration     time.Duration      `json:"duration"`
+	Component    string            `json:"component"`
+	Valid        bool              `json:"valid"`
+	ChecksPassed int               `json:"checks_passed"`
+	Errors       []string          `json:"errors"`
+	Warnings     []string          `json:"warnings"`
+	Suggestions  []string          `json:"suggestions"`
+	Checks       []ValidationCheck `json:"checks"`
+	Duration     time.Duration     `json:"duration"`
 }
 
 // ValidationCheck represents an individual validation check
@@ -66,12 +66,12 @@ func (bv *BuildValidator) ValidateComponent(rc *eos_io.RuntimeContext, component
 		zap.Bool("strict", bv.config.Strict))
 
 	result := &ValidationResult{
-		Component: componentName,
-		Valid:     true,
-		Errors:    []string{},
-		Warnings:  []string{},
+		Component:   componentName,
+		Valid:       true,
+		Errors:      []string{},
+		Warnings:    []string{},
 		Suggestions: []string{},
-		Checks:    []ValidationCheck{},
+		Checks:      []ValidationCheck{},
 	}
 
 	// Assessment: Define validation checks
@@ -122,10 +122,10 @@ func (bv *BuildValidator) ValidateWorkspace(rc *eos_io.RuntimeContext) (*Validat
 	logger.Info("Validating workspace")
 
 	result := &ValidationResult{
-		Component: "workspace",
-		Valid:     true,
-		Errors:    []string{},
-		Warnings:  []string{},
+		Component:   "workspace",
+		Valid:       true,
+		Errors:      []string{},
+		Warnings:    []string{},
 		Suggestions: []string{},
 	}
 

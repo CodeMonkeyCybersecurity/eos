@@ -96,14 +96,14 @@ func GetPrimaryInterface() (*InterfaceInfo, error) {
 // IsVirtualInterface checks if an interface is virtual/non-physical
 func IsVirtualInterface(ifaceName string) bool {
 	virtualPrefixes := []string{
-		"docker",  // Docker bridge
-		"virbr",   // libvirt/KVM bridge
-		"veth",    // Virtual ethernet (containers)
-		"br-",     // Docker custom bridges
-		"lxc",     // LXC containers
-		"tun",     // VPN tunnels
-		"tap",     // VPN taps
-		"wg",      // WireGuard VPN
+		"docker",    // Docker bridge
+		"virbr",     // libvirt/KVM bridge
+		"veth",      // Virtual ethernet (containers)
+		"br-",       // Docker custom bridges
+		"lxc",       // LXC containers
+		"tun",       // VPN tunnels
+		"tap",       // VPN taps
+		"wg",        // WireGuard VPN
 		"tailscale", // Tailscale VPN
 	}
 

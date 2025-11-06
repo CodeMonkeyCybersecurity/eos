@@ -504,7 +504,7 @@ func validateOutputPath(path string) error {
 
 	// Clean the path and check it hasn't changed
 	cleanPath := filepath.Clean(path)
-	if cleanPath != path && path != "./" + cleanPath {
+	if cleanPath != path && path != "./"+cleanPath {
 		// Allow relative paths that get cleaned (e.g., "./file" -> "file")
 		if !strings.HasPrefix(path, "./") || cleanPath != strings.TrimPrefix(path, "./") {
 			return fmt.Errorf("output path contains unsafe elements")

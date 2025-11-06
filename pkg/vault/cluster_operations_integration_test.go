@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package vault
@@ -313,7 +314,7 @@ func TestTokenFileLeak_MultipleOperations(t *testing.T) {
 
 	// Should not have accumulated token files
 	leaked := afterCount - beforeCount
-	if leaked > 5 {  // Allow small variance
+	if leaked > 5 { // Allow small variance
 		t.Errorf("Token file leak detected: %d files leaked", leaked)
 	}
 

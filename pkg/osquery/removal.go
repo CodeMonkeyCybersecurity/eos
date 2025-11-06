@@ -97,7 +97,7 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 	// Stop and disable service if it exists
 	if state.ServiceExists {
 		logger.Info("Stopping and disabling osqueryd service")
-		
+
 		// Stop service
 		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "systemctl",
@@ -127,7 +127,7 @@ func removeOsqueryComponents(rc *eos_io.RuntimeContext, state *OsqueryState, kee
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", "osquery"); err != nil {
 			logger.Warn("Failed to remove osquery package", zap.Error(err))
 		}
-		
+
 		// Purge configuration
 		if !keepData {
 			_ = execute.RunSimple(rc.Ctx, "apt-get", "purge", "-y", "osquery")

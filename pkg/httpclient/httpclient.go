@@ -32,9 +32,9 @@ func init() {
 				MaxRetries: 0, // No retries in fallback
 			},
 			PoolConfig: &PoolConfig{
-				MaxIdleConns:    10,
-				DialTimeout:     5 * time.Second,
-				KeepAlive:       30 * time.Second,
+				MaxIdleConns: 10,
+				DialTimeout:  5 * time.Second,
+				KeepAlive:    30 * time.Second,
 			},
 			LogConfig: &LogConfig{},
 		}
@@ -51,7 +51,6 @@ func DefaultClient() *Client {
 func DefaultHTTPClient() *http.Client {
 	return defaultClient.httpClient
 }
-
 
 // SetDefaultClient allows replacing the default client for testing purposes
 func SetDefaultClient(client *Client) {

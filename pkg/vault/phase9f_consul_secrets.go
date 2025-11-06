@@ -73,7 +73,7 @@ func PhaseEnableConsulSecretsEngine(rc *eos_io.RuntimeContext, vaultClient *vaul
 	config := &ConsulSecretsEngineConfig{
 		ConsulAddress: consulConfig.Address,
 		ConsulScheme:  "http",
-		ConsulToken:   "", // Will be configured later by operator
+		ConsulToken:   "",             // Will be configured later by operator
 		Roles:         []ConsulRole{}, // Roles will be created after token is configured
 		DefaultTTL:    "1h",
 		MaxTTL:        "24h",

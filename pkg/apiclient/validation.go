@@ -208,7 +208,7 @@ func validateFloat(value string) error {
 // validateEnum validates an enum value against allowed values list
 func validateEnum(value string, allowedValues []string) error {
 	if value == "" {
-		return fmt.Errorf("enum value cannot be empty\n" +
+		return fmt.Errorf("enum value cannot be empty\n"+
 			"Allowed values: %s",
 			strings.Join(allowedValues, ", "))
 	}

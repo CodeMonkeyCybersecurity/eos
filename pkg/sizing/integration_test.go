@@ -27,7 +27,7 @@ func TestPreflightCheck(t *testing.T) {
 
 	// Run preflight check (should pass on most systems)
 	err := PreflightCheck(rc, services, workload)
-	
+
 	// We don't assert no error because it depends on the test machine's resources
 	// Instead, we just verify the function runs without panic
 	if err != nil {
@@ -49,7 +49,7 @@ func TestPostflightValidation(t *testing.T) {
 
 	// Run postflight validation
 	err := PostflightValidation(rc, services)
-	
+
 	// We expect this to return an error since the services aren't actually deployed
 	// but we verify it runs without panic
 	if err != nil {
@@ -66,15 +66,15 @@ func TestSystemResourceDetection(t *testing.T) {
 	// Test system resource detection
 	resources, err := getSystemResources(rc)
 	require.NoError(t, err)
-	
+
 	// Verify we got reasonable values
 	assert.Greater(t, resources.CPU.Cores, float64(0))
 	assert.Greater(t, resources.Memory.GB, float64(0))
 	assert.Greater(t, resources.Disk.GB, float64(0))
-	
+
 	// Verify disk type detection
 	assert.Contains(t, []string{"ssd", "hdd", "nvme"}, resources.Disk.Type)
-	
+
 	t.Logf("Detected system resources: CPU=%.1f cores, Memory=%.1f GB, Disk=%.1f GB (%s)",
 		resources.CPU.Cores, resources.Memory.GB, resources.Disk.GB, resources.Disk.Type)
 }
@@ -88,16 +88,16 @@ func TestMetricsCollection(t *testing.T) {
 	// Test metrics collection
 	metrics, err := collectSystemMetrics(rc)
 	require.NoError(t, err)
-	
+
 	// Verify we got reasonable values
 	assert.GreaterOrEqual(t, metrics.CPUUsage, float64(0))
 	assert.LessOrEqual(t, metrics.CPUUsage, float64(100))
-	
+
 	assert.GreaterOrEqual(t, metrics.MemoryUsage, float64(0))
 	assert.LessOrEqual(t, metrics.MemoryUsage, float64(100))
-	
+
 	assert.GreaterOrEqual(t, metrics.LoadAverage, float64(0))
-	
+
 	t.Logf("Current system metrics: CPU=%.1f%%, Memory=%.1f%%, Load=%.2f",
 		metrics.CPUUsage, metrics.MemoryUsage, metrics.LoadAverage)
 }

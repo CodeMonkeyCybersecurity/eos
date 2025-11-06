@@ -33,10 +33,10 @@ func SanitizeName(name string) string {
 	if len(name) > 255 {
 		name = name[:255]
 	}
-	
+
 	// Remove forbidden characters (including null bytes and control characters)
 	clean := forbidden.ReplaceAllString(name, "_")
-	
+
 	// Remove trailing spaces or dots
 	clean = strings.TrimRight(clean, " .")
 

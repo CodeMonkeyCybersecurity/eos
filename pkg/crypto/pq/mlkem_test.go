@@ -213,8 +213,8 @@ func TestValidateMLKEMPublicKey(t *testing.T) {
 
 	t.Run("invalid_sizes", func(t *testing.T) {
 		testCases := []struct {
-			size     int
-			name     string
+			size int
+			name string
 		}{
 			{0, "empty"},
 			{1183, "one_byte_short"},
@@ -519,7 +519,7 @@ func TestRealWorldScenarios(t *testing.T) {
 		// Simulate key rotation every N operations
 		const rotationInterval = 3
 		var currentKeypair *MLKEMKeypair
-		
+
 		for i := 0; i < 10; i++ {
 			// Rotate keys at interval
 			if i%rotationInterval == 0 {
@@ -626,7 +626,7 @@ func TestAPICompatibility(t *testing.T) {
 
 	t.Run("info_completeness", func(t *testing.T) {
 		info := GetMLKEMInfo()
-		
+
 		// Verify all expected fields are present
 		requiredFields := []string{
 			"algorithm", "standard", "security_level",

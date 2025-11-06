@@ -37,7 +37,7 @@ func init() {
 func rollbackAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	backupPath := args[0]
 	_ = backupPath // Use backupPath in the implementation
-	
+
 	// Implementation will be moved from the rollback functionality
 	// This is a placeholder that matches the expected function signature
 	return fmt.Errorf("not implemented")

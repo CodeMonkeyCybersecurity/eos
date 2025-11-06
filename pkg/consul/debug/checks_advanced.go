@@ -36,10 +36,10 @@ import (
 //   - If this fails, ALL other checks are meaningless
 //
 // Methodology:
-//   1. Check if `consul` process exists (pgrep)
-//   2. Show process details (ps aux)
-//   3. Verify process is Consul agent (not just `consul` command)
-//   4. Show listening ports (lsof/ss) to confirm service is active
+//  1. Check if `consul` process exists (pgrep)
+//  2. Show process details (ps aux)
+//  3. Verify process is Consul agent (not just `consul` command)
+//  4. Show listening ports (lsof/ss) to confirm service is active
 //
 // Returns:
 //   - SUCCESS: Consul process running and appears healthy
@@ -335,11 +335,11 @@ func identifyConsulPort(port int) string {
 //   - Shows which operations are blocked vs. allowed
 //
 // Methodology:
-//   1. Test API without token (baseline - should fail with "Permission denied" if ACLs on)
-//   2. Try to get token from CONSUL_HTTP_TOKEN environment variable
-//   3. Try to get token from Vault at secret/consul/bootstrap-token
-//   4. Test API with token (should succeed if token valid)
-//   5. Verify token permissions by reading token metadata
+//  1. Test API without token (baseline - should fail with "Permission denied" if ACLs on)
+//  2. Try to get token from CONSUL_HTTP_TOKEN environment variable
+//  3. Try to get token from Vault at secret/consul/bootstrap-token
+//  4. Test API with token (should succeed if token valid)
+//  5. Verify token permissions by reading token metadata
 //
 // Returns:
 //   - SUCCESS: API accessible with valid token
@@ -689,12 +689,13 @@ func getTokenFromConsulConfig(rc *eos_io.RuntimeContext) string {
 //   - Checks token has required permissions (agent:write, node:write)
 //
 // Why this matters:
-//   Agent without token cannot:
-//     - Register services
-//     - Update health checks
-//     - Perform anti-entropy
-//     - Sync cluster state
-//   Results in "Permission denied" errors that are hard to diagnose
+//
+//	Agent without token cannot:
+//	  - Register services
+//	  - Update health checks
+//	  - Perform anti-entropy
+//	  - Sync cluster state
+//	Results in "Permission denied" errors that are hard to diagnose
 //
 // Returns:
 //   - SUCCESS: Agent has valid token configured
@@ -928,6 +929,7 @@ func min(a, b int) int {
 //   - SUCCESS: Raft state accessible and shows current index
 //   - WARNING: Raft state inaccessible, using fallback methods
 //   - INFO: Raft inspection not available (expected without token)
+//
 // checkRaftBootstrapState inspects Raft state for ACL bootstrap information
 // Accepts optional authenticated Consul client (pass nil if client creation failed)
 func checkRaftBootstrapState(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {
@@ -1057,6 +1059,7 @@ func checkRaftBootstrapState(rc *eos_io.RuntimeContext, consulClient *consulapi.
 //   - SUCCESS: Service registration/discovery working
 //   - WARNING: Service operations failing (check ACL permissions)
 //   - CRITICAL: Consul catalog unavailable (severe)
+//
 // checkConsulServiceDiscovery tests service registration and discovery
 // Accepts authenticated Consul client (required for ACL-protected catalog operations)
 func checkConsulServiceDiscovery(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {

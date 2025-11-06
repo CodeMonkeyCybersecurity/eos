@@ -18,7 +18,7 @@ import (
 // InstallCodeServer installs code-server for the specified user
 func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if already installed
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -32,10 +32,10 @@ func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Download and install code-server
 	logger.Info("Downloading code-server", zap.String("version", CodeServerVersion))
-	
+
 	debURL := fmt.Sprintf(CodeServerURL, CodeServerVersion, CodeServerVersion)
 	debFile := fmt.Sprintf("/tmp/code-server_%s_amd64.deb", CodeServerVersion)
-	
+
 	// Download the deb file
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
@@ -60,7 +60,7 @@ func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 			Args:    []string{"install", "-f", "-y"},
 			Timeout: InstallTimeout,
 		})
-		
+
 		// Retry installation
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "dpkg",
@@ -78,21 +78,21 @@ func InstallCodeServer(rc *eos_io.RuntimeContext, config *Config) error {
 // ConfigureCodeServer configures code-server for the user and returns access information
 func ConfigureCodeServer(rc *eos_io.RuntimeContext, config *Config) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create config directory for user
 	userHome := fmt.Sprintf("/home/%s", config.User)
 	if config.User == "root" {
 		userHome = "/root"
 	}
-	
+
 	configDir := filepath.Join(userHome, ".config", "code-server")
 	configFile := filepath.Join(configDir, "config.yaml")
-	
+
 	// Create directory with proper ownership
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Set ownership
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "chown",
@@ -140,7 +140,7 @@ cert: false
 	// Enable and start the service
 	logger.Info("Enabling code-server service")
 	serviceName := fmt.Sprintf("code-server@%s", config.User)
-	
+
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
 		Args:    []string{"enable", serviceName},
@@ -166,11 +166,11 @@ cert: false
 	accessInfo.WriteString("================================\n")
 	accessInfo.WriteString(fmt.Sprintf("Password: %s\n\n", password))
 	accessInfo.WriteString("Access URLs:\n")
-	
+
 	for _, ip := range ipAddresses {
 		accessInfo.WriteString(fmt.Sprintf("  • http://%s:%d\n", ip, CodeServerPort))
 	}
-	
+
 	if isTailscaleIP := findTailscaleIP(ipAddresses); isTailscaleIP != "" {
 		accessInfo.WriteString(fmt.Sprintf("\nTailscale URL: http://%s:%d\n", isTailscaleIP, CodeServerPort))
 	}
@@ -181,15 +181,15 @@ cert: false
 // InstallClaudeExtension installs the Claude Code extension
 func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// We need to install the extension as the user
 	// The extension ID for Claude Code is: anthropic.claude-code
-	
+
 	logger.Info("Installing Claude Code extension")
-	
+
 	// Run code-server command to install extension
 	installCmd := fmt.Sprintf("sudo -u %s code-server --install-extension anthropic.claude-code", config.User)
-	
+
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "bash",
 		Args:    []string{"-c", installCmd},
@@ -197,29 +197,29 @@ func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 	}); err != nil {
 		// Try alternative approach - download and install manually
 		logger.Debug("Direct installation failed, trying manual approach")
-		
+
 		// Get extension directory
 		userHome := fmt.Sprintf("/home/%s", config.User)
 		if config.User == "root" {
 			userHome = "/root"
 		}
 		extensionDir := filepath.Join(userHome, ".local", "share", "code-server", "extensions")
-		
+
 		// Create directory
 		if err := os.MkdirAll(extensionDir, 0755); err != nil {
 			return fmt.Errorf("failed to create extensions directory: %w", err)
 		}
-		
+
 		// Set ownership
 		_, _ = execute.Run(rc.Ctx, execute.Options{
 			Command: "chown",
 			Args:    []string{"-R", fmt.Sprintf("%s:%s", config.User, config.User), filepath.Join(userHome, ".local")},
 			Timeout: 5 * time.Second,
 		})
-		
+
 		return fmt.Errorf("automatic installation failed, please install Claude Code extension manually from VS Code marketplace")
 	}
-	
+
 	logger.Info("Claude Code extension installed successfully")
 	return nil
 }
@@ -260,9 +260,9 @@ func getServerIPAddresses(rc *eos_io.RuntimeContext) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	ips := strings.Fields(output)
-	
+
 	// Also get hostname
 	hostname, _ := execute.Run(rc.Ctx, execute.Options{
 		Command: "hostname",
@@ -270,11 +270,11 @@ func getServerIPAddresses(rc *eos_io.RuntimeContext) ([]string, error) {
 		Timeout: 5 * time.Second,
 	})
 	hostname = strings.TrimSpace(hostname)
-	
+
 	if hostname != "" && hostname != "localhost" {
 		ips = append([]string{hostname}, ips...)
 	}
-	
+
 	return ips, nil
 }
 
