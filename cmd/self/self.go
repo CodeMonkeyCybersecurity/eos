@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/test"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/enrollment"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
@@ -63,6 +64,7 @@ func init() {
 	// Add subcommands to SelfCmd
 	SelfCmd.AddCommand(UpdateCmd)
 	SelfCmd.AddCommand(EnrollCmd)
+	SelfCmd.AddCommand(test.TestCmd)
 
 	// Setup UpdateCmd flags
 	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", true, "Update system packages (apt/yum/dnf/pacman)")

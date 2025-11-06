@@ -59,7 +59,7 @@ func TestHashPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			hash, err := HashPassword(tt.password)
 
 			if tt.expectError {
@@ -132,7 +132,7 @@ func TestHashPasswordWithCost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			hash, err := HashPasswordWithCost(tt.password, tt.cost)
 
 			if tt.expectError {
@@ -209,7 +209,7 @@ func TestComparePassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ComparePassword(tt.hash, tt.password)
 
 			if tt.expectError {
@@ -268,7 +268,7 @@ func TestComparePasswordBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ComparePasswordBool(tt.hash, tt.password)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -334,7 +334,7 @@ func TestIsHashCostWeak(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := IsHashCostWeak(tt.hash, tt.minCost)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -392,7 +392,7 @@ func TestComparePasswordLogging(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ComparePasswordLogging(tt.hash, tt.password, tt.logger)
 			assert.Equal(t, tt.expected, result)
 		})

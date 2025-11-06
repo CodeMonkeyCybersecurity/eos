@@ -56,7 +56,7 @@ func TestHashString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := HashString(tt.input)
 
 			// Basic validation
@@ -128,7 +128,7 @@ func TestHashStrings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := HashStrings(tt.inputs)
 
 			// Length should match input length
@@ -212,7 +212,7 @@ func TestAllUnique(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := AllUnique(tt.items)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -286,7 +286,7 @@ func TestAllHashesPresent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := AllHashesPresent(tt.hashes, tt.known)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -347,7 +347,7 @@ func TestInjectSecretsFromPlaceholders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result, replacements, err := InjectSecretsFromPlaceholders([]byte(tt.input))
 
 			if tt.shouldError {
@@ -425,7 +425,7 @@ func TestSecureZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Make a copy to verify original data
 			original := make([]byte, len(tt.data))
 			copy(original, tt.data)

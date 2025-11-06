@@ -99,7 +99,7 @@ func TestPrintError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Set debug mode for this test
 			debugMode = tt.debugMode
 
@@ -143,7 +143,7 @@ func TestPrintError_DebugMode(t *testing.T) {
 	// We'll verify the debug mode detection works correctly
 
 	t.Run("debug_enabled_check", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		debugMode = true
 		if !DebugEnabled() {
 			t.Error("debug should be enabled")
@@ -167,7 +167,7 @@ func TestExitWithError_Components(t *testing.T) {
 	// But we can test its components and verify the output it would produce
 
 	t.Run("output_before_exit", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Save original debug mode
 		originalDebug := debugMode
 		defer func() { debugMode = originalDebug }()
@@ -192,7 +192,7 @@ func TestExitWithError_Components(t *testing.T) {
 	})
 
 	t.Run("debug_tip_format", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that the debug tip would be correctly formatted
 		expectedTip := " Tip: rerun with --debug for more details."
 
@@ -214,7 +214,7 @@ func TestExitWithError_Integration(t *testing.T) {
 	// We simulate what ExitWithError does step by step
 
 	t.Run("full_flow_simulation", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Save original debug mode
 		originalDebug := debugMode
 		defer func() { debugMode = originalDebug }()
@@ -250,7 +250,7 @@ func TestExitWithError_Integration(t *testing.T) {
 	})
 
 	t.Run("user_error_exit_flow", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test ExitWithError with a user error
 		originalDebug := debugMode
 		defer func() { debugMode = originalDebug }()

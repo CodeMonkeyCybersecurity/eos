@@ -134,7 +134,7 @@ func TestUsernameValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ValidateUsername(tt.username)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -199,7 +199,7 @@ func TestPasswordValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidatePassword(tt.password)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -290,7 +290,7 @@ func TestEmailValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ValidateEmail(tt.email)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -359,7 +359,7 @@ func TestAPIKeyValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ValidateAPIKey(tt.apiKey)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -427,7 +427,7 @@ func TestJWTStructureValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ValidateJWTStructure(rc, tt.token)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -491,7 +491,7 @@ func TestSessionIDValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := ValidateSessionID(tt.sessionID)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -504,7 +504,7 @@ func TestAuthenticationFlow(t *testing.T) {
 	mockProvider := new(MockAuthProvider)
 
 	t.Run("successful authentication", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		credentials := map[string]string{
 			"username": "testuser",
@@ -531,7 +531,7 @@ func TestAuthenticationFlow(t *testing.T) {
 	})
 
 	t.Run("invalid credentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		credentials := map[string]string{
 			"username": "testuser",
@@ -548,7 +548,7 @@ func TestAuthenticationFlow(t *testing.T) {
 	})
 
 	t.Run("missing credentials", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		credentials := map[string]string{
 			"username": "",
@@ -570,7 +570,7 @@ func TestTokenValidation(t *testing.T) {
 	mockProvider := new(MockAuthProvider)
 
 	t.Run("valid token", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		token := generateTestToken()
 
@@ -593,7 +593,7 @@ func TestTokenValidation(t *testing.T) {
 	})
 
 	t.Run("expired token", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		token := generateTestToken()
 
@@ -614,7 +614,7 @@ func TestTokenValidation(t *testing.T) {
 	})
 
 	t.Run("invalid token", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		token := "invalid-token"
 
@@ -627,7 +627,7 @@ func TestTokenValidation(t *testing.T) {
 	})
 
 	t.Run("revoked token", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		token := generateTestToken()
 
@@ -707,7 +707,7 @@ func TestPasswordHashing(t *testing.T) {
 
 	for _, password := range passwords {
 		t.Run("hash and verify "+password[:4]+"...", func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Hash the password
 			hash, err := HashPassword(password)
 			assert.NoError(t, err)
@@ -746,7 +746,7 @@ func TestSessionManagement(t *testing.T) {
 	})
 
 	t.Run("session expiration", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		session := &Session{
 			ID:        generateSessionID(),
 			UserID:    "user123",
@@ -758,7 +758,7 @@ func TestSessionManagement(t *testing.T) {
 	})
 
 	t.Run("concurrent session creation", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		var wg sync.WaitGroup
 		sessions := make(map[string]bool)
 		mu := sync.Mutex{}
@@ -790,7 +790,7 @@ func TestRateLimiting(t *testing.T) {
 	limiter := NewRateLimiter(3, time.Minute) // 3 attempts per minute
 
 	t.Run("within limit", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		userID := "user123"
 
 		for i := 0; i < 3; i++ {
@@ -800,7 +800,7 @@ func TestRateLimiting(t *testing.T) {
 	})
 
 	t.Run("exceeds limit", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		userID := "user456"
 
 		// First 3 attempts should succeed
@@ -815,7 +815,7 @@ func TestRateLimiting(t *testing.T) {
 	})
 
 	t.Run("different users", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Each user has their own limit
 		for i := 0; i < 5; i++ {
 			userID := "user" + string(rune(i))

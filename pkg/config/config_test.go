@@ -81,7 +81,7 @@ user = "testuser"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Create a new viper instance for isolation
 			oldConfig := Config
 			Config = viper.New()
@@ -124,7 +124,7 @@ func TestMustLoadConfig(t *testing.T) {
 	})
 
 	t.Run("invalid config path", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Create a new viper instance for isolation
 		oldConfig := Config
 		Config = viper.New()
@@ -213,7 +213,7 @@ func TestBindEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Set environment variable
 			_ = os.Setenv(tt.envVar, tt.value)
 			defer func() { _ = os.Unsetenv(tt.envVar) }()
@@ -314,7 +314,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test GetString with required flag
 	t.Run("GetString", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		Config.Set("test.string", "value")
 		assert.Equal(t, "value", GetString("test.string", false))
 		assert.Equal(t, "", GetString("nonexistent", false))
@@ -327,7 +327,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test GetDuration
 	t.Run("GetDuration", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		Config.Set("test.duration", "5m")
 		assert.Equal(t, 5*time.Minute, GetDuration("test.duration", 0))
 		assert.Equal(t, 10*time.Second, GetDuration("nonexistent", 10*time.Second))
@@ -336,7 +336,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test viper's built-in getters
 	t.Run("ViperGetters", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		Config.Set("test.bool", true)
 		Config.Set("test.int", 42)
 		Config.Set("test.slice", []string{"a", "b", "c"})
@@ -358,7 +358,7 @@ func TestRequiredConfig(t *testing.T) {
 	Config.Set("existing.key", "value")
 
 	t.Run("Require", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		err := Require("existing.key")
 		assert.NoError(t, err)
 
@@ -373,7 +373,7 @@ func TestRequiredConfig(t *testing.T) {
 	})
 
 	t.Run("MustRequire", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		Config.Set("test.key", "value")
 
 		// Should not panic
@@ -716,7 +716,7 @@ func TestConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Create a new viper instance for isolation
 			oldConfig := Config
 			Config = viper.New()

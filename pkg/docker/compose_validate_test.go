@@ -374,7 +374,7 @@ func TestErrorMessagesIncludeRemediation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			composeFile := filepath.Join(tempDir, "test-"+tt.name+".yml")
 			if err := os.WriteFile(composeFile, []byte(tt.composeContent), 0644); err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
@@ -460,7 +460,7 @@ KEY2=value2
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			tempDir := t.TempDir()
 			envFile := filepath.Join(tempDir, ".env")
 			if err := os.WriteFile(envFile, []byte(tt.content), 0644); err != nil {

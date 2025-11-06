@@ -78,7 +78,7 @@ func TestSecureErase(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			filePath := tc.setupFn(t)
 			ctx := context.Background()
 
@@ -153,7 +153,7 @@ func TestSecureEraseSecurity(t *testing.T) {
 	})
 
 	t.Run("handles malicious file names", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		tmpDir := testutil.TempDir(t)
 
 		// Test with safe file in temp directory

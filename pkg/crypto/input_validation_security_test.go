@@ -81,7 +81,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 
 	for _, tc := range injectionPayloads {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			var err error
 
 			switch tc.field {
@@ -155,7 +155,7 @@ func TestUnicodeNormalizationAttacks(t *testing.T) {
 
 	for _, tc := range unicodePayloads {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			var err error
 
 			switch tc.field {
@@ -201,7 +201,7 @@ func TestRegexCatastrophicBacktracking(t *testing.T) {
 
 	for _, tc := range backtrackingPayloads {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Use a timeout to detect if regex takes too long (potential ReDoS)
 			done := make(chan bool, 1)
 			var err error
@@ -258,7 +258,7 @@ func TestLengthBasedAttacks(t *testing.T) {
 
 	for _, tc := range lengthAttacks {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			payload := tc.generator()
 			var err error
 
@@ -316,7 +316,7 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 
 	for _, domain := range suspiciousDomains {
 		t.Run("suspicious_"+strings.ReplaceAll(domain, ".", "_"), func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidateDomainName(domain)
 			testutil.AssertError(t, err)
 
@@ -354,7 +354,7 @@ func TestReservedNameValidation(t *testing.T) {
 	// Critical names should always be blocked
 	for _, name := range criticalReservedNames {
 		t.Run("critical_reserved_"+name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidateAppName(name)
 			testutil.AssertError(t, err)
 			testutil.AssertContains(t, err.Error(), "reserved")
@@ -362,7 +362,7 @@ func TestReservedNameValidation(t *testing.T) {
 
 		// Test case variations
 		t.Run("critical_reserved_upper_"+name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidateAppName(strings.ToUpper(name))
 			testutil.AssertError(t, err)
 		})
@@ -371,7 +371,7 @@ func TestReservedNameValidation(t *testing.T) {
 	// Production reserved names should be blocked in production
 	for _, name := range productionReservedNames {
 		t.Run("production_reserved_"+name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidateAppName(name)
 			testutil.AssertError(t, err)
 			testutil.AssertContains(t, err.Error(), "reserved")
@@ -422,7 +422,7 @@ func TestCertificateInputCombinations(t *testing.T) {
 
 	for _, tc := range maliciousCombinations {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := ValidateAllCertificateInputs(tc.appName, tc.baseDomain, tc.email)
 			testutil.AssertError(t, err)
 		})
@@ -452,7 +452,7 @@ func TestSanitizationEffectiveness(t *testing.T) {
 
 	for _, tc := range sanitizationTests {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := SanitizeInputForCommand(tc.input)
 			testutil.AssertEqual(t, tc.expected, result)
 		})

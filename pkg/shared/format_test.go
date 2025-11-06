@@ -25,7 +25,7 @@ func TestFormatBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := FormatBytes(tt.bytes)
 			if result != tt.expected {
 				t.Errorf("FormatBytes(%d) = %s, want %s", tt.bytes, result, tt.expected)
@@ -58,7 +58,7 @@ func TestParseSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result, err := ParseSize(tt.input)
 			if tt.wantErr {
 				if err == nil {
@@ -96,7 +96,7 @@ func TestFormatAge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := FormatAge(tt.time)
 			if result != tt.expected {
 				t.Errorf("FormatAge(%v) = %s, want %s", tt.time, result, tt.expected)
@@ -123,7 +123,7 @@ func TestTruncateString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := TruncateString(tt.input, tt.length)
 			if result != tt.expected {
 				t.Errorf("TruncateString(%q, %d) = %q, want %q", tt.input, tt.length, result, tt.expected)

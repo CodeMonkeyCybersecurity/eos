@@ -64,7 +64,7 @@ func TestAddService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			calc := NewCalculator(EnvironmentConfigs["development"], DefaultWorkloadProfiles["small"])
 
 			err := calc.AddService(tt.serviceType)
@@ -199,7 +199,7 @@ func TestCalculateScalingMultiplier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			calc := NewCalculator(EnvironmentConfigs["development"], tt.workload)
 			multiplier := calc.calculateScalingMultiplier(tt.service)
 			assert.GreaterOrEqual(t, multiplier, tt.minValue)
@@ -240,7 +240,7 @@ func TestCalculateDiskGrowth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			growth := calc.calculateDiskGrowth(tt.service)
 			if tt.expectGrowth {
 				assert.Greater(t, growth, 0.0)
@@ -289,7 +289,7 @@ func TestDeterminePlacementStrategy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			strategy := calc.determinePlacementStrategy(tt.service)
 			assert.Equal(t, tt.expected, strategy)
 		})
@@ -334,7 +334,7 @@ func TestRoundToStandardSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := calc.roundToStandardSize(tt.value, tt.sizes)
 			assert.Equal(t, tt.expected, result)
 		})

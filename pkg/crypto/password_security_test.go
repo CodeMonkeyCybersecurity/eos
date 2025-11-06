@@ -37,7 +37,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("character_distribution", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test character class distribution in generated passwords
 		const numTests = 100
 		const passwordLength = 24
@@ -85,7 +85,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("length_boundaries", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test minimum length enforcement
 		_, err := GeneratePassword(MinPasswordLen - 1)
 		testutil.AssertError(t, err)
@@ -106,7 +106,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("no_predictable_patterns", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Generate multiple passwords and check for predictable patterns
 		passwords := make([]string, 50)
 		for i := range passwords {
@@ -150,7 +150,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("common_password_rejection", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that common/weak passwords are rejected
 		commonPasswords := []string{
 			"password",
@@ -178,7 +178,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("injection_attempt_rejection", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that passwords containing injection attempts are rejected
 		injectionPasswords := []string{
 			"password'; DROP TABLE users; --",
@@ -199,7 +199,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("unicode_attack_rejection", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that Unicode-based attacks are handled properly
 		unicodePasswords := []string{
 			"password\u200B123", // Zero-width space
@@ -217,7 +217,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("length_boundary_validation", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test length boundaries
 		shortPasswords := []string{
 			"",
@@ -246,7 +246,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("complexity_requirements", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test passwords missing complexity requirements
 		insufficientPasswords := []struct {
 			password string
@@ -274,7 +274,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("valid_strong_passwords", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that legitimately strong passwords are accepted
 		strongPasswords := []string{
 			"MyVerySecure!Password123",
@@ -322,7 +322,7 @@ func TestPasswordMemorySecurity(t *testing.T) {
 	})
 
 	t.Run("secure_zero_edge_cases", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test edge cases
 		testCases := [][]byte{
 			{},                 // Empty slice
@@ -343,7 +343,7 @@ func TestPasswordMemorySecurity(t *testing.T) {
 	})
 
 	t.Run("password_generation_cleanup", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// This is more of a documentation test - ensure password generation
 		// doesn't leave sensitive data in memory longer than necessary
 		pwd, err := GeneratePassword(32)
@@ -395,7 +395,7 @@ func TestPasswordRedactionSecurity(t *testing.T) {
 	})
 
 	t.Run("non_sensitive_passthrough", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Test that non-sensitive strings are passed through
 		nonSensitiveStrings := []string{
 			"hello",

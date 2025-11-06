@@ -132,7 +132,7 @@ COMPOSE_PORT_HTTP=9000`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			// Create temporary .env file
 			tmpDir := t.TempDir()
 			envFile := filepath.Join(tmpDir, ".env")
@@ -194,7 +194,7 @@ EMPTY_VAR=`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			value, found, err := GetEnvVar(envFile, tt.key)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
@@ -233,7 +233,7 @@ EMPTY_VAR=`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			value, err := MustGetEnvVar(envFile, tt.key)
 
 			if tt.expectError {

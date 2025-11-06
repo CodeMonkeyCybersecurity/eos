@@ -124,7 +124,7 @@ func TestRedact(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := Redact(tc.input)
 			testutil.AssertEqual(t, tc.expected, result)
 
@@ -165,7 +165,7 @@ func TestRedactSecurity(t *testing.T) {
 	})
 
 	t.Run("handles malicious inputs safely", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		maliciousInputs := []string{
 			"\x00\x01\x02\x03",                       // control characters
 			"\n\r\t",                                 // whitespace characters
@@ -177,7 +177,7 @@ func TestRedactSecurity(t *testing.T) {
 
 		for _, input := range maliciousInputs {
 			t.Run("malicious_input", func(t *testing.T) {
-					t.Parallel()
+				t.Parallel()
 				result := Redact(input)
 
 				// Should not panic or cause issues
@@ -189,7 +189,7 @@ func TestRedactSecurity(t *testing.T) {
 	})
 
 	t.Run("consistent output for same input", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		input := "consistent-test-string"
 
 		// Call Redact multiple times
@@ -221,7 +221,7 @@ func TestRedactEdgeCases(t *testing.T) {
 	})
 
 	t.Run("unicode edge cases", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		unicodeTests := []struct {
 			name  string
 			input string
@@ -235,7 +235,7 @@ func TestRedactEdgeCases(t *testing.T) {
 
 		for _, tc := range unicodeTests {
 			t.Run(tc.name, func(t *testing.T) {
-					t.Parallel()
+				t.Parallel()
 				result := Redact(tc.input)
 
 				// Should not panic and should produce asterisks
@@ -247,7 +247,7 @@ func TestRedactEdgeCases(t *testing.T) {
 	})
 
 	t.Run("invalid UTF-8 sequences", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Invalid UTF-8 byte sequences
 		invalidUTF8 := []string{
 			"\xff\xfe\xfd",  // invalid start bytes
@@ -257,7 +257,7 @@ func TestRedactEdgeCases(t *testing.T) {
 
 		for _, input := range invalidUTF8 {
 			t.Run("invalid_utf8", func(t *testing.T) {
-					t.Parallel()
+				t.Parallel()
 				// Should not panic
 				result := Redact(input)
 
@@ -310,7 +310,7 @@ func TestRedactUseCases(t *testing.T) {
 
 		for _, tc := range secrets {
 			t.Run(tc.name, func(t *testing.T) {
-					t.Parallel()
+				t.Parallel()
 				result := Redact(tc.secret)
 
 				// Should not contain original secret

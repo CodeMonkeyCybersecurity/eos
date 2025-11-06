@@ -29,7 +29,7 @@ func TestWrapValidationError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			wrapped := WrapValidationError(tt.err)
 
 			if tt.err == nil {
@@ -90,7 +90,7 @@ func TestWrapPolicyError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			wrapped := WrapPolicyError(tt.err)
 
 			if tt.err == nil {
@@ -140,7 +140,7 @@ func TestWrapErrors_StackTrace(t *testing.T) {
 	})
 
 	t.Run("policy_error_has_stack", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		originalErr := errors.New("policy denied")
 		wrapped := WrapPolicyError(originalErr)
 
@@ -171,7 +171,7 @@ func TestWrapErrors_Unwrapping(t *testing.T) {
 	})
 
 	t.Run("policy_error_unwraps_correctly", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		originalErr := errors.New("original policy error")
 		wrapped := WrapPolicyError(originalErr)
 

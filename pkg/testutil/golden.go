@@ -31,7 +31,7 @@ import (
 //
 //	go test -update
 type GoldenFile struct {
-	t          *testing.T
+	t           *testing.T
 	snapshotter *cupaloy.Config
 }
 
@@ -161,7 +161,7 @@ func GoldenString(t *testing.T, got string) {
 
 // GoldenJSON is a convenience function for JSON comparisons
 //
-// Automatically marshals the struct to formatted JSON before comparison
+// # Automatically marshals the struct to formatted JSON before comparison
 //
 // Usage:
 //

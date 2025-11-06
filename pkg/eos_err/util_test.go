@@ -100,7 +100,7 @@ func TestExtractSummary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			got := ExtractSummary(ctx, tt.output, tt.maxCandidates)
 			if got != tt.want {
 				t.Errorf("ExtractSummary() = %q, want %q", got, tt.want)
@@ -169,7 +169,7 @@ func TestIsExpectedUserError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			if got := IsExpectedUserError(tt.err); got != tt.want {
 				t.Errorf("IsExpectedUserError() = %v, want %v", got, tt.want)
 			}

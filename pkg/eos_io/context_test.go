@@ -41,7 +41,7 @@ func TestNewContext(t *testing.T) {
 	})
 
 	t.Run("creates_unique_contexts", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc1 := NewContext(ctx, "command1")
 		time.Sleep(time.Millisecond) // Ensure different timestamps
@@ -86,7 +86,7 @@ func TestRuntimeContext_HandlePanic(t *testing.T) {
 	})
 
 	t.Run("no_panic_leaves_error_unchanged", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 		var err error
@@ -102,7 +102,7 @@ func TestRuntimeContext_HandlePanic(t *testing.T) {
 	})
 
 	t.Run("preserves_existing_error", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 		existingErr := errors.New("existing error")
@@ -144,7 +144,7 @@ func TestRuntimeContext_End(t *testing.T) {
 	}
 
 	t.Run("logs_successful_completion", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 		var err error
@@ -157,7 +157,7 @@ func TestRuntimeContext_End(t *testing.T) {
 	})
 
 	t.Run("logs_failed_completion", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 		err := errors.New("test failure")
@@ -169,7 +169,7 @@ func TestRuntimeContext_End(t *testing.T) {
 	})
 
 	t.Run("includes_vault_context", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 		rc.Attributes["vault_addr"] = "http://localhost:8200"
@@ -198,7 +198,7 @@ func TestRuntimeContext_Attributes(t *testing.T) {
 	})
 
 	t.Run("attributes_are_isolated_per_context", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc1 := NewContext(ctx, "test1")
 		rc2 := NewContext(ctx, "test2")
@@ -242,7 +242,7 @@ func TestContextCancellation(t *testing.T) {
 	})
 
 	t.Run("context_timeout_works", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		rc := NewContext(ctx, "test")
 		defer cancel()
@@ -273,7 +273,7 @@ func TestLogVaultContext(t *testing.T) {
 	})
 
 	t.Run("logs_vault_error", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 
@@ -284,7 +284,7 @@ func TestLogVaultContext(t *testing.T) {
 	})
 
 	t.Run("logs_empty_address", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 
@@ -308,7 +308,7 @@ func TestContextualLogger(t *testing.T) {
 	})
 
 	t.Run("uses_base_logger_when_provided", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		rc := NewContext(ctx, "test")
 
@@ -368,7 +368,7 @@ func TestNewExtendedContext(t *testing.T) {
 	})
 
 	t.Run("creates_extended_context_with_short_timeout", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		timeout := 100 * time.Millisecond
 
@@ -391,7 +391,7 @@ func TestNewExtendedContext(t *testing.T) {
 	})
 
 	t.Run("creates_extended_context_with_zero_timeout", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		ctx := context.Background()
 		timeout := 0 * time.Second
 
@@ -424,7 +424,7 @@ func TestValidateAll(t *testing.T) {
 	})
 
 	t.Run("validates_context_with_nil_validate", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		rc := &RuntimeContext{
 			Ctx:      context.Background(),
 			Log:      NewContext(context.Background(), "test").Log,
@@ -438,7 +438,7 @@ func TestValidateAll(t *testing.T) {
 	})
 
 	t.Run("validates_context_with_empty_context", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		rc := &RuntimeContext{
 			Ctx:      context.Background(),
 			Log:      nil,
@@ -452,7 +452,7 @@ func TestValidateAll(t *testing.T) {
 	})
 
 	t.Run("validates_context_with_all_nil", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		rc := &RuntimeContext{}
 
 		err := rc.ValidateAll()
@@ -519,7 +519,7 @@ func TestClassifyCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := classifyCommand(tt.command)
 			if result != tt.expected {
 				t.Errorf("classifyCommand(%q) = %q, want %q", tt.command, result, tt.expected)
@@ -570,7 +570,7 @@ func TestClassifyError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := classifyError(tt.err)
 			if result != tt.expected {
 				t.Errorf("classifyError(%v) = %q, want %q", tt.err, result, tt.expected)
@@ -603,7 +603,7 @@ func TestGetCallContext(t *testing.T) {
 	})
 
 	t.Run("different skip levels", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		component1, action1, err1 := getCallContext(1)
 		component2, action2, err2 := getCallContext(2)
 
@@ -622,7 +622,7 @@ func TestGetCallContext(t *testing.T) {
 	})
 
 	t.Run("invalid skip level", func(t *testing.T) {
-			t.Parallel()
+		t.Parallel()
 		// Very high skip level might fail
 		component, action, err := getCallContext(100)
 

@@ -112,7 +112,7 @@ func TestValidateNodeCapacity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			errors, err := validator.ValidateNodeCapacity(rc, tt.node)
 			require.NoError(t, err)
 
@@ -218,7 +218,7 @@ func TestValidateServicePlacement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := validator.ValidateServicePlacement(rc, tt.serviceType, tt.nodeResources)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -275,7 +275,7 @@ func TestValidateClusterCapacity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := validator.ValidateClusterCapacity(rc, tt.nodes)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -346,7 +346,7 @@ func TestValidateServiceDistribution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			err := validator.ValidateServiceDistribution(rc, tt.placements)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -419,7 +419,7 @@ func TestIsDiskTypeCompatible(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
+			t.Parallel()
 			result := validator.isDiskTypeCompatible(tt.actual, tt.required)
 			assert.Equal(t, tt.expected, result)
 		})
