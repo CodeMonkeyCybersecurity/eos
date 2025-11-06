@@ -8,6 +8,7 @@ import (
 )
 
 func TestNewValidator(t *testing.T) {
+	t.Parallel()
 	result := &SizingResult{
 		TotalCPUCores: 16,
 		TotalMemoryGB: 32,
@@ -28,6 +29,7 @@ func TestNewValidator(t *testing.T) {
 }
 
 func TestValidateNodeCapacity(t *testing.T) {
+	t.Parallel()
 	rc := testContext(t)
 
 	result := &SizingResult{
@@ -110,6 +112,7 @@ func TestValidateNodeCapacity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			errors, err := validator.ValidateNodeCapacity(rc, tt.node)
 			require.NoError(t, err)
 
@@ -124,6 +127,7 @@ func TestValidateNodeCapacity(t *testing.T) {
 }
 
 func TestValidateServicePlacement(t *testing.T) {
+	t.Parallel()
 	rc := testContext(t)
 
 	result := &SizingResult{
@@ -214,6 +218,7 @@ func TestValidateServicePlacement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			err := validator.ValidateServicePlacement(rc, tt.serviceType, tt.nodeResources)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -226,6 +231,7 @@ func TestValidateServicePlacement(t *testing.T) {
 }
 
 func TestValidateClusterCapacity(t *testing.T) {
+	t.Parallel()
 	rc := testContext(t)
 
 	result := &SizingResult{
@@ -269,6 +275,7 @@ func TestValidateClusterCapacity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			err := validator.ValidateClusterCapacity(rc, tt.nodes)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -280,6 +287,7 @@ func TestValidateClusterCapacity(t *testing.T) {
 }
 
 func TestValidateServiceDistribution(t *testing.T) {
+	t.Parallel()
 	rc := testContext(t)
 
 	result := &SizingResult{
@@ -338,6 +346,7 @@ func TestValidateServiceDistribution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			err := validator.ValidateServiceDistribution(rc, tt.placements)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -349,6 +358,7 @@ func TestValidateServiceDistribution(t *testing.T) {
 }
 
 func TestIsDiskTypeCompatible(t *testing.T) {
+	t.Parallel()
 	validator := NewValidator(&SizingResult{})
 
 	tests := []struct {
@@ -409,6 +419,7 @@ func TestIsDiskTypeCompatible(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			result := validator.isDiskTypeCompatible(tt.actual, tt.required)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -416,6 +427,7 @@ func TestIsDiskTypeCompatible(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
+	t.Parallel()
 	rc := testContext(t)
 
 	result := &SizingResult{

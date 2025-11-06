@@ -6,6 +6,7 @@ import (
 )
 
 func TestErrFallbackUsed(t *testing.T) {
+	t.Parallel()
 	if ErrFallbackUsed == nil {
 		t.Fatal("ErrFallbackUsed should not be nil")
 	}
@@ -16,6 +17,7 @@ func TestErrFallbackUsed(t *testing.T) {
 }
 
 func TestErrReexecCompleted(t *testing.T) {
+	t.Parallel()
 	if ErrReexecCompleted == nil {
 		t.Fatal("ErrReexecCompleted should not be nil")
 	}
@@ -26,6 +28,7 @@ func TestErrReexecCompleted(t *testing.T) {
 }
 
 func TestErrSecretNotFound(t *testing.T) {
+	t.Parallel()
 	if ErrSecretNotFound == nil {
 		t.Fatal("ErrSecretNotFound should not be nil")
 	}
@@ -36,6 +39,7 @@ func TestErrSecretNotFound(t *testing.T) {
 }
 
 func TestUserError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		cause       error
@@ -55,6 +59,7 @@ func TestUserError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			userErr := &UserError{cause: tt.cause}
 
 			// Test Error() method
@@ -80,6 +85,7 @@ func TestUserError(t *testing.T) {
 }
 
 func TestUserError_ErrorChaining(t *testing.T) {
+	t.Parallel()
 	baseErr := errors.New("base error")
 	userErr := &UserError{cause: baseErr}
 

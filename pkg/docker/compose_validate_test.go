@@ -73,6 +73,7 @@ PORT=8080
 
 // TestValidateComposeFile_ValidFile tests SDK validation with valid compose file
 func TestValidateComposeFile_ValidFile(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -97,6 +98,7 @@ func TestValidateComposeFile_ValidFile(t *testing.T) {
 
 // TestValidateComposeFile_InvalidSyntax tests SDK catches YAML syntax errors
 func TestValidateComposeFile_InvalidSyntax(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -125,6 +127,7 @@ func TestValidateComposeFile_InvalidSyntax(t *testing.T) {
 
 // TestValidateComposeFile_MissingRequiredVariable tests variable validation
 func TestValidateComposeFile_MissingRequiredVariable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -154,6 +157,7 @@ func TestValidateComposeFile_MissingRequiredVariable(t *testing.T) {
 
 // TestValidateComposeFile_MissingFile tests error handling for missing files
 func TestValidateComposeFile_MissingFile(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -173,6 +177,7 @@ func TestValidateComposeFile_MissingFile(t *testing.T) {
 
 // TestValidateComposeWithShellFallback_SDKSuccess tests fallback not triggered on SDK success
 func TestValidateComposeWithShellFallback_SDKSuccess(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -196,6 +201,7 @@ func TestValidateComposeWithShellFallback_SDKSuccess(t *testing.T) {
 
 // TestValidateComposeWithShellFallback_BothFail tests both SDK and shell fail
 func TestValidateComposeWithShellFallback_BothFail(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -219,6 +225,7 @@ func TestValidateComposeWithShellFallback_BothFail(t *testing.T) {
 
 // TestValidateCaddyfile_ValidFile tests Caddyfile validation with valid syntax
 func TestValidateCaddyfile_ValidFile(t *testing.T) {
+	t.Parallel()
 	// Skip if caddy not installed (this is expected and OK)
 	if _, err := os.Stat("/usr/bin/caddy"); os.IsNotExist(err) {
 		t.Skip("Caddy not installed - skipping Caddyfile validation test")
@@ -242,6 +249,7 @@ func TestValidateCaddyfile_ValidFile(t *testing.T) {
 
 // TestValidateCaddyfile_InvalidFile tests Caddyfile validation with invalid syntax
 func TestValidateCaddyfile_InvalidFile(t *testing.T) {
+	t.Parallel()
 	// Skip if caddy not installed
 	if _, err := os.Stat("/usr/bin/caddy"); os.IsNotExist(err) {
 		t.Skip("Caddy not installed - skipping Caddyfile validation test")
@@ -265,6 +273,7 @@ func TestValidateCaddyfile_InvalidFile(t *testing.T) {
 
 // TestValidateCaddyfile_MissingBinary tests graceful skip when caddy not installed
 func TestValidateCaddyfile_MissingBinary(t *testing.T) {
+	t.Parallel()
 	// This test verifies that validation gracefully skips if caddy isn't installed
 	// We can't reliably test this without uninstalling caddy, so we document the behavior
 
@@ -279,6 +288,7 @@ func TestValidateCaddyfile_MissingBinary(t *testing.T) {
 
 // TestValidateGeneratedFiles_AllValid tests convenience function with all valid files
 func TestValidateGeneratedFiles_AllValid(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -307,6 +317,7 @@ func TestValidateGeneratedFiles_AllValid(t *testing.T) {
 
 // TestValidateGeneratedFiles_InvalidCompose tests convenience function with invalid compose
 func TestValidateGeneratedFiles_InvalidCompose(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -334,6 +345,7 @@ func TestValidateGeneratedFiles_InvalidCompose(t *testing.T) {
 
 // TestErrorMessagesIncludeRemediation tests that error messages have actionable guidance
 func TestErrorMessagesIncludeRemediation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	tempDir := t.TempDir()
 
@@ -362,6 +374,7 @@ func TestErrorMessagesIncludeRemediation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			composeFile := filepath.Join(tempDir, "test-"+tt.name+".yml")
 			if err := os.WriteFile(composeFile, []byte(tt.composeContent), 0644); err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
@@ -394,6 +407,7 @@ func TestErrorMessagesIncludeRemediation(t *testing.T) {
 
 // TestParseEnvFile tests .env file parsing
 func TestParseEnvFile(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		content  string
@@ -446,6 +460,7 @@ KEY2=value2
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			tempDir := t.TempDir()
 			envFile := filepath.Join(tempDir, ".env")
 			if err := os.WriteFile(envFile, []byte(tt.content), 0644); err != nil {

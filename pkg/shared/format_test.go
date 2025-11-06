@@ -8,6 +8,7 @@ import (
 )
 
 func TestFormatBytes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		bytes    int64
@@ -24,6 +25,7 @@ func TestFormatBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			result := FormatBytes(tt.bytes)
 			if result != tt.expected {
 				t.Errorf("FormatBytes(%d) = %s, want %s", tt.bytes, result, tt.expected)
@@ -33,6 +35,7 @@ func TestFormatBytes(t *testing.T) {
 }
 
 func TestParseSize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -55,6 +58,7 @@ func TestParseSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			result, err := ParseSize(tt.input)
 			if tt.wantErr {
 				if err == nil {
@@ -74,6 +78,7 @@ func TestParseSize(t *testing.T) {
 }
 
 func TestFormatAge(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	tests := []struct {
 		name     string
@@ -91,6 +96,7 @@ func TestFormatAge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			result := FormatAge(tt.time)
 			if result != tt.expected {
 				t.Errorf("FormatAge(%v) = %s, want %s", tt.time, result, tt.expected)
@@ -100,6 +106,7 @@ func TestFormatAge(t *testing.T) {
 }
 
 func TestTruncateString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -116,6 +123,7 @@ func TestTruncateString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			result := TruncateString(tt.input, tt.length)
 			if result != tt.expected {
 				t.Errorf("TruncateString(%q, %d) = %q, want %q", tt.input, tt.length, result, tt.expected)
@@ -125,6 +133,7 @@ func TestTruncateString(t *testing.T) {
 }
 
 func TestFormatBytesUint64(t *testing.T) {
+	t.Parallel()
 	// Test the uint64 convenience wrapper
 	result := FormatBytesUint64(1024 * 1024)
 	expected := "1.0 MiB"

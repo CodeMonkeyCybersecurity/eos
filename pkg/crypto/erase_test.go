@@ -11,6 +11,7 @@ import (
 )
 
 func TestSecureErase(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		setupFn func(t *testing.T) string // returns file path
@@ -77,6 +78,7 @@ func TestSecureErase(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 			filePath := tc.setupFn(t)
 			ctx := context.Background()
 
@@ -101,6 +103,7 @@ func TestSecureErase(t *testing.T) {
 }
 
 func TestSecureEraseConcurrency(t *testing.T) {
+	t.Parallel()
 	t.Run("concurrent erase operations", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t)
 
@@ -131,6 +134,7 @@ func TestSecureEraseConcurrency(t *testing.T) {
 }
 
 func TestSecureEraseSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("handles context cancellation", func(t *testing.T) {
 		tmpDir := testutil.TempDir(t)
 		filePath := filepath.Join(tmpDir, "context-test.txt")
@@ -149,6 +153,7 @@ func TestSecureEraseSecurity(t *testing.T) {
 	})
 
 	t.Run("handles malicious file names", func(t *testing.T) {
+			t.Parallel()
 		tmpDir := testutil.TempDir(t)
 
 		// Test with safe file in temp directory

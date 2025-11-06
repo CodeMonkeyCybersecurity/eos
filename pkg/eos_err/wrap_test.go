@@ -8,6 +8,7 @@ import (
 )
 
 func TestWrapValidationError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -28,6 +29,7 @@ func TestWrapValidationError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			wrapped := WrapValidationError(tt.err)
 
 			if tt.err == nil {
@@ -63,6 +65,7 @@ func TestWrapValidationError(t *testing.T) {
 }
 
 func TestWrapPolicyError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -87,6 +90,7 @@ func TestWrapPolicyError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			wrapped := WrapPolicyError(tt.err)
 
 			if tt.err == nil {
@@ -122,6 +126,7 @@ func TestWrapPolicyError(t *testing.T) {
 }
 
 func TestWrapErrors_StackTrace(t *testing.T) {
+	t.Parallel()
 	t.Run("validation_error_has_stack", func(t *testing.T) {
 		originalErr := errors.New("field missing")
 		wrapped := WrapValidationError(originalErr)
@@ -135,6 +140,7 @@ func TestWrapErrors_StackTrace(t *testing.T) {
 	})
 
 	t.Run("policy_error_has_stack", func(t *testing.T) {
+			t.Parallel()
 		originalErr := errors.New("policy denied")
 		wrapped := WrapPolicyError(originalErr)
 
@@ -148,6 +154,7 @@ func TestWrapErrors_StackTrace(t *testing.T) {
 }
 
 func TestWrapErrors_Unwrapping(t *testing.T) {
+	t.Parallel()
 	t.Run("validation_error_unwraps_correctly", func(t *testing.T) {
 		originalErr := errors.New("original validation error")
 		wrapped := WrapValidationError(originalErr)
@@ -164,6 +171,7 @@ func TestWrapErrors_Unwrapping(t *testing.T) {
 	})
 
 	t.Run("policy_error_unwraps_correctly", func(t *testing.T) {
+			t.Parallel()
 		originalErr := errors.New("original policy error")
 		wrapped := WrapPolicyError(originalErr)
 
@@ -180,6 +188,7 @@ func TestWrapErrors_Unwrapping(t *testing.T) {
 }
 
 func TestWrapErrors_ChainedErrors(t *testing.T) {
+	t.Parallel()
 	t.Run("chain_validation_and_policy_errors", func(t *testing.T) {
 		// Create a chain: original -> validation wrapper -> policy wrapper
 		originalErr := errors.New("base error")

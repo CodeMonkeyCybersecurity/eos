@@ -10,6 +10,7 @@ import (
 )
 
 func TestParseEnvFile(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		content     string
@@ -131,6 +132,7 @@ COMPOSE_PORT_HTTP=9000`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			// Create temporary .env file
 			tmpDir := t.TempDir()
 			envFile := filepath.Join(tmpDir, ".env")
@@ -168,6 +170,7 @@ COMPOSE_PORT_HTTP=9000`,
 }
 
 func TestGetEnvVar(t *testing.T) {
+	t.Parallel()
 	content := `DB_HOST=localhost
 DB_PORT=5432
 EMPTY_VAR=`
@@ -191,6 +194,7 @@ EMPTY_VAR=`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			value, found, err := GetEnvVar(envFile, tt.key)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
@@ -206,6 +210,7 @@ EMPTY_VAR=`
 }
 
 func TestMustGetEnvVar(t *testing.T) {
+	t.Parallel()
 	content := `DB_HOST=localhost
 EMPTY_VAR=`
 
@@ -228,6 +233,7 @@ EMPTY_VAR=`
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 			value, err := MustGetEnvVar(envFile, tt.key)
 
 			if tt.expectError {
@@ -249,6 +255,7 @@ EMPTY_VAR=`
 }
 
 func TestParseEnvFile_NonExistentFile(t *testing.T) {
+	t.Parallel()
 	_, err := ParseEnvFile("/nonexistent/path/.env")
 	if err == nil {
 		t.Errorf("Expected error for non-existent file")
