@@ -82,7 +82,7 @@ ERROR CRITICAL: Required rollback step failed {"step": "revert_git"
 
 ## Fixes Implemented
 
-### Fix P0-1: Go Toolchain Availability Check
+### ✅ Fix P0-1: Go Toolchain Availability Check (IMPLEMENTED)
 
 **File**: `pkg/build/integrity.go`
 **Function Added**: `VerifyGoToolchainAvailability()`
@@ -97,25 +97,48 @@ ERROR CRITICAL: Required rollback step failed {"step": "revert_git"
 
 **Benefit**: **FAIL FAST** - User knows immediately if update will fail due to toolchain
 
+**Status**: ✅ Committed in 6132d98
+
 ---
 
-### Fix P0-2: Manual Stash Management (NEEDS IMPLEMENTATION)
+### ✅ Fix P0-2: Manual Stash Management (IMPLEMENTED)
 
-**File**: `pkg/git/operations.go`
-**Function Needed**: `PullWithManualStash()` (returns stash ref)
+**Files Modified**:
+- `pkg/git/operations.go` - Added `PullWithStashTracking()` and `RestoreStash()`
+- `pkg/self/updater_enhanced.go` - Updated to use stash tracking, added rollback step
 
-**What It Should Do**:
-1. Check for uncommitted changes (`git status --porcelain`)
+**What It Does**:
+
+**PullWithStashTracking()** (pkg/git/operations.go):
+1. Checks for uncommitted changes (`git status --porcelain`)
 2. If changes exist: `git stash push -m "eos self-update auto-stash"`
-3. Capture stash ref: `git rev-parse stash@{0}`
-4. Pull WITHOUT `--autostash`: `git pull origin <branch>`
-5. Return stash ref to caller
+3. Captures stash ref: `git rev-parse stash@{0}` (full SHA, not symbolic ref)
+4. Pulls WITHOUT `--autostash`: `git pull origin <branch>`
+5. Returns `(codeChanged bool, stashRef string, error)`
+6. If pull fails: automatically restores stash
+7. If no code changes: automatically restores stash (no rollback needed)
 
-**Integration Point**: `pkg/self/updater_enhanced.go:pullLatestCodeWithVerification()`
-**Current**: Returns `(bool, error)`
-**Needed**: Returns `(bool, string, error)` where string is stash ref
+**RestoreStash()** (pkg/git/operations.go):
+1. Takes stash ref (full SHA) as input
+2. Uses `git stash apply <ref>` to restore changes
+3. Preserves stash even if restore fails (for manual recovery)
 
-**Benefit**: Rollback knows exactly which stash to restore
+**Integration Changes** (pkg/self/updater_enhanced.go):
+1. `pullLatestCodeWithVerification()` now calls `PullWithStashTracking()`
+2. Stores stash ref in `transaction.GitStashRef`
+3. Added new rollback step: `restore_stash`
+4. Rollback flow: revert_git → restore_stash → cleanup_temp
+
+**Key Safety Features**:
+- Uses full SHA refs (immutable) instead of symbolic refs like `stash@{0}`
+- Automatically restores stash on pull failure
+- Automatically restores stash if no code changes (optimization)
+- Stash preserved for manual recovery if automatic restore fails
+- Non-critical rollback step (doesn't fail entire rollback if restore fails)
+
+**Benefit**: Rollback can now safely restore uncommitted changes
+
+**Status**: ✅ Ready to commit
 
 ---
 

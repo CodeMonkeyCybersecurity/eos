@@ -786,10 +786,25 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	return currentHash, nil
 }
 
-// pullLatestCodeWithVerification pulls code and verifies something actually changed
+// pullLatestCodeWithVerification pulls code with stash tracking for rollback safety
+// P0-2 FIX: Uses manual stash management to track stash ref for rollback
 // Returns true if code changed, false if already up-to-date
 func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
-	return git.PullWithVerification(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	// Use stash tracking version for rollback safety
+	codeChanged, stashRef, err := git.PullWithStashTracking(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	if err != nil {
+		return false, err
+	}
+
+	// Store stash ref in transaction for rollback
+	eeu.transaction.GitStashRef = stashRef
+
+	if stashRef != "" {
+		eeu.logger.Info("Stash tracked in transaction for rollback",
+			zap.String("ref", stashRef[:8]+"..."))
+	}
+
+	return codeChanged, nil
 }
 
 // installBinaryAtomic installs the binary atomically with flock-based locking
@@ -1034,6 +1049,45 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("✓ Git repository reset to previous commit")
+				return nil
+			},
+		},
+		{
+			Name:        "restore_stash",
+			Description: "Restore uncommitted changes from stash",
+			Required:    false, // Best-effort, not critical (stash is preserved for manual recovery)
+			Execute: func() error {
+				// P0-2 FIX: Restore stash after git reset to recover uncommitted changes
+				if eeu.transaction.GitStashRef == "" {
+					eeu.logger.Debug("No stash to restore (stashRef empty)")
+					return nil
+				}
+
+				// Only restore stash if we actually reverted the git repository
+				if !eeu.transaction.ChangesPulled {
+					eeu.logger.Debug("Git not reverted, no need to restore stash")
+					return nil
+				}
+
+				eeu.logger.Info("Restoring uncommitted changes from stash",
+					zap.String("ref", eeu.transaction.GitStashRef[:8]+"..."))
+
+				// Use helper function from git package
+				if err := git.RestoreStash(eeu.rc, eeu.config.SourceDir, eeu.transaction.GitStashRef); err != nil {
+					// Don't fail rollback if stash restore fails
+					// Stash is still preserved for manual recovery
+					eeu.logger.Warn("Failed to restore stash automatically",
+						zap.Error(err),
+						zap.String("stash_ref", eeu.transaction.GitStashRef[:8]+"..."))
+					return fmt.Errorf("failed to restore stash (stash preserved): %w\n\n"+
+						"Your uncommitted changes are saved in stash.\n"+
+						"Manual recovery:\n"+
+						"  git -C %s stash list\n"+
+						"  git -C %s stash apply %s",
+						err, eeu.config.SourceDir, eeu.config.SourceDir, eeu.transaction.GitStashRef)
+				}
+
+				eeu.logger.Info("✓ Uncommitted changes restored from stash")
 				return nil
 			},
 		},
