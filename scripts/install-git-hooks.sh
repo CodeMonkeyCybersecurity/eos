@@ -289,5 +289,114 @@ echo "Performance: ~2-5 seconds for typical commits (vs. ~120 seconds)"
 echo ""
 echo "To bypass (NOT RECOMMENDED): git commit --no-verify"
 echo ""
+
+# ============================================================================
+# Install commit-msg hook (Conventional Commits validation)
+# ============================================================================
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if [ -f .git/hooks/commit-msg ]; then
+    echo -e "${YELLOW}⚠${NC}  Commit-msg hook already exists"
+    read -p "Overwrite? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Skipping commit-msg hook installation"
+        echo ""
+        echo -e "${BLUE}ℹ${NC}  Install golangci-lint: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+        echo -e "${BLUE}ℹ${NC}  Install gitleaks: brew install gitleaks (or see https://github.com/gitleaks/gitleaks)"
+        exit 0
+    fi
+fi
+
+# Create commit-msg hook
+cat > .git/hooks/commit-msg << 'COMMITMSG_HOOK_EOF'
+#!/bin/bash
+# Eos Commit Message Validation Hook
+# Last Updated: 2025-11-07
+# Enforces Conventional Commits specification
+#
+# Format: <type>(<scope>): <subject>
+#
+# Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# Optional scope: (vault), (consul), (nomad), (bionicgpt), (wazuh), etc.
+# Subject: Brief description in imperative mood
+#
+# To bypass (NOT RECOMMENDED): git commit --no-verify
+
+set -e
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Skip validation for merge commits, revert commits, and fixup commits
+if echo "$COMMIT_MSG" | grep -qE "^Merge |^Revert |^fixup!|^squash!"; then
+    echo -e "${BLUE}ℹ${NC}  Skipping validation for special commit type"
+    exit 0
+fi
+
+# Conventional Commits regex pattern
+CONVENTIONAL_COMMIT_REGEX="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9_-]+\))?!?: .{1,100}"
+
+# Check if commit message follows Conventional Commits
+if ! echo "$COMMIT_MSG" | head -n1 | grep -qE "$CONVENTIONAL_COMMIT_REGEX"; then
+    echo -e "${RED}✗ Commit message validation FAILED${NC}"
+    echo ""
+    echo "Commit message does not follow Conventional Commits specification."
+    echo ""
+    echo "Expected format: <type>(<scope>): <subject>"
+    echo ""
+    echo "Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+    echo ""
+    echo "Examples:"
+    echo "  feat(vault): add automatic token rotation"
+    echo "  fix: resolve build errors in pkg/bionicgpt"
+    echo "  docs(claude): update shift-left strategy"
+    echo ""
+    echo "Your commit message:"
+    echo "  $(echo "$COMMIT_MSG" | head -n1)"
+    echo ""
+    echo "Reference: https://www.conventionalcommits.org/"
+    exit 1
+fi
+
+# Check subject line length
+SUBJECT_LINE=$(echo "$COMMIT_MSG" | head -n1)
+SUBJECT_LENGTH=${#SUBJECT_LINE}
+
+if [ "$SUBJECT_LENGTH" -gt 100 ]; then
+    echo -e "${YELLOW}⚠${NC}  Warning: Subject line is ${SUBJECT_LENGTH} characters (recommended max: 100)"
+fi
+
+# Check for imperative mood
+if echo "$SUBJECT_LINE" | grep -qE "(added|adding|adds|fixed|fixing|fixes|updated|updating|updates)"; then
+    echo -e "${YELLOW}⚠${NC}  Warning: Use imperative mood ('add' not 'added', 'fix' not 'fixed')"
+fi
+
+echo -e "${GREEN}✓${NC} Commit message follows Conventional Commits"
+exit 0
+COMMITMSG_HOOK_EOF
+
+# Make hook executable
+chmod +x .git/hooks/commit-msg
+
+echo -e "${GREEN}✓${NC} Commit-msg hook installed successfully"
+echo ""
+echo "The commit-msg hook will now validate commit messages before each commit."
+echo "It enforces Conventional Commits specification."
+echo ""
+echo "Format: <type>(<scope>): <subject>"
+echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 echo -e "${BLUE}ℹ${NC}  Install golangci-lint: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
 echo -e "${BLUE}ℹ${NC}  Install gitleaks: brew install gitleaks (or see https://github.com/gitleaks/gitleaks)"
