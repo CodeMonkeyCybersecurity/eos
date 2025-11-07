@@ -1,0 +1,188 @@
+# .golangci.yml - golangci-lint v2 configuration
+# Last Updated: 2025-11-07
+# Documentation: https://golangci-lint.run/docs/configuration/
+#
+# This configuration enforces Eos code quality standards as defined in CLAUDE.md.
+# Used by:
+#   - Local development (golangci-lint run)
+#   - Pre-commit hooks (.git/hooks/pre-commit)
+#   - CI/CD (.github/workflows/comprehensive-quality.yml, lint.yml)
+
+version: "2"
+
+# Linter Selection
+linters:
+  # Use recommended linters as baseline, then enable additional ones
+  default: recommended
+
+  enable:
+    # Code Quality
+    - errcheck        # Check for unchecked errors (P0 - critical)
+    - gosimple        # Suggest code simplifications
+    - govet           # Standard go vet checks
+    - ineffassign     # Detect ineffectual assignments
+    - staticcheck     # Advanced static analysis (comprehensive)
+    - unused          # Find unused constants, variables, functions
+
+    # Security (P0 - critical for Eos)
+    - gosec           # Security issues (G101-G602)
+
+    # Style & Best Practices
+    - gofmt           # Ensure code is formatted
+    - goimports       # Check import formatting
+    - misspell        # Find commonly misspelled English words
+    - unconvert       # Remove unnecessary type conversions
+    - unparam         # Find unused function parameters
+    - goconst         # Find repeated strings that could be constants
+    - prealloc        # Find slice declarations that could be preallocated
+
+    # Bug Prevention
+    - exportloopref   # Prevent loop variable capture bugs
+    - nolintlint      # Ensure //nolint directives are used correctly
+    - bodyclose       # Ensure HTTP response bodies are closed
+    - contextcheck    # Ensure context.Context is used correctly
+
+    # Performance
+    - nakedret        # Find naked returns in functions > 5 lines
+    - nilerr          # Find code that returns nil even if it checks != nil
+
+# Linter-Specific Settings
+linters-settings:
+  # Security scanner configuration
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      # G104: Audit errors not checked - covered by errcheck linter
+      - G104
+      # G304: File path from variable - common in CLI tools, manually audited
+      - G304
+      # G306: Expect WriteFile permissions to be 0600 or less - we use constants
+      - G306
+
+  # Error checking configuration
+  errcheck:
+    check-blank: true              # Report assignments to blank identifier
+    check-type-assertions: true    # Report type assertions without error check
+    exclude-functions:
+      - (*github.com/spf13/cobra.Command).MarkFlagRequired  # Cobra flags
+
+  # Go vet configuration
+  govet:
+    enable-all: true
+    disable:
+      - shadow      # Too noisy for large projects
+      - fieldalignment  # Struct field ordering for memory - not critical
+
+  # Staticcheck configuration
+  staticcheck:
+    checks: ["all", "-SA1019"]  # All checks except deprecated usage (we handle separately)
+
+  # Style configuration
+  gofmt:
+    simplify: true  # Use gofmt -s
+
+  goimports:
+    local-prefixes: github.com/CodeMonkeyCybersecurity/eos
+
+  # Complexity limits
+  nakedret:
+    max-func-lines: 5  # Only allow naked returns in very short functions
+
+  # Constant detection
+  goconst:
+    min-len: 3                # Minimum length of string constant
+    min-occurrences: 3        # Minimum occurrences to trigger
+    ignore-tests: true        # Don't check test files
+
+  # Unused parameters
+  unparam:
+    check-exported: false  # Don't check exported functions (may be interface implementations)
+
+# Run Configuration
+run:
+  timeout: 10m              # Maximum time for linters to run
+  tests: true              # Include test files
+  build-tags:
+    - integration
+    - unit
+  skip-dirs:
+    - vendor
+    - testdata
+    - .github
+    - docs
+  skip-files:
+    - ".*\\.pb\\.go$"      # Skip protobuf generated files
+    - ".*_gen\\.go$"       # Skip generated files
+
+# Issues Configuration
+issues:
+  # Maximum issues to report (0 = unlimited)
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Show all issues, even in new code
+  new: false
+
+  # Exclude rules for specific cases
+  exclude-rules:
+    # Test files - allow certain patterns
+    - path: _test\.go
+      linters:
+        - errcheck        # Tests can ignore errors for brevity
+        - gosec           # Tests can have security "issues" (like hardcoded creds for mocks)
+        - unparam         # Test helpers may have unused params
+        - goconst         # Tests can repeat strings
+
+    # cmd/ orchestration layer - allow embedding
+    - path: ^cmd/
+      linters:
+        - goconst         # Orchestration layer can embed strings
+        - unparam         # CLI commands may not use all cobra.Command fields
+
+    # Mock/stub files
+    - path: "(mock|stub|fake).*\\.go"
+      linters:
+        - errcheck
+        - gosec
+
+    # Exclude specific error messages globally
+    - text: "Error return value of .((os\\.)?std(out|err)\\..*|.*Close|.*Flush|os\\.Remove(All)?|.*print(f|ln)?|os\\.(Un)?Setenv). is not checked"
+      linters:
+        - errcheck
+
+    # Exclude TODOs/FIXMEs from being errors (warnings only)
+    - text: "Line contains TODO/BUG/FIXME"
+      linters:
+        - godox
+
+  # Don't exclude issues in vendor or generated code
+  exclude-use-default: false
+
+# Output Configuration
+output:
+  formats:
+    - format: colored-line-number  # Human-readable colored output
+  print-issued-lines: true         # Show the lines with issues
+  print-linter-name: true          # Show which linter found the issue
+  uniq-by-line: true              # Show multiple issues on same line
+  sort-results: true               # Sort results for consistent output
+  path-prefix: ""                  # Don't modify paths in output
+
+# Severity Configuration
+severity:
+  default-severity: error
+  case-sensitive: false
+  rules:
+    - linters:
+        - gosec
+      severity: error
+    - linters:
+        - errcheck
+        - staticcheck
+        - govet
+      severity: error
+    - linters:
+        - misspell
+        - goconst
+      severity: warning
