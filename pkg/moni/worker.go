@@ -31,17 +31,36 @@ func RunWorker(rc *eos_io.RuntimeContext, config *WorkerConfig) (*SetupResult, e
 		StartTime: startTime,
 	}
 
-	// Change to working directory
+	// P1 FIX: Validate working directory (don't use os.Chdir - not thread-safe)
 	workDir := MoniDir
 	if config.WorkDir != "" {
 		workDir = config.WorkDir
 	}
 
-	if err := os.Chdir(workDir); err != nil {
-		return nil, fmt.Errorf("failed to change to working directory %s: %w", workDir, err)
+	// Check if working directory exists
+	if !fileExists(workDir) {
+		return nil, fmt.Errorf("working directory does not exist: %s\n"+
+			"This usually means Moni has not been installed yet.\n"+
+			"Fix: Run 'eos create moni' first to install Moni", workDir)
 	}
 
-	logger.Info("Working directory", zap.String("path", workDir))
+	// Check if docker-compose.yml exists
+	composeFile := filepath.Join(workDir, "docker-compose.yml")
+	if !fileExists(composeFile) {
+		return nil, fmt.Errorf("docker-compose.yml not found: %s\n"+
+			"This usually means Moni installation is incomplete.\n"+
+			"Fix: Run 'eos create moni' to complete installation", composeFile)
+	}
+
+	// Check if .env file exists (warning only)
+	envFile := filepath.Join(workDir, ".env")
+	if !fileExists(envFile) {
+		logger.Warn(".env file not found",
+			zap.String("path", envFile),
+			zap.String("impact", "Some configuration steps may be skipped"))
+	}
+
+	logger.Info("Working directory validated", zap.String("path", workDir))
 
 	// Pre-flight checks
 	if err := checkPrerequisites(rc); err != nil {
@@ -128,7 +147,7 @@ func runFullSetup(rc *eos_io.RuntimeContext, config *WorkerConfig) (*SetupResult
 
 	// Phase 4: Restart Containers
 	phase4 := runPhase(rc, 4, "Container Restart", func() error {
-		return restartContainers(rc)
+		return restartContainers(rc, workDir)
 	})
 	result.Phases = append(result.Phases, phase4)
 	if !phase4.Success {
@@ -467,7 +486,8 @@ func cleanupOldBackups(rc *eos_io.RuntimeContext) {
 }
 
 // restartContainers restarts Docker containers
-func restartContainers(rc *eos_io.RuntimeContext) error {
+// P1 FIX: Uses WorkDir instead of relying on os.Chdir (thread-safe)
+func restartContainers(rc *eos_io.RuntimeContext, workDir string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info("Stopping containers")
@@ -477,7 +497,8 @@ func restartContainers(rc *eos_io.RuntimeContext) error {
 	_, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "down"},
-		Capture: false, // Show output to user
+		WorkDir: workDir,      // P1 FIX: Explicit working directory (thread-safe)
+		Capture: false,        // Show output to user
 	})
 
 	if err != nil {
@@ -492,7 +513,8 @@ func restartContainers(rc *eos_io.RuntimeContext) error {
 	_, err = execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "up", "-d"},
-		Capture: false, // Show output to user
+		WorkDir: workDir,      // P1 FIX: Explicit working directory (thread-safe)
+		Capture: false,        // Show output to user
 	})
 
 	if err != nil {

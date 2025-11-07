@@ -303,7 +303,52 @@ ORDER BY tablename, policyname;
 		result.Warnings = append(result.Warnings, "Failed to query RLS policies")
 	}
 
-	// Step 4: Summary
+	// Step 4: Check team_id indexes (P1 CRITICAL - Performance)
+	logger.Info("Checking team_id indexes for RLS performance")
+
+	tablesNeedingIndexes := []string{"api_keys", "conversations", "datasets", "documents",
+		"api_key_connections", "audit_trail", "document_pipelines", "integrations",
+		"invitations", "oauth2_connections", "objects", "prompts", "team_users"}
+
+	missingIndexes := []string{}
+
+	for _, table := range tablesNeedingIndexes {
+		indexSQL := fmt.Sprintf(`
+			SELECT COUNT(*) FROM pg_indexes
+			WHERE tablename = '%s' AND indexdef LIKE '%%team_id%%';
+		`, table)
+
+		indexCount, err := querySingleValue(rc, PostgresContainer, DBUser, DBName, indexSQL)
+		if err != nil {
+			logger.Debug("Could not check indexes", zap.String("table", table), zap.Error(err))
+			continue
+		}
+
+		var count int
+		fmt.Sscanf(indexCount, "%d", &count)
+
+		if count == 0 {
+			missingIndexes = append(missingIndexes, table)
+			logger.Warn("Missing team_id index (performance issue)",
+				zap.String("table", table),
+				zap.String("recommendation", fmt.Sprintf("CREATE INDEX idx_%s_team_id ON %s(team_id)", table, table)),
+				zap.String("impact", "Queries will do sequential scans instead of index scans"))
+		} else {
+			logger.Debug("Index exists", zap.String("table", table), zap.Int("count", count))
+		}
+	}
+
+	if len(missingIndexes) > 0 {
+		logger.Warn("RLS Performance Warning",
+			zap.Int("tables_without_indexes", len(missingIndexes)),
+			zap.Strings("tables", missingIndexes))
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("%d tables missing team_id indexes (will cause performance issues)", len(missingIndexes)))
+	} else {
+		logger.Info("All critical tables have team_id indexes")
+	}
+
+	// Step 5: Summary
 	result.CriticalTablesProtected = len(criticalUnprotected) == 0 && len(criticalProtected) > 0
 
 	if result.CriticalTablesProtected {

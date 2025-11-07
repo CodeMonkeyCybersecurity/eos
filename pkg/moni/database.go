@@ -175,6 +175,9 @@ func EnableRowLevelSecurity(rc *eos_io.RuntimeContext) error {
 	logger.Info("Enabling Row Level Security (Multi-Tenant Isolation)")
 
 	// RLS SQL from enable_rls.sql
+	// SECURITY FIX (P0): Removed 'true' parameter from current_setting() to fail loudly if not set
+	// This prevents silent failures where users see no data instead of getting a clear error
+	// If app.current_team_id is not set, queries will ERROR instead of silently returning empty results
 	rlsSQL := `
 -- Enable RLS on tables with direct team_id
 ALTER TABLE api_key_connections ENABLE ROW LEVEL SECURITY;
@@ -196,61 +199,63 @@ ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for direct team_id tables
+-- SECURITY: No 'true' parameter - will ERROR if app.current_team_id not set (fail loudly, not silently)
 CREATE POLICY tenant_isolation_api_key_connections ON api_key_connections
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_api_keys ON api_keys
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_audit_trail ON audit_trail
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_conversations ON conversations
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_datasets ON datasets
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_document_pipelines ON document_pipelines
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_integrations ON integrations
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_invitations ON invitations
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_oauth2_connections ON oauth2_connections
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_objects ON objects
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_prompts ON prompts
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 CREATE POLICY tenant_isolation_team_users ON team_users
     FOR ALL TO bionic_application
-    USING (team_id = current_setting('app.current_team_id', true)::int);
+    USING (team_id = current_setting('app.current_team_id')::int);
 
 -- Create RLS policies for indirect team_id tables
+-- SECURITY: No 'true' parameter - will ERROR if app.current_team_id not set (fail loudly, not silently)
 CREATE POLICY tenant_isolation_chats ON chats
     FOR ALL TO bionic_application
     USING (
         conversation_id IN (
             SELECT id FROM conversations
-            WHERE team_id = current_setting('app.current_team_id', true)::int
+            WHERE team_id = current_setting('app.current_team_id')::int
         )
     );
 
@@ -259,7 +264,7 @@ CREATE POLICY tenant_isolation_documents ON documents
     USING (
         dataset_id IN (
             SELECT id FROM datasets
-            WHERE team_id = current_setting('app.current_team_id', true)::int
+            WHERE team_id = current_setting('app.current_team_id')::int
         )
     );
 
@@ -269,7 +274,7 @@ CREATE POLICY tenant_isolation_chunks ON chunks
         document_id IN (
             SELECT d.id FROM documents d
             JOIN datasets ds ON d.dataset_id = ds.id
-            WHERE ds.team_id = current_setting('app.current_team_id', true)::int
+            WHERE ds.team_id = current_setting('app.current_team_id')::int
         )
     );
 `
@@ -304,7 +309,47 @@ WHERE schemaname = 'public' AND rowsecurity = true;
 		zap.String("isolation", "database-level tenant isolation enforced"),
 		zap.String("security", "application bypasses cannot leak cross-tenant data"))
 
-	logger.Warn("CRITICAL: Application must set session variable: SET app.current_team_id = <user's team ID>")
+	// P0 SECURITY FIX: Verify bionic_application is NOT a superuser
+	// Superusers bypass RLS, making all policies useless
+	logger.Info("Verifying bionic_application is not a superuser")
+
+	verifySuperuserSQL := `SELECT rolsuper FROM pg_roles WHERE rolname = 'bionic_application';`
+	isSuperuser, err := querySingleValue(rc, PostgresContainer, DBUser, DBName, verifySuperuserSQL)
+	if err != nil {
+		logger.Warn("Could not verify bionic_application superuser status", zap.Error(err))
+	} else if isSuperuser == "t" || isSuperuser == "true" {
+		return fmt.Errorf("CRITICAL SECURITY FAILURE: bionic_application is a superuser and will BYPASS all RLS policies\n"+
+			"RLS is completely ineffective when the user is a superuser.\n"+
+			"Fix: Revoke superuser: ALTER USER bionic_application NOSUPERUSER;")
+	} else {
+		logger.Info("Verified: bionic_application is NOT a superuser (RLS will work correctly)")
+	}
+
+	// P1 CRITICAL WARNING: Application MUST set session variable
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Warn("⚠️  CRITICAL: APPLICATION INTEGRATION REQUIRED")
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Warn("")
+	logger.Warn("BionicGPT application MUST set the session variable on EVERY connection:")
+	logger.Warn("")
+	logger.Warn("  SET app.current_team_id = <user's team ID>;")
+	logger.Warn("")
+	logger.Warn("Without this:")
+	logger.Warn("  • All database queries will ERROR with: unrecognized configuration parameter")
+	logger.Warn("  • Users will see NO DATA (RLS will block everything)")
+	logger.Warn("  • This is INTENTIONAL - fail loudly, not silently")
+	logger.Warn("")
+	logger.Warn("Where to add:")
+	logger.Warn("  • In database connection initialization code")
+	logger.Warn("  • Before any queries execute")
+	logger.Warn("  • Use the authenticated user's team_id from their session")
+	logger.Warn("")
+	logger.Warn("Example (pseudocode):")
+	logger.Warn("  conn = db.connect()")
+	logger.Warn("  conn.execute('SET app.current_team_id = ?', [user.team_id])")
+	logger.Warn("  # Now queries will be filtered by RLS policies")
+	logger.Warn("")
+	logger.Warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	return nil
 }
