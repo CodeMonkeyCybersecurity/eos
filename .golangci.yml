@@ -161,10 +161,13 @@ issues:
 
 # Output Configuration
 output:
+  # In v2, formats is a map (not a slice)
   formats:
-    - format: colored-line-number  # Human-readable colored output
-  print-issued-lines: true         # Show the lines with issues
-  print-linter-name: true          # Show which linter found the issue
+    text:  # Human-readable colored output (replaces 'colored-line-number' in v1)
+      path: stdout
+      print-issued-lines: true
+      print-linter-name: true
+      colors: true
   uniq-by-line: true              # Show multiple issues on same line
   sort-results: true               # Sort results for consistent output
   path-prefix: ""                  # Don't modify paths in output
