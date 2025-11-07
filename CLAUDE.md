@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-*Last Updated: 2025-10-31*
+*Last Updated: 2025-11-07*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
@@ -726,6 +726,123 @@ go build -o /tmp/eos-build ./cmd/    # Must compile
 golangci-lint run                    # Must pass linting
 go test -v ./pkg/...                 # Must pass tests
 ```
+
+## Shift-Left Strategy: Automated Pre-Commit Validation
+
+**Philosophy**: Catch errors at development time, not at user installation time.
+
+### Problem Statement
+
+Compile-time errors that reach the main branch violate P0 Rule #10 and create poor user experience:
+- Users see cryptic build failures during `install.sh`
+- CI/CD pipelines fail after merge
+- Development velocity slows due to fixing broken builds
+- Trust in codebase quality erodes
+
+### Solution: Three-Layer Defense
+
+#### Layer 1: AI Assistant Pre-Commit Check (P0 - MANDATORY)
+
+**RULE**: Before completing ANY task, AI assistants MUST run:
+```bash
+go build -o /tmp/eos-build ./cmd/
+```
+
+If build fails, fix ALL errors before responding to user. Zero tolerance.
+
+This is already documented in P0 Rule #10 but bears repeating: **never mark a task complete without verifying the build**.
+
+#### Layer 2: Git Pre-Commit Hook (AUTOMATED)
+
+Installed automatically in `.git/hooks/pre-commit`, this hook runs before every commit and enforces:
+
+1. **Build validation**: `go build -o /tmp/eos-build ./cmd/`
+2. **Static analysis**: `go vet ./pkg/...` and `go vet ./cmd/...`
+3. **Format checking**: `gofmt -l .`
+
+**Installation**:
+```bash
+# Automatic (hook already present in repo)
+git clone <repo> && cd eos
+# Hook is active immediately
+
+# Manual (if hook gets removed)
+./scripts/install-git-hooks.sh
+```
+
+**Bypass** (NOT RECOMMENDED):
+```bash
+git commit --no-verify  # Only use if you know what you're doing
+```
+
+#### Layer 3: CI/CD Pipeline (PLANNED)
+
+Future enhancement: GitHub Actions workflow that runs on every push:
+- Build verification
+- Full test suite
+- Security scanning
+- Coverage reporting
+
+This provides final safety net before merge to main.
+
+### Developer Workflow
+
+```
+Write code
+    ↓
+[Layer 1] AI runs go build before completion
+    ↓
+git add .
+    ↓
+git commit  ← [Layer 2] Pre-commit hook validates
+    ↓
+git push
+    ↓
+[Layer 3] CI/CD validates (future)
+    ↓
+Merge to main
+```
+
+### Error Prevention Examples
+
+**Example 1: Unused Import**
+```go
+// BEFORE: AI completes task without building
+import (
+    "bytes"  // ← Unused, will break build
+    "fmt"
+)
+// AI marks task complete ✗ WRONG
+
+// AFTER: AI runs go build before completion
+// Build fails with "bytes imported and not used"
+// AI fixes error, verifies build, then marks complete ✓ CORRECT
+```
+
+**Example 2: Function Signature Mismatch**
+```go
+// BEFORE: AI writes code without verifying
+proceed, err := interaction.PromptYesNo(...)  // ← Wrong signature
+// AI marks task complete ✗ WRONG
+
+// AFTER: AI runs go build before completion
+// Build fails with "assignment mismatch: 2 variables but PromptYesNo returns 1 value"
+// AI uses PromptYesNoSafe instead, verifies build ✓ CORRECT
+```
+
+### Enforcement Checklist
+
+- [ ] AI assistants verify build before task completion (P0 Rule #10)
+- [ ] Pre-commit hook installed in `.git/hooks/pre-commit`
+- [ ] Hook is executable: `chmod +x .git/hooks/pre-commit`
+- [ ] Developers understand bypass is discouraged: `--no-verify`
+- [ ] CI/CD pipeline planned for future implementation
+
+### Related Documentation
+
+- **P0 Rule #10**: Pre-commit validation (line 48)
+- **Pre-Completion Review Checklist**: Architecture compliance (line 764)
+- **Testing Requirements**: Manual validation commands (line 721)
 
 ## AI Assistant Guidelines
 
