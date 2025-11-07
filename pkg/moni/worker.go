@@ -218,7 +218,7 @@ func runFullSetup(rc *eos_io.RuntimeContext, config *WorkerConfig) (*SetupResult
 
 		// Phase 7.5: Row Level Security
 		phase75 := runPhase(rc, 7, "Row Level Security (RLS)", func() error {
-			return EnableRowLevelSecurity(rc)
+			return EnableRowLevelSecurity(rc, config)
 		})
 		result.Phases = append(result.Phases, phase75)
 		if !phase75.Success {

@@ -44,6 +44,7 @@ var (
 	moniVerifySecurity bool
 	moniCleanupBackups bool
 	moniWorkDir        string
+	moniForce          bool
 )
 
 // MoniCmd is the command for Moni (BionicGPT) operations
@@ -161,6 +162,10 @@ Examples:
 	// Work directory flag
 	MoniCmd.Flags().StringVar(&moniWorkDir, "work-dir", "/opt/moni",
 		"Working directory for Moni initialization (default: /opt/moni)")
+
+	// Force flag (skip confirmations for RLS breaking changes)
+	MoniCmd.Flags().BoolVar(&moniForce, "force", false,
+		"Skip confirmation prompts (use for automation/CI/CD)")
 
 	MoniCmd.AddCommand(refreshCmd)
 }
@@ -309,6 +314,7 @@ func runMoniInit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 		VerifySecurityOnly: moniVerifySecurity,
 		CleanupBackups:     moniCleanupBackups,
 		WorkDir:            moniWorkDir,
+		Force:              moniForce,
 	}
 
 	// Log operation

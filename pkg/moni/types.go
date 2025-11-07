@@ -23,6 +23,9 @@ type WorkerConfig struct {
 
 	// Paths (overridable for testing)
 	WorkDir string
+
+	// Force flag (skip confirmations for RLS breaking changes)
+	Force bool
 }
 
 // PostgresImage represents a detected PostgreSQL container image

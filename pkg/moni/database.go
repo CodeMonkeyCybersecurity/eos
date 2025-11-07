@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 	"go.uber.org/zap/otelzap"
 )
@@ -170,9 +171,42 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 }
 
 // EnableRowLevelSecurity enables RLS for multi-tenant data isolation
-func EnableRowLevelSecurity(rc *eos_io.RuntimeContext) error {
+func EnableRowLevelSecurity(rc *eos_io.RuntimeContext, config *WorkerConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Enabling Row Level Security (Multi-Tenant Isolation)")
+
+	// P1 FIX (Issue #9): Breaking change warning and confirmation
+	// RLS requires application code changes - must set app.current_team_id
+	// This will break existing installations that don't set this variable
+	logger.Warn("⚠️  BREAKING CHANGE: Row Level Security (RLS) requires application code changes")
+	logger.Warn("")
+	logger.Warn("Impact:")
+	logger.Warn("  • Existing installations will ERROR without app.current_team_id")
+	logger.Warn("  • Application MUST set session variable on EVERY database connection:")
+	logger.Warn("    SET app.current_team_id = <user's team ID>;")
+	logger.Warn("")
+	logger.Warn("Before proceeding:")
+	logger.Warn("  1. Verify BionicGPT application has been updated to set app.current_team_id")
+	logger.Warn("  2. Ensure you have a rollback plan (database backup)")
+	logger.Warn("  3. Test in non-production environment first")
+	logger.Warn("")
+
+	// Skip confirmation if --force flag is set
+	if !config.Force {
+		// Prompt user for confirmation (default: No for safety)
+		confirmed, err := interaction.PromptYesNoSafe(rc,
+			"Do you want to proceed with enabling RLS?", false)
+		if err != nil {
+			return fmt.Errorf("failed to get user confirmation: %w", err)
+		}
+		if !confirmed {
+			logger.Info("RLS enablement cancelled by user")
+			return fmt.Errorf("RLS enablement cancelled - application code changes required first")
+		}
+		logger.Info("User confirmed RLS enablement")
+	} else {
+		logger.Info("Skipping confirmation (--force flag set)")
+	}
 
 	// RLS SQL from enable_rls.sql
 	// SECURITY FIX (P0): Removed 'true' parameter from current_setting() to fail loudly if not set
@@ -199,57 +233,72 @@ ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for direct team_id tables
+-- P0 FIX (Issue #8): Add DROP POLICY IF EXISTS for idempotency
 -- SECURITY: No 'true' parameter - will ERROR if app.current_team_id not set (fail loudly, not silently)
+DROP POLICY IF EXISTS tenant_isolation_api_key_connections ON api_key_connections;
 CREATE POLICY tenant_isolation_api_key_connections ON api_key_connections
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_api_keys ON api_keys;
 CREATE POLICY tenant_isolation_api_keys ON api_keys
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_audit_trail ON audit_trail;
 CREATE POLICY tenant_isolation_audit_trail ON audit_trail
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_conversations ON conversations;
 CREATE POLICY tenant_isolation_conversations ON conversations
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_datasets ON datasets;
 CREATE POLICY tenant_isolation_datasets ON datasets
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_document_pipelines ON document_pipelines;
 CREATE POLICY tenant_isolation_document_pipelines ON document_pipelines
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_integrations ON integrations;
 CREATE POLICY tenant_isolation_integrations ON integrations
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_invitations ON invitations;
 CREATE POLICY tenant_isolation_invitations ON invitations
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_oauth2_connections ON oauth2_connections;
 CREATE POLICY tenant_isolation_oauth2_connections ON oauth2_connections
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_objects ON objects;
 CREATE POLICY tenant_isolation_objects ON objects
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_prompts ON prompts;
 CREATE POLICY tenant_isolation_prompts ON prompts
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
+DROP POLICY IF EXISTS tenant_isolation_team_users ON team_users;
 CREATE POLICY tenant_isolation_team_users ON team_users
     FOR ALL TO bionic_application
     USING (team_id = current_setting('app.current_team_id')::int);
 
 -- Create RLS policies for indirect team_id tables
+-- P0 FIX (Issue #8): Add DROP POLICY IF EXISTS for idempotency
 -- SECURITY: No 'true' parameter - will ERROR if app.current_team_id not set (fail loudly, not silently)
+DROP POLICY IF EXISTS tenant_isolation_chats ON chats;
 CREATE POLICY tenant_isolation_chats ON chats
     FOR ALL TO bionic_application
     USING (
@@ -259,6 +308,7 @@ CREATE POLICY tenant_isolation_chats ON chats
         )
     );
 
+DROP POLICY IF EXISTS tenant_isolation_documents ON documents;
 CREATE POLICY tenant_isolation_documents ON documents
     FOR ALL TO bionic_application
     USING (
@@ -268,6 +318,7 @@ CREATE POLICY tenant_isolation_documents ON documents
         )
     );
 
+DROP POLICY IF EXISTS tenant_isolation_chunks ON chunks;
 CREATE POLICY tenant_isolation_chunks ON chunks
     FOR ALL TO bionic_application
     USING (
@@ -316,7 +367,15 @@ WHERE schemaname = 'public' AND rowsecurity = true;
 	verifySuperuserSQL := `SELECT rolsuper FROM pg_roles WHERE rolname = 'bionic_application';`
 	isSuperuser, err := querySingleValue(rc, PostgresContainer, DBUser, DBName, verifySuperuserSQL)
 	if err != nil {
-		logger.Warn("Could not verify bionic_application superuser status", zap.Error(err))
+		// P1 FIX (Issue #11): Fail hard instead of warning
+		// Cannot verify superuser status = cannot guarantee RLS security
+		return fmt.Errorf("CRITICAL SECURITY CHECK FAILED: could not verify bionic_application superuser status: %w\n"+
+			"RLS security cannot be guaranteed without this verification.\n"+
+			"Possible causes:\n"+
+			"  • Database connection failed\n"+
+			"  • PostgreSQL container not running\n"+
+			"  • bionic_application user does not exist\n"+
+			"Fix: Ensure PostgreSQL is running and bionic_application user exists", err)
 	} else if isSuperuser == "t" || isSuperuser == "true" {
 		return fmt.Errorf("CRITICAL SECURITY FAILURE: bionic_application is a superuser and will BYPASS all RLS policies\n"+
 			"RLS is completely ineffective when the user is a superuser.\n"+
