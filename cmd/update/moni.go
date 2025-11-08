@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt/refresh"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/moni"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -28,6 +29,22 @@ var (
 	moniPostInstall   bool
 	moniRotateAPIKeys bool
 	moniInstallDir    string
+
+	// Moni init (worker) flags
+	moniInit           bool
+	moniSkipSSL        bool
+	moniSkipDatabase   bool
+	moniSkipSecurity   bool
+	moniSkipVerification bool
+	moniValidateCerts  bool
+	moniFixCerts       bool
+	moniVerifyDB       bool
+	moniVerifyRLS      bool
+	moniVerifyCSP      bool
+	moniVerifySecurity bool
+	moniCleanupBackups bool
+	moniWorkDir        string
+	moniForce          bool
 )
 
 // MoniCmd is the command for Moni (BionicGPT) operations
@@ -112,6 +129,44 @@ Examples:
 	MoniCmd.Flags().StringVar(&moniInstallDir, "install-dir", "/opt/bionicgpt",
 		"Path to Moni installation directory")
 
+	// Moni init (worker) flags - full initialization
+	MoniCmd.Flags().BoolVar(&moniInit, "init", false,
+		"Run full Moni initialization (SSL, database, security)")
+
+	// Phase control flags
+	MoniCmd.Flags().BoolVar(&moniSkipSSL, "skip-ssl", false,
+		"Skip SSL certificate generation")
+	MoniCmd.Flags().BoolVar(&moniSkipDatabase, "skip-database", false,
+		"Skip database configuration")
+	MoniCmd.Flags().BoolVar(&moniSkipSecurity, "skip-security", false,
+		"Skip security hardening")
+	MoniCmd.Flags().BoolVar(&moniSkipVerification, "skip-verification", false,
+		"Skip security verification")
+
+	// Targeted action flags
+	MoniCmd.Flags().BoolVar(&moniValidateCerts, "validate-certs", false,
+		"Validate SSL certificate readability")
+	MoniCmd.Flags().BoolVar(&moniFixCerts, "fix-certs", false,
+		"Fix SSL certificate permissions")
+	MoniCmd.Flags().BoolVar(&moniVerifyDB, "verify-db", false,
+		"Verify database configuration")
+	MoniCmd.Flags().BoolVar(&moniVerifyRLS, "verify-rls", false,
+		"Verify Row Level Security (RLS)")
+	MoniCmd.Flags().BoolVar(&moniVerifyCSP, "verify-csp", false,
+		"Verify Content Security Policy (CSP)")
+	MoniCmd.Flags().BoolVar(&moniVerifySecurity, "verify-security", false,
+		"Run all security verifications (RLS + CSP)")
+	MoniCmd.Flags().BoolVar(&moniCleanupBackups, "cleanup-backups", false,
+		"Cleanup old .env backups")
+
+	// Work directory flag
+	MoniCmd.Flags().StringVar(&moniWorkDir, "work-dir", "/opt/moni",
+		"Working directory for Moni initialization (default: /opt/moni)")
+
+	// Force flag (skip confirmations for RLS breaking changes)
+	MoniCmd.Flags().BoolVar(&moniForce, "force", false,
+		"Skip confirmation prompts (use for automation/CI/CD)")
+
 	MoniCmd.AddCommand(refreshCmd)
 }
 
@@ -120,17 +175,32 @@ Examples:
 func runMoniOperations(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check which operation was requested
+	// Check which operation was requested (priority order)
+
+	// 1. Init/worker operations (new functionality)
+	if moniInit || moniValidateCerts || moniFixCerts || moniVerifyDB ||
+		moniVerifyRLS || moniVerifyCSP || moniVerifySecurity || moniCleanupBackups {
+		return runMoniInit(rc, cmd, args)
+	}
+
+	// 2. Post-install
 	if moniPostInstall {
 		return runMoniPostInstall(rc, cmd, args)
 	}
 
+	// 3. API key rotation
 	if moniRotateAPIKeys {
 		return runMoniRotateAPIKeys(rc, cmd, args)
 	}
 
 	// If no operation specified, show help
-	logger.Info("No operation specified. Use --post-install or --rotate-api-keys")
+	logger.Info("No operation specified")
+	logger.Info("Common operations:")
+	logger.Info("  --init             # Full initialization (SSL, database, security)")
+	logger.Info("  --post-install     # Post-installation configuration")
+	logger.Info("  --rotate-api-keys  # Rotate API keys")
+	logger.Info("  --validate-certs   # Validate SSL certificates")
+	logger.Info("  --verify-security  # Security verification")
 	return cmd.Help()
 }
 
@@ -222,5 +292,72 @@ func runMoniRefresh(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	}
 
 	logger.Info("Moni refresh completed successfully")
+	return nil
+}
+
+// runMoniInit handles the Moni initialization worker
+// Orchestration layer: delegates to pkg/moni for business logic
+func runMoniInit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Build worker configuration
+	config := &moni.WorkerConfig{
+		SkipSSL:            moniSkipSSL,
+		SkipDatabase:       moniSkipDatabase,
+		SkipSecurity:       moniSkipSecurity,
+		SkipVerification:   moniSkipVerification,
+		ValidateCertsOnly:  moniValidateCerts,
+		FixCertsOnly:       moniFixCerts,
+		VerifyDBOnly:       moniVerifyDB,
+		VerifyRLSOnly:      moniVerifyRLS,
+		VerifyCSPOnly:      moniVerifyCSP,
+		VerifySecurityOnly: moniVerifySecurity,
+		CleanupBackups:     moniCleanupBackups,
+		WorkDir:            moniWorkDir,
+		Force:              moniForce,
+	}
+
+	// Log operation
+	if moniInit {
+		logger.Info("Starting Moni full initialization",
+			zap.String("work_dir", moniWorkDir))
+	} else if moniValidateCerts {
+		logger.Info("Validating SSL certificates")
+	} else if moniFixCerts {
+		logger.Info("Fixing SSL certificate permissions")
+	} else if moniVerifyDB {
+		logger.Info("Verifying database configuration")
+	} else if moniVerifyRLS {
+		logger.Info("Verifying Row Level Security")
+	} else if moniVerifyCSP {
+		logger.Info("Verifying Content Security Policy")
+	} else if moniVerifySecurity {
+		logger.Info("Running security verification")
+	} else if moniCleanupBackups {
+		logger.Info("Cleaning up old backups")
+	}
+
+	// Run worker
+	result, err := moni.RunWorker(rc, config)
+	if err != nil {
+		logger.Error("Moni worker failed", zap.Error(err))
+		return fmt.Errorf("moni worker failed: %w", err)
+	}
+
+	// Check result
+	if !result.Success {
+		logger.Error("Moni operation did not complete successfully")
+
+		if len(result.CriticalIssues) > 0 {
+			logger.Error("Critical issues detected:")
+			for _, issue := range result.CriticalIssues {
+				logger.Error(fmt.Sprintf("  • %s", issue))
+			}
+		}
+
+		return fmt.Errorf("moni operation failed")
+	}
+
+	logger.Info("Moni operation completed successfully")
 	return nil
 }
