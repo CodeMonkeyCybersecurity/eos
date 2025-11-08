@@ -16,7 +16,6 @@ package apikeys
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"

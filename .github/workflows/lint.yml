@@ -25,10 +25,10 @@ jobs:
         run: go mod download
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: --timeout=5m --out-format colored-line-number
+          args: --timeout=5m --config=.golangci.yml
 
       - name: Check code formatting
         run: |

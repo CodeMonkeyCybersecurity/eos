@@ -302,7 +302,7 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 
 		// Use interaction package for consistent prompting
 		// Default to NO (safer option)
-		proceed, err := interaction.PromptYesNo(eeu.rc, "Continue with uncommitted changes?", false)
+		proceed, err := interaction.PromptYesNoSafe(eeu.rc, "Continue with uncommitted changes?", false)
 		if err != nil {
 			return fmt.Errorf("failed to get user input: %w", err)
 		}
