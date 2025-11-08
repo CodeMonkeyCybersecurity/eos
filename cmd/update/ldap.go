@@ -3,21 +3,16 @@ package update
 
 import (
 	"fmt"
-	"net"
-	"os/exec"
-	"regexp"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/spf13/cobra"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
-	ipSAN  string
-	dryRun bool
+	ldapIPSAN  string
+	ldapDryRun bool
 )
 
 var UpdateLDAPCmd = &cobra.Command{
@@ -26,62 +21,26 @@ var UpdateLDAPCmd = &cobra.Command{
 	Long: `Regenerates the TLS certificate for your LDAP server, including the IP address
 in the SAN field. Useful when clients (like Wazuh/Wazuh) need to connect via IP.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := otelzap.Ctx(rc.Ctx)
-		if ipSAN == "" {
+		// Validate required flag
+		if ldapIPSAN == "" {
 			return fmt.Errorf("--ip flag is required to set SAN IP")
 		}
 
-		// Validate IP address to prevent command injection
-		if err := validateIPAddress(ipSAN); err != nil {
-			return fmt.Errorf("invalid IP address: %w", err)
+		// Delegate to pkg/ldap for business logic
+		config := &ldap.RegenerateTLSCertificateConfig{
+			IPSAN:  ldapIPSAN,
+			DryRun: ldapDryRun,
 		}
 
-		cmds := []string{
-			"mkdir -p /etc/ldap/certs",
-			fmt.Sprintf(`openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -subj "/CN=%s" \
-  -keyout /etc/ldap/certs/ldap.key \
-  -out /etc/ldap/certs/ldap.crt \
-  -addext "subjectAltName = IP:%s"`, ipSAN, ipSAN),
-		}
-
-		for _, c := range cmds {
-			logger.Info("terminal prompt:  Executing command", zap.String("cmd", c))
-			if !dryRun {
-				cmd := exec.Command("bash", "-c", c)
-				cmd.Stdout = cmd.Stderr
-				if err := cmd.Run(); err != nil {
-					return fmt.Errorf("failed to run command: %s: %w", c, err)
-				}
-			}
-		}
-
-		logger.Info("terminal prompt:  LDAP TLS certificate regenerated with IP SAN.")
-		logger.Info("terminal prompt:  Path: /etc/ldap/certs/ldap.crt and ldap.key")
-		logger.Info("terminal prompt: 🧠 Reminder: Restart your LDAP server to use the new certificate.")
-
-		return nil
+		return ldap.RegenerateTLSCertificate(rc, config)
 	}),
-}
-
-// validateIPAddress validates that the input is a valid IP address and doesn't contain injection characters
-func validateIPAddress(ip string) error {
-	// Check for basic IP format
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil {
-		return fmt.Errorf("invalid IP address format")
-	}
-
-	// Additional security check: ensure no shell metacharacters
-	if matched, _ := regexp.MatchString(`[;&|<>$()\x00-\x1f\x7f-\x9f]`, ip); matched {
-		return fmt.Errorf("IP address contains forbidden characters")
-	}
-
-	return nil
 }
 
 func init() {
 	UpdateCmd.AddCommand(UpdateLDAPCmd)
-	UpdateLDAPCmd.Flags().StringVar(&ipSAN, "ip", "", "IP address to include in SAN")
-	UpdateLDAPCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show commands without executing them")
+	UpdateLDAPCmd.Flags().StringVar(&ldapIPSAN, "ip", "", "IP address to include in SAN")
+	UpdateLDAPCmd.Flags().BoolVar(&ldapDryRun, "dry-run", false, "Show commands without executing them")
 }
+
+// All business logic has been migrated to pkg/ldap/certificate.go
+// This file now contains only Cobra orchestration as per CLAUDE.md architecture rules
