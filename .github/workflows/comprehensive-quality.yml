@@ -180,7 +180,7 @@ jobs:
           curl -s "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > coverage-badge.svg
       
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-reports
           path: |
@@ -260,7 +260,7 @@ jobs:
           sha256sum ${OUTPUT_NAME} > ${OUTPUT_NAME}.sha256
       
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: eos-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
