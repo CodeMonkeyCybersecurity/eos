@@ -4,11 +4,11 @@ import "time"
 
 // Container names
 const (
-	PostgresContainer     = "bionicgpt-postgres"
-	LiteLLMContainer      = "bionicgpt-litellm"
-	LiteLLMDBContainer    = "bionicgpt-litellm-db"
-	LangfuseDBContainer   = "bionicgpt-langfuse-db"
-	AppContainer          = "bionicgpt-app"
+	PostgresContainer   = "bionicgpt-postgres"
+	LiteLLMContainer    = "bionicgpt-litellm"
+	LiteLLMDBContainer  = "bionicgpt-litellm-db"
+	LangfuseDBContainer = "bionicgpt-langfuse-db"
+	AppContainer        = "bionicgpt-app"
 )
 
 // Service URLs
@@ -50,12 +50,12 @@ const (
 
 // SSL Certificate ownership (Alpine PostgreSQL containers)
 const (
-	CertOwnerUID  = 0   // root
-	CertOwnerGID  = 70  // postgres group in Alpine
-	CertKeyPerms  = 0640
-	CertCrtPerms  = 0644
-	StandardUID   = 999 // Standard PostgreSQL UID
-	TempKeyPerms  = 0600
+	CertOwnerUID = 0  // root
+	CertOwnerGID = 70 // postgres group in Alpine
+	CertKeyPerms = 0640
+	CertCrtPerms = 0644
+	StandardUID  = 999 // Standard PostgreSQL UID
+	TempKeyPerms = 0600
 )
 
 // Certificate strategies
@@ -70,14 +70,14 @@ const (
 // max completion tokens. This prevents API errors when BionicGPT reads this
 // value and sends it as max_tokens in requests.
 const (
-	ModelContextSize       = 16384
-	EmbeddingsContextSize  = 8192
-	ModelTPMLimit          = 50000
-	ModelRPMLimit          = 1000
-	ModelFallbackTPMLimit  = 30000
-	ModelFallbackRPMLimit  = 500
-	EmbeddingsTPMLimit     = 10000
-	EmbeddingsRPMLimit     = 10000
+	ModelContextSize      = 16384
+	EmbeddingsContextSize = 8192
+	ModelTPMLimit         = 50000
+	ModelRPMLimit         = 1000
+	ModelFallbackTPMLimit = 30000
+	ModelFallbackRPMLimit = 500
+	EmbeddingsTPMLimit    = 10000
+	EmbeddingsRPMLimit    = 10000
 )
 
 // RLS table counts

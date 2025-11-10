@@ -11,11 +11,11 @@ type WorkerConfig struct {
 	SkipVerification bool
 
 	// Validation only
-	ValidateCertsOnly bool
-	FixCertsOnly      bool
-	VerifyDBOnly      bool
-	VerifyRLSOnly     bool
-	VerifyCSPOnly     bool
+	ValidateCertsOnly  bool
+	FixCertsOnly       bool
+	VerifyDBOnly       bool
+	VerifyRLSOnly      bool
+	VerifyCSPOnly      bool
 	VerifySecurityOnly bool
 
 	// Cleanup
@@ -61,13 +61,13 @@ type HealthCheckResult struct {
 
 // RLSVerificationResult contains RLS verification results
 type RLSVerificationResult struct {
-	RLSEnabled               bool
-	TablesWithRLS            []string
-	TablesWithoutRLS         []string
-	PoliciesFound            []RLSPolicy
-	CriticalTablesProtected  bool
-	Warnings                 []string
-	Errors                   []string
+	RLSEnabled              bool
+	TablesWithRLS           []string
+	TablesWithoutRLS        []string
+	PoliciesFound           []RLSPolicy
+	CriticalTablesProtected bool
+	Warnings                []string
+	Errors                  []string
 }
 
 // RLSPolicy represents a Row Level Security policy
@@ -91,12 +91,12 @@ type CSPVerificationResult struct {
 
 // DBVerificationResult contains database verification results
 type DBVerificationResult struct {
-	ModelCount  int
-	MoniExists  bool
-	Models      []DBModel
-	Prompts     []DBPrompt
-	Errors      []string
-	Warnings    []string
+	ModelCount int
+	MoniExists bool
+	Models     []DBModel
+	Prompts    []DBPrompt
+	Errors     []string
+	Warnings   []string
 }
 
 // DBModel represents a database model record
@@ -129,13 +129,13 @@ type EnvCheckResult struct {
 
 // SetupResult contains the overall setup result
 type SetupResult struct {
-	Success           bool
-	Phases            []SetupPhase
-	HealthCheck       *HealthCheckResult
-	RLSVerification   *RLSVerificationResult
-	CSPVerification   *CSPVerificationResult
-	DBVerification    *DBVerificationResult
-	StartTime         time.Time
-	EndTime           time.Time
-	CriticalIssues    []string
+	Success         bool
+	Phases          []SetupPhase
+	HealthCheck     *HealthCheckResult
+	RLSVerification *RLSVerificationResult
+	CSPVerification *CSPVerificationResult
+	DBVerification  *DBVerificationResult
+	StartTime       time.Time
+	EndTime         time.Time
+	CriticalIssues  []string
 }

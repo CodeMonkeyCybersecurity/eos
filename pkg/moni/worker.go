@@ -292,11 +292,11 @@ func runPhase(rc *eos_io.RuntimeContext, number int, name string, fn func() erro
 	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	phase := SetupPhase{
-		Number:      number,
-		Name:        name,
-		StartTime:   time.Now(),
-		Errors:      []string{},
-		Warnings:    []string{},
+		Number:    number,
+		Name:      name,
+		StartTime: time.Now(),
+		Errors:    []string{},
+		Warnings:  []string{},
 	}
 
 	err := fn()
