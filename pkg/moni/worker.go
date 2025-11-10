@@ -497,8 +497,8 @@ func restartContainers(rc *eos_io.RuntimeContext, workDir string) error {
 	_, err := execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "down"},
-		WorkDir: workDir,      // P1 FIX: Explicit working directory (thread-safe)
-		Capture: false,        // Show output to user
+		Dir:     workDir, // P1 FIX: Explicit working directory (thread-safe)
+		Capture: false,   // Show output to user
 	})
 
 	if err != nil {
@@ -513,8 +513,8 @@ func restartContainers(rc *eos_io.RuntimeContext, workDir string) error {
 	_, err = execute.Run(ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "up", "-d"},
-		WorkDir: workDir,      // P1 FIX: Explicit working directory (thread-safe)
-		Capture: false,        // Show output to user
+		Dir:     workDir, // P1 FIX: Explicit working directory (thread-safe)
+		Capture: false,   // Show output to user
 	})
 
 	if err != nil {
