@@ -25,7 +25,7 @@ func TestTokenFileIntegration_RealFileCreation(t *testing.T) {
 	// RATIONALE: Unit tests mock filesystem, integration tests use real OS
 	// COMPLIANCE: NIST 800-53 AC-3 (Access Enforcement)
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	// Create token file
@@ -47,7 +47,7 @@ func TestTokenFileIntegration_RealFileCreation(t *testing.T) {
 	}
 
 	actualPerm := info.Mode().Perm()
-	expectedPerm := TempTokenFilePerm
+	expectedPerm := os.FileMode(TempTokenFilePerm)
 
 	if actualPerm != expectedPerm {
 		t.Errorf("Token file permissions incorrect:\nExpected: %o\nActual:   %o",
@@ -77,7 +77,7 @@ func TestTokenFileIntegration_UnpredictableNames(t *testing.T) {
 	// THREAT MODEL: Attacker trying to guess token file path
 	// MITIGATION: os.CreateTemp generates cryptographically random suffix
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	// Create multiple token files
@@ -128,7 +128,7 @@ func TestTokenFileIntegration_CleanupOnSuccess(t *testing.T) {
 	// RATIONALE: Token files must not persist on disk after use
 	// COMPLIANCE: PCI-DSS 3.2.1 (Do not store after authorization)
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	var tokenFilePath string
@@ -167,7 +167,7 @@ func TestTokenFileIntegration_CleanupOnError(t *testing.T) {
 	// THREAT MODEL: Operation fails, token file left on disk
 	// MITIGATION: defer cleanup ensures cleanup on all exit paths
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	var tokenFilePath string
@@ -213,7 +213,7 @@ func TestTokenFileIntegration_PermissionsDenyOtherUsers(t *testing.T) {
 	// NOTE: This test requires root to properly test setuid behavior
 	// For non-root users, we verify permissions are set correctly
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	tokenFile, err := createTemporaryTokenFile(rc, testToken)
@@ -260,7 +260,7 @@ func TestTokenFileIntegration_NoTokenInProcessEnvironment(t *testing.T) {
 	// ATTACK VECTOR: ps auxe | grep VAULT_TOKEN
 	// MITIGATION: Use VAULT_TOKEN_FILE instead of VAULT_TOKEN env var
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	tokenFile, err := createTemporaryTokenFile(rc, testToken)
@@ -311,7 +311,7 @@ func TestTokenFileIntegration_RaceConditionPrevention(t *testing.T) {
 	// THREAT MODEL: Attacker monitoring /tmp for new files with default perms
 	// MITIGATION: Chmod BEFORE writing content
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	// Monitor permissions during file creation
@@ -384,7 +384,7 @@ func TestTokenFileIntegration_WithRealVaultCommand(t *testing.T) {
 		t.Skip("VAULT_TOKEN_TEST not set, skipping real Vault integration test")
 	}
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 
 	// Create token file
 	tokenFile, err := createTemporaryTokenFile(rc, testToken)
@@ -414,13 +414,13 @@ func TestTokenFileIntegration_WithRealVaultCommand(t *testing.T) {
 }
 
 // Helper function to create test RuntimeContext
-func createTestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
+func createSecurityTestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 	ctx := context.Background()
 
 	return &eos_io.RuntimeContext{
-		Ctx:    ctx,
-		Logger: logger,
+		Ctx: ctx,
+		Log: logger,
 	}
 }
 
@@ -430,7 +430,7 @@ func TestTokenFileIntegration_FileDescriptorLeak(t *testing.T) {
 	// RESOURCE TEST: Verify no file descriptor leak
 	// RATIONALE: File descriptor leaks can cause "too many open files" errors
 
-	rc := createTestRuntimeContext(t)
+	rc := createSecurityTestRuntimeContext(t)
 	testToken := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	// Get initial FD count

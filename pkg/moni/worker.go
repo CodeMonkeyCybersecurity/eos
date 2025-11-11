@@ -23,14 +23,6 @@ func RunWorker(rc *eos_io.RuntimeContext, config *WorkerConfig) (*SetupResult, e
 		zap.String("version", "1.0"),
 		zap.String("mode", "Full end-to-end configuration"))
 
-	startTime := time.Now()
-
-	result := &SetupResult{
-		Success:   false,
-		Phases:    []SetupPhase{},
-		StartTime: startTime,
-	}
-
 	// P1 FIX: Validate working directory (don't use os.Chdir - not thread-safe)
 	workDir := MoniDir
 	if config.WorkDir != "" {
@@ -146,6 +138,11 @@ func runFullSetup(rc *eos_io.RuntimeContext, config *WorkerConfig) (*SetupResult
 	}
 
 	// Phase 4: Restart Containers
+	// Determine working directory for docker compose operations
+	workDir := MoniDir
+	if config.WorkDir != "" {
+		workDir = config.WorkDir
+	}
 	phase4 := runPhase(rc, 4, "Container Restart", func() error {
 		return restartContainers(rc, workDir)
 	})

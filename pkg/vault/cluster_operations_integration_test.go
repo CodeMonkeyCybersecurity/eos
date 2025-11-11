@@ -5,6 +5,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -36,7 +37,7 @@ func TestRaftAutopilot_Integration_WithTokenFile(t *testing.T) {
 	token := getTestVaultToken(t)
 
 	// Configure Autopilot using token file
-	err := ConfigureRaftAutopilot(rc, token)
+	err := ConfigureRaftAutopilot(rc, token, DefaultAutopilotConfig())
 
 	if err != nil {
 		t.Fatalf("ConfigureRaftAutopilot failed: %v", err)
@@ -68,12 +69,16 @@ func TestGetAutopilotState_Integration_WithTokenFile(t *testing.T) {
 		t.Fatalf("GetAutopilotState failed: %v", err)
 	}
 
-	if state == "" {
-		t.Error("Autopilot state is empty")
+	if state == nil {
+		t.Error("Autopilot state is nil")
 	}
 
 	t.Logf("✓ Autopilot state retrieved successfully")
-	t.Logf("State (truncated): %s", truncateString(state, 200))
+	if state != nil {
+		if b, err := json.Marshal(state); err == nil {
+			t.Logf("State (truncated): %s", truncateString(string(b), 200))
+		}
+	}
 }
 
 // TestTakeRaftSnapshot_Integration_WithTokenFile tests Raft snapshot operation
@@ -151,7 +156,7 @@ func TestRestoreRaftSnapshot_Integration_WithTokenFile(t *testing.T) {
 
 	// Attempt restore (with force flag for test)
 	// NOTE: This is destructive, only safe in test environment
-	err = RestoreRaftSnapshot(rc, token, snapshotFile)
+	err = RestoreRaftSnapshot(rc, token, snapshotFile, true)
 
 	if err != nil {
 		// Restore might fail if cluster is active - this is expected
@@ -184,7 +189,7 @@ func TestTokenExposurePrevention_ProcessList(t *testing.T) {
 
 	go func() {
 		// This operation takes a few seconds, giving us time to check ps
-		err := ConfigureRaftAutopilot(rc, token)
+		err := ConfigureRaftAutopilot(rc, token, DefaultAutopilotConfig())
 		errChan <- err
 		done <- true
 	}()
@@ -401,8 +406,8 @@ func createTestRuntimeContextForCluster(t *testing.T) *eos_io.RuntimeContext {
 	ctx := context.Background()
 
 	return &eos_io.RuntimeContext{
-		Ctx:    ctx,
-		Logger: logger,
+		Ctx: ctx,
+		Log: logger,
 	}
 }
 
@@ -650,8 +655,8 @@ func TestClusterOperations_LoggingNoTokenLeakage(t *testing.T) {
 	)
 
 	rc := &eos_io.RuntimeContext{
-		Ctx:    context.Background(),
-		Logger: logger,
+		Ctx: context.Background(),
+		Log: logger,
 	}
 
 	token := getTestVaultToken(t)
@@ -729,8 +734,8 @@ func BenchmarkTokenFileCreation(b *testing.B) {
 	// PERFORMANCE BENCHMARK: Measure token file creation overhead
 
 	rc := &eos_io.RuntimeContext{
-		Ctx:    context.Background(),
-		Logger: zap.NewNop(),
+		Ctx: context.Background(),
+		Log: zap.NewNop(),
 	}
 
 	token := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
@@ -749,8 +754,8 @@ func BenchmarkTokenFileVsEnvVar(b *testing.B) {
 	// PERFORMANCE COMPARISON: Token file vs environment variable
 
 	rc := &eos_io.RuntimeContext{
-		Ctx:    context.Background(),
-		Logger: zap.NewNop(),
+		Ctx: context.Background(),
+		Log: zap.NewNop(),
 	}
 
 	token := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
