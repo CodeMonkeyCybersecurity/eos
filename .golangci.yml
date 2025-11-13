@@ -28,8 +28,8 @@ linters:
     - gosec           # Security issues (G101-G602)
 
     # Style & Best Practices
-    - gofmt           # Ensure code is formatted
-    - goimports       # Check import formatting
+    # - gofmt           # REMOVED: gofmt is a formatter, not a linter in golangci-lint v2
+    # - goimports       # REMOVED: goimports is a formatter, not a linter in golangci-lint v2
     - misspell        # Find commonly misspelled English words
     - unconvert       # Remove unnecessary type conversions
     - unparam         # Find unused function parameters
@@ -79,11 +79,11 @@ linters-settings:
     checks: ["all", "-SA1019"]  # All checks except deprecated usage (we handle separately)
 
   # Style configuration
-  gofmt:
-    simplify: true  # Use gofmt -s
+  # gofmt:  # REMOVED: gofmt is not a linter in golangci-lint v2
+  #   simplify: true
 
-  goimports:
-    local-prefixes: github.com/CodeMonkeyCybersecurity/eos
+  # goimports:  # REMOVED: goimports is not a linter in golangci-lint v2
+  #   local-prefixes: github.com/CodeMonkeyCybersecurity/eos
 
   # Complexity limits
   nakedret:
@@ -173,19 +173,20 @@ output:
   path-prefix: ""                  # Don't modify paths in output
 
 # Severity Configuration
-severity:
-  default-severity: error
-  case-sensitive: false
-  rules:
-    - linters:
-        - gosec
-      severity: error
-    - linters:
-        - errcheck
-        - staticcheck
-        - govet
-      severity: error
-    - linters:
-        - misspell
-        - goconst
-      severity: warning
+# NOTE: Disabled due to golangci-lint v2 configuration changes
+# severity:
+#   default-severity: error
+#   case-sensitive: false
+#   rules:
+#     - linters:
+#         - gosec
+#       severity: error
+#     - linters:
+#         - errcheck
+#         - staticcheck
+#         - govet
+#       severity: error
+#     - linters:
+#         - misspell
+#         - goconst
+#       severity: warning
