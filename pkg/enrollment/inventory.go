@@ -1,0 +1,716 @@
+// pkg/enrollment/inventory.go
+package enrollment
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+
+	// Database drivers
+	_ "github.com/lib/pq"
+)
+
+// ExportToEosInventory exports system information to eos inventory
+func ExportToEosInventory(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Exporting system information to eos inventory")
+
+	// Generate HashiCorp configuration data
+	if err := generateHashiCorpData(rc, info); err != nil {
+		return fmt.Errorf("failed to generate HashiCorp configuration data: %w", err)
+	}
+
+	// Generate system facts
+	if err := generateSystemFacts(rc, info); err != nil {
+		return fmt.Errorf("failed to generate system facts: %w", err)
+	}
+
+	// Export to inventory database
+	if err := exportToInventoryDatabase(rc, info); err != nil {
+		logger.Warn("Failed to export to inventory database", zap.Error(err))
+		// Continue - this is not critical
+	}
+
+	// Generate Terraform data
+	if err := generateTerraformData(rc, info); err != nil {
+		logger.Warn("Failed to generate Terraform data", zap.Error(err))
+		// Continue - this is not critical
+	}
+
+	logger.Info("System information exported successfully")
+	return nil
+}
+
+// generateSystemFacts generates system facts for inventory
+func generateSystemFacts(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if we're in dry-run mode
+	if rc.Attributes != nil {
+		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
+			logger.Info("DRY RUN: Would generate system facts")
+			return nil
+		}
+	}
+
+	// Create facts directory
+	factsDir := "/var/lib/eos/facts"
+	if err := os.MkdirAll(factsDir, shared.ServiceDirPerm); err != nil {
+		return fmt.Errorf("failed to create facts directory: %w", err)
+	}
+
+	// Generate JSON facts
+	facts := map[string]interface{}{
+		"system": map[string]interface{}{
+			"hostname":       info.Hostname,
+			"platform":       info.Platform,
+			"architecture":   info.Architecture,
+			"kernel_version": info.KernelVersion,
+			"uptime":         info.Uptime.Seconds(),
+			"discovered_at":  time.Now().Format(time.RFC3339),
+		},
+		"hardware": map[string]interface{}{
+			"cpu_cores":     info.CPUCores,
+			"memory_gb":     info.MemoryGB,
+			"disk_space_gb": info.DiskSpaceGB,
+			"load_average":  info.LoadAverage,
+		},
+		"network": map[string]interface{}{
+			"interfaces": info.NetworkIfaces,
+		},
+		"services": info.Services,
+		"": map[string]interface{}{
+			"platform": info.Platform,
+			"version":  info.Version,
+		},
+	}
+
+	if info.DockerVersion != "" {
+		facts["docker"] = map[string]interface{}{
+			"version":   info.DockerVersion,
+			"installed": true,
+		}
+	}
+
+	// Write facts to JSON file
+	factsJSON, err := json.MarshalIndent(facts, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal facts: %w", err)
+	}
+
+	factsPath := filepath.Join(factsDir, "system.json")
+	if err := os.WriteFile(factsPath, factsJSON, shared.ConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write facts file: %w", err)
+	}
+
+	logger.Info("System facts generated", zap.String("facts_path", factsPath))
+	return nil
+}
+
+// exportToInventoryDatabase exports system information to inventory database
+func exportToInventoryDatabase(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if we're in dry-run mode
+	if rc.Attributes != nil {
+		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
+			logger.Info("DRY RUN: Would export to inventory database")
+			return nil
+		}
+	}
+
+	// Try to connect to inventory database
+	db, err := connectToInventoryDatabase(rc)
+	if err != nil {
+		return fmt.Errorf("failed to connect to inventory database: %w", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.Warn("Failed to close database connection", zap.Error(err))
+		}
+	}()
+
+	// Insert/update node record
+	if err := insertOrUpdateNodeRecord(rc, db, info); err != nil {
+		return fmt.Errorf("failed to insert/update node record: %w", err)
+	}
+
+	// Update service inventory
+	if err := updateServiceInventory(rc, db, info); err != nil {
+		return fmt.Errorf("failed to update service inventory: %w", err)
+	}
+
+	// Update network inventory
+	if err := updateNetworkInventory(rc, db, info); err != nil {
+		return fmt.Errorf("failed to update network inventory: %w", err)
+	}
+
+	// Create enrollment audit record
+	if err := createEnrollmentAuditRecord(rc, db, info); err != nil {
+		return fmt.Errorf("failed to create audit record: %w", err)
+	}
+
+	logger.Info("System information exported to inventory database successfully")
+	return nil
+}
+
+// connectToInventoryDatabase connects to the inventory database
+func connectToInventoryDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Try PostgreSQL connection
+	if db, err := connectToPostgreSQL(rc); err == nil {
+		logger.Debug("Connected to PostgreSQL inventory database")
+		return db, nil
+	}
+
+	return nil, fmt.Errorf("no inventory database available")
+}
+
+// connectToPostgreSQL connects to PostgreSQL database
+// SECURITY: Uses environment variables or Vault for credentials, never hardcoded
+func connectToPostgreSQL(rc *eos_io.RuntimeContext) (*sql.DB, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Get credentials from environment or Vault - NEVER hardcode
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		// Try reading from standard PostgreSQL environment variables
+		host := os.Getenv("PGHOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port := os.Getenv("PGPORT")
+		if port == "" {
+			port = "5432"
+		}
+		dbname := os.Getenv("PGDATABASE")
+		if dbname == "" {
+			dbname = "eos_inventory"
+		}
+		user := os.Getenv("PGUSER")
+		password := os.Getenv("PGPASSWORD")
+		sslmode := os.Getenv("PGSSLMODE")
+		if sslmode == "" {
+			sslmode = "require" // SECURE DEFAULT - require SSL
+		}
+
+		if user == "" || password == "" {
+			return nil, fmt.Errorf("database credentials not found in environment (set DATABASE_URL or PGUSER/PGPASSWORD)")
+		}
+
+		connStr = fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s",
+			host, port, dbname, user, password, sslmode)
+	}
+
+	logger.Info("Connecting to PostgreSQL",
+		zap.String("host", extractHost(connStr)),
+		zap.String("database", extractDatabase(connStr)))
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	logger.Info("Successfully connected to PostgreSQL inventory database")
+	return db, nil
+}
+
+// extractHost extracts hostname from connection string for logging (without credentials)
+func extractHost(connStr string) string {
+	if strings.HasPrefix(connStr, "postgresql://") {
+		parts := strings.Split(connStr, "@")
+		if len(parts) > 1 {
+			hostPart := strings.Split(parts[1], "/")[0]
+			return strings.Split(hostPart, ":")[0]
+		}
+	}
+	if strings.Contains(connStr, "host=") {
+		parts := strings.Split(connStr, "host=")
+		if len(parts) > 1 {
+			return strings.Fields(parts[1])[0]
+		}
+	}
+	return "unknown"
+}
+
+// extractDatabase extracts database name from connection string for logging
+func extractDatabase(connStr string) string {
+	if strings.HasPrefix(connStr, "postgresql://") {
+		parts := strings.Split(connStr, "/")
+		if len(parts) > 3 {
+			return strings.Split(parts[3], "?")[0]
+		}
+	}
+	if strings.Contains(connStr, "dbname=") {
+		parts := strings.Split(connStr, "dbname=")
+		if len(parts) > 1 {
+			return strings.Fields(parts[1])[0]
+		}
+	}
+	return "unknown"
+}
+
+// insertOrUpdateNodeRecord inserts or updates node record in database
+func insertOrUpdateNodeRecord(rc *eos_io.RuntimeContext, db *sql.DB, info *SystemInfo) error {
+	// SECURITY: Validate hostname before inserting into database
+	if !isValidHostname(info.Hostname) {
+		return fmt.Errorf("invalid hostname: %s (must be alphanumeric with dots/hyphens, max 255 chars)", info.Hostname)
+	}
+
+	query := `
+	INSERT INTO nodes (
+		hostname, platform, architecture, kernel_version,
+		cpu_cores, memory_gb, disk_space_gb, docker_version,
+		updated_at
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+	ON CONFLICT (hostname) DO UPDATE SET
+		platform = EXCLUDED.platform,
+		architecture = EXCLUDED.architecture,
+		kernel_version = EXCLUDED.kernel_version,
+		cpu_cores = EXCLUDED.cpu_cores,
+		memory_gb = EXCLUDED.memory_gb,
+		disk_space_gb = EXCLUDED.disk_space_gb,
+		docker_version = EXCLUDED.docker_version,
+		updated_at = CURRENT_TIMESTAMP
+	`
+
+	// FIXED: Parameter count now matches placeholders (8 params, $1-$8)
+	_, err := db.Exec(query,
+		info.Hostname,
+		info.Platform,
+		info.Architecture,
+		info.KernelVersion,
+		info.CPUCores,
+		info.MemoryGB,
+		info.DiskSpaceGB,
+		info.DockerVersion,
+	)
+
+	return err
+}
+
+// isValidHostname validates hostname to prevent SQL injection and malformed data
+func isValidHostname(hostname string) bool {
+	if len(hostname) == 0 || len(hostname) > 255 {
+		return false
+	}
+	// Allow alphanumeric, dots, hyphens, underscores
+	// Reject any special characters that could be used for injection
+	for _, char := range hostname {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '.' || char == '-' || char == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// updateServiceInventory updates service inventory in database
+func updateServiceInventory(rc *eos_io.RuntimeContext, db *sql.DB, info *SystemInfo) error {
+	// Delete existing service records for this node
+	_, err := db.Exec("DELETE FROM services WHERE node_hostname = $1", info.Hostname)
+	if err != nil {
+		return err
+	}
+
+	// Insert new service records
+	for _, service := range info.Services {
+		query := `
+		INSERT INTO services (
+			node_hostname, service_name, service_status, service_port,
+			process_id, start_time, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+		`
+
+		_, err := db.Exec(query,
+			info.Hostname,
+			service.Name,
+			service.Status,
+			service.Port,
+			service.ProcessID,
+			service.StartTime,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// updateNetworkInventory updates network inventory in database
+func updateNetworkInventory(rc *eos_io.RuntimeContext, db *sql.DB, info *SystemInfo) error {
+	// Delete existing network records for this node
+	_, err := db.Exec("DELETE FROM network_interfaces WHERE node_hostname = $1", info.Hostname)
+	if err != nil {
+		return err
+	}
+
+	// Insert new network records
+	for _, iface := range info.NetworkIfaces {
+		query := `
+		INSERT INTO network_interfaces (
+			node_hostname, interface_name, interface_type, mac_address, mtu,
+			is_up, is_public, ipv4_addresses, ipv6_addresses, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+		`
+
+		// Convert IP address slices to JSON strings
+		ipv4JSON, _ := json.Marshal(iface.IPv4)
+		ipv6JSON, _ := json.Marshal(iface.IPv6)
+
+		_, err := db.Exec(query,
+			info.Hostname,
+			iface.Name,
+			iface.Type,
+			iface.MAC,
+			iface.MTU,
+			iface.IsUp,
+			iface.IsPublic,
+			string(ipv4JSON),
+			string(ipv6JSON),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createEnrollmentAuditRecord creates an audit record for enrollment
+func createEnrollmentAuditRecord(rc *eos_io.RuntimeContext, db *sql.DB, info *SystemInfo) error {
+	query := `
+	INSERT INTO enrollment_audit (
+		node_hostname, enrollment_type, enrollment_status, enrollment_time, details
+	) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
+	`
+
+	details := fmt.Sprintf("System enrolled with %dGB RAM, %dGB disk, %d CPU cores",
+		info.MemoryGB, info.DiskSpaceGB, info.CPUCores)
+
+	_, err := db.Exec(query,
+		info.Hostname,
+		"self-enrollment",
+		"completed",
+		details,
+	)
+
+	return err
+}
+
+// generateTerraformData generates Terraform data for infrastructure management
+func generateTerraformData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if we're in dry-run mode
+	if rc.Attributes != nil {
+		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
+			logger.Info("DRY RUN: Would generate Terraform data")
+			return nil
+		}
+	}
+
+	// Create Terraform directory
+	terraformDir := "/var/lib/eos/terraform"
+	if err := os.MkdirAll(terraformDir, shared.ServiceDirPerm); err != nil {
+		return fmt.Errorf("failed to create terraform directory: %w", err)
+	}
+
+	// Generate Terraform resource definition
+	terraformResource := generateTerraformResource(info)
+
+	// Write to Terraform file
+	hostname := strings.ToLower(strings.Split(info.Hostname, ".")[0])
+	terraformPath := filepath.Join(terraformDir, fmt.Sprintf("%s.tf", hostname))
+
+	if err := os.WriteFile(terraformPath, []byte(terraformResource), shared.ConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write terraform file: %w", err)
+	}
+
+	logger.Info("Terraform data generated", zap.String("terraform_path", terraformPath))
+	return nil
+}
+
+// generateTerraformResource generates a Terraform resource definition
+func generateTerraformResource(info *SystemInfo) string {
+	var tf strings.Builder
+
+	hostname := strings.ToLower(strings.Split(info.Hostname, ".")[0])
+
+	// Header
+	tf.WriteString("# Terraform resource for node: " + info.Hostname + "\n")
+	tf.WriteString("# Generated by: eos self enroll\n")
+	tf.WriteString("# Generated at: " + time.Now().Format(time.RFC3339) + "\n")
+	tf.WriteString("\n")
+
+	// Node resource
+	tf.WriteString(fmt.Sprintf("resource \"eos_node\" \"%s\" {\n", hostname))
+	tf.WriteString(fmt.Sprintf("  name         = \"%s\"\n", info.Hostname))
+	tf.WriteString(fmt.Sprintf("  platform     = \"%s\"\n", info.Platform))
+	tf.WriteString(fmt.Sprintf("  architecture = \"%s\"\n", info.Architecture))
+	tf.WriteString("\n")
+
+	// Hardware block
+	tf.WriteString("  hardware {\n")
+	tf.WriteString(fmt.Sprintf("    cpu_cores     = %d\n", info.CPUCores))
+	tf.WriteString(fmt.Sprintf("    memory_gb     = %d\n", info.MemoryGB))
+	tf.WriteString(fmt.Sprintf("    disk_space_gb = %d\n", info.DiskSpaceGB))
+	tf.WriteString("  }\n")
+	tf.WriteString("\n")
+
+	// Network block
+	if len(info.NetworkIfaces) > 0 {
+		tf.WriteString("  network {\n")
+		for _, iface := range info.NetworkIfaces {
+			if iface.IsUp && iface.Type != "loopback" {
+				tf.WriteString("    interface {\n")
+				tf.WriteString(fmt.Sprintf("      name   = \"%s\"\n", iface.Name))
+				tf.WriteString(fmt.Sprintf("      type   = \"%s\"\n", iface.Type))
+				tf.WriteString(fmt.Sprintf("      mac    = \"%s\"\n", iface.MAC))
+				tf.WriteString(fmt.Sprintf("      is_up  = %v\n", iface.IsUp))
+
+				if len(iface.IPv4) > 0 {
+					tf.WriteString("      ipv4 = [\n")
+					for _, ip := range iface.IPv4 {
+						tf.WriteString(fmt.Sprintf("        \"%s\",\n", ip))
+					}
+					tf.WriteString("      ]\n")
+				}
+
+				tf.WriteString("    }\n")
+			}
+		}
+		tf.WriteString("  }\n")
+		tf.WriteString("\n")
+	}
+
+	// Services
+	if len(info.Services) > 0 {
+		tf.WriteString("  services = [\n")
+		for _, service := range info.Services {
+			tf.WriteString(fmt.Sprintf("    \"%s\",\n", service.Name))
+		}
+		tf.WriteString("  ]\n")
+		tf.WriteString("\n")
+	}
+
+	// Tags
+	tf.WriteString("  tags = {\n")
+	tf.WriteString("    \"managed-by\"    = \"eos\"\n")
+	tf.WriteString(fmt.Sprintf("    \"enrolled-at\"   = \"%s\"\n", time.Now().Format("2006-01-02")))
+	tf.WriteString(fmt.Sprintf("    \"platform\"      = \"%s\"\n", info.Platform))
+	tf.WriteString(fmt.Sprintf("    \"architecture\"  = \"%s\"\n", info.Architecture))
+	tf.WriteString("  }\n")
+
+	tf.WriteString("}\n")
+
+	return tf.String()
+}
+
+// CreateInventoryBackup creates a backup of current inventory data
+func CreateInventoryBackup(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if we're in dry-run mode
+	if rc.Attributes != nil {
+		if dryRun, exists := rc.Attributes["dry_run"]; exists && dryRun == "true" {
+			logger.Info("DRY RUN: Would create inventory backup")
+			return nil
+		}
+	}
+
+	backupDir := "/var/backups/eos-inventory"
+	timestamp := time.Now().Format("20060102-150405")
+	backupPath := filepath.Join(backupDir, fmt.Sprintf("inventory-backup-%s", timestamp))
+
+	if err := os.MkdirAll(backupPath, shared.ServiceDirPerm); err != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err)
+	}
+
+	// Backup directories to preserve
+	backupDirs := map[string]string{
+		"/srv/":                  "",
+		"/var/lib/eos/facts":     "facts",
+		"/var/lib/eos/terraform": "terraform",
+	}
+
+	for srcDir, destDir := range backupDirs {
+		if _, err := os.Stat(srcDir); err == nil {
+			destPath := filepath.Join(backupPath, destDir)
+			if err := copyDirectory(srcDir, destPath); err != nil {
+				logger.Warn("Failed to backup directory",
+					zap.String("src", srcDir),
+					zap.String("dest", destPath),
+					zap.Error(err))
+			}
+		}
+	}
+
+	logger.Info("Inventory backup created", zap.String("backup_path", backupPath))
+	return nil
+}
+
+// copyDirectory recursively copies a directory from src to dst
+func copyDirectory(src, dst string) error {
+	// Get source directory info
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat source directory: %w", err)
+	}
+
+	// Create destination directory
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Read source directory
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read source directory: %w", err)
+	}
+
+	// Copy each entry
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively copy subdirectory
+			if err := copyDirectory(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			// Copy file
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyFile copies a single file from src to dst
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer func() { _ = srcFile.Close() }()
+
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat source file: %w", err)
+	}
+
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer func() { _ = dstFile.Close() }()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file contents: %w", err)
+	}
+
+	return nil
+}
+
+// generateHashiCorpData generates HashiCorp configuration data for the system
+func generateHashiCorpData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Create HashiCorp configuration directory
+	configDir := "/opt/eos/hashicorp"
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
+		return fmt.Errorf("failed to create HashiCorp config directory: %w", err)
+	}
+
+	// Generate Consul node configuration
+	consulConfig := map[string]interface{}{
+		"node_name":   info.Hostname,
+		"datacenter":  "dc1",
+		"server":      false, // Default to agent mode
+		"bind_addr":   "0.0.0.0",
+		"client_addr": shared.GetInternalHostname(),
+		"ui_config":   map[string]bool{"enabled": true},
+	}
+
+	consulConfigPath := filepath.Join(configDir, "consul.json")
+	if err := writeJSONConfig(consulConfigPath, consulConfig); err != nil {
+		return fmt.Errorf("failed to write Consul config: %w", err)
+	}
+
+	logger.Info("Generated HashiCorp configuration data",
+		zap.String("consul_config", consulConfigPath))
+
+	return nil
+}
+
+// writeJSONConfig writes configuration data as JSON
+func writeJSONConfig(path string, config interface{}) error {
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, data, shared.ConfigFilePerm)
+}
+
+// ValidateHashiCorpExport validates the exported HashiCorp configuration data
+func ValidateHashiCorpExport(rc *eos_io.RuntimeContext, info *SystemInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check HashiCorp configuration directory exists
+	configDir := "/opt/eos/hashicorp"
+	if _, err := os.Stat(configDir); err != nil {
+		return fmt.Errorf("HashiCorp config directory not found: %s", configDir)
+	}
+
+	// Check Consul configuration file exists
+	consulConfigPath := filepath.Join(configDir, "consul.json")
+	if _, err := os.Stat(consulConfigPath); err != nil {
+		return fmt.Errorf("Consul config file not found: %s", consulConfigPath)
+	}
+
+	// Validate JSON structure
+	if data, err := os.ReadFile(consulConfigPath); err == nil {
+		var consulConfig map[string]interface{}
+		if err := json.Unmarshal(data, &consulConfig); err != nil {
+			return fmt.Errorf("invalid JSON in Consul config file: %w", err)
+		}
+
+		// Check required fields
+		requiredFields := []string{"node_name", "datacenter"}
+		for _, field := range requiredFields {
+			if _, exists := consulConfig[field]; !exists {
+				return fmt.Errorf("missing required field in Consul config: %s", field)
+			}
+		}
+	}
+
+	logger.Info("HashiCorp configuration validation completed successfully")
+	return nil
+}

@@ -1,0 +1,211 @@
+# BionicGPT Application with OAuth2 Proxy
+# Managed by Eos - Generated from template
+
+job "{{.Namespace}}-bionicgpt" {
+  datacenters = ["{{.Datacenter}}"]
+  namespace   = "{{.Namespace}}"
+  type        = "service"
+
+  # Constraint: Only run on nodes tagged as local
+  constraint {
+    attribute = "${meta.location}"
+    value     = "local"
+  }
+
+  group "application" {
+    count = 1
+
+    # Restart policy
+    restart {
+      attempts = 3
+      delay    = "15s"
+      interval = "5m"
+      mode     = "fail"
+    }
+
+    network {
+      mode = "host"
+      port "bionicgpt_http" {
+        static = 7703
+      }
+      port "oauth2_http" {
+        static = 4180
+      }
+    }
+
+    # Main BionicGPT application
+    task "bionicgpt" {
+      driver = "docker"
+
+      config {
+        image = "ghcr.io/bionic-gpt/bionic-gpt:latest"
+        ports = ["bionicgpt_http"]
+
+        force_pull = true
+      }
+
+      # Environment variables for BionicGPT
+      env {
+        APP_BASE_URL          = "https://{{.Domain}}"
+        TRUST_PROXY           = "true"
+        AUTH_HEADER_EMAIL     = "X-Auth-Request-Email"
+        AUTH_HEADER_NAME      = "X-Auth-Request-User"
+        AUTH_HEADER_GROUPS    = "X-Auth-Request-Groups"
+        AUTH_ENABLED          = "true"
+      }
+
+      # Vault integration
+      vault {
+        policies      = ["bionicgpt-policy"]
+        change_mode   = "restart"
+        change_signal = "SIGTERM"
+      }
+
+      # Database connection from Consul service discovery + Vault password
+      template {
+        data = <<EOH
+{{ range service "bionicgpt-postgres" }}
+{{ with secret "{{.VaultDBSecretPath}}" }}
+DATABASE_URL="postgresql://bionicgpt:{{ .Data.data.password }}@{{ .Address }}:{{ .Port }}/bionicgpt"
+{{ end }}
+{{ end }}
+
+# LiteLLM proxy URL (if available)
+{{ if service "litellm" }}
+{{ range service "litellm" }}
+LITELLM_URL="http://{{ .Address }}:{{ .Port }}"
+{{ end }}
+{{ end }}
+
+# Ollama URL for local embeddings (if available)
+{{ if service "ollama" }}
+{{ range service "ollama" }}
+OLLAMA_URL="http://{{ .Address }}:{{ .Port }}"
+{{ end }}
+{{ end }}
+EOH
+        destination = "secrets/app.env"
+        env         = true
+      }
+
+      # Resource allocation
+      resources {
+        cpu    = 2000  # 2 CPU cores
+        memory = 4096  # 4 GB RAM
+      }
+
+      # Consul service registration
+      service {
+        name = "bionicgpt"
+        port = "bionicgpt_http"
+
+        tags = [
+          "app",
+          "llm",
+          "bionicgpt"
+        ]
+
+        meta {
+          version = "latest"
+          domain  = "{{.Domain}}"
+        }
+
+        # HTTP health check
+        check {
+          type     = "http"
+          path     = "/health"
+          port     = "bionicgpt_http"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+
+    # OAuth2 Proxy for Authentik SSO
+    task "oauth2-proxy" {
+      driver = "docker"
+
+      config {
+        image = "quay.io/oauth2-proxy/oauth2-proxy:latest"
+        ports = ["oauth2_http"]
+
+        args = [
+          "--http-address=0.0.0.0:4180",
+          "--upstream=http://127.0.0.1:7703",
+          "--provider=oidc",
+          "--provider-display-name=Authentik",
+          "--skip-provider-button=true",
+          "--set-xauthrequest=true",
+          "--pass-user-headers=true",
+          "--pass-authorization-header=true",
+          "--pass-access-token=true",
+          "--email-domain=*",
+          "--scope=openid profile email groups",
+          "--cookie-httponly=true",
+          "--cookie-samesite=lax"
+        ]
+      }
+
+      # Vault integration for OAuth2 credentials
+      vault {
+        policies      = ["bionicgpt-policy"]
+        change_mode   = "restart"
+        change_signal = "SIGTERM"
+      }
+
+      template {
+        data = <<EOH
+# Authentik OIDC configuration
+OAUTH2_PROXY_OIDC_ISSUER_URL="{{.AuthURL}}/application/o/bionicgpt/"
+OAUTH2_PROXY_REDIRECT_URL="https://{{.Domain}}/oauth2/callback"
+
+# OAuth2 credentials from Vault
+{{ with secret "{{.VaultOAuthSecretPath}}" }}
+OAUTH2_PROXY_CLIENT_ID="{{ .Data.data.client_id }}"
+OAUTH2_PROXY_CLIENT_SECRET="{{ .Data.data.client_secret }}"
+OAUTH2_PROXY_COOKIE_SECRET="{{ .Data.data.cookie_secret }}"
+{{ end }}
+
+# Cookie configuration
+OAUTH2_PROXY_COOKIE_SECURE="true"
+OAUTH2_PROXY_COOKIE_DOMAINS="{{.Domain}}"
+OAUTH2_PROXY_COOKIE_NAME="_oauth2_proxy_bionicgpt"
+EOH
+        destination = "secrets/oauth2.env"
+        env         = true
+      }
+
+      # Resource allocation
+      resources {
+        cpu    = 500   # 0.5 CPU core
+        memory = 512   # 512 MB RAM
+      }
+
+      # Consul service registration
+      service {
+        name = "bionicgpt-oauth2-proxy"
+        port = "oauth2_http"
+
+        tags = [
+          "auth",
+          "proxy",
+          "oauth2",
+          "bionicgpt"
+        ]
+
+        meta {
+          domain = "{{.Domain}}"
+        }
+
+        # HTTP health check
+        check {
+          type     = "http"
+          path     = "/ping"
+          port     = "oauth2_http"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+  }
+}

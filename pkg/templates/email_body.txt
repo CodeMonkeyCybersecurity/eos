@@ -1,0 +1,18 @@
+Code Monkey Cybersecurity
+Delphi Notify Alert • {{ .Time.Format "Monday, 02 January 2006 03:04 PM AWST" }}
+
+Cybersecurity Alert: What Happened, What To Do, and How To Check
+
+{{ .Title }}
+
+{{ .Description }}
+
+{{- if .HTMLDetails }}
+{{ .HTMLDetails | html }}
+{{- end }}
+
+Need help? Reply to this email or contact support@cybermonkey.sh.
+
+You’re taking the right steps — Delphi Notify helps you stay ahead of problems.
+
+

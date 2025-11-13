@@ -1,0 +1,76 @@
+# Top-level docs
+documentation:
+  - README.md
+  - SECURITY.md
+  - LICENSE.*
+  - '**/*.md'
+
+cli:
+  - main.go
+  - cmd/**
+  - policies/**
+  - sql/**
+
+ansible:
+  - ansible/**
+
+scripts:
+  - scripts/**
+  - install.sh
+  - installGoAndGhOnRhel.sh
+  - setupGo.sh
+  - uninstall.sh
+  - install.ps1
+
+pkg-container:
+  - pkg/container/**
+  - pkg/docker/**
+
+pkg-vault:
+  - pkg/vault/**
+
+pkg-kvm:
+  - pkg/kvm/**
+
+pkg-wazuh:
+  - pkg/wazuh/**
+
+pkg-crypto:
+  - pkg/crypto/**
+
+pkg-hecate:
+  - pkg/hecate/**
+  - cmd/hecate/**
+
+pkg-ldap:
+  - pkg/ldap/**
+
+pkg-mattermost:
+  - pkg/mattermost/**
+
+pkg-platform:
+  - pkg/platform/**
+
+pkg-utils:
+  - pkg/utils/**
+  - pkg/shared/**
+  - pkg/logger/**
+
+pkg-other:
+  - pkg/**
+
+ci:
+  - .github/workflows/**
+  - .github/labeler.yml
+  - .github/dependabot.yml
+
+dependencies:
+  - go.mod
+  - go.sum
+  - Dockerfile
+  - docker-compose.yml
+
+policies:
+  - policies/**
+sql:
+  - sql/**

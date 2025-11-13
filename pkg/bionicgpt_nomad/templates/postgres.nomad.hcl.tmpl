@@ -1,0 +1,123 @@
+# BionicGPT PostgreSQL Database with pgVector
+# Managed by Eos - Generated from template
+
+job "{{.Namespace}}-bionicgpt-postgres" {
+  datacenters = ["{{.Datacenter}}"]
+  namespace   = "{{.Namespace}}"
+  type        = "service"
+
+  # Constraint: Only run on nodes tagged as local
+  constraint {
+    attribute = "${meta.location}"
+    value     = "local"
+  }
+
+  group "database" {
+    count = 1
+
+    # Restart policy for database stability
+    restart {
+      attempts = 3
+      delay    = "30s"
+      interval = "5m"
+      mode     = "fail"
+    }
+
+    # Persistent storage for PostgreSQL data
+    volume "postgres_data" {
+      type      = "host"
+      source    = "bionicgpt_postgres"
+      read_only = false
+    }
+
+    network {
+      mode = "host"
+      port "db" {
+        static = 5432
+      }
+    }
+
+    task "postgres" {
+      driver = "docker"
+
+      config {
+        image = "ankane/pgvector:latest"
+        ports = ["db"]
+
+        # Force pull latest image
+        force_pull = false
+      }
+
+      # Volume mount for data persistence
+      volume_mount {
+        volume      = "postgres_data"
+        destination = "/var/lib/postgresql/data"
+        read_only   = false
+      }
+
+      # Environment variables
+      env {
+        POSTGRES_USER = "bionicgpt"
+        POSTGRES_DB   = "bionicgpt"
+      }
+
+      # Vault integration for database password
+      vault {
+        policies      = ["bionicgpt-policy"]
+        change_mode   = "restart"
+        change_signal = "SIGTERM"
+      }
+
+      template {
+        data = <<EOH
+{{ with secret "{{.VaultDBSecretPath}}" }}
+POSTGRES_PASSWORD="{{ .Data.data.password }}"
+{{ end }}
+EOH
+        destination = "secrets/db.env"
+        env         = true
+      }
+
+      # Resource allocation
+      resources {
+        cpu    = 1000  # 1 CPU core
+        memory = 2048  # 2 GB RAM
+      }
+
+      # Consul service registration
+      service {
+        name = "bionicgpt-postgres"
+        port = "db"
+
+        tags = [
+          "database",
+          "postgresql",
+          "pgvector",
+          "bionicgpt"
+        ]
+
+        meta {
+          version = "pgvector-latest"
+        }
+
+        # TCP health check
+        check {
+          type     = "tcp"
+          port     = "db"
+          interval = "10s"
+          timeout  = "2s"
+        }
+
+        # Script-based health check for readiness
+        check {
+          name     = "postgres-ready"
+          type     = "script"
+          command  = "/usr/bin/pg_isready"
+          args     = ["-U", "bionicgpt", "-d", "bionicgpt"]
+          interval = "15s"
+          timeout  = "5s"
+        }
+      }
+    }
+  }
+}

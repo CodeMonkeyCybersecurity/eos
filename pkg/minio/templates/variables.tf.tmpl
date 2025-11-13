@@ -1,0 +1,55 @@
+variable "nomad_addr" {
+  description = "Nomad server address"
+  type        = string
+  default     = "http://localhost:4646"
+}
+
+variable "consul_addr" {
+  description = "Consul server address"
+  type        = string
+  default     = "http://localhost:8161"
+}
+
+variable "vault_addr" {
+  description = "Vault server address"
+  type        = string
+  default     = "http://localhost:8200"
+}
+
+variable "datacenter" {
+  description = "Nomad datacenter"
+  type        = string
+}
+
+variable "storage_path" {
+  description = "MinIO storage path on host"
+  type        = string
+}
+
+variable "api_port" {
+  description = "MinIO API port"
+  type        = number
+}
+
+variable "console_port" {
+  description = "MinIO console port"
+  type        = number
+}
+
+variable "minio_root_user" {
+  description = "MinIO root username"
+  type        = string
+  default     = "minioadmin"
+}
+
+variable "node_name" {
+  description = "Consul node name for service registration"
+  type        = string
+  default     = "nomad-client-1"
+}
+
+variable "node_address" {
+  description = "Node IP address for health checks"
+  type        = string
+  default     = shared.GetInternalHostname()
+}

@@ -1,0 +1,266 @@
+package container
+
+import (
+	"testing"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
+)
+
+func TestKubernetesInstallOptions(t *testing.T) {
+	t.Run("kubernetes install options struct", func(t *testing.T) {
+		opts := KubernetesInstallOptions{
+			Type:                 "kubeadm",
+			ControlPlaneEndpoint: "k8s-control.example.com:6443",
+			PodNetworkCIDR:       "192.168.0.0/16",
+			EnableAddons:         []string{"dashboard", "dns"},
+			Version:              "v1.32",
+		}
+
+		// Verify all fields are set correctly
+		testutil.AssertEqual(t, "kubeadm", opts.Type)
+		testutil.AssertEqual(t, "k8s-control.example.com:6443", opts.ControlPlaneEndpoint)
+		testutil.AssertEqual(t, "192.168.0.0/16", opts.PodNetworkCIDR)
+		testutil.AssertEqual(t, 2, len(opts.EnableAddons))
+		testutil.AssertEqual(t, "dashboard", opts.EnableAddons[0])
+		testutil.AssertEqual(t, "dns", opts.EnableAddons[1])
+		testutil.AssertEqual(t, "v1.32", opts.Version)
+	})
+}
+
+func TestInstallKubeadm(t *testing.T) {
+	tests := []struct {
+		name    string
+		options *KubernetesInstallOptions
+		wantErr bool
+	}{
+		{
+			name: "basic kubeadm installation",
+			options: &KubernetesInstallOptions{
+				Type:           "kubeadm",
+				PodNetworkCIDR: "192.168.0.0/16",
+				Version:        "v1.32",
+			},
+			wantErr: true, // Will fail in test environment (requires root, packages, etc.)
+		},
+		{
+			name: "kubeadm with control plane endpoint",
+			options: &KubernetesInstallOptions{
+				Type:                 "kubeadm",
+				ControlPlaneEndpoint: "k8s.example.com:6443",
+				PodNetworkCIDR:       "10.244.0.0/16",
+				Version:              "v1.31",
+			},
+			wantErr: true, // Will fail in test environment
+		},
+		{
+			name:    "nil options",
+			options: nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rc := testutil.TestRuntimeContext(t)
+
+			err := InstallKubeadm(rc, tc.options)
+
+			if tc.wantErr {
+				testutil.AssertError(t, err)
+			} else {
+				testutil.AssertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestInstallMicroK8s(t *testing.T) {
+	tests := []struct {
+		name    string
+		options *KubernetesInstallOptions
+		wantErr bool
+	}{
+		{
+			name: "basic microk8s installation",
+			options: &KubernetesInstallOptions{
+				Type:         "microk8s",
+				EnableAddons: []string{"dashboard", "dns"},
+			},
+			wantErr: true, // Will fail in test environment
+		},
+		{
+			name: "microk8s with custom addons",
+			options: &KubernetesInstallOptions{
+				Type:         "microk8s",
+				EnableAddons: []string{"registry", "ingress", "rbac"},
+			},
+			wantErr: true, // Will fail in test environment
+		},
+		{
+			name:    "nil options",
+			options: nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rc := testutil.TestRuntimeContext(t)
+
+			err := InstallMicroK8s(rc, tc.options)
+
+			if tc.wantErr {
+				testutil.AssertError(t, err)
+			} else {
+				testutil.AssertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetKubernetesStatus(t *testing.T) {
+	tests := []struct {
+		name           string
+		kubernetesType string
+		wantErr        bool
+		errContains    string
+	}{
+		{
+			name:           "kubeadm status",
+			kubernetesType: "kubeadm",
+			wantErr:        true, // Will fail without kubectl access
+		},
+		{
+			name:           "microk8s status",
+			kubernetesType: "microk8s",
+			wantErr:        true, // Will fail without microk8s
+		},
+		{
+			name:           "unknown type",
+			kubernetesType: "unknown",
+			wantErr:        true,
+			errContains:    "unknown Kubernetes type",
+		},
+		{
+			name:           "empty type",
+			kubernetesType: "",
+			wantErr:        true,
+			errContains:    "unknown Kubernetes type",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rc := testutil.TestRuntimeContext(t)
+
+			err := GetKubernetesStatus(rc, tc.kubernetesType)
+
+			if tc.wantErr {
+				testutil.AssertError(t, err)
+				if tc.errContains != "" {
+					testutil.AssertErrorContains(t, err, tc.errContains)
+				}
+			} else {
+				testutil.AssertNoError(t, err)
+			}
+		})
+	}
+}
+
+func TestKubernetesSecurity(t *testing.T) {
+	t.Run("malicious control plane endpoints", func(t *testing.T) {
+		rc := testutil.TestRuntimeContext(t)
+
+		maliciousEndpoints := []string{
+			"$(whoami).example.com:6443",
+			"`id`.example.com:6443",
+			"endpoint; rm -rf /:6443",
+			"endpoint\nmalicious:6443",
+		}
+
+		for _, endpoint := range maliciousEndpoints {
+			t.Run("malicious_endpoint", func(t *testing.T) {
+				opts := &KubernetesInstallOptions{
+					Type:                 "kubeadm",
+					ControlPlaneEndpoint: endpoint,
+				}
+
+				err := InstallKubeadm(rc, opts)
+				// Should handle malicious input safely
+				testutil.AssertError(t, err)
+			})
+		}
+	})
+
+	t.Run("malicious pod network CIDR", func(t *testing.T) {
+		rc := testutil.TestRuntimeContext(t)
+
+		maliciousCIDRs := []string{
+			"192.168.0.0/16; rm -rf /",
+			"$(whoami)/16",
+			"`id`/16",
+			"192.168.0.0\nmalicious",
+		}
+
+		for _, cidr := range maliciousCIDRs {
+			t.Run("malicious_cidr", func(t *testing.T) {
+				opts := &KubernetesInstallOptions{
+					Type:           "kubeadm",
+					PodNetworkCIDR: cidr,
+				}
+
+				err := InstallKubeadm(rc, opts)
+				// Should handle malicious input safely
+				testutil.AssertError(t, err)
+			})
+		}
+	})
+
+	t.Run("malicious kubernetes type", func(t *testing.T) {
+		rc := testutil.TestRuntimeContext(t)
+
+		maliciousTypes := []string{
+			"kubeadm; rm -rf /",
+			"$(whoami)",
+			"`id`",
+			"type\nmalicious",
+		}
+
+		for _, ktype := range maliciousTypes {
+			t.Run("malicious_type", func(t *testing.T) {
+				err := GetKubernetesStatus(rc, ktype)
+				// Should handle malicious input safely
+				testutil.AssertError(t, err)
+			})
+		}
+	})
+}
+
+func TestKubernetesConcurrency(t *testing.T) {
+	t.Run("concurrent status checks", func(t *testing.T) {
+		kubernetesTypes := []string{"kubeadm", "microk8s", "unknown"}
+
+		// Test concurrent status checks
+		testutil.ParallelTest(t, 3, func(t *testing.T, i int) {
+			rc := testutil.TestRuntimeContext(t)
+			err := GetKubernetesStatus(rc, kubernetesTypes[i])
+			// All will error in test environment, but should be safe
+			testutil.AssertError(t, err)
+		})
+	})
+}
+
+func BenchmarkInstallKubeadm(b *testing.B) {
+	// Skip benchmarks since they require root privileges and system packages
+	b.Skip("Skipping benchmark - requires root privileges and system setup")
+}
+
+func BenchmarkInstallMicroK8s(b *testing.B) {
+	// Skip benchmarks since they require root privileges and snap
+	b.Skip("Skipping benchmark - requires root privileges and snap")
+}
+
+func BenchmarkGetKubernetesStatus(b *testing.B) {
+	// Skip benchmarks since they require kubectl/microk8s installation
+	b.Skip("Skipping benchmark - requires kubernetes installation")
+}

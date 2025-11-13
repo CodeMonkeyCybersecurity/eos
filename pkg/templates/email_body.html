@@ -1,0 +1,33 @@
+{{- /* Wazuh Notify HTML template */ -}}
+{{ $ts := .Time.Format "Monday, 02 January 2006 03:04 PM AWST" }}
+<div style="font-family:Helvetica,Arial,sans-serif;background:#f8f9fa;padding:24px;">
+  <div style="background:#fff;color:#099268;padding:16px 24px;border-radius:8px 8px 0 0;border-bottom:1.5px solid #e0e0e0;">
+    <h1 style="margin:0;font-size:1.2em;font-weight:700;letter-spacing:.02em;">Code Monkey Cybersecurity</h1>
+    <div style="font-size:.98em;color:#495057;margin-top:2px;">Wazuh Notify Alert • {{ $ts }}</div>
+  </div>
+
+  <div style="background:#fff;color:#222;padding:24px;border-radius:0 0 8px 8px;box-shadow:0 4px 12px #0001;">
+    <div style="font-size:1.15em;color:#087f5b;font-weight:600;margin-bottom:14px;">
+      Cybersecurity Alert: What Happened, What To Do, and How To Check
+    </div>
+
+    <b style="font-size:1.07em;color:#222;">{{ .Title }}</b>
+
+    <hr style="margin:18px 0 12px 0;border:none;border-top:1.2px solid #eee;">
+
+    <div style="font-size:1.06em;line-height:1.6;">
+      {{ .HTMLDetails }}
+      <div style="margin:24px 0 0 0;padding:16px 18px;border-radius:5px;color:#333;font-size:1.02em;">
+        You’re taking the right steps — Wazuh Notify helps you stay ahead of problems.<br>
+        This message was sent automatically by Wazuh Notify. If you have questions, reach out to your security team or Code Monkey Cybersecurity.
+      </div>
+    </div>
+
+    <hr style="margin:20px 0 12px 0;border:none;border-top:1.2px solid #eee;">
+
+    <div style="color:#555;font-size:1.07em;">
+      <b>Need help?</b> Reply to this mail or contact
+      <a href="mailto:support@cybermonkey.sh">support@cybermonkey.net.au</a>.
+    </div>
+  </div>
+</div>

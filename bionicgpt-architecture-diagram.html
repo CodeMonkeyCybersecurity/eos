@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BionicGPT + Nomad + Hecate Architecture</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        
+        .architecture {
+            display: flex;
+            gap: 40px;
+            margin: 40px 0;
+        }
+        
+        .node {
+            flex: 1;
+            border: 3px solid #2a5298;
+            border-radius: 15px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        .node-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-bottom: 20px;
+            text-align: center;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #2a5298;
+        }
+        
+        .component {
+            background: white;
+            border: 2px solid #2a5298;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .component:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .component-name {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+        
+        .component-desc {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+        
+        .component-port {
+            color: #999;
+            font-size: 0.85em;
+            font-family: monospace;
+            background: #f0f0f0;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .flow-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        
+        .flow-title {
+            font-size: 1.8em;
+            color: #1e3c72;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border-left: 5px solid #2a5298;
+        }
+        
+        .step-number {
+            background: #2a5298;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+        
+        .step-desc {
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .connection-arrow {
+            text-align: center;
+            font-size: 3em;
+            color: #2a5298;
+            margin: 20px 0;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 40px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-box {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            border: 2px solid #333;
+        }
+        
+        .legend-cloud { background: #ffd7d7; }
+        .legend-local { background: #d7e8ff; }
+        .legend-data { background: #d7ffd7; }
+        
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 40px 0;
+        }
+        
+        .highlight-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        
+        .highlight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .highlight-item {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid white;
+        }
+        
+        .highlight-item-title {
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        
+        .tech-stack {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+        }
+        
+        .tech-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .tech-card:hover {
+            transform: translateY(-5px);
+            border-color: #2a5298;
+        }
+        
+        .tech-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .tech-name {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 1.2em;
+            margin-bottom: 8px;
+        }
+        
+        .tech-role {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏗️ BionicGPT + Nomad + Hecate Architecture</h1>
+        <p class="subtitle">Complete System Design for Code Monkey Cybersecurity</p>
+        
+        <!-- Main Architecture -->
+        <div class="architecture">
+            <!-- Cloud Node -->
+            <div class="node" style="background: linear-gradient(135deg, #ffd7d7 0%, #ffb3b3 100%);">
+                <div class="node-title">☁️ CLOUD NODE (Public)</div>
+                
+                <div class="component">
+                    <div class="component-name">🌐 Hecate Framework</div>
+                    <div class="component-desc">Reverse Proxy Infrastructure</div>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">📨 Caddy</div>
+                    <div class="component-desc">HTTPS Reverse Proxy</div>
+                    <span class="component-port">:443</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🔀 nginx</div>
+                    <div class="component-desc">TCP/UDP Proxy</div>
+                    <span class="component-port">:80, :25, :587</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">📞 STUN/TURN</div>
+                    <div class="component-desc">WebRTC Support</div>
+                    <span class="component-port">:3478</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🔑 Authentik</div>
+                    <div class="component-desc">Identity Provider (OIDC/SAML)</div>
+                    <span class="component-port">:9000, :9443</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🗺️ Consul Agent</div>
+                    <div class="component-desc">Service Discovery (Server)</div>
+                    <span class="component-port">:8500, :8600</span>
+                </div>
+            </div>
+            
+            <div class="connection-arrow">⟷<br><span style="font-size: 0.4em;">VPN Tunnel<br>(WireGuard)</span></div>
+            
+            <!-- Local Node -->
+            <div class="node" style="background: linear-gradient(135deg, #d7e8ff 0%, #b3d9ff 100%);">
+                <div class="node-title">🏠 LOCAL NODE (Private)</div>
+                
+                <div class="component">
+                    <div class="component-name">🗺️ Consul Agent</div>
+                    <div class="component-desc">Service Discovery (Client)</div>
+                    <span class="component-port">:8500</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🚀 Nomad Client</div>
+                    <div class="component-desc">Job Orchestration</div>
+                    <span class="component-port">:4646</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🛡️ oauth2-proxy</div>
+                    <div class="component-desc">Authentication Middleware</div>
+                    <span class="component-port">:4180</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🤖 BionicGPT</div>
+                    <div class="component-desc">AI Chat Application</div>
+                    <span class="component-port">:7703</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🔄 LiteLLM</div>
+                    <div class="component-desc">LLM Proxy (Azure + Local)</div>
+                    <span class="component-port">:4000</span>
+                </div>
+                
+                <div class="component">
+                    <div class="component-name">🦙 Ollama</div>
+                    <div class="component-desc">Local Embeddings (nomic-embed-text)</div>
+                    <span class="component-port">:11434</span>
+                </div>
+                
+                <div class="component" style="background: linear-gradient(135deg, #d7ffd7 0%, #b3ffb3 100%);">
+                    <div class="component-name">🗄️ PostgreSQL</div>
+                    <div class="component-desc">Database with pgvector</div>
+                    <span class="component-port">:5432</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box legend-cloud"></div>
+                <span>Cloud Infrastructure</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box legend-local"></div>
+                <span>Local Infrastructure</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box legend-data"></div>
+                <span>Data Storage</span>
+            </div>
+        </div>
+        
+        <!-- Authentication Flow -->
+        <div class="flow-container">
+            <h2 class="flow-title">🔐 Authentication Flow</h2>
+            
+            <div class="flow-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <div class="step-title">User Access</div>
+                    <div class="step-desc">User navigates to https://chat.codemonkey.ai</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <div class="step-title">Caddy Receives Request</div>
+                    <div class="step-desc">Hecate's Caddy proxy receives the HTTPS request and queries Consul for bionicgpt service location</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <div class="step-title">Forward to oauth2-proxy</div>
+                    <div class="step-desc">Caddy forwards request over VPN tunnel to oauth2-proxy on local node</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <div class="step-title">Check Authentication</div>
+                    <div class="step-desc">oauth2-proxy checks for valid authentication cookie. None found → redirect to Authentik</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <div class="step-title">Authentik Login</div>
+                    <div class="step-desc">User is redirected to https://auth.codemonkey.ai and logs in with credentials (+ MFA for superadmin)</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">6</div>
+                <div class="step-content">
+                    <div class="step-title">Authorization Code</div>
+                    <div class="step-desc">Authentik issues authorization code and redirects back to /oauth2/callback</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">7</div>
+                <div class="step-content">
+                    <div class="step-title">Token Exchange</div>
+                    <div class="step-desc">oauth2-proxy exchanges code for access token (server-to-server with Authentik over VPN)</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">8</div>
+                <div class="step-content">
+                    <div class="step-title">Set Cookie & Forward</div>
+                    <div class="step-desc">oauth2-proxy sets encrypted cookie and forwards to BionicGPT with headers:
+                        <br>• X-Auth-Request-Email: henry@codemonkey.ai
+                        <br>• X-Auth-Request-Groups: bionicgpt-superadmin</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">9</div>
+                <div class="step-content">
+                    <div class="step-title">BionicGPT Response</div>
+                    <div class="step-desc">BionicGPT creates/identifies user, assigns to teams based on groups, and returns response</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="step-number">10</div>
+                <div class="step-content">
+                    <div class="step-title">User Access Granted</div>
+                    <div class="step-desc">Response flows back through oauth2-proxy → Caddy → User. Subsequent requests use cookie.</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Technology Stack -->
+        <h2 style="text-align: center; color: #1e3c72; font-size: 2em; margin-top: 40px;">🛠️ Technology Stack</h2>
+        <div class="tech-stack">
+            <div class="tech-card">
+                <div class="tech-icon">🚀</div>
+                <div class="tech-name">Nomad</div>
+                <div class="tech-role">Orchestration</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🗺️</div>
+                <div class="tech-name">Consul</div>
+                <div class="tech-role">Service Discovery</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🔐</div>
+                <div class="tech-name">Vault</div>
+                <div class="tech-role">Secrets Management</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🔑</div>
+                <div class="tech-name">Authentik</div>
+                <div class="tech-role">Identity Provider</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🌐</div>
+                <div class="tech-name">Caddy</div>
+                <div class="tech-role">Reverse Proxy</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🛡️</div>
+                <div class="tech-name">oauth2-proxy</div>
+                <div class="tech-role">Auth Middleware</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🤖</div>
+                <div class="tech-name">BionicGPT</div>
+                <div class="tech-role">AI Application</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🔄</div>
+                <div class="tech-name">LiteLLM</div>
+                <div class="tech-role">LLM Proxy</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🦙</div>
+                <div class="tech-name">Ollama</div>
+                <div class="tech-role">Local LLM</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🗄️</div>
+                <div class="tech-name">PostgreSQL</div>
+                <div class="tech-role">Database</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">🔒</div>
+                <div class="tech-name">WireGuard</div>
+                <div class="tech-role">VPN Tunnel</div>
+            </div>
+            
+            <div class="tech-card">
+                <div class="tech-icon">⚙️</div>
+                <div class="tech-name">Go + Cobra</div>
+                <div class="tech-role">CLI Tool (eos)</div>
+            </div>
+        </div>
+        
+        <!-- Key Features -->
+        <div class="highlight-box">
+            <div class="highlight-title">✨ Key Features</div>
+            <div class="highlight-grid">
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🔐 Secure Authentication</div>
+                    <div>OAuth2/OIDC via Authentik with MFA support for superadmin</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🗺️ Service Discovery</div>
+                    <div>Consul for dynamic service registration and health checking</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🚀 Easy Deployment</div>
+                    <div>Single command: eos create bionicgpt --domain chat.example.com</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🔒 Isolated Groups</div>
+                    <div>Separate BionicGPT groups (superadmin, demo-tenant) via prefixing</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🌍 Hybrid Architecture</div>
+                    <div>Cloud reverse proxy + local compute for optimal security</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🦙 Local Embeddings</div>
+                    <div>Ollama for privacy-preserving embeddings (nomic-embed-text)</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🔄 LLM Flexibility</div>
+                    <div>LiteLLM proxy supports Azure OpenAI + local models</div>
+                </div>
+                
+                <div class="highlight-item">
+                    <div class="highlight-item-title">🛡️ Security First</div>
+                    <div>VPN tunnels, TLS everywhere, secrets in Vault</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Commands -->
+        <div style="background: #f8f9fa; border-radius: 15px; padding: 30px; margin: 40px 0;">
+            <h2 style="text-align: center; color: #1e3c72; font-size: 1.8em; margin-bottom: 25px;">⚡ Quick Start Commands</h2>
+            
+            <div style="background: #2d3748; color: #68d391; padding: 20px; border-radius: 10px; font-family: monospace; margin-bottom: 15px;">
+                # Basic deployment<br>
+                eos create bionicgpt --domain chat.codemonkey.ai
+            </div>
+            
+            <div style="background: #2d3748; color: #68d391; padding: 20px; border-radius: 10px; font-family: monospace; margin-bottom: 15px;">
+                # With all options<br>
+                eos create bionicgpt \<br>
+                &nbsp;&nbsp;--domain chat.codemonkey.ai \<br>
+                &nbsp;&nbsp;--auth-provider authentik \<br>
+                &nbsp;&nbsp;--auth-url https://auth.codemonkey.ai \<br>
+                &nbsp;&nbsp;--local-embeddings \<br>
+                &nbsp;&nbsp;--vpn-type wireguard \<br>
+                &nbsp;&nbsp;--use-hecate
+            </div>
+            
+            <div style="background: #2d3748; color: #68d391; padding: 20px; border-radius: 10px; font-family: monospace;">
+                # Dry run (see what will be deployed)<br>
+                eos create bionicgpt --domain chat.codemonkey.ai --dry-run
+            </div>
+        </div>
+    </div>
+</body>
+</html>

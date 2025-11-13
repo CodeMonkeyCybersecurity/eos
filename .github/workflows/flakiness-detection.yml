@@ -1,0 +1,126 @@
+# Flakiness Detection Workflow
+# Runs changed tests multiple times to detect flaky/unstable tests
+# Last Updated: 2025-11-05
+
+name: Flakiness Detection
+
+on:
+  pull_request:
+    paths:
+      - '**/*_test.go'      # Run when test files change
+      - 'pkg/**/*.go'       # Run when production code changes (tests might become flaky)
+
+jobs:
+  detect-flaky-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Get changed test files
+        id: changed-tests
+        run: |
+          # Find all changed test files (both new and modified)
+          git diff --name-only HEAD~1 HEAD | grep '_test.go$' > changed_tests.txt || true
+
+          if [ -s changed_tests.txt ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "::notice::Found $(wc -l < changed_tests.txt) changed test files"
+            cat changed_tests.txt
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "::notice::No test files changed"
+          fi
+
+      - name: Run changed tests 10 times to detect flakiness
+        if: steps.changed-tests.outputs.has_changes == 'true'
+        id: flakiness-check
+        continue-on-error: true
+        run: |
+          # Track failures
+          FLAKY_TESTS=""
+          EXIT_CODE=0
+
+          while IFS= read -r test_file; do
+            package_path=$(dirname "$test_file")
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Testing $package_path for flakiness (10 runs with race detector)..."
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Run test 10 times with race detector
+            if ! go test -count=10 -race -v "./$package_path"; then
+              echo "::error file=$test_file::Flaky test detected - failed when run multiple times"
+              FLAKY_TESTS="$FLAKY_TESTS\n- $test_file"
+              EXIT_CODE=1
+            else
+              echo "::notice file=$test_file::Test is stable (passed all 10 runs)"
+            fi
+
+            echo ""
+          done < changed_tests.txt
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "flaky_tests<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$FLAKY_TESTS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+          exit $EXIT_CODE
+
+      - name: Comment on PR if flaky tests found
+        if: failure() && steps.flakiness-check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const flakyTests = process.env.FLAKY_TESTS || 'Unknown tests';
+
+            const message = `## ⚠️ Flaky Test Detected!
+
+            One or more tests failed when run multiple times with the race detector. This indicates non-deterministic behavior that must be fixed before merging.
+
+            ### Flaky Tests
+            ${flakyTests}
+
+            ### Common Causes
+            - **Race conditions**: Use \`-race\` flag to detect data races
+            - **Timing dependencies**: Replace \`time.Sleep()\` with polling + timeout
+            - **Map iteration order**: Sort maps before comparing
+            - **Shared global state**: Ensure proper test isolation
+            - **Non-deterministic random values**: Use fixed seeds for testing
+
+            ### How to Fix
+            1. Run locally with \`go test -count=10 -race ./path/to/package\`
+            2. Review [Flakiness Prevention Guide](https://github.com/CodeMonkeyCybersecurity/eos/blob/main/INTEGRATION_TESTING.md#flakiness-prevention)
+            3. Consider quarantining with \`//go:build flaky\` tag if immediate fix isn't possible
+
+            ### Resources
+            - [Go Testing Best Practices](https://go.dev/wiki/TestComments)
+            - [Detecting Flakiness](https://circleci.com/blog/reducing-flaky-test-failures/)
+            - [Eos Integration Testing Guide](/INTEGRATION_TESTING.md)
+
+            **This PR cannot be merged until flakiness is resolved.**`;
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+        env:
+          FLAKY_TESTS: ${{ steps.flakiness-check.outputs.flaky_tests }}
+
+      - name: Fail workflow if flaky tests detected
+        if: failure() && steps.flakiness-check.outcome == 'failure'
+        run: |
+          echo "::error::Flaky tests detected. See PR comment for details."
+          exit 1

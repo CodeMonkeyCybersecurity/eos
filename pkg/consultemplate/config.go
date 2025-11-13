@@ -1,0 +1,309 @@
+// pkg/consultemplate/config.go
+//
+// Consul Template Configuration Builder
+//
+// Provides configuration generation for Consul Template services.
+// Each service gets its own consul-template instance with dedicated config.
+
+package consultemplate
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+// ServiceConfig contains configuration for a consul-template service instance
+type ServiceConfig struct {
+	// Service identification
+	ServiceName string // Name of the service (e.g., "bionicgpt", "eos-global")
+
+	// Connection settings
+	ConsulAddr       string // Consul address (default: http://localhost:8500)
+	VaultAddr        string // Vault address (default: https://localhost:8200)
+	VaultTokenPath   string // Path to Vault token (default: /run/eos/vault_agent_eos.token)
+	VaultRenewToken  bool   // Whether to renew Vault token (default: true)
+	VaultUnwrapToken bool   // Whether to unwrap Vault token (default: false)
+
+	// Template configurations
+	Templates []TemplateConfig
+
+	// Behavior settings
+	MaxStale       time.Duration // Max staleness for Consul queries (default: 10s)
+	WaitMin        time.Duration // Min wait before rendering (default: 2s)
+	WaitMax        time.Duration // Max wait before rendering (default: 10s)
+	RetryInterval  time.Duration // Retry interval on errors (default: 5s)
+	KillSignal     string        // Signal to send to child process (default: SIGTERM)
+	KillTimeout    time.Duration // Timeout before killing child (default: 30s)
+	CreateDestDirs bool          // Create destination directories (default: true)
+	LogLevel       string        // Log level (default: "info")
+
+	// Process management
+	Exec      *ExecConfig      // Command to run after rendering (optional)
+	Lifecycle *LifecycleConfig // Lifecycle hooks (optional)
+}
+
+// TemplateConfig defines a template to render
+type TemplateConfig struct {
+	Source         string        // Template source file path
+	Destination    string        // Rendered file destination
+	Perms          os.FileMode   // File permissions for rendered file
+	Command        string        // Command to run after rendering (optional)
+	CommandTimeout time.Duration // Timeout for command execution
+	Wait           *WaitConfig   // Custom wait config for this template
+	Backup         bool          // Backup existing file before overwriting
+	LeftDelim      string        // Left template delimiter (default: "{{")
+	RightDelim     string        // Right template delimiter (default: "}}")
+}
+
+// ExecConfig defines a command to exec after template rendering
+type ExecConfig struct {
+	Command      string        // Command to execute
+	Args         []string      // Command arguments
+	Splay        time.Duration // Random delay before exec (default: 0)
+	Enabled      bool          // Whether exec is enabled
+	ReloadSignal string        // Signal to send on template change (instead of restart)
+	KillSignal   string        // Signal to send on shutdown
+	KillTimeout  time.Duration // Timeout before sending SIGKILL
+}
+
+// WaitConfig defines wait behavior for template rendering
+type WaitConfig struct {
+	Min time.Duration // Minimum wait time
+	Max time.Duration // Maximum wait time
+}
+
+// LifecycleConfig defines lifecycle hooks
+type LifecycleConfig struct {
+	PreRender  string // Command to run before rendering
+	PostRender string // Command to run after rendering
+	OnError    string // Command to run on error
+}
+
+// DefaultServiceConfig returns default service configuration
+func DefaultServiceConfig(serviceName string) *ServiceConfig {
+	return &ServiceConfig{
+		ServiceName:      serviceName,
+		ConsulAddr:       DefaultConsulAddr,
+		VaultAddr:        DefaultVaultAddr,
+		VaultTokenPath:   DefaultVaultTokenPath,
+		VaultRenewToken:  true,
+		VaultUnwrapToken: false,
+		Templates:        []TemplateConfig{},
+		MaxStale:         DefaultMaxStale,
+		WaitMin:          DefaultMinWait,
+		WaitMax:          DefaultMaxWait,
+		RetryInterval:    DefaultRetryInterval,
+		KillSignal:       "SIGTERM",
+		KillTimeout:      DefaultKillTimeout,
+		CreateDestDirs:   DefaultCreateDestDirs,
+		LogLevel:         DefaultLogLevel,
+	}
+}
+
+// ConfigBuilder builds consul-template HCL configuration
+type ConfigBuilder struct {
+	rc     *eos_io.RuntimeContext
+	logger otelzap.LoggerWithCtx
+}
+
+// NewConfigBuilder creates a new configuration builder
+func NewConfigBuilder(rc *eos_io.RuntimeContext) *ConfigBuilder {
+	return &ConfigBuilder{
+		rc:     rc,
+		logger: otelzap.Ctx(rc.Ctx),
+	}
+}
+
+// Build generates the HCL configuration file for a service
+func (b *ConfigBuilder) Build(config *ServiceConfig) (string, error) {
+	b.logger.Debug("Building consul-template configuration",
+		zap.String("service", config.ServiceName))
+
+	var hcl strings.Builder
+
+	// Header comment
+	hcl.WriteString(fmt.Sprintf("# Consul Template Configuration for %s\n", config.ServiceName))
+	hcl.WriteString("# Generated by EOS\n")
+	hcl.WriteString(fmt.Sprintf("# Service: %s\n\n", config.ServiceName))
+
+	// Consul configuration
+	hcl.WriteString("consul {\n")
+	hcl.WriteString(fmt.Sprintf("  address = %q\n", config.ConsulAddr))
+	hcl.WriteString("  retry {\n")
+	hcl.WriteString("    enabled = true\n")
+	hcl.WriteString("    attempts = 12\n")
+	hcl.WriteString("    backoff = \"250ms\"\n")
+	hcl.WriteString("    max_backoff = \"1m\"\n")
+	hcl.WriteString("  }\n")
+	hcl.WriteString("}\n\n")
+
+	// Vault configuration
+	hcl.WriteString("vault {\n")
+	hcl.WriteString(fmt.Sprintf("  address = %q\n", config.VaultAddr))
+	hcl.WriteString(fmt.Sprintf("  renew_token = %t\n", config.VaultRenewToken))
+	hcl.WriteString(fmt.Sprintf("  unwrap_token = %t\n", config.VaultUnwrapToken))
+	hcl.WriteString("  retry {\n")
+	hcl.WriteString("    enabled = true\n")
+	hcl.WriteString("    attempts = 12\n")
+	hcl.WriteString("    backoff = \"250ms\"\n")
+	hcl.WriteString("    max_backoff = \"1m\"\n")
+	hcl.WriteString("  }\n")
+	hcl.WriteString("}\n\n")
+
+	// Global wait configuration
+	hcl.WriteString("wait {\n")
+	hcl.WriteString(fmt.Sprintf("  min = %q\n", config.WaitMin.String()))
+	hcl.WriteString(fmt.Sprintf("  max = %q\n", config.WaitMax.String()))
+	hcl.WriteString("}\n\n")
+
+	// Log level
+	hcl.WriteString(fmt.Sprintf("log_level = %q\n\n", config.LogLevel))
+
+	// Max staleness
+	hcl.WriteString(fmt.Sprintf("max_stale = %q\n\n", config.MaxStale.String()))
+
+	// Kill signal and timeout
+	hcl.WriteString(fmt.Sprintf("kill_signal = %q\n", config.KillSignal))
+	hcl.WriteString(fmt.Sprintf("kill_timeout = %q\n\n", config.KillTimeout.String()))
+
+	// Template configurations
+	for i, tmpl := range config.Templates {
+		hcl.WriteString(fmt.Sprintf("# Template %d: %s\n", i+1, filepath.Base(tmpl.Source)))
+		hcl.WriteString("template {\n")
+		hcl.WriteString(fmt.Sprintf("  source      = %q\n", tmpl.Source))
+		hcl.WriteString(fmt.Sprintf("  destination = %q\n", tmpl.Destination))
+		hcl.WriteString(fmt.Sprintf("  perms       = %#o\n", tmpl.Perms))
+
+		if tmpl.Command != "" {
+			hcl.WriteString(fmt.Sprintf("  command     = %q\n", tmpl.Command))
+			if tmpl.CommandTimeout > 0 {
+				hcl.WriteString(fmt.Sprintf("  command_timeout = %q\n", tmpl.CommandTimeout.String()))
+			}
+		}
+
+		if tmpl.Backup {
+			hcl.WriteString("  backup      = true\n")
+		}
+
+		if tmpl.Wait != nil {
+			hcl.WriteString("  wait {\n")
+			hcl.WriteString(fmt.Sprintf("    min = %q\n", tmpl.Wait.Min.String()))
+			hcl.WriteString(fmt.Sprintf("    max = %q\n", tmpl.Wait.Max.String()))
+			hcl.WriteString("  }\n")
+		}
+
+		if tmpl.LeftDelim != "" {
+			hcl.WriteString(fmt.Sprintf("  left_delimiter  = %q\n", tmpl.LeftDelim))
+		}
+		if tmpl.RightDelim != "" {
+			hcl.WriteString(fmt.Sprintf("  right_delimiter = %q\n", tmpl.RightDelim))
+		}
+
+		hcl.WriteString("}\n\n")
+	}
+
+	// Exec configuration
+	if config.Exec != nil && config.Exec.Enabled {
+		hcl.WriteString("exec {\n")
+		hcl.WriteString(fmt.Sprintf("  command = %q\n", config.Exec.Command))
+		if len(config.Exec.Args) > 0 {
+			hcl.WriteString(fmt.Sprintf("  # Args: %v\n", config.Exec.Args))
+		}
+		if config.Exec.Splay > 0 {
+			hcl.WriteString(fmt.Sprintf("  splay = %q\n", config.Exec.Splay.String()))
+		}
+		if config.Exec.ReloadSignal != "" {
+			hcl.WriteString(fmt.Sprintf("  reload_signal = %q\n", config.Exec.ReloadSignal))
+		}
+		if config.Exec.KillSignal != "" {
+			hcl.WriteString(fmt.Sprintf("  kill_signal = %q\n", config.Exec.KillSignal))
+		}
+		if config.Exec.KillTimeout > 0 {
+			hcl.WriteString(fmt.Sprintf("  kill_timeout = %q\n", config.Exec.KillTimeout.String()))
+		}
+		hcl.WriteString("}\n\n")
+	}
+
+	return hcl.String(), nil
+}
+
+// WriteConfig writes the configuration to a file
+func (b *ConfigBuilder) WriteConfig(config *ServiceConfig, outputPath string) error {
+	b.logger.Info("Writing consul-template configuration",
+		zap.String("service", config.ServiceName),
+		zap.String("path", outputPath))
+
+	// Build configuration
+	hclConfig, err := b.Build(config)
+	if err != nil {
+		return fmt.Errorf("failed to build configuration: %w", err)
+	}
+
+	// Ensure directory exists
+	configDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(configDir, ConfigDirPerm); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Write configuration file
+	if err := os.WriteFile(outputPath, []byte(hclConfig), ConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	b.logger.Info("Configuration written successfully",
+		zap.String("path", outputPath),
+		zap.Int("size", len(hclConfig)))
+
+	return nil
+}
+
+// ValidateConfig validates a service configuration before writing
+func (b *ConfigBuilder) ValidateConfig(config *ServiceConfig) error {
+	if config.ServiceName == "" {
+		return fmt.Errorf("service name is required")
+	}
+
+	if config.ConsulAddr == "" {
+		return fmt.Errorf("consul address is required")
+	}
+
+	if config.VaultAddr == "" {
+		return fmt.Errorf("vault address is required")
+	}
+
+	if len(config.Templates) == 0 {
+		return fmt.Errorf("at least one template is required")
+	}
+
+	// Validate each template
+	for i, tmpl := range config.Templates {
+		if tmpl.Source == "" {
+			return fmt.Errorf("template %d: source is required", i)
+		}
+		if tmpl.Destination == "" {
+			return fmt.Errorf("template %d: destination is required", i)
+		}
+		if tmpl.Perms == 0 {
+			return fmt.Errorf("template %d: perms is required", i)
+		}
+	}
+
+	return nil
+}
+
+// GetConfigPath returns the configuration file path for a service
+func GetConfigPath(serviceName string) string {
+	return filepath.Join(ConfigDir, fmt.Sprintf("%s.hcl", serviceName))
+}
+
+// GetTemplatePath returns the template file path
+func GetTemplatePath(serviceName, templateName string) string {
+	return filepath.Join(TemplateDir, serviceName, templateName)
+}

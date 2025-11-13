@@ -1,0 +1,103 @@
+name: Emoji Check
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - '**.md'
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - '**.md'
+
+jobs:
+  check-emojis:
+    name: Check for Emojis in Non-Test Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Make emoji script executable
+        run: chmod +x .github/hooks/remove-emojis.sh
+
+      - name: Run emoji check in dry-run mode
+        id: emoji-check
+        run: |
+          # Run the emoji removal script in dry-run mode
+          ./.github/hooks/remove-emojis.sh --dry-run > emoji-check.log 2>&1 || true
+
+          # Check if any emojis were found
+          if grep -q "Files with emojis found: [1-9]" emoji-check.log; then
+            echo "emojis_found=true" >> $GITHUB_OUTPUT
+            echo "##  Emojis Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following files contain emojis that should be removed:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat emoji-check.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "emojis_found=false" >> $GITHUB_OUTPUT
+            echo "## ✓ No Emojis Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All non-test files are emoji-free!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload emoji check log
+        if: steps.emoji-check.outputs.emojis_found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: emoji-check-log
+          path: emoji-check.log
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.emoji-check.outputs.emojis_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.readFileSync('emoji-check.log', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `##  Emojis Detected
+
+              Your PR contains emojis in non-test files. According to Eos project standards (CLAUDE.md), emojis should not be used in production code.
+
+              ### How to Fix
+
+              Run the emoji removal script locally:
+              \`\`\`bash
+              ./.github/hooks/remove-emojis.sh
+              \`\`\`
+
+              Or set up the pre-commit hook to automatically remove emojis:
+              \`\`\`bash
+              ./.github/hooks/setup-hooks.sh
+              \`\`\`
+
+              ### Details
+
+              <details>
+              <summary>Click to see emoji check results</summary>
+
+              \`\`\`
+              ${log}
+              \`\`\`
+
+              </details>
+
+              **Note:** Test files are exempt from this check.`
+            })
+
+      - name: Fail if emojis found
+        if: steps.emoji-check.outputs.emojis_found == 'true'
+        run: |
+          echo "::error::Emojis found in non-test files. Please run ./.github/hooks/remove-emojis.sh to clean them."
+          exit 1

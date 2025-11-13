@@ -1,0 +1,187 @@
+// Package bionicgpt provides LiteLLM proxy configuration for Azure OpenAI translation
+//
+// LiteLLM acts as a translation layer between BionicGPT (OpenAI format) and Azure OpenAI (Azure format).
+//
+// Architecture:
+//
+//	BionicGPT → LiteLLM Proxy → Azure OpenAI
+//
+// LiteLLM handles:
+//   - API format translation (OpenAI ↔ Azure)
+//   - Different URL structures
+//   - Different authentication headers
+//   - API version management
+//
+// Code Monkey Cybersecurity - "Cybersecurity. With humans."
+package bionicgpt
+
+import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
+)
+
+// LiteLLMConfig represents the LiteLLM configuration file structure
+type LiteLLMConfig struct {
+	ModelList       []LiteLLMModel         `yaml:"model_list"`
+	GeneralSettings LiteLLMGeneralSettings `yaml:"general_settings"`
+	LiteLLMSettings LiteLLMRuntimeSettings `yaml:"litellm_settings"`
+}
+
+// LiteLLMModel represents a model configuration in LiteLLM
+type LiteLLMModel struct {
+	ModelName     string                 `yaml:"model_name"`
+	LiteLLMParams map[string]interface{} `yaml:"litellm_params"`
+}
+
+// LiteLLMGeneralSettings contains general LiteLLM settings
+type LiteLLMGeneralSettings struct {
+	MasterKey      string `yaml:"master_key"`
+	MaxBudget      int    `yaml:"max_budget,omitempty"`      // Optional budget limit in USD
+	BudgetDuration string `yaml:"budget_duration,omitempty"` // e.g., "30d"
+}
+
+// LiteLLMRuntimeSettings contains runtime settings for LiteLLM
+type LiteLLMRuntimeSettings struct {
+	SetVerbose bool `yaml:"set_verbose,omitempty"`
+}
+
+// createLiteLLMConfig creates the LiteLLM configuration file
+// Supports hybrid mode: Azure chat + local embeddings OR full Azure
+func (bgi *BionicGPTInstaller) createLiteLLMConfig(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	litellmConfigPath := filepath.Join(bgi.config.InstallDir, "litellm_config.yaml")
+
+	logger.Info("Creating LiteLLM configuration",
+		zap.String("path", litellmConfigPath),
+		zap.Bool("local_embeddings", bgi.config.UseLocalEmbeddings))
+
+	// Build model list based on configuration
+	modelList := []LiteLLMModel{
+		// Chat completion model (gpt-4) - always Azure
+		{
+			ModelName: "gpt-4",
+			LiteLLMParams: map[string]interface{}{
+				"model":       fmt.Sprintf("azure/%s", bgi.config.AzureChatDeployment),
+				"api_key":     "os.environ/AZURE_OPENAI_API_KEY",
+				"api_base":    "os.environ/AZURE_API_BASE",
+				"api_version": "os.environ/AZURE_API_VERSION",
+			},
+		},
+		// Alternative chat model name (gpt-3.5-turbo maps to same deployment)
+		{
+			ModelName: "gpt-3.5-turbo",
+			LiteLLMParams: map[string]interface{}{
+				"model":       fmt.Sprintf("azure/%s", bgi.config.AzureChatDeployment),
+				"api_key":     "os.environ/AZURE_OPENAI_API_KEY",
+				"api_base":    "os.environ/AZURE_API_BASE",
+				"api_version": "os.environ/AZURE_API_VERSION",
+			},
+		},
+	}
+
+	// Add embeddings model based on configuration
+	if bgi.config.UseLocalEmbeddings {
+		// Local embeddings via Ollama
+		logger.Info("Configuring LiteLLM for local embeddings",
+			zap.String("model", bgi.config.LocalEmbeddingsModel),
+			zap.String("endpoint", DefaultOllamaDockerEndpoint))
+
+		modelList = append(modelList, LiteLLMModel{
+			ModelName: bgi.config.LocalEmbeddingsModel,
+			LiteLLMParams: map[string]interface{}{
+				"model":    fmt.Sprintf("ollama/%s", bgi.config.LocalEmbeddingsModel),
+				"api_base": DefaultOllamaDockerEndpoint, // Docker host access
+			},
+		})
+	} else {
+		// Azure embeddings
+		logger.Info("Configuring LiteLLM for Azure embeddings",
+			zap.String("deployment", bgi.config.AzureEmbeddingsDeployment))
+
+		modelList = append(modelList, LiteLLMModel{
+			ModelName: "text-embedding-ada-002",
+			LiteLLMParams: map[string]interface{}{
+				"model":       fmt.Sprintf("azure/%s", bgi.config.AzureEmbeddingsDeployment),
+				"api_key":     "os.environ/AZURE_OPENAI_API_KEY",
+				"api_base":    "os.environ/AZURE_API_BASE",
+				"api_version": "os.environ/AZURE_API_VERSION",
+			},
+		})
+	}
+
+	// Build LiteLLM configuration
+	config := LiteLLMConfig{
+		ModelList: modelList,
+		GeneralSettings: LiteLLMGeneralSettings{
+			MasterKey: bgi.config.LiteLLMMasterKey,
+			// Optional: Add budget limits
+			// MaxBudget: 100,
+			// BudgetDuration: "30d",
+		},
+		LiteLLMSettings: LiteLLMRuntimeSettings{
+			SetVerbose: false, // Set to true for debugging
+		},
+	}
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(&config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal LiteLLM config to YAML: %w", err)
+	}
+
+	// Write configuration file
+	if err := os.WriteFile(litellmConfigPath, yamlData, shared.ConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write LiteLLM config file: %w", err)
+	}
+
+	logger.Debug("LiteLLM configuration created",
+		zap.String("path", litellmConfigPath),
+		zap.Int("models", len(config.ModelList)))
+
+	return nil
+}
+
+// createLiteLLMEnvFile creates the .env.litellm file for LiteLLM
+func (bgi *BionicGPTInstaller) createLiteLLMEnvFile(ctx context.Context) error {
+	logger := otelzap.Ctx(ctx)
+
+	envPath := filepath.Join(bgi.config.InstallDir, ".env.litellm")
+
+	logger.Info("Creating LiteLLM environment file", zap.String("path", envPath))
+
+	content := fmt.Sprintf(`# LiteLLM Environment Configuration
+# Generated by Eos - Code Monkey Cybersecurity
+
+# Azure OpenAI Configuration
+AZURE_OPENAI_API_KEY=%s
+AZURE_API_BASE=%s
+AZURE_API_VERSION=%s
+
+# LiteLLM will translate OpenAI API calls to Azure OpenAI format
+# using the deployment names configured in litellm_config.yaml
+`,
+		bgi.config.AzureAPIKey,
+		bgi.config.AzureEndpoint,
+		bgi.config.AzureAPIVersion,
+	)
+
+	// Create .env.litellm file with appropriate permissions
+	// 0640 = owner read/write, group read, others none
+	if err := os.WriteFile(envPath, []byte(content), shared.SecureConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write .env.litellm file: %w", err)
+	}
+
+	logger.Debug(".env.litellm file created",
+		zap.String("path", envPath),
+		zap.String("permissions", "0640"))
+
+	return nil
+}

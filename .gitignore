@@ -1,0 +1,80 @@
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Secrets
+*.pem
+*.key
+*.gpg
+*.vault
+*.asc
+
+# data
+**/data/
+
+# Environment
+*.env
+*.ini
+*.venv
+*.json
+
+# python 
+__pycache__
+
+# MacOS
+*.DS_Store
+*desktop.ini
+
+# Backups 
+*.bak
+
+# Apps
+apps/mailcow/mailcow-dockerized*
+apps/mattermost/docker*
+apps/umami/umami*
+apps/wazuh/wazuh-docker*
+apps/erpNext/frappe_docker*
+apps/mattermost/docker*
+
+# Logs and output
+*.log
+*.out
+
+# Other 
+*.deb
+*.rpm
+/eos
+eos.exe
+
+# tests
+coverage.*
+*.out
+gosec-report.*
+*eos-test*
+
+*.aider*
+
+#claude
+*this-session-is-being-continued-from-a-previous-co.txt
+*.txt
+
+*.bootstrapped
