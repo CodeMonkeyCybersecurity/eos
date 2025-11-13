@@ -81,7 +81,7 @@ func FixVaultConfig(rc *eos_io.RuntimeContext, configPath string) error {
 
 	// Create backup
 	backupPath := configPath + ".backup"
-	if err := os.WriteFile(backupPath, []byte(originalContent), 0640); err != nil {
+	if err := os.WriteFile(backupPath, []byte(originalContent), VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -89,7 +89,7 @@ func FixVaultConfig(rc *eos_io.RuntimeContext, configPath string) error {
 		zap.String("backup_path", backupPath))
 
 	// Write fixed config
-	if err := os.WriteFile(configPath, []byte(newContent), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte(newContent), VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to write fixed config: %w", err)
 	}
 

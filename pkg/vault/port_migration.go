@@ -242,7 +242,7 @@ func MigrateVaultPorts(rc *eos_io.RuntimeContext, config *PortMigrationConfig) (
 	// INTERVENE - Backup current configuration
 	logger.Info("Backing up current configuration")
 	backupPath := fmt.Sprintf("%s.backup.%d", config.ConfigPath, os.Getpid())
-	if err := os.WriteFile(backupPath, currentConfig, 0640); err != nil {
+	if err := os.WriteFile(backupPath, currentConfig, VaultConfigPerm); err != nil {
 		logger.Warn("Failed to create backup", zap.Error(err))
 	} else {
 		logger.Info("Configuration backed up", zap.String("backup", backupPath))
@@ -257,7 +257,7 @@ func MigrateVaultPorts(rc *eos_io.RuntimeContext, config *PortMigrationConfig) (
 		newConfig = UpdateConfigPorts(string(currentConfig), 0, actualToPort)
 	}
 
-	if err := os.WriteFile(config.ConfigPath, []byte(newConfig), 0640); err != nil {
+	if err := os.WriteFile(config.ConfigPath, []byte(newConfig), VaultConfigPerm); err != nil {
 		return nil, fmt.Errorf("failed to write updated configuration: %w", err)
 	}
 
@@ -273,7 +273,7 @@ func MigrateVaultPorts(rc *eos_io.RuntimeContext, config *PortMigrationConfig) (
 	if err != nil {
 		logger.Error("Failed to restart Vault", zap.String("output", output))
 		logger.Info("Attempting to restore backup", zap.String("backup", backupPath))
-		if restoreErr := os.WriteFile(config.ConfigPath, currentConfig, 0640); restoreErr != nil {
+		if restoreErr := os.WriteFile(config.ConfigPath, currentConfig, VaultConfigPerm); restoreErr != nil {
 			logger.Error("Failed to restore backup", zap.Error(restoreErr))
 		}
 		return nil, fmt.Errorf("failed to restart Vault service: %w\nOutput: %s", err, output)

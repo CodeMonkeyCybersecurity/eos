@@ -93,7 +93,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 		// Check if parent directory exists and is writable
 		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 			// Check if we can create the parent directory
-			if err := os.MkdirAll(parentDir, 0755); err != nil {
+			if err := os.MkdirAll(parentDir, VaultBaseDirPerm); err != nil {
 				logger.Error("Cannot create required parent directory",
 					zap.String("directory", parentDir),
 					zap.Error(err))
@@ -104,7 +104,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 		}
 		
 		// Test if we can create the target directory
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, VaultBaseDirPerm); err != nil {
 			logger.Error("Cannot create required directory",
 				zap.String("directory", dir),
 				zap.Error(err))

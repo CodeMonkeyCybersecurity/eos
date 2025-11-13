@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"bufio"
 	"fmt"
 	"os"
@@ -120,7 +121,7 @@ func SaveVaultConfig(rc *eos_io.RuntimeContext, vaultAddr, authMethod string) er
 
 	// INTERVENE - Create directory and save configuration
 	configDir := "/etc/eos"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, vault.VaultBaseDirPerm); err != nil {
 		logger.Error("Failed to create config directory",
 			zap.String("dir", configDir),
 			zap.Error(err))

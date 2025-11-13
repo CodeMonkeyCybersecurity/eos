@@ -281,8 +281,8 @@ func disableSwap(rc *eos_io.RuntimeContext) error {
 		}
 
 		newContent := strings.Join(newLines, "\n")
-		if err := os.WriteFile(fstabPath+".eos-backup", content, 0644); err == nil {
-			if err := os.WriteFile(fstabPath, []byte(newContent), 0644); err != nil {
+		if err := os.WriteFile(fstabPath+".eos-backup", content, VaultTLSCertPerm); err == nil {
+			if err := os.WriteFile(fstabPath, []byte(newContent), VaultTLSCertPerm); err != nil {
 				log.Warn("Failed to update fstab file", zap.String("path", fstabPath), zap.Error(err))
 			}
 		}
@@ -330,7 +330,7 @@ func disableCoreDumps(rc *eos_io.RuntimeContext) error {
 vault hard core 0
 vault soft core 0
 `
-	if err := os.WriteFile("/etc/security/limits.d/vault-hardening.conf", []byte(limitsContent), 0644); err != nil {
+	if err := os.WriteFile("/etc/security/limits.d/vault-hardening.conf", []byte(limitsContent), VaultTLSCertPerm); err != nil {
 		log.Warn("Failed to write vault hardening limits", zap.Error(err))
 	}
 
@@ -351,7 +351,7 @@ vault soft nproc 4096
 vault hard nproc 4096
 `
 
-	if err := os.WriteFile("/etc/security/limits.d/vault-ulimits.conf", []byte(ulimitsContent), 0644); err != nil {
+	if err := os.WriteFile("/etc/security/limits.d/vault-ulimits.conf", []byte(ulimitsContent), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write ulimits configuration: %w", err)
 	}
 
@@ -473,7 +473,7 @@ func hardenSSH(rc *eos_io.RuntimeContext) error {
 
 	// Write new config
 	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(sshConfigPath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(sshConfigPath, []byte(newContent), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write hardened SSH config: %w", err)
 	}
 
@@ -496,7 +496,7 @@ func enableComprehensiveAuditLogging(rc *eos_io.RuntimeContext, client *api.Clie
 
 	// Create audit log directory
 	auditDir := "/var/log/vault"
-	if err := os.MkdirAll(auditDir, 0750); err != nil {
+	if err := os.MkdirAll(auditDir, VaultDirPerm); err != nil {
 		return fmt.Errorf("failed to create audit directory: %w", err)
 	}
 
@@ -584,7 +584,7 @@ func setupLogRotation(rc *eos_io.RuntimeContext) error {
 }
 `
 
-	if err := os.WriteFile("/etc/logrotate.d/vault", []byte(logrotateConfig), 0644); err != nil {
+	if err := os.WriteFile("/etc/logrotate.d/vault", []byte(logrotateConfig), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write logrotate configuration: %w", err)
 	}
 
@@ -673,7 +673,7 @@ echo "Vault snapshot saved to $BACKUP_FILE.gz"
 `
 
 	scriptPath := VaultBackupScriptPath
-	if err := os.WriteFile(scriptPath, []byte(backupScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(backupScript), VaultBinaryPerm); err != nil {
 		return fmt.Errorf("failed to write backup script: %w", err)
 	}
 
@@ -703,10 +703,10 @@ ExecStart=%s
 Environment=VAULT_ADDR=%s
 `, VaultBackupScriptPath, shared.GetVaultHTTPSAddr())
 
-	if err := os.WriteFile(VaultBackupTimerPath, []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile(VaultBackupTimerPath, []byte(timerContent), VaultTLSCertPerm); err != nil {
 		log.Warn("Failed to write vault backup timer", zap.Error(err))
 	}
-	if err := os.WriteFile(VaultBackupServicePath, []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(VaultBackupServicePath, []byte(serviceContent), VaultTLSCertPerm); err != nil {
 		log.Warn("Failed to write vault backup service", zap.Error(err))
 	}
 

@@ -89,7 +89,7 @@ func NewVaultUninstaller(rc *eos_io.RuntimeContext, config *UninstallConfig) *Va
 
 	// Initialize transaction tracking with secure log directory
 	logDir := "/var/log/eos"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, VaultBaseDirPerm); err != nil {
 		// If we can't create log directory, fall back to temp
 		logDir = os.TempDir()
 	}

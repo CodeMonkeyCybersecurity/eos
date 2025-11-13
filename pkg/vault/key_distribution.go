@@ -87,7 +87,7 @@ func generateEncryptedKeyFiles(rc *eos_io.RuntimeContext, initRes *api.InitRespo
 
 	logger.Info("Creating encrypted key files directory", zap.String("path", outputDir))
 
-	if err := os.MkdirAll(outputDir, 0700); err != nil {
+	if err := os.MkdirAll(outputDir, VaultDataDirPerm); err != nil {
 		return fmt.Errorf("create key directory: %w", err)
 	}
 

@@ -37,7 +37,7 @@ func NewFileAuditRepository(logDir string, logger *zap.Logger) *FileAuditReposit
 	}
 
 	// Ensure log directory exists
-	if err := os.MkdirAll(logDir, 0750); err != nil {
+	if err := os.MkdirAll(logDir, VaultDirPerm); err != nil {
 		logger.Error("Failed to create audit log directory",
 			zap.String("dir", logDir),
 			zap.Error(err))
