@@ -124,10 +124,13 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
    - **Impact**: Production deletion, running VM deletion, emergency overrides can be bypassed
    - **Remediation**: Add validation to 357 unprotected commands (12 hours, scriptable)
 
-2. **Hardcoded File Permissions (Compliance Risk)**: 1347 violations (78 in cmd/, 1269 in pkg/)
+2. **Hardcoded File Permissions (Compliance Risk)**: 732 violations (695 production, 37 test)
    - **Issue**: SOC2/PCI-DSS/HIPAA audit failure - no documented security rationale
-   - **Examples**: `os.MkdirAll("/etc/vault", 0755)` instead of `vault.VaultConfigDir, vault.VaultDirPerm`
-   - **Remediation**: Create constants in `pkg/shared/permissions.go`, automated search-replace (2-3 days)
+   - **Breakdown**: 419 WriteFile, 233 MkdirAll, 29 Chmod, 14 FileMode() calls (excludes test files)
+   - **Examples**: `os.WriteFile(path, data, 0600)` → `shared.SecretFilePerm`, `os.MkdirAll(dir, 0755)` → `shared.ServiceDirPerm`
+   - **Architecture**: TWO-TIER pattern - shared constants (pkg/shared/permissions.go) + service-specific (pkg/vault/constants.go, pkg/consul/constants.go)
+   - **Remediation**: Automated replacement for production code (1-2 days), manual review for service-specific permissions
+   - **Note**: Original estimate (1347) was inflated by string matching - caught comments, port numbers, documentation
 
 3. **Architecture Boundary Violations**: 19 cmd/ files >100 lines (should be <100)
    - **Worst**: `cmd/debug/iris.go` (1507 lines, 15x over limit)
@@ -176,7 +179,7 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
 - CVE announcement: "Flag bypass vulnerability patched in eos v1.X"
 
 **Phase 2: Compliance & Architecture (P1)** - Week 3-4, 7-10 days
-- [ ] Hardcoded permissions: Create constants with security rationale, automated search-replace (2-3 days)
+- [ ] Hardcoded permissions: Automated replacement for 695 production violations (1-2 days, preserve service-specific constants)
 - [ ] Architecture violations: Refactor 19 oversized cmd/ files to pkg/ (76h, manual)
 - [ ] fmt.Print violations: Convert to structured logging (5h, semi-automated)
 
@@ -211,7 +214,7 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
 
 **Pre-Remediation** (Current State):
 - Flag bypass: 357/363 commands vulnerable (98.3%)
-- Hardcoded permissions: 1347 violations
+- Hardcoded permissions: 732 violations (695 production, 37 test; original 1347 was inflated by string matching)
 - Architecture violations: 19 files (6-15x over limit)
 - fmt.Print violations: 298
 - Human-centric flags: 5/363 commands (1.4%)
