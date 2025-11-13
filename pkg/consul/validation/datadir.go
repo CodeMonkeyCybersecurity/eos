@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -106,7 +107,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext, path string) error {
 
 	// Test write access by creating a temp file
 	testFile := filepath.Join(path, ".eos-write-test")
-	err = os.WriteFile(testFile, []byte("test"), 0600)
+	err = os.WriteFile(testFile, []byte("test"), shared.SecretFilePerm)
 	if err != nil {
 		return fmt.Errorf("directory not writable: %w", err)
 	}

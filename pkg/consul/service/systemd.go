@@ -142,7 +142,7 @@ func (sm *SystemdManager) CreateServiceFile(content string) error {
 		zap.String("path", servicePath))
 
 	// Write service file with proper permissions
-	if err := os.WriteFile(servicePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(servicePath, []byte(content), consulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write service file: %w", err)
 	}
 

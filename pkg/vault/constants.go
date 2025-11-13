@@ -375,6 +375,12 @@ const (
 	// THREAT MODEL: Token theft = unauthorized Vault access
 	VaultTokenFilePerm = 0600 // vault:vault
 
+	// VaultSystemdServicePerm - Systemd service unit files (0644 = rw-r--r--)
+	// RATIONALE: Systemd requires world-readable service files
+	// SECURITY: Owned by root, no secrets in service files (secrets via environment)
+	// COMPLIANCE: Standard systemd file permissions per systemd.unit(5)
+	VaultSystemdServicePerm = 0644 // root:root
+
 	// === Owner/Group (string identifiers) ===
 	VaultOwner = "vault"
 	VaultGroup = "vault"
@@ -662,6 +668,6 @@ var VaultFilePermissions = []FilePermission{
 	{Path: VaultBinaryPath, Owner: RootOwner, Group: RootGroup, Mode: VaultBinaryPerm}, // /usr/local/bin/vault
 
 	// === Systemd Services (owned by root) ===
-	{Path: VaultServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644},      // vault.service
-	{Path: VaultAgentServicePath, Owner: RootOwner, Group: RootGroup, Mode: 0644}, // vault-agent-eos.service
+	{Path: VaultServicePath, Owner: RootOwner, Group: RootGroup, Mode: VaultSystemdServicePerm},      // vault.service
+	{Path: VaultAgentServicePath, Owner: RootOwner, Group: RootGroup, Mode: VaultSystemdServicePerm}, // vault-agent-eos.service
 }
