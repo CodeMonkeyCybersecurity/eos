@@ -1,0 +1,84 @@
+name: Quality Gates
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25
+
+      - name: Download Go module dependencies
+        run: go mod download
+
+      - name: Check code formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not properly formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Check for security issues
+        run: |
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          gosec -quiet ./... || true
+
+      - name: Verify tests pass
+        run: go test -race -timeout=3m ./pkg/...
+
+      - name: Verify integration tests pass  
+        run: go test -timeout=5m ./integration_test.go ./integration_scenarios_test.go
+
+      - name: Check test coverage
+        run: |
+          go test -coverprofile=coverage.out ./pkg/...
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Test coverage: ${COVERAGE}%"
+          
+          # Convert coverage to integer for comparison (remove decimal)
+          COVERAGE_INT=${COVERAGE%.*}
+          
+          # Require minimum 70% coverage
+          if [ "$COVERAGE_INT" -lt 70 ]; then
+            echo "Test coverage ${COVERAGE}% is below required 70%"
+            exit 1
+          fi
+
+      - name: Verify no sensitive data in code
+        run: |
+          # Check for potential secrets or sensitive data patterns
+          if grep -r -E "(password|secret|key|token).*=" --include="*.go" --exclude-dir=".git" . | grep -v "test"; then
+            echo "Warning: Potential sensitive data found in code"
+            echo "Please review the above findings"
+            # Note: Don't fail the build, just warn
+          fi
+
+      - name: Check build
+        run: go build -o eos .
+
+      - name: Verify documentation is up to date
+        run: |
+          if [ ! -f "INTEGRATION_TESTING.md" ]; then
+            echo "Integration testing documentation missing"
+            exit 1
+          fi
+          
+          if [ ! -f "CLAUDE.md" ]; then
+            echo "Project documentation missing"
+            exit 1
+          fi

@@ -1,0 +1,20 @@
+name: eos-security-queries
+version: 1.0.0
+description: Custom security queries for the Eos CLI application
+license: MIT
+
+dependencies:
+  codeql/go-all: "*"
+
+defaultSuiteFile: eos-security-queries.qls
+
+extractor: go
+
+groups:
+  - security
+  - external/cwe
+
+exclude:
+  - "**/*_test.go"
+  - "**/testutil/**"
+  - "**/testdata/**"

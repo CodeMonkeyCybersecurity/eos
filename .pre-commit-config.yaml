@@ -1,0 +1,92 @@
+# Eos Pre-Commit Hook Configuration
+# Last Updated: 2025-11-05
+#
+# Installation:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run manually:
+#   pre-commit run --all-files
+#
+# Update hooks:
+#   pre-commit autoupdate
+
+repos:
+  # Go-specific hooks from TekWizely (most flexible for Go monorepos)
+  - repo: https://github.com/TekWizely/pre-commit-golang
+    rev: v1.0.0-rc.1
+    hooks:
+      # Format Go code
+      - id: go-fmt
+        name: Format Go code (gofmt)
+        description: Ensures all Go code is properly formatted
+
+      # Organize imports
+      - id: go-imports
+        name: Organize imports (goimports)
+        description: Ensures imports are organized correctly
+
+      # Run go vet
+      - id: go-vet
+        name: Static analysis (go vet)
+        description: Runs go vet for static analysis
+        args: []  # Can add CGO_ENABLED=1 if needed
+
+      # Run golangci-lint
+      - id: golangci-lint
+        name: Lint (golangci-lint)
+        description: Runs golangci-lint with project config
+        args: [--timeout=5m]
+
+      # Ensure go.mod and go.sum are tidy
+      - id: go-mod-tidy
+        name: Verify go.mod is tidy
+        description: Ensures go.mod and go.sum are up to date
+        args: [-v]
+
+  # Local hooks for custom checks
+  - repo: local
+    hooks:
+      # Run fast tests (skip integration and E2E)
+      - id: go-test-fast
+        name: Run unit tests
+        entry: go test -race -short -v ./...
+        language: system
+        pass_filenames: false
+        description: Runs fast unit tests with race detector
+
+      # Check test coverage
+      - id: go-coverage-check
+        name: Check test coverage
+        entry: bash -c 'go test -coverprofile=coverage.out -covermode=atomic ./... && go run github.com/vladopajic/go-test-coverage/v2@latest --config=.testcoverage.yml'
+        language: system
+        pass_filenames: false
+        description: Ensures test coverage meets thresholds
+
+      # Build verification
+      - id: go-build
+        name: Verify build
+        entry: go build -o /tmp/eos-build-precommit ./cmd/
+        language: system
+        pass_filenames: false
+        description: Ensures code compiles successfully
+
+      # Verify E2E tests have build tags
+      - id: verify-e2e-build-tags
+        name: Verify E2E build tags
+        entry: bash -c 'for f in test/e2e/*_test.go; do head -1 "$f" | grep -q "//go:build e2e" || { echo "ERROR: $f missing //go:build e2e tag"; exit 1; }; done'
+        language: system
+        pass_filenames: false
+        description: Ensures all E2E tests have proper build tags
+
+      # Check for deprecated benchmark pattern
+      - id: check-benchmark-pattern
+        name: Check for deprecated benchmarks
+        entry: bash -c '! git grep -n "for.*b\.N.*{" -- "*_test.go" || { echo "ERROR: Found deprecated benchmark pattern. Use B.Loop() instead of for b.N"; exit 1; }'
+        language: system
+        pass_filenames: false
+        description: Detects deprecated benchmark patterns
+
+# Global settings
+fail_fast: false  # Run all hooks even if one fails
+minimum_pre_commit_version: '2.20.0'

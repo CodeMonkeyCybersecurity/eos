@@ -1,0 +1,76 @@
+# Hecate Configuration Example
+# This file demonstrates the ultra-simple YAML config format for Hecate
+#
+# Usage: eos create hecate --config hecate-config.yaml
+
+apps:
+  # Simple web application
+  main:
+    domain: example.com
+    backend: 192.0.2.10:8009
+
+  # Wazuh security monitoring (auto-detected type)
+  wazuh:
+    domain: wazuh.example.com
+    backend: 192.0.2.20
+    # Automatically includes TCP ports 1514, 1515, 55000
+
+  # Nextcloud with SSO protection
+  nextcloud:
+    domain: cloud.example.com
+    backend: 192.0.2.30
+    sso: true      # Requires authentication via Authentik
+    talk: true     # Enables WebRTC/Coturn for Nextcloud Talk
+
+  # MinIO object storage
+  minio:
+    domain: s3.example.com
+    backend: 192.0.2.40:9000
+
+  # MinIO API endpoint
+  minio-api:
+    domain: s3api.example.com
+    backend: 192.0.2.40
+    # Port automatically detected as 9123 for MinIO API
+
+  # Authentik identity provider (SSO)
+  # Backend is automatic - always uses hecate-server-1:9000
+  authentik:
+    domain: auth.example.com
+
+  # Grafana monitoring with SSO
+  grafana:
+    domain: grafana.example.com
+    backend: 192.0.2.50:3000
+    sso: true
+
+  # Umami analytics
+  umami:
+    domain: umami.example.com
+    backend: 192.0.2.60:3000
+
+# What Hecate generates:
+#
+# 1. docker-compose.yml with:
+#    - Caddy (HTTP/HTTPS reverse proxy)
+#    - Authentik + PostgreSQL + Redis (if authentik app present)
+#    - Coturn (if talk: true on any app)
+#    - Nginx (if TCP ports needed, like Wazuh)
+#
+# 2. Caddyfile with:
+#    - Automatic HTTPS for all domains
+#    - Security hardening (block scanners, malicious patterns)
+#    - SSO integration (if sso: true)
+#    - WebSocket support (auto-detected for Nextcloud, Authentik)
+#
+# 3. nginx.conf + stream configs (if needed for TCP/UDP)
+#
+# 4. .env file with placeholders for Authentik secrets
+#
+# Smart Defaults:
+# - App types auto-detected from names (wazuh, nextcloud, minio, etc.)
+# - Backend ports use sensible defaults from pkg/shared/ports.go
+# - TCP ports automatically added for services that need them
+# - WebSocket support enabled where needed
+# - Health checks configured per service type
+# - Log levels (INFO for most, DEBUG for Authentik/Wazuh)

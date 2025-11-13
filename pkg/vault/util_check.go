@@ -1,0 +1,362 @@
+package vault
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+
+	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.uber.org/zap"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/hashicorp/vault/api"
+)
+
+// tracer is the OpenTelemetry tracer for this package
+// Note: This duplicates the one in tls.go but avoids import cycles
+var vaultCheckTracer = otel.Tracer("github.com/CodeMonkeyCybersecurity/eos/pkg/vault")
+
+func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
+	_, span := vaultCheckTracer.Start(context.Background(), "vault.Check")
+	defer span.End()
+
+	report := &shared.CheckReport{}
+
+	if os.Getenv(shared.VaultAddrEnv) == "" {
+		return failReport(rc, report, "VAULT_ADDR not set")
+	}
+
+	if healthy, err := CheckVaultHealth(rc); err != nil || !healthy {
+		errMsg := fmt.Sprintf("Vault health check failed: %v", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, errMsg)
+		return failReport(rc, report, errMsg)
+	}
+
+	if !isInstalled(rc) {
+		return failReport(rc, report, "Vault CLI binary not found in PATH")
+	}
+	report.Installed = true
+
+	if client == nil {
+		c, err := GetVaultClient(rc)
+		if err != nil {
+			return failReport(rc, report, "Vault client initialization failed")
+		}
+		client = c
+	}
+
+	initStatus, err := IsVaultInitialized(rc, client)
+	if err != nil {
+		errMsg := fmt.Sprintf("Init check error: %v", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, errMsg)
+		return failReport(rc, report, errMsg)
+	}
+	report.Initialized = initStatus
+	report.Sealed = IsVaultSealed(rc, client)
+
+	if report.Sealed {
+		report.Notes = append(report.Notes, "Vault is sealed")
+	}
+
+	if len(storedHashes) > 0 && hashedRoot != "" && !verifyVaultSecrets(rc, storedHashes, hashedRoot) {
+		report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
+	}
+
+	span.SetStatus(codes.Ok, "Vault check complete")
+	return report, client
+}
+
+func failReport(rc *eos_io.RuntimeContext, r *shared.CheckReport, msg string) (*shared.CheckReport, *api.Client) {
+	otelzap.Ctx(rc.Ctx).Warn("Vault check failed", zap.String("reason", msg))
+	r.Notes = append(r.Notes, msg)
+	return r, nil
+}
+
+func verifyVaultSecrets(rc *eos_io.RuntimeContext, storedHashes []string, hashedRoot string) bool {
+	keys, root, err := PromptOrRecallUnsealKeys(rc)
+	if err != nil || !crypto.AllUnique(keys) {
+		return false
+	}
+	return crypto.AllHashesPresent(crypto.HashStrings(keys), storedHashes) &&
+		crypto.HashString(root) == hashedRoot
+}
+
+func isInstalled(rc *eos_io.RuntimeContext) bool {
+	logger := otelzap.Ctx(rc.Ctx)
+	path, err := exec.LookPath("vault")
+	if err != nil {
+		logger.Debug("Vault binary not found in PATH", zap.Error(err))
+		return false
+	}
+	logger.Debug("Vault binary found", zap.String("path", path))
+	return true
+}
+
+func IsVaultInitialized(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault initialization status")
+
+	status, err := client.Sys().Health()
+	if err != nil {
+		logger.Warn("Failed to check Vault health", zap.Error(err))
+		return false, err
+	}
+
+	logger.Debug("Vault initialization status checked",
+		zap.Bool("initialized", status.Initialized),
+		zap.Bool("sealed", status.Sealed))
+	return status.Initialized, nil
+}
+
+func IsVaultSealed(rc *eos_io.RuntimeContext, client *api.Client) bool {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault seal status")
+
+	status, err := client.Sys().Health()
+	if err != nil {
+		logger.Warn("Failed to check Vault health", zap.Error(err))
+		return true // Assume sealed if we can't check
+	}
+
+	logger.Debug("Vault seal status checked",
+		zap.Bool("sealed", status.Sealed),
+		zap.Bool("initialized", status.Initialized))
+	return status.Sealed
+}
+
+// CheckVaultSealStatusUnauthenticated checks Vault seal status without authentication
+// This is used for preflight checks and early failure detection to avoid wasting time
+// on authentication when Vault is sealed or uninitialized.
+//
+// The /v1/sys/seal-status endpoint is UNAUTHENTICATED in Vault, making it perfect
+// for fast health checks before attempting authentication.
+//
+// Returns (initialized, sealed, error):
+//   - initialized: true if Vault has been initialized
+//   - sealed: true if Vault is sealed (requires unseal operation)
+//   - error: non-nil if unable to check status (network, API errors)
+//
+// Example usage:
+//
+//	initialized, sealed, err := vault.CheckVaultSealStatusUnauthenticated(rc)
+//	if err != nil {
+//	    return fmt.Errorf("failed to check Vault: %w", err)
+//	}
+//	if !initialized {
+//	    return eos_err.NewUserError("Vault not initialized: sudo eos init vault")
+//	}
+//	if sealed {
+//	    return eos_err.NewUserError("Vault is sealed: vault operator unseal")
+//	}
+func CheckVaultSealStatusUnauthenticated(rc *eos_io.RuntimeContext) (bool, bool, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault seal status (unauthenticated)")
+
+	// Create unauthenticated client
+	vaultAddr := shared.GetVaultAddrWithEnv()
+	config := api.DefaultConfig()
+	config.Address = vaultAddr
+
+	// Read environment for VAULT_SKIP_VERIFY and other settings
+	if err := config.ReadEnvironment(); err != nil {
+		logger.Warn("Failed to read Vault environment config", zap.Error(err))
+		// Continue anyway - ReadEnvironment is best-effort
+	}
+
+	client, err := api.NewClient(config)
+	if err != nil {
+		return false, false, fmt.Errorf("create unauthenticated vault client: %w", err)
+	}
+
+	// Call unauthenticated seal-status endpoint
+	// This endpoint does NOT require authentication, making it perfect for preflight checks
+	sealStatus, err := client.Sys().SealStatus()
+	if err != nil {
+		return false, false, fmt.Errorf("check seal status: %w", err)
+	}
+
+	logger.Debug("Vault seal status checked",
+		zap.Bool("initialized", sealStatus.Initialized),
+		zap.Bool("sealed", sealStatus.Sealed),
+		zap.String("vault_addr", vaultAddr))
+
+	return sealStatus.Initialized, sealStatus.Sealed, nil
+}
+
+func IsAlreadyInitialized(err error) bool {
+	return strings.Contains(err.Error(), "Vault is already initialized")
+}
+
+func ListVault(rc *eos_io.RuntimeContext, path string) ([]string, error) {
+	_, span := tracer.Start(context.Background(), "vault.ListVault")
+	defer span.End()
+
+	// Use admin client (HashiCorp best practice)
+	// During initial setup, this will fallback to root token if admin AppRole not yet configured
+	client, err := GetAdminClient(rc)
+	if err != nil {
+		span.RecordError(err)
+		return nil, cerr.Wrap(err, "get admin client")
+	}
+
+	fullPath := shared.VaultSecretMountPath + path
+	resp, err := client.Logical().List(fullPath)
+	if err != nil || resp == nil {
+		span.RecordError(err)
+		return nil, cerr.Wrapf(err, "vault list failed at %s", fullPath)
+	}
+
+	rawKeys, _ := resp.Data["keys"].([]interface{})
+	keys := make([]string, len(rawKeys))
+	for i, k := range rawKeys {
+		keys[i] = fmt.Sprintf("%v", k)
+	}
+
+	return keys, nil
+}
+
+func CheckVaultTokenFile(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault token file", zap.String("path", shared.AgentToken))
+
+	info, err := os.Stat(shared.AgentToken)
+	if os.IsNotExist(err) {
+		logger.Error("Vault agent token file missing", zap.String("path", shared.AgentToken))
+		return cerr.Newf("vault agent token file missing: %s", shared.AgentToken)
+	}
+	if err != nil {
+		logger.Error("Failed to stat Vault token file",
+			zap.String("path", shared.AgentToken),
+			zap.Error(err))
+		return cerr.Wrapf(err, "failed to check token file %s", shared.AgentToken)
+	}
+
+	logger.Debug("Vault token file exists",
+		zap.String("path", shared.AgentToken),
+		zap.String("permissions", info.Mode().String()))
+	return nil
+}
+
+// RunVaultTestQuery attempts a simple KVv2 read using the configured client.
+func RunVaultTestQuery(rc *eos_io.RuntimeContext) error {
+	client, err := GetVaultClient(rc)
+	if err != nil {
+		return fmt.Errorf("get client: %w", err)
+	}
+	_, err = client.KVv2(shared.VaultSecretMount).Get(context.Background(), shared.TestKVPath)
+	return err
+}
+
+func EnsureVaultReady(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	client, err := GetVaultClient(rc)
+	if err != nil {
+		return nil, err
+	}
+	if err := probeVaultHealthUntilReady(rc, client); err == nil {
+		return client, nil
+	}
+	if err := recoverVaultHealth(rc, client); err != nil {
+		return nil, fmt.Errorf("vault recovery failed: %w", err)
+	}
+	return client, nil
+}
+
+// PathExistsKVv2 checks if a KV-v2 path has metadata.
+func PathExistsKVv2(rc *eos_io.RuntimeContext, client *api.Client, mount, path string) (bool, error) {
+	if client == nil {
+		return false, fmt.Errorf("nil Vault client")
+	}
+	md, err := client.KVv2(mount).GetMetadata(rc.Ctx, path)
+	switch {
+	case err == nil && md != nil:
+		otelzap.Ctx(rc.Ctx).Debug(" Metadata found", zap.String("mount", mount), zap.String("path", path))
+		return true, nil
+	case isNotFound(err):
+		return false, nil
+	default:
+		otelzap.Ctx(rc.Ctx).Error(" Metadata check failed", zap.Error(err))
+		return false, err
+	}
+}
+
+func isNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
+		return true
+	}
+	return strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404")
+}
+
+// FindNextAvailableKVv2Path discovers an unused path under baseDir.
+func FindNextAvailableKVv2Path(rc *eos_io.RuntimeContext, client *api.Client, mount, baseDir, leafBase string) (string, error) {
+	listPath := fmt.Sprintf("%s/metadata/%s", mount, baseDir)
+
+	sec, err := client.Logical().ListWithContext(rc.Ctx, listPath)
+	if err != nil {
+		if isNotFound(err) {
+			return fmt.Sprintf("%s/%s", baseDir, leafBase), nil
+		}
+		return "", fmt.Errorf("listing metadata: %w", err)
+	}
+	if sec == nil || sec.Data == nil {
+		return fmt.Sprintf("%s/%s", baseDir, leafBase), nil
+	}
+
+	rawKeys, _ := sec.Data["keys"].([]interface{})
+	maxIdx := -1
+	pattern := regexp.MustCompile(fmt.Sprintf(`^%s-(\d{3})$`, regexp.QuoteMeta(leafBase)))
+
+	for _, v := range rawKeys {
+		name := fmt.Sprintf("%v", v)
+		switch {
+		case name == leafBase:
+			if maxIdx < 0 {
+				maxIdx = 0
+			}
+		case pattern.MatchString(name):
+			if parts := pattern.FindStringSubmatch(name); len(parts) == 2 {
+				if idx, err := strconv.Atoi(parts[1]); err == nil && idx > maxIdx {
+					maxIdx = idx
+				}
+			}
+		}
+	}
+
+	nextIdx := maxIdx + 1
+	var nextLeaf string
+	if nextIdx == 0 {
+		nextLeaf = leafBase
+	} else {
+		nextLeaf = fmt.Sprintf("%s-%03d", leafBase, nextIdx)
+	}
+	return fmt.Sprintf("%s/%s", baseDir, nextLeaf), nil
+}
+
+func CheckVaultAgentService(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Vault Agent service status", zap.String("service", shared.VaultAgentService))
+
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "is-active", "--quiet", shared.VaultAgentService)
+	if err := cmd.Run(); err != nil {
+		logger.Warn("Vault Agent service is not active",
+			zap.String("service", shared.VaultAgentService),
+			zap.Error(err))
+		return fmt.Errorf("vault agent service %s is not active: %w", shared.VaultAgentService, err)
+	}
+
+	logger.Debug("Vault Agent service is active", zap.String("service", shared.VaultAgentService))
+	return nil
+}

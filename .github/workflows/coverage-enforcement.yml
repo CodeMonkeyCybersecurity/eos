@@ -1,0 +1,195 @@
+# github/workflows/coverage-enforcement.yml
+
+name: Coverage Enforcement
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Install bc for calculations
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bc
+    
+    - name: Run tests with coverage
+      run: |
+        go test -v -coverprofile=coverage.out -covermode=atomic ./pkg/...
+        go tool cover -func=coverage.out
+    
+    - name: Check coverage thresholds
+      id: coverage-check
+      run: |
+        # Extract overall coverage percentage
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Overall coverage: ${COVERAGE}%"
+        echo "overall_coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+        
+        # Check if bc is available, fallback to awk if not
+        if command -v bc &> /dev/null; then
+          if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 70% threshold"
+            exit 1
+          fi
+        else
+          if awk "BEGIN {exit !($COVERAGE < 70)}"; then
+            echo "::error::Coverage ${COVERAGE}% is below 70% threshold"
+            exit 1
+          fi
+        fi
+        
+        # Critical packages must have > 90% coverage
+        CRITICAL_FAILED=0
+        CRITICAL_REPORT=""
+        
+        for pkg in vault crypto eos_io eos_err; do
+          if [ -d "./pkg/${pkg}" ]; then
+            go test -coverprofile=${pkg}.coverage.out ./pkg/${pkg}/... || true
+            
+            if [ -f "${pkg}.coverage.out" ]; then
+              PKG_COV=$(go tool cover -func=${pkg}.coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+              echo "${pkg} coverage: ${PKG_COV}%"
+              CRITICAL_REPORT="${CRITICAL_REPORT}| ${pkg} | ${PKG_COV}% |\\n"
+              
+              # Use awk for compatibility
+              if awk "BEGIN {exit !($PKG_COV < 90)}"; then
+                echo "::error::${pkg} coverage ${PKG_COV}% is below 90% threshold"
+                CRITICAL_FAILED=1
+              fi
+            else
+              echo "::warning::No coverage data for ${pkg}"
+              CRITICAL_REPORT="${CRITICAL_REPORT}| ${pkg} | No data |\\n"
+            fi
+          else
+            echo "::warning::Package ${pkg} not found"
+            CRITICAL_REPORT="${CRITICAL_REPORT}| ${pkg} | Not found |\\n"
+          fi
+        done
+        
+        echo "critical_report=${CRITICAL_REPORT}" >> $GITHUB_OUTPUT
+        
+        if [ $CRITICAL_FAILED -eq 1 ]; then
+          exit 1
+        fi
+    
+    - name: Generate coverage badge
+      if: success() && github.ref == 'refs/heads/main'
+      run: |
+        COVERAGE=${{ steps.coverage-check.outputs.overall_coverage }}
+        COLOR="red"
+        
+        # Determine badge color based on coverage
+        if [ $(echo "$COVERAGE >= 90" | bc -l) -eq 1 ]; then
+          COLOR="brightgreen"
+        elif [ $(echo "$COVERAGE >= 80" | bc -l) -eq 1 ]; then
+          COLOR="green"
+        elif [ $(echo "$COVERAGE >= 70" | bc -l) -eq 1 ]; then
+          COLOR="yellow"
+        elif [ $(echo "$COVERAGE >= 60" | bc -l) -eq 1 ]; then
+          COLOR="orange"
+        fi
+        
+        # Create badge URL
+        BADGE_URL="https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}"
+        echo "Badge URL: ${BADGE_URL}"
+        
+        # Download badge
+        curl -s "${BADGE_URL}" > coverage-badge.svg
+    
+    - name: Upload coverage to Codecov
+      if: always()
+      uses: codecov/codecov-action@v4
+      continue-on-error: true
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Upload coverage artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: |
+          coverage.out
+          *.coverage.out
+          coverage-badge.svg
+        retention-days: 30
+    
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const coverage = '${{ steps.coverage-check.outputs.overall_coverage }}';
+          const criticalReport = `${{ steps.coverage-check.outputs.critical_report }}`;
+          
+          // Construct the comment body
+          let body = `##  Test Coverage Report\n\n`;
+          body += `**Overall Coverage**: ${coverage}% `;
+          
+          // Add emoji based on coverage
+          if (parseFloat(coverage) >= 90) {
+            body += '';
+          } else if (parseFloat(coverage) >= 80) {
+            body += '🟢';
+          } else if (parseFloat(coverage) >= 70) {
+            body += '🟡';
+          } else {
+            body += '🔴';
+          }
+          
+          body += '\n\n### Critical Packages (90% required)\n\n';
+          body += '| Package | Coverage |\n';
+          body += '|---------|----------|\n';
+          body += criticalReport.replace(/\\n/g, '\n');
+          
+          body += '\n---\n';
+          body += `*Minimum coverage requirements: Overall 70%, Critical packages 90%*`;
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.type === 'Bot' && 
+            comment.body.includes('Test Coverage Report')
+          );
+          
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

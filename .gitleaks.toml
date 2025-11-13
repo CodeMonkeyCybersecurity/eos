@@ -1,0 +1,203 @@
+# .gitleaks.toml - Secret scanning configuration for Eos
+# Last Updated: 2025-11-07
+# Documentation: https://github.com/gitleaks/gitleaks
+#
+# This configuration detects secrets specific to Eos infrastructure:
+#   - Vault tokens, Consul tokens, Nomad tokens
+#   - Database passwords, API keys
+#   - TLS certificates and private keys
+#   - Generic secrets (passwords, tokens, keys)
+#
+# Used by:
+#   - Pre-commit hook (.git/hooks/pre-commit - gitleaks protect --staged)
+#   - CI/CD (future GitHub Actions workflow)
+#   - Manual scans (gitleaks detect)
+
+title = "Eos Secret Scanning Configuration"
+
+# Use gitleaks' default ruleset as baseline
+[extend]
+useDefault = true
+
+# ============================================================================
+# Eos-Specific Secret Patterns
+# ============================================================================
+
+[[rules]]
+id = "vault-token"
+description = "HashiCorp Vault Token (hvs.* or s.* format)"
+regex = '''(hvs\.[a-zA-Z0-9]{90,}|s\.[a-zA-Z0-9]{24})'''
+tags = ["vault", "token", "hashicorp"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',          # Test files may have fake tokens
+    '''testdata/.*''',           # Test data
+    '''docs/.*\.md$''',          # Documentation examples
+]
+
+[[rules]]
+id = "consul-acl-token"
+description = "HashiCorp Consul ACL Token (UUID format)"
+regex = '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'''
+tags = ["consul", "token", "hashicorp"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+    '''docs/.*\.md$''',
+]
+# Allow UUIDs in comments (often examples)
+regexes = [
+    '''// .*[0-9a-f]{8}-[0-9a-f]{4}''',  # UUID in comment
+]
+
+[[rules]]
+id = "nomad-token"
+description = "HashiCorp Nomad ACL Token"
+regex = '''(?i)(nomad[_-]?token|x-nomad-token)[\s:=]+["\']?([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})["\']?'''
+tags = ["nomad", "token", "hashicorp"]
+
+[[rules]]
+id = "postgres-connection-string"
+description = "PostgreSQL Connection String with Password"
+regex = '''postgres(ql)?://[a-zA-Z0-9_-]+:[^@\s]+@[a-zA-Z0-9_.-]+(:[0-9]+)?/[a-zA-Z0-9_-]+'''
+tags = ["database", "postgresql", "connection-string"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+]
+# Allow placeholder passwords
+regexes = [
+    '''postgres.*:password@''',
+    '''postgres.*:REPLACE_ME@''',
+    '''postgres.*:\$\{.*\}@''',  # Environment variables
+]
+
+[[rules]]
+id = "api-key-pattern"
+description = "Generic API Key Pattern"
+regex = '''(?i)(api[_-]?key|apikey|access[_-]?key)[\s:=]+["\']([a-zA-Z0-9_\-]{20,})["\']'''
+tags = ["api-key", "secret"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+    '''docs/.*''',
+]
+
+[[rules]]
+id = "private-key"
+description = "Private Key (RSA, EC, etc.)"
+regex = '''-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'''
+tags = ["private-key", "tls", "certificate"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+]
+
+[[rules]]
+id = "jwt-token"
+description = "JSON Web Token (JWT)"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+tags = ["jwt", "token"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+]
+
+[[rules]]
+id = "litellm-master-key"
+description = "LiteLLM Master Key (for BionicGPT/Moni)"
+regex = '''(?i)(litellm[_-]?master[_-]?key|master[_-]?key)[\s:=]+["\']?(sk-[a-zA-Z0-9_-]{20,})["\']?'''
+tags = ["litellm", "api-key", "bionicgpt"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API Key"
+regex = '''sk-[a-zA-Z0-9]{32,}'''
+tags = ["openai", "api-key"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+]
+
+[[rules]]
+id = "generic-password"
+description = "Generic Password Assignment"
+regex = '''(?i)(password|passwd|pwd)[\s:=]+["\']([^"\']{8,})["\']'''
+tags = ["password", "secret"]
+[rules.allowlist]
+paths = [
+    '''.*_test\.go$''',
+    '''testdata/.*''',
+    '''docs/.*''',
+]
+# Allow obvious placeholders
+regexes = [
+    '''(?i)password.*["\'](password|changeme|example|test|demo|placeholder|REPLACE_ME)["\'  ]''',
+]
+
+# ============================================================================
+# Global Allowlist (applies to ALL rules)
+# ============================================================================
+
+[allowlist]
+description = "Global allowlist for files that can contain secrets"
+
+# File paths to ignore completely
+paths = [
+    '''vendor/.*''',             # Third-party dependencies
+    '''\.git/.*''',              # Git internals
+    '''\.github/.*''',           # GitHub workflows (may contain examples)
+    '''testdata/.*''',           # Test fixtures
+    '''.*_test\.go$''',          # Test files
+    '''docs/.*\.md$''',          # Documentation
+    '''.*\.pb\.go$''',           # Protobuf generated files
+    '''.*_gen\.go$''',           # Generated files
+    '''^\.golangci\.yml$''',     # Linter config
+    '''^go\.sum$''',             # Go dependencies checksum
+]
+
+# Regex patterns to ignore (applies to file content)
+regexes = [
+    # Ignore environment variable placeholders
+    '''\$\{[A-Z_]+\}''',
+    '''\$[A-Z_]+''',
+
+    # Ignore common placeholders
+    '''(?i)(example|test|demo|placeholder|changeme|replace_me|your_.*_here)''',
+
+    # Ignore URLs with placeholders
+    '''https?://localhost''',
+    '''https?://127\.0\.0\.1''',
+    '''https?://example\.(com|org|net)''',
+
+    # Ignore comments with "fake" or "example"
+    '''//.*(?i)(fake|example|test|mock)''',
+]
+
+# Files to ignore by content (hash-based)
+# Note: This is for intentionally committed secrets in test fixtures
+stopwords = [
+    "test",
+    "example",
+    "fake",
+    "mock",
+    "placeholder",
+]
+
+# ============================================================================
+# Additional Configuration
+# ============================================================================
+
+# Maximum file size to scan (bytes) - skip very large files
+[max-file-size]
+value = 10485760  # 10 MB
+
+# Performance tuning
+[parallelism]
+value = 4  # Number of parallel workers

@@ -1,0 +1,10 @@
+provide-queries-from:
+  - .github/codeql/custom-queries
+  
+repositories:
+  - ./
+
+default-language: go
+
+database-languages:
+  - go
