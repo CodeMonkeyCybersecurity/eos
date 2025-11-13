@@ -9,13 +9,14 @@ import (
 // IntegrationResources tracks resources created during service integration
 // Used for rollback on failure
 type IntegrationResources struct {
-	ProxyProviderPK int      // Authentik proxy provider PK (for cleanup)
-	ApplicationPK   string   // Authentik application PK (for cleanup)
-	ApplicationSlug string   // Authentik application slug (for cleanup)
-	UserPK          string   // Created user PK (for cleanup)
-	GroupPKs        []string // Created group PKs (for cleanup)
-	PolicyPK        string   // Created policy PK
-	PolicyBindingPK string   // Created policy binding PK
+	ProxyProviderPK    int      // Authentik proxy provider PK (for cleanup)
+	ApplicationPK      string   // Authentik application PK (for cleanup)
+	ApplicationSlug    string   // Authentik application slug (for cleanup)
+	UserPK             string   // Created user PK (for cleanup)
+	GroupPKs           []string // Created group PKs (for cleanup)
+	PropertyMappingPKs []string // Created OIDC property mapping PKs (for cleanup) - P0-3 fix
+	PolicyPK           string   // Created policy PK
+	PolicyBindingPK    string   // Created policy binding PK
 }
 
 // ServiceIntegrator defines the interface for service-specific integrations
