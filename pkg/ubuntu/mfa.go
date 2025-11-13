@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -165,7 +166,7 @@ func configurePAMSudo(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write new sudo PAM configuration with MFA
-	if err := os.WriteFile(originalPath, []byte(pamSudoMFAConfig), 0644); err != nil {
+	if err := os.WriteFile(originalPath, []byte(pamSudoMFAConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write sudo PAM config: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func configurePAMSu(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write new su PAM configuration with MFA
-	if err := os.WriteFile(originalPath, []byte(pamSuMFAConfig), 0644); err != nil {
+	if err := os.WriteFile(originalPath, []byte(pamSuMFAConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 

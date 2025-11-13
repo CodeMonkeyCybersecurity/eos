@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,7 +102,7 @@ WantedBy=multi-user.target
 		logger.Info("Creating systemd service",
 			zap.String("path", servicePath))
 
-		if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+		if err := os.WriteFile(servicePath, []byte(serviceContent), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("writing service file: %w", err)
 		}
 
@@ -131,7 +132,7 @@ WantedBy=timers.target
 			zap.String("path", timerPath),
 			zap.String("schedule", onCalendar))
 
-		if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {
+		if err := os.WriteFile(timerPath, []byte(timerContent), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("writing timer file: %w", err)
 		}
 

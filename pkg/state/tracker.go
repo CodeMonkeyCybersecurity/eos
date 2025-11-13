@@ -1,6 +1,7 @@
 package state
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -69,7 +70,7 @@ func Load(rc *eos_io.RuntimeContext) (*StateTracker, error) {
 
 	// Create directory if it doesn't exist
 	stateDir := filepath.Dir(stateFile)
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -109,7 +110,7 @@ func (s *StateTracker) Save(rc *eos_io.RuntimeContext) error {
 	}
 
 	stateFile := "/var/lib/eos/state.json"
-	if err := os.WriteFile(stateFile, data, 0644); err != nil {
+	if err := os.WriteFile(stateFile, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 

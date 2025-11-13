@@ -333,7 +333,7 @@ func (sm *SystemdServiceManager) InstallService(config *ServiceConfig) error {
 	content := sm.generateServiceFile(config)
 
 	// INTERVENE - Write service file
-	if err := WriteFileContents(config.ServiceFile, []byte(content), 0644); err != nil {
+	if err := WriteFileContents(config.ServiceFile, []byte(content), ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write service file: %w", err)
 	}
 

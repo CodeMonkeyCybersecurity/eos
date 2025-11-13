@@ -173,7 +173,7 @@ func extractClusterNodes(enhanced *EnhancedEnvironmentConfig) []string {
 // saveEnhancedConfig saves the enhanced configuration
 func saveEnhancedConfig(config *EnhancedEnvironmentConfig) error {
 	configDir := "/opt/eos/config"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -183,7 +183,7 @@ func saveEnhancedConfig(config *EnhancedEnvironmentConfig) error {
 		return fmt.Errorf("failed to marshal enhanced config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write enhanced config file: %w", err)
 	}
 
@@ -365,7 +365,7 @@ func determineVaultAddress() string {
 // saveConfig saves the discovered configuration
 func saveConfig(config *EnvironmentConfig) error {
 	configDir := "/opt/eos/config"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -375,7 +375,7 @@ func saveConfig(config *EnvironmentConfig) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

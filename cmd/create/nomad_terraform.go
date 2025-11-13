@@ -90,7 +90,7 @@ func runCreateNomadTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		zap.Bool("enable_mail", enableMail))
 
 	// Create output directory
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -111,20 +111,20 @@ func runCreateNomadTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 
 	// Create jobs directory for Nomad job files
 	jobsDir := filepath.Join(outputDir, "jobs")
-	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+	if err := os.MkdirAll(jobsDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create jobs directory: %w", err)
 	}
 
 	// Generate Caddy ingress job
 	caddyJobPath := filepath.Join(jobsDir, "caddy-ingress.nomad")
-	if err := os.WriteFile(caddyJobPath, []byte(terraform.CaddyIngressNomadJob), 0644); err != nil {
+	if err := os.WriteFile(caddyJobPath, []byte(terraform.CaddyIngressNomadJob), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to generate Caddy job file: %w", err)
 	}
 
 	// Generate Nginx mail job if enabled
 	if enableMail {
 		nginxJobPath := filepath.Join(jobsDir, "nginx-mail.nomad")
-		if err := os.WriteFile(nginxJobPath, []byte(terraform.NginxMailNomadJob), 0644); err != nil {
+		if err := os.WriteFile(nginxJobPath, []byte(terraform.NginxMailNomadJob), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to generate Nginx job file: %w", err)
 		}
 	}

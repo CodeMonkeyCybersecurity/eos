@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,7 +56,7 @@ func ConfigureFIDO2SSH(rc *eos_io.RuntimeContext) error {
 	
 	// Create SSH config directory if it doesn't exist
 	sshConfigDir := "/etc/ssh/sshd_config.d"
-	if err := os.MkdirAll(sshConfigDir, 0755); err != nil {
+	if err := os.MkdirAll(sshConfigDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create SSH config directory: %w", err)
 	}
 	
@@ -91,7 +92,7 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 `
 	
 	configPath := filepath.Join(sshConfigDir, "99-eos-fido2.conf")
-	if err := os.WriteFile(configPath, []byte(fido2SSHConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(fido2SSHConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write SSH FIDO2 config: %w", err)
 	}
 	
@@ -134,7 +135,7 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 	
 	// Write updated PAM config
 	newPAMContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(pamSSHPath, []byte(newPAMContent), 0644); err != nil {
+	if err := os.WriteFile(pamSSHPath, []byte(newPAMContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write PAM SSH config: %w", err)
 	}
 	
@@ -305,7 +306,7 @@ Remember to re-enable after resolving the issue.
 `
 	
 	recoveryPath := "/etc/ssh/FIDO2_RECOVERY.md"
-	if err := os.WriteFile(recoveryPath, []byte(recoveryDoc), 0644); err != nil {
+	if err := os.WriteFile(recoveryPath, []byte(recoveryDoc), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create recovery documentation: %w", err)
 	}
 	

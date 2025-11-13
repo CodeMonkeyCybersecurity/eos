@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -51,14 +52,14 @@ func configureUnattendedUpgrades(rc *eos_io.RuntimeContext) error {
 
 	// Configure unattended-upgrades
 	configPath := "/etc/apt/apt.conf.d/50unattended-upgrades"
-	if err := os.WriteFile(configPath, []byte(unattendedUpgradesConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(unattendedUpgradesConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write unattended-upgrades config: %w", err)
 	}
 	logger.Info("Unattended upgrades configured", zap.String("path", configPath))
 
 	// Enable automatic updates
 	autoPath := "/etc/apt/apt.conf.d/20auto-upgrades"
-	if err := os.WriteFile(autoPath, []byte(autoUpgradesConfig), 0644); err != nil {
+	if err := os.WriteFile(autoPath, []byte(autoUpgradesConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write auto-upgrades config: %w", err)
 	}
 	logger.Info("Automatic updates enabled", zap.String("path", autoPath))
@@ -109,7 +110,7 @@ restic forget --prune \
 	// Create example restic password file
 	// #nosec G101 - This is a file path, not a hardcoded credential
 	passwordPath := "/root/.restic-password"
-	if err := os.WriteFile(passwordPath, []byte("CHANGE_THIS_PASSWORD\n"), 0600); err != nil {
+	if err := os.WriteFile(passwordPath, []byte("CHANGE_THIS_PASSWORD\n"), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("write restic password file: %w", err)
 	}
 

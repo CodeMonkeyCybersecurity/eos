@@ -34,7 +34,7 @@ func FlushDataSafety(rc *eos_io.RuntimeContext) error {
 	// Drop caches
 	logger.Debug("Dropping system caches")
 	if shared.FileExists("/proc/sys/vm/drop_caches") {
-		if err := os.WriteFile("/proc/sys/vm/drop_caches", []byte("3\n"), 0644); err != nil {
+		if err := os.WriteFile("/proc/sys/vm/drop_caches", []byte("3\n"), shared.ConfigFilePerm); err != nil {
 			logger.Warn("Failed to drop caches", zap.Error(err))
 		}
 	}
@@ -148,7 +148,7 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 	if shared.FileExists(motdPath) {
 		motdMsg := fmt.Sprintf("\n=== RAGEQUIT RECOVERY ===\n%s\nSee ~/RAGEQUIT-RECOVERY-PLAN.md for details\n\n", message)
 		if currentMotd, err := os.ReadFile(motdPath); err == nil {
-			_ = os.WriteFile(motdPath+".bak", currentMotd, 0644)
+			_ = os.WriteFile(motdPath+".bak", currentMotd, shared.ConfigFilePerm)
 			_ = os.WriteFile(motdPath, append([]byte(motdMsg), currentMotd...), 0644)
 		}
 	}

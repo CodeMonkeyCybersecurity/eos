@@ -5,6 +5,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -429,7 +430,7 @@ func (sm *SnapshotManager) assessSnapshotBackup(rc *eos_io.RuntimeContext, snaps
 	}
 
 	// Verify backup directory exists and is writable
-	if err := os.MkdirAll(sm.config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(sm.config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -440,7 +441,7 @@ func (sm *SnapshotManager) backupSnapshotIntervention(rc *eos_io.RuntimeContext,
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(sm.config.BackupDir, fmt.Sprintf("%s_%s_%s", sm.config.VMName, snapshotName, timestamp))
 	
-	if err := os.MkdirAll(backupPath, 0755); err != nil {
+	if err := os.MkdirAll(backupPath, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup path: %w", err)
 	}
 
@@ -457,7 +458,7 @@ func (sm *SnapshotManager) backupSnapshotIntervention(rc *eos_io.RuntimeContext,
 		return fmt.Errorf("failed to export snapshot XML: %w", err)
 	}
 
-	if err := os.WriteFile(xmlPath, []byte(xmlOutput), 0644); err != nil {
+	if err := os.WriteFile(xmlPath, []byte(xmlOutput), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write snapshot XML: %w", err)
 	}
 	result.ComponentPaths["xml"] = xmlPath

@@ -98,7 +98,7 @@ func LoadConfig(rc *eos_io.RuntimeContext, defaultSubdomain string) (*HecateBasi
 	// Log when configuration is written
 	content := fmt.Sprintf("BASE_DOMAIN=%s\nbackendIP=%s\nSUBDOMAIN=%s\nEMAIL=%s\n",
 		cfg.BaseDomain, cfg.BackendIP, cfg.Subdomain, cfg.Email)
-	if err := os.WriteFile(shared.HecateLastValuesFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(shared.HecateLastValuesFile, []byte(content), shared.ConfigFilePerm); err != nil {
 
 		return nil, fmt.Errorf("failed to write %s: %w", shared.HecateLastValuesFile, err)
 	}

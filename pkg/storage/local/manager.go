@@ -1,6 +1,7 @@
 package local
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -70,7 +71,7 @@ func (lsm *LocalStorageManager) CreateVolume(ctx context.Context, spec *VolumeSp
 	}
 
 	// 3. Create mount point
-	if err := os.MkdirAll(spec.MountPoint, 0755); err != nil {
+	if err := os.MkdirAll(spec.MountPoint, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create mount point: %w", err)
 	}
 

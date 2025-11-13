@@ -1,6 +1,7 @@
 package minio
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -115,7 +116,7 @@ path "kv/data/minio/users/*" {
 
 	// Write policy to temporary file
 	tmpFile := "/tmp/minio-vault-policy.hcl"
-	if err := os.WriteFile(tmpFile, []byte(policyContent), 0600); err != nil {
+	if err := os.WriteFile(tmpFile, []byte(policyContent), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write policy file: %w", err)
 	}
 	defer func() { _ = os.Remove(tmpFile) }()
@@ -145,7 +146,7 @@ func GenerateDeploymentConfig(rc *eos_io.RuntimeContext, opts *DeploymentOptions
 
 	// Create deployment directory
 	deployDir := filepath.Join("/tmp", "eos-minio-deploy")
-	if err := os.MkdirAll(deployDir, 0755); err != nil {
+	if err := os.MkdirAll(deployDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create deployment directory: %w", err)
 	}
 
@@ -157,7 +158,7 @@ func GenerateDeploymentConfig(rc *eos_io.RuntimeContext, opts *DeploymentOptions
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}

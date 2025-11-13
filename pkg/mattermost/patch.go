@@ -1,6 +1,7 @@
 package mattermost
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ func PatchMattermostEnv(cloneDir string) error {
 		if err != nil {
 			return fmt.Errorf("read env.example: %w", err)
 		}
-		if err := os.WriteFile(dst, input, 0644); err != nil {
+		if err := os.WriteFile(dst, input, shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("write .env: %w", err)
 		}
 	}

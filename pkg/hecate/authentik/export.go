@@ -153,7 +153,7 @@ func ExportAuthentikConfig(rc *eos_io.RuntimeContext) error {
 	timestamp := time.Now().Format("20060102_150405")
 	outputDir := filepath.Join(hecate.ExportsDir, fmt.Sprintf("authentik_blueprint_%s", timestamp))
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -469,7 +469,7 @@ func exportAllConfigurations(rc *eos_io.RuntimeContext, client *AuthentikClient,
 
 		// Write to file
 		filePath := filepath.Join(outputDir, export.filename)
-		if err := os.WriteFile(filePath, data, 0644); err != nil {
+		if err := os.WriteFile(filePath, data, shared.ConfigFilePerm); err != nil {
 			logger.Warn(fmt.Sprintf("Failed to write %s", export.name), zap.Error(err))
 			continue
 		}
@@ -668,7 +668,7 @@ func exportCaddyfileFromAPI(rc *eos_io.RuntimeContext, outputDir string) error {
 
 	// Write JSON config (Caddy's native format)
 	jsonPath := filepath.Join(outputDir, "19_Caddyfile.live.json")
-	if err := os.WriteFile(jsonPath, configJSON, 0644); err != nil {
+	if err := os.WriteFile(jsonPath, configJSON, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write live config JSON: %w", err)
 	}
 
@@ -745,7 +745,7 @@ func exportDockerComposeFromRuntime(rc *eos_io.RuntimeContext, outputDir string)
 
 	// Write runtime state as JSON (raw Docker inspect output)
 	jsonPath := filepath.Join(outputDir, "20_docker-compose.runtime.json")
-	if err := os.WriteFile(jsonPath, containersJSON, 0644); err != nil {
+	if err := os.WriteFile(jsonPath, containersJSON, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write runtime state: %w", err)
 	}
 
@@ -1118,7 +1118,7 @@ func exportAuthentikBlueprint(rc *eos_io.RuntimeContext, outputDir string) (stri
 	}
 
 	// Write blueprint output directly to host file
-	if err := os.WriteFile(blueprintPath, output, 0600); err != nil {
+	if err := os.WriteFile(blueprintPath, output, shared.SecretFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write blueprint to %s: %w", blueprintPath, err)
 	}
 
@@ -1234,7 +1234,7 @@ func backupPostgreSQLDatabase(rc *eos_io.RuntimeContext, outputDir string) error
 	}
 
 	// Write SQL dump to file
-	if err := os.WriteFile(dumpFile, output, 0600); err != nil {
+	if err := os.WriteFile(dumpFile, output, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write SQL dump: %w", err)
 	}
 

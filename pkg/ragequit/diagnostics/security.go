@@ -131,7 +131,7 @@ func SecuritySnapshot(rc *eos_io.RuntimeContext) error {
 	}
 
 	// EVALUATE - Write results
-	if err := os.WriteFile(outputFile, []byte(output.String()), 0600); err != nil {
+	if err := os.WriteFile(outputFile, []byte(output.String()), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write security snapshot: %w", err)
 	}
 

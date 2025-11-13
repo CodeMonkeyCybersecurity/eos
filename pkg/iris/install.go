@@ -3,6 +3,7 @@
 package iris
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,7 +34,7 @@ func CreateProjectStructure(rc *eos_io.RuntimeContext, projectDir string) error 
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 		logger.Debug("Created directory", zap.String("path", dir))
@@ -56,14 +57,14 @@ func GenerateSourceFiles(rc *eos_io.RuntimeContext, projectDir string) error {
 
 	// Generate worker/main.go
 	workerPath := filepath.Join(projectDir, "worker", "main.go")
-	if err := os.WriteFile(workerPath, []byte(GetWorkerSource()), 0644); err != nil {
+	if err := os.WriteFile(workerPath, []byte(GetWorkerSource()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write worker source: %w", err)
 	}
 	logger.Info("Worker source generated", zap.String("path", workerPath))
 
 	// Generate webhook/main.go
 	webhookPath := filepath.Join(projectDir, "webhook", "main.go")
-	if err := os.WriteFile(webhookPath, []byte(GetWebhookSource()), 0644); err != nil {
+	if err := os.WriteFile(webhookPath, []byte(GetWebhookSource()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write webhook source: %w", err)
 	}
 	logger.Info("Webhook source generated", zap.String("path", webhookPath))
@@ -190,17 +191,17 @@ WantedBy=multi-user.target
 
 	// Write Temporal service to /etc/systemd/system directly (requires root)
 	temporalServicePath := "/etc/systemd/system/temporal.service"
-	if err := os.WriteFile(temporalServicePath, []byte(temporalService), 0644); err != nil {
+	if err := os.WriteFile(temporalServicePath, []byte(temporalService), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write temporal service: %w", err)
 	}
 
 	workerServicePath := filepath.Join(projectDir, "iris-worker.service")
-	if err := os.WriteFile(workerServicePath, []byte(workerService), 0644); err != nil {
+	if err := os.WriteFile(workerServicePath, []byte(workerService), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write worker service: %w", err)
 	}
 
 	webhookServicePath := filepath.Join(projectDir, "iris-webhook.service")
-	if err := os.WriteFile(webhookServicePath, []byte(webhookService), 0644); err != nil {
+	if err := os.WriteFile(webhookServicePath, []byte(webhookService), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write webhook service: %w", err)
 	}
 
@@ -278,7 +279,7 @@ echo "  - Email inbox for notification"
 
 	// Create README
 	readmePath := filepath.Join(projectDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte(GetReadmeContent()), 0644); err != nil {
+	if err := os.WriteFile(readmePath, []byte(GetReadmeContent()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write README: %w", err)
 	}
 	logger.Info("README created", zap.String("path", readmePath))

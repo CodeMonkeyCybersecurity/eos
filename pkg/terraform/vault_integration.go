@@ -3,6 +3,7 @@
 package terraform
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -133,7 +134,7 @@ terraform {
 		config.Token)
 
 	backendFile := filepath.Join(m.Config.WorkingDir, "backend.tf")
-	if err := os.WriteFile(backendFile, []byte(backendHCL), 0644); err != nil {
+	if err := os.WriteFile(backendFile, []byte(backendHCL), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backend configuration: %w", err)
 	}
 
@@ -162,7 +163,7 @@ provider "vault" {
 `, vaultAddr, vaultToken)
 
 	providerFile := filepath.Join(m.Config.WorkingDir, "vault_provider.tf")
-	if err := os.WriteFile(providerFile, []byte(providerHCL), 0644); err != nil {
+	if err := os.WriteFile(providerFile, []byte(providerHCL), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write vault provider configuration: %w", err)
 	}
 
@@ -348,7 +349,7 @@ locals {
 	}
 
 	dataSourcesFile := filepath.Join(m.Config.WorkingDir, "vault_data_sources.tf")
-	if err := os.WriteFile(dataSourcesFile, []byte(dataSourcesHCL.String()), 0644); err != nil {
+	if err := os.WriteFile(dataSourcesFile, []byte(dataSourcesHCL.String()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write vault data sources: %w", err)
 	}
 

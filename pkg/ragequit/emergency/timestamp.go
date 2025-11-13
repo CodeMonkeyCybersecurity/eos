@@ -1,6 +1,7 @@
 package emergency
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ func CreateTimestampFile(rc *eos_io.RuntimeContext, reason string) error {
 		reason,
 		system.GetHostname())
 
-	if err := os.WriteFile(timestampFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(timestampFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create timestamp file: %w", err)
 	}
 

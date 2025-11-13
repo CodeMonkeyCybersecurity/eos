@@ -15,6 +15,7 @@
 package apikeys
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"context"
 	"encoding/json"
@@ -376,7 +377,7 @@ func updateEnvFile(ctx context.Context, envFile, newVKey string) error {
 		return fmt.Errorf("failed to read .env file: %w", err)
 	}
 
-	if err := os.WriteFile(backupFile, input, 0600); err != nil {
+	if err := os.WriteFile(backupFile, input, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -398,7 +399,7 @@ func updateEnvFile(ctx context.Context, envFile, newVKey string) error {
 
 	// Write updated content
 	content := strings.Join(updated, "\n")
-	if err := os.WriteFile(envFile, []byte(content), 0600); err != nil {
+	if err := os.WriteFile(envFile, []byte(content), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 

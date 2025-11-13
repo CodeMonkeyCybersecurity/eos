@@ -2,6 +2,7 @@
 package fileops
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"io"
@@ -51,7 +52,7 @@ func (f *FileSystemOperations) WriteFile(ctx context.Context, path string, data 
 
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		f.logger.Error("Failed to create directory",
 			zap.String("dir", dir),
 			zap.Error(err))
@@ -100,7 +101,7 @@ func (f *FileSystemOperations) CopyFile(ctx context.Context, src, dst string, pe
 
 	// Ensure destination directory exists
 	dstDir := filepath.Dir(dst)
-	if err := os.MkdirAll(dstDir, 0755); err != nil {
+	if err := os.MkdirAll(dstDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create destination directory %s: %w", dstDir, err)
 	}
 

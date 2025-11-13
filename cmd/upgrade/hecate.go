@@ -2,6 +2,7 @@
 package upgrade
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -232,7 +233,7 @@ func createUpgradeBackup(rc *eos_io.RuntimeContext) (string, error) {
 	fmt.Println("Step 2: Creating backup...")
 
 	backupDir := filepath.Join(hecateUpgradePath, "backups", time.Now().Format("20060102-150405"))
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -363,7 +364,7 @@ func updateDockerComposeFile(rc *eos_io.RuntimeContext) error {
 	content = strings.ReplaceAll(content, "AUTHENTIK_WORKER__CONCURRENCY", "AUTHENTIK_WORKER__THREADS")
 
 	// Write the updated file
-	if err := os.WriteFile(composePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(composePath, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write updated docker-compose.yml: %w", err)
 	}
 
@@ -422,7 +423,7 @@ func updateEnvironmentFile(rc *eos_io.RuntimeContext) error {
 	if removedCount > 0 {
 		// Write the updated file
 		newContent := strings.Join(newLines, "\n")
-		if err := os.WriteFile(envPath, []byte(newContent), 0644); err != nil {
+		if err := os.WriteFile(envPath, []byte(newContent), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write updated .env file: %w", err)
 		}
 		fmt.Printf("✅ .env file updated (removed %d deprecated settings)\n", removedCount)
@@ -570,7 +571,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0644)
+	return os.WriteFile(dst, data, shared.ConfigFilePerm)
 }
 
 // copyDir recursively copies a directory

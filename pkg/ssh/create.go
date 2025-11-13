@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -78,7 +79,7 @@ func CreateSSHWithRemote(rc *eos_io.RuntimeContext, opts *SSHKeyOptions) error {
 
 	// Ensure .ssh directory exists
 	logger.Info("Ensuring ~/.ssh directory exists", zap.String("path", sshDir))
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
+	if err := os.MkdirAll(sshDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to create ~/.ssh: %w", err)
 	}
 
@@ -221,17 +222,17 @@ func CreateSSHKeyWithVault(rc *eos_io.RuntimeContext, opts *VaultSSHKeyOptions) 
 	pubPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s.pub", name))
 	privPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s", name))
 
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
+	if err := os.MkdirAll(keyDir, shared.SecretDirPerm); err != nil {
 		logger.Error("Failed to create .ssh directory", zap.String("dir", keyDir), zap.Error(err))
 		return fmt.Errorf("mkdir failed: %w", err)
 	}
 
-	if err := os.WriteFile(pubPath, []byte(pubStr), 0644); err != nil {
+	if err := os.WriteFile(pubPath, []byte(pubStr), shared.ConfigFilePerm); err != nil {
 		logger.Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
 		return fmt.Errorf("write public key failed: %w", err)
 	}
 
-	if err := os.WriteFile(privPath, privPEM, 0600); err != nil {
+	if err := os.WriteFile(privPath, privPEM, shared.SecretFilePerm); err != nil {
 		logger.Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
 		return fmt.Errorf("write private key failed: %w", err)
 	}

@@ -256,7 +256,7 @@ func installIntegrationScripts(rc *eos_io.RuntimeContext, config WazuhConfig) er
 	}
 
 	// Write Python script
-	if err := os.WriteFile(pythonPath, []byte(pythonScript), 0640); err != nil {
+	if err := os.WriteFile(pythonPath, []byte(pythonScript), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Python script: %w", err)
 	}
 
@@ -297,7 +297,7 @@ HOOK_URL=%s
 WEBHOOK_TOKEN=%s
 `, config.HookURL, config.WebhookToken)
 
-	if err := os.WriteFile(envPath, []byte(envContent), 0640); err != nil {
+	if err := os.WriteFile(envPath, []byte(envContent), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 
@@ -401,7 +401,7 @@ func updateOssecConf(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 	content += integrationBlock
 
 	// Write updated config
-	if err := os.WriteFile(confPath, []byte(content), 0640); err != nil {
+	if err := os.WriteFile(confPath, []byte(content), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ossec.conf: %w", err)
 	}
 
@@ -457,7 +457,7 @@ func testIntegration(rc *eos_io.RuntimeContext, config WazuhConfig) error {
 }`
 
 	testFile := "/tmp/eos_test_alert.json"
-	if err := os.WriteFile(testFile, []byte(testAlert), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testAlert), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create test alert: %w", err)
 	}
 	defer func() { _ = os.Remove(testFile) }()
@@ -548,7 +548,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0640)
+	return os.WriteFile(dst, data, shared.SecureConfigFilePerm)
 }
 
 // TODO: refactor

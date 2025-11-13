@@ -3,6 +3,7 @@
 package watchdog
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"context"
 	"fmt"
@@ -171,7 +172,7 @@ func (tl *TraceLogger) Initialize() error {
 
 	// Create session directory
 	sessionDir := filepath.Join(tl.baseDir, tl.sessionID)
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+	if err := os.MkdirAll(sessionDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create session directory: %w", err)
 	}
 
@@ -342,7 +343,7 @@ func (rw *ResourceWatchdog) handleWarningStatus(status ResourceStatus) {
 	// Capture warning-level traces
 	sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 	warningDir := filepath.Join(sessionDir, fmt.Sprintf("warning-%03d", rw.warningCount))
-	_ = os.MkdirAll(warningDir, 0755)
+	_ = os.MkdirAll(warningDir, shared.ServiceDirPerm)
 
 	// Write process list
 	rw.writeProcessList(warningDir, status)
@@ -397,7 +398,7 @@ func (rw *ResourceWatchdog) handleCriticalCondition(status ResourceStatus) {
 		// Create critical trace directory
 		sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 		criticalDir := filepath.Join(sessionDir, "critical")
-		_ = os.MkdirAll(criticalDir, 0755)
+		_ = os.MkdirAll(criticalDir, shared.ServiceDirPerm)
 
 		// Capture everything we can
 		rw.captureCriticalDiagnostics(criticalDir, status)
@@ -524,7 +525,7 @@ func (rw *ResourceWatchdog) captureSystemCommands(dir string) {
 	for _, cmd := range commands {
 		outputFile := filepath.Join(dir, fmt.Sprintf("%s.txt", cmd.name))
 		output, _ := exec.Command(cmd.cmd[0], cmd.cmd[1:]...).Output()
-		_ = os.WriteFile(outputFile, output, 0644)
+		_ = os.WriteFile(outputFile, output, shared.ConfigFilePerm)
 	}
 }
 
@@ -696,7 +697,7 @@ func (rw *ResourceWatchdog) captureTrace(status ResourceStatus) {
 	timestamp := time.Now().Format("20060102-150405")
 	traceDir := fmt.Sprintf("%s/%s", rw.config.TracePath, timestamp)
 
-	if err := os.MkdirAll(traceDir, 0755); err != nil {
+	if err := os.MkdirAll(traceDir, shared.ServiceDirPerm); err != nil {
 		rw.logger.Error("Failed to create trace directory", zap.Error(err))
 		return
 	}
@@ -948,7 +949,7 @@ func (rw *ResourceWatchdog) CapturePanic(panicInfo interface{}) {
 	// Create panic directory
 	sessionDir := filepath.Join(rw.traceLogger.baseDir, rw.traceLogger.sessionID)
 	panicDir := filepath.Join(sessionDir, "panic")
-	_ = os.MkdirAll(panicDir, 0755)
+	_ = os.MkdirAll(panicDir, shared.ServiceDirPerm)
 
 	// Write panic info
 	panicFile := filepath.Join(panicDir, "panic.txt")

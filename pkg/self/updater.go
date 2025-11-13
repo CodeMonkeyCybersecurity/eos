@@ -1,6 +1,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -291,7 +292,7 @@ func (eu *EosUpdater) BuildBinary() (string, error) {
 		zap.String("size_human", fmt.Sprintf("%.2f MB", float64(binaryInfo.Size())/(1024*1024))))
 
 	// Set execute permissions
-	if err := os.Chmod(tempBinary, 0755); err != nil {
+	if err := os.Chmod(tempBinary, shared.ExecutablePerm); err != nil {
 		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("failed to set execute permissions: %w", err)
 	}

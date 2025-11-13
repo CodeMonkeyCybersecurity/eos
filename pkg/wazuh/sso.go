@@ -2,6 +2,7 @@
 package wazuh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"encoding/base64"
 	"fmt"
@@ -171,11 +172,11 @@ func fetchAuthentikMetadata(authentikURL, entityID string) ([]byte, error) {
 func saveMetadata(metadata []byte, path string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, metadata, 0644)
+	return os.WriteFile(path, metadata, shared.ConfigFilePerm)
 }
 
 func createSecurityConfig(entityID, exchangeKey, metadataPath, wazuhURL string) error {
@@ -274,7 +275,7 @@ config:
 	}
 
 	configPath := "/etc/wazuh-indexer/opensearch-security/config.yml"
-	return os.WriteFile(configPath, buf.Bytes(), 0644)
+	return os.WriteFile(configPath, buf.Bytes(), shared.ConfigFilePerm)
 }
 
 func updateRolesMapping() error {
@@ -317,7 +318,7 @@ readall:
 `
 
 	rolesPath := "/etc/wazuh-indexer/opensearch-security/roles_mapping.yml"
-	return os.WriteFile(rolesPath, []byte(rolesMappingTemplate), 0644)
+	return os.WriteFile(rolesPath, []byte(rolesMappingTemplate), shared.ConfigFilePerm)
 }
 
 func applySecurityConfig(adminPass, wazuhHost string) error {
@@ -368,7 +369,7 @@ server.xsrf.allowlist: [
 `, wazuhURL, kibanaPass)
 
 	dashboardPath := "/etc/wazuh-dashboard/opensearch_dashboards.yml"
-	return os.WriteFile(dashboardPath, []byte(dashboardConfig), 0644)
+	return os.WriteFile(dashboardPath, []byte(dashboardConfig), shared.ConfigFilePerm)
 }
 
 func restartServices() error {

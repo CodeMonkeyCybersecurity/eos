@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -72,14 +73,14 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 		// Use legacy repository line for apt-key
 		repoLine := "deb https://pkg.osquery.io/deb deb main"
 		repoPath := "/etc/apt/sources.list.d/osquery.list"
-		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("create osquery repo file: %w", err)
 		}
 	} else {
 		// Use modern signed-by syntax
 		repoLine := "deb [signed-by=/usr/share/keyrings/osquery-keyring.gpg] https://pkg.osquery.io/deb deb main"
 		repoPath := "/etc/apt/sources.list.d/osquery.list"
-		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("create osquery repo file: %w", err)
 		}
 	}
@@ -98,13 +99,13 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 
 	// Create osquery configuration directory if it doesn't exist
 	configDir := "/etc/osquery"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("create osquery config dir: %w", err)
 	}
 
 	// Write osquery configuration
 	configPath := "/etc/osquery/osquery.conf"
-	if err := os.WriteFile(configPath, []byte(osqueryConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(osqueryConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write osquery config: %w", err)
 	}
 	logger.Info("Osquery configuration written", zap.String("path", configPath))

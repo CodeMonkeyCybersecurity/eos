@@ -20,6 +20,7 @@
 package storage
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -299,7 +300,7 @@ func (dm *DiskManagerImpl) MountPartition(rc *eos_io.RuntimeContext, device stri
 
 	if !dryRun {
 		// Create mount point if it doesn't exist
-		if err = os.MkdirAll(mountPoint, 0755); err != nil {
+		if err = os.MkdirAll(mountPoint, shared.ServiceDirPerm); err != nil {
 			return nil, fmt.Errorf("failed to create mount point: %w", err)
 		}
 
@@ -400,7 +401,7 @@ func (dm *DiskManagerImpl) backupPartitionTable(rc *eos_io.RuntimeContext, devic
 		return fmt.Errorf("failed to dump partition table: %w", err)
 	}
 
-	return os.WriteFile(backupFile, output, 0644)
+	return os.WriteFile(backupFile, output, shared.ConfigFilePerm)
 }
 
 func (dm *DiskManagerImpl) createPartitionWithFdisk(rc *eos_io.RuntimeContext, device string, _ *PartitionOptions) error {

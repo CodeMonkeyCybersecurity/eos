@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,7 +79,7 @@ func CustomHooks(rc *eos_io.RuntimeContext) error {
 
 	// EVALUATE - Write results
 	if executedCount > 0 {
-		if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
+		if err := os.WriteFile(outputFile, []byte(output.String()), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write custom hooks output: %w", err)
 		}
 

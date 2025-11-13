@@ -3,6 +3,7 @@
 package iris
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -75,7 +76,7 @@ logging:
 	)
 
 	configPath := filepath.Join(projectDir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
+	if err := os.WriteFile(configPath, []byte(configYAML), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

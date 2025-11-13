@@ -6,6 +6,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -36,7 +37,7 @@ func auditGuestExecChange(vmName, action, method, result string) {
 
 	// Ensure audit log directory exists
 	logDir := "/var/log/eos/audit"
-	_ = os.MkdirAll(logDir, 0755)
+	_ = os.MkdirAll(logDir, shared.ServiceDirPerm)
 
 	// Append to audit log
 	logFile := filepath.Join(logDir, "guest-exec.log")

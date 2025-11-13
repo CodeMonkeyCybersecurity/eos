@@ -2,6 +2,7 @@
 package macos
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"

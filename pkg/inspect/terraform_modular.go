@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -60,7 +61,7 @@ locals {
 }
 `
 
-	return os.WriteFile(c.BaseDir+"/main.tf", []byte(content), 0644)
+	return os.WriteFile(c.BaseDir+"/main.tf", []byte(content), shared.ConfigFilePerm)
 }
 
 // generateVariablesTf creates the variables configuration
@@ -111,7 +112,7 @@ variable "volumes" {
 }
 `
 
-	return os.WriteFile(c.BaseDir+"/variables.tf", []byte(content), 0644)
+	return os.WriteFile(c.BaseDir+"/variables.tf", []byte(content), shared.ConfigFilePerm)
 }
 
 // generateOutputsTf creates the outputs configuration
@@ -134,7 +135,7 @@ output "wazuh_volume_names" {
 `
 	}
 
-	return os.WriteFile(c.BaseDir+"/outputs.tf", []byte(content), 0644)
+	return os.WriteFile(c.BaseDir+"/outputs.tf", []byte(content), shared.ConfigFilePerm)
 }
 
 // generateDockerResources creates Docker-specific Terraform files
@@ -228,7 +229,7 @@ func (c *TerraformConfig) generateDockerContainers() error {
 		tf.WriteString("}\n\n")
 	}
 
-	return os.WriteFile(c.BaseDir+"/docker/containers.tf", []byte(tf.String()), 0644)
+	return os.WriteFile(c.BaseDir+"/docker/containers.tf", []byte(tf.String()), shared.ConfigFilePerm)
 }
 
 // generateDockerNetworks creates network-specific configuration
@@ -258,7 +259,7 @@ func (c *TerraformConfig) generateDockerNetworks() error {
 `, resourceName, network.Name, network.Driver, network.Scope))
 	}
 
-	return os.WriteFile(c.BaseDir+"/docker/networks.tf", []byte(tf.String()), 0644)
+	return os.WriteFile(c.BaseDir+"/docker/networks.tf", []byte(tf.String()), shared.ConfigFilePerm)
 }
 
 // generateDockerVolumes creates volume-specific configuration (excluding Wazuh)
@@ -288,7 +289,7 @@ func (c *TerraformConfig) generateDockerVolumes() error {
 `, resourceName, volume.Name, volume.Driver))
 	}
 
-	return os.WriteFile(c.BaseDir+"/docker/volumes.tf", []byte(tf.String()), 0644)
+	return os.WriteFile(c.BaseDir+"/docker/volumes.tf", []byte(tf.String()), shared.ConfigFilePerm)
 }
 
 // generateWazuhModule creates the Wazuh volumes module
@@ -317,7 +318,7 @@ func (c *TerraformConfig) generateWazuhModule() error {
 }
 `
 
-	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/main.tf", []byte(moduleMain), 0644); err != nil {
+	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/main.tf", []byte(moduleMain), shared.ConfigFilePerm); err != nil {
 		return err
 	}
 
@@ -341,7 +342,7 @@ variable "volumes" {
 }
 `
 
-	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/variables.tf", []byte(moduleVars), 0644); err != nil {
+	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/variables.tf", []byte(moduleVars), shared.ConfigFilePerm); err != nil {
 		return err
 	}
 
@@ -357,7 +358,7 @@ output "volume_ids" {
 }
 `
 
-	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/outputs.tf", []byte(moduleOutputs), 0644); err != nil {
+	if err := os.WriteFile(c.BaseDir+"/modules/wazuh-volumes/outputs.tf", []byte(moduleOutputs), shared.ConfigFilePerm); err != nil {
 		return err
 	}
 
@@ -374,7 +375,7 @@ module "wazuh_volumes" {
 }
 `
 
-	return os.WriteFile(c.BaseDir+"/docker/wazuh-volumes.tf", []byte(moduleUsage), 0644)
+	return os.WriteFile(c.BaseDir+"/docker/wazuh-volumes.tf", []byte(moduleUsage), shared.ConfigFilePerm)
 }
 
 // generateHetznerResources creates Hetzner-specific configuration
@@ -405,7 +406,7 @@ func (c *TerraformConfig) generateHetznerResources() error {
 `, resourceName, server.Name, server.ServerType, server.Image, server.Location, server.Datacenter, server.PublicIP))
 	}
 
-	return os.WriteFile(c.BaseDir+"/hetzner/servers.tf", []byte(tf.String()), 0644)
+	return os.WriteFile(c.BaseDir+"/hetzner/servers.tf", []byte(tf.String()), shared.ConfigFilePerm)
 }
 
 // generateKVMResources creates KVM-specific configuration
@@ -443,7 +444,7 @@ provider "libvirt" {
 `, resourceName, vm.Name, vm.Memory, vm.CPUs, vm.State, vm.UUID))
 	}
 
-	return os.WriteFile(c.BaseDir+"/kvm/domains.tf", []byte(tf.String()), 0644)
+	return os.WriteFile(c.BaseDir+"/kvm/domains.tf", []byte(tf.String()), shared.ConfigFilePerm)
 }
 
 // generateEnvironmentFiles creates environment-specific tfvars files
@@ -506,7 +507,7 @@ container_ports = {
 
 	devContent += "}"
 
-	if err := os.WriteFile(c.BaseDir+"/envs/dev.tfvars", []byte(devContent), 0644); err != nil {
+	if err := os.WriteFile(c.BaseDir+"/envs/dev.tfvars", []byte(devContent), shared.ConfigFilePerm); err != nil {
 		return err
 	}
 
@@ -525,7 +526,7 @@ volumes = {
 }
 `
 
-	return os.WriteFile(c.BaseDir+"/envs/prod.tfvars", []byte(prodContent), 0644)
+	return os.WriteFile(c.BaseDir+"/envs/prod.tfvars", []byte(prodContent), shared.ConfigFilePerm)
 }
 
 // generateDocumentation creates README and usage documentation
@@ -617,5 +618,5 @@ Before applying, import existing resources:
 		readmeContent += fmt.Sprintf("- KVM Virtual Machines: %d\n", len(c.Infrastructure.KVM.VMs))
 	}
 
-	return os.WriteFile(c.BaseDir+"/README.md", []byte(readmeContent), 0644)
+	return os.WriteFile(c.BaseDir+"/README.md", []byte(readmeContent), shared.ConfigFilePerm)
 }

@@ -3,6 +3,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func RegenerateFromConsulKV(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	if err := os.WriteFile(tempYAMLPath, yamlData, 0644); err != nil {
+	if err := os.WriteFile(tempYAMLPath, yamlData, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write temp config: %w", err)
 	}
 	defer func() { _ = os.Remove(tempYAMLPath) }()

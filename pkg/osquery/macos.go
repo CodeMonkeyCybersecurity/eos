@@ -3,6 +3,7 @@
 package osquery
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -137,7 +138,7 @@ func configureMacOSHomebrew(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Writing osquery configuration",
 		zap.String("path", configPath))
 	configContent := defaultOsqueryConfig
-	if err := os.WriteFile("/tmp/osquery.conf", []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile("/tmp/osquery.conf", []byte(configContent), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write temporary config",
 			zap.Error(err))
 		return fmt.Errorf("write temporary config: %w", err)

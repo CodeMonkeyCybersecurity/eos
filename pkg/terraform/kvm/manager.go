@@ -1,6 +1,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -96,7 +97,7 @@ func NewKVMManager(rc *eos_io.RuntimeContext, workingDir string) (*KVMManager, e
 	}
 
 	// Ensure working directory exists
-	if err := os.MkdirAll(workingDir, 0755); err != nil {
+	if err := os.MkdirAll(workingDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create working directory: %w", err)
 	}
 

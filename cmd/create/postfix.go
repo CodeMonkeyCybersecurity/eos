@@ -3,6 +3,7 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -133,7 +134,7 @@ func configurePostfixRelay(rc *eos_io.RuntimeContext, smtpHost, email, password,
 	}
 
 	cred := formatSaslCredentials(smtpHost, email, password)
-	if err := os.WriteFile("/etc/postfix/sasl_passwd", []byte(cred), 0600); err != nil {
+	if err := os.WriteFile("/etc/postfix/sasl_passwd", []byte(cred), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write sasl_passwd: %w", err)
 	}
 

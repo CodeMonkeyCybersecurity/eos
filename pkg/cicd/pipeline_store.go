@@ -1,6 +1,7 @@
 package cicd
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ type FilePipelineStore struct {
 // NewFilePipelineStore creates a new filesystem-based pipeline store
 func NewFilePipelineStore(basePath string, logger *zap.Logger) (*FilePipelineStore, error) {
 	// Ensure base path exists
-	if err := os.MkdirAll(basePath, 0755); err != nil {
+	if err := os.MkdirAll(basePath, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create store directory: %w", err)
 	}
 
@@ -45,7 +46,7 @@ func (s *FilePipelineStore) SaveExecution(execution *PipelineExecution) error {
 
 	// Create execution directory
 	execDir := filepath.Join(s.basePath, "executions", execution.PipelineID)
-	if err := os.MkdirAll(execDir, 0755); err != nil {
+	if err := os.MkdirAll(execDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create execution directory: %w", err)
 	}
 
@@ -56,7 +57,7 @@ func (s *FilePipelineStore) SaveExecution(execution *PipelineExecution) error {
 		return fmt.Errorf("failed to marshal execution: %w", err)
 	}
 
-	if err := os.WriteFile(execFile, data, 0644); err != nil {
+	if err := os.WriteFile(execFile, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write execution file: %w", err)
 	}
 
@@ -242,7 +243,7 @@ func (s *FilePipelineStore) updateExecutionIndex(pipelineID, executionID string)
 		return fmt.Errorf("failed to marshal index: %w", err)
 	}
 
-	return os.WriteFile(indexFile, data, 0644)
+	return os.WriteFile(indexFile, data, shared.ConfigFilePerm)
 }
 
 // executionIndex tracks execution IDs for a pipeline

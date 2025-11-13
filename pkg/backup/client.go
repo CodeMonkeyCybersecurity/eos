@@ -668,7 +668,7 @@ func (c *Client) Restore(snapshotID, target string) error {
 		zap.String("target", target))
 
 	// Ensure target directory exists
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("creating target directory: %w", err)
 	}
 

@@ -127,7 +127,7 @@ EXAMPLES:
 		// Create configuration directory
 		logger.Info("Creating configuration directory",
 			zap.String("path", configDir))
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 

@@ -60,7 +60,7 @@ func ConfigureKVMBridge(rc *eos_io.RuntimeContext) error {
 `, iface)
 
 	bridgeFile := "/etc/netplan/99-kvm-bridge.yaml"
-	if err := os.WriteFile(bridgeFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(bridgeFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write bridge config: %w", err)
 	}
 

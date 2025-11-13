@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -91,7 +92,7 @@ Examples:
 		}
 
 		// Ensure target directory exists
-		if err := os.MkdirAll(target, 0755); err != nil {
+		if err := os.MkdirAll(target, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("creating target directory: %w", err)
 		}
 

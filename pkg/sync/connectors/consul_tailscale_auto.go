@@ -2,6 +2,7 @@
 package connectors
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -172,7 +173,7 @@ func (c *ConsulTailscaleAutoConnector) Connect(rc *eos_io.RuntimeContext, config
 	newConfig := updateConsulBindAddr(string(existingConfig), myTailscaleIP)
 
 	// Write new configuration
-	if err := os.WriteFile(consulConfigPath, []byte(newConfig), 0640); err != nil {
+	if err := os.WriteFile(consulConfigPath, []byte(newConfig), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Consul config: %w", err)
 	}
 

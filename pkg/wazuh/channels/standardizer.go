@@ -1,6 +1,7 @@
 package wazuh_channels
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -182,13 +183,13 @@ func (cs *ChannelStandardizer) standardizeWorkerFile(workerPath string, expected
 		// Create backup if enabled
 		if cs.config.CreateBackups {
 			backupPath = workerPath + ".bak"
-			if err := os.WriteFile(backupPath, []byte(originalContent), 0644); err != nil {
+			if err := os.WriteFile(backupPath, []byte(originalContent), shared.ConfigFilePerm); err != nil {
 				return false, "", fmt.Errorf("failed to create backup: %v", err)
 			}
 		}
 
 		// Write updated content
-		if err := os.WriteFile(workerPath, []byte(updatedContent), 0644); err != nil {
+		if err := os.WriteFile(workerPath, []byte(updatedContent), shared.ConfigFilePerm); err != nil {
 			return false, backupPath, fmt.Errorf("failed to write updated file: %v", err)
 		}
 

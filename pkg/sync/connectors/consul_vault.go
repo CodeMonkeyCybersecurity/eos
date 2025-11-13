@@ -415,7 +415,7 @@ func (c *ConsulVaultConnector) Backup(rc *eos_io.RuntimeContext, config *synctyp
 	timestamp := time.Now().Format("20060102-150405")
 	backupDir := filepath.Join("/opt/eos/backups/sync", fmt.Sprintf("consul-vault-%s", timestamp))
 
-	if err := os.MkdirAll(backupDir, 0750); err != nil {
+	if err := os.MkdirAll(backupDir, shared.SecretDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create backup directory: %w", err)
 	}
 

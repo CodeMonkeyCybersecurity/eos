@@ -2,6 +2,7 @@
 package telemetry
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"os"
 	"path/filepath"
@@ -36,13 +37,13 @@ func Init(service string) error {
 
 	// Try system directory first
 	telemetryDir = "/var/log/eos"
-	if err := os.MkdirAll(telemetryDir, 0755); err != nil {
+	if err := os.MkdirAll(telemetryDir, shared.ServiceDirPerm); err != nil {
 		// Fallback to user home
 		telemetryDir = filepath.Join(os.Getenv("HOME"), ".eos", "telemetry")
-		if err := os.MkdirAll(telemetryDir, 0755); err != nil {
+		if err := os.MkdirAll(telemetryDir, shared.ServiceDirPerm); err != nil {
 			// Final fallback to temp directory for tests
 			telemetryDir = filepath.Join(os.TempDir(), "eos-telemetry")
-			if dirErr = os.MkdirAll(telemetryDir, 0755); dirErr != nil {
+			if dirErr = os.MkdirAll(telemetryDir, shared.ServiceDirPerm); dirErr != nil {
 				// If all fallbacks fail, use no-op tracer
 				tp := noop.NewTracerProvider()
 				otel.SetTracerProvider(tp)
@@ -192,8 +193,8 @@ func AnonTelemetryID() string {
 	}
 
 	id := "anon-" + uuid.New().String()
-	_ = os.MkdirAll(filepath.Dir(path), 0700)
-	_ = os.WriteFile(path, []byte(id), 0600)
+	_ = os.MkdirAll(filepath.Dir(path), shared.SecretDirPerm)
+	_ = os.WriteFile(path, []byte(id), shared.SecretFilePerm)
 
 	return id
 }

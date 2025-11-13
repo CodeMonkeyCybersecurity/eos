@@ -1,7 +1,6 @@
 package ubuntu
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -127,7 +126,7 @@ Generated: %s
 
 	// Create instructions file in user's home directory
 	instructionsPath := filepath.Join(user.HomeDir, "MFA_SETUP_REQUIRED.txt")
-	if err := os.WriteFile(instructionsPath, []byte(instructions), shared.ConfigFilePerm); err != nil {
+	if err := os.WriteFile(instructionsPath, []byte(instructions), 0644); err != nil {
 		return fmt.Errorf("write instructions file: %w", err)
 	}
 
@@ -423,7 +422,7 @@ func (m *MFAManager) configureAuditLogging() error {
 %s
 `, strings.Join(auditRules, "\n"))
 
-	if err := os.WriteFile(rulesFile, []byte(content), shared.SecureConfigFilePerm); err != nil {
+	if err := os.WriteFile(rulesFile, []byte(content), 0640); err != nil {
 		return fmt.Errorf("write audit rules file: %w", err)
 	}
 
@@ -454,7 +453,7 @@ func (m *MFAManager) configureSecurityLimits() error {
 `
 
 	limitsFile := "/etc/security/limits.d/99-mfa-security.conf"
-	if err := os.WriteFile(limitsFile, []byte(limitsConfig), shared.ConfigFilePerm); err != nil {
+	if err := os.WriteFile(limitsFile, []byte(limitsConfig), 0644); err != nil {
 		return fmt.Errorf("write security limits: %w", err)
 	}
 
@@ -614,7 +613,7 @@ Implementation completed successfully by Eos MFA Manager
 		m.backupDir)
 
 	reportPath := filepath.Join(m.backupDir, "implementation-report.md")
-	if err := os.WriteFile(reportPath, []byte(report), shared.ConfigFilePerm); err != nil {
+	if err := os.WriteFile(reportPath, []byte(report), 0644); err != nil {
 		return fmt.Errorf("write implementation report: %w", err)
 	}
 

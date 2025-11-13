@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"path/filepath"
 	"time"
@@ -32,7 +33,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 	// Failed units
 	if failedUnits := system.RunCommandWithTimeout("systemctl", []string{"list-units", "--failed", "--no-pager"}, 5*time.Second); failedUnits != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-failed.txt")
-		if err := os.WriteFile(outputFile, []byte(failedUnits), 0644); err != nil {
+		if err := os.WriteFile(outputFile, []byte(failedUnits), shared.ConfigFilePerm); err != nil {
 			logger.Warn("Failed to write failed units",
 				zap.String("file", outputFile),
 				zap.Error(err))
@@ -45,7 +46,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 	// Pending jobs
 	if pendingJobs := system.RunCommandWithTimeout("systemctl", []string{"list-jobs", "--no-pager"}, 5*time.Second); pendingJobs != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-jobs.txt")
-		if err := os.WriteFile(outputFile, []byte(pendingJobs), 0644); err != nil {
+		if err := os.WriteFile(outputFile, []byte(pendingJobs), shared.ConfigFilePerm); err != nil {
 			logger.Warn("Failed to write pending jobs",
 				zap.String("file", outputFile),
 				zap.Error(err))
@@ -59,7 +60,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 	if system.CommandExists("journalctl") {
 		if journalErrors := system.RunCommandWithTimeout("journalctl", []string{"-p", "err", "-n", "100", "--no-pager"}, 10*time.Second); journalErrors != "" {
 			outputFile := filepath.Join(homeDir, "ragequit-journal-errors.txt")
-			if err := os.WriteFile(outputFile, []byte(journalErrors), 0644); err != nil {
+			if err := os.WriteFile(outputFile, []byte(journalErrors), shared.ConfigFilePerm); err != nil {
 				logger.Warn("Failed to write journal errors",
 					zap.String("file", outputFile),
 					zap.Error(err))
@@ -73,7 +74,7 @@ func SystemctlDiagnostics(rc *eos_io.RuntimeContext) error {
 	// System status
 	if systemStatus := system.RunCommandWithTimeout("systemctl", []string{"status", "--no-pager"}, 5*time.Second); systemStatus != "" {
 		outputFile := filepath.Join(homeDir, "ragequit-systemctl-status.txt")
-		if err := os.WriteFile(outputFile, []byte(systemStatus), 0644); err != nil {
+		if err := os.WriteFile(outputFile, []byte(systemStatus), shared.ConfigFilePerm); err != nil {
 			logger.Warn("Failed to write system status",
 				zap.String("file", outputFile),
 				zap.Error(err))

@@ -6,6 +6,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -771,7 +772,7 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	eeu.logger.Debug("Pre-allocated backup path for transaction",
 		zap.String("path", expectedBackupPath))
 
-	if err := os.MkdirAll(eeu.config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(eeu.config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 

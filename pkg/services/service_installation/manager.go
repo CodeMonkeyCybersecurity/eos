@@ -2,6 +2,7 @@
 package service_installation
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"net"
@@ -576,11 +577,11 @@ func (sim *ServiceInstallationManager) runCommand(rc *eos_io.RuntimeContext, ste
 }
 
 func (sim *ServiceInstallationManager) createFile(path, content string) error {
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), shared.ConfigFilePerm)
 }
 
 func (sim *ServiceInstallationManager) ensureDirectory(path string) error {
-	return os.MkdirAll(path, 0755)
+	return os.MkdirAll(path, shared.ServiceDirPerm)
 }
 
 func (sim *ServiceInstallationManager) createCommandInDir(dir string, name string, args ...string) *exec.Cmd {

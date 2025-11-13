@@ -1,6 +1,7 @@
 package build
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -41,7 +42,7 @@ func NewBuilder(workDir string) (*Builder, error) {
 	}
 
 	// Ensure work directory exists
-	if err := os.MkdirAll(workDir, 0755); err != nil {
+	if err := os.MkdirAll(workDir, shared.ServiceDirPerm); err != nil {
 		return nil, &BuildError{
 			Type:      "initialization",
 			Stage:     "setup",

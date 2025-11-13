@@ -66,7 +66,7 @@ The Nomad-based vault integration provides the same capabilities but with simple
 			zap.String("cluster_name", clusterName))
 
 		// Create output directory
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 
@@ -156,7 +156,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 			zap.String("server_name", serverName))
 
 		// Create output directory
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 

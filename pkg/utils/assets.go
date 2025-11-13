@@ -2,6 +2,7 @@
 package utils
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -19,7 +20,7 @@ func ReplacePlaceholders(filePath, baseDomain, backendIP string) error {
 	content = strings.ReplaceAll(content, "${BASE_DOMAIN}", baseDomain)
 	content = strings.ReplaceAll(content, "${backendIP}", backendIP)
 
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("error writing file %s: %w", filePath, err)
 	}
 

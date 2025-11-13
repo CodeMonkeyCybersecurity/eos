@@ -1,6 +1,7 @@
 package helen
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -137,7 +138,7 @@ func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 	}
 
 	// Ensure work directory exists
-	if err := os.MkdirAll(m.config.WorkDir, 0755); err != nil {
+	if err := os.MkdirAll(m.config.WorkDir, shared.ServiceDirPerm); err != nil {
 		logger.Error("Failed to create work directory", zap.Error(err))
 		return fmt.Errorf("failed to create work directory: %w", err)
 	}

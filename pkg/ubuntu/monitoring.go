@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -268,13 +269,13 @@ func configureOsqueryFIM(rc *eos_io.RuntimeContext) error {
 
 	// Ensure osquery config directory exists
 	configDir := "/etc/osquery"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("create osquery config directory: %w", err)
 	}
 
 	// Write comprehensive FIM configuration
 	configPath := filepath.Join(configDir, "osquery.conf")
-	if err := os.WriteFile(configPath, []byte(osqueryFIMConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(osqueryFIMConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write osquery config: %w", err)
 	}
 
@@ -283,7 +284,7 @@ func configureOsqueryFIM(rc *eos_io.RuntimeContext) error {
 
 	// Ensure osquery log directory exists with proper permissions
 	logDir := "/var/log/osquery"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("create osquery log directory: %w", err)
 	}
 
@@ -379,7 +380,7 @@ func enhanceAuditdConfig(rc *eos_io.RuntimeContext) error {
 -a always,exit -F arch=b32 -S init_module,delete_module -k modules
 `
 
-	if err := os.WriteFile(enhancedRulesPath, []byte(enhancedRules), 0640); err != nil {
+	if err := os.WriteFile(enhancedRulesPath, []byte(enhancedRules), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("write enhanced audit rules: %w", err)
 	}
 

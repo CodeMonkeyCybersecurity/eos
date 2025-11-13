@@ -2,6 +2,7 @@
 package refresh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"fmt"
@@ -37,7 +38,7 @@ func (r *Refresher) updateDatabase(ctx context.Context) error {
 
 	// Step 3: Write SQL to temporary file
 	tmpFile := filepath.Join(os.TempDir(), "moni-update-models.sql")
-	if err := os.WriteFile(tmpFile, []byte(sqlContent), 0600); err != nil {
+	if err := os.WriteFile(tmpFile, []byte(sqlContent), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write SQL file: %w", err)
 	}
 	defer os.Remove(tmpFile)

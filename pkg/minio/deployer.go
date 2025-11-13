@@ -1,6 +1,7 @@
 package minio
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"embed"
 	"fmt"
 	"os"
@@ -125,7 +126,7 @@ func (d *Deployer) generateDeploymentFiles(rc *eos_io.RuntimeContext, opts *Depl
 
 	// Create temporary directory for deployment files
 	deployDir := filepath.Join("/tmp", "minio-deploy")
-	if err := os.MkdirAll(deployDir, 0755); err != nil {
+	if err := os.MkdirAll(deployDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create deploy directory: %w", err)
 	}
 
@@ -133,10 +134,10 @@ func (d *Deployer) generateDeploymentFiles(rc *eos_io.RuntimeContext, opts *Depl
 	terraformDir := filepath.Join(deployDir, "terraform", "minio")
 	nomadDir := filepath.Join(deployDir, "nomad")
 
-	if err := os.MkdirAll(terraformDir, 0755); err != nil {
+	if err := os.MkdirAll(terraformDir, shared.ServiceDirPerm); err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(nomadDir, 0755); err != nil {
+	if err := os.MkdirAll(nomadDir, shared.ServiceDirPerm); err != nil {
 		return "", err
 	}
 

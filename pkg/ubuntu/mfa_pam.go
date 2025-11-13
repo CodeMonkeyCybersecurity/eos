@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -207,7 +208,7 @@ func (m *MFAManager) updatePAMFileSafely(pamFile string, content string) error {
 
 	// Write to temporary file first
 	tmpFile := pamFile + ".tmp"
-	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(tmpFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write temp file: %w", err)
 	}
 

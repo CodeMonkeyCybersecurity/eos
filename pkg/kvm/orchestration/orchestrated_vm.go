@@ -3,6 +3,7 @@
 package orchestration
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -246,13 +247,13 @@ func (om *OrchestratedVMManager) createVMWithVirsh(vmName, _ /* ip */, cloudInit
 	metaDataPath := filepath.Join(workDir, "meta-data")
 
 	// SECURITY P0 #1: Use os.WriteFile instead of shell to prevent command injection
-	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	// Write meta-data
 	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vmName, vmName)
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 

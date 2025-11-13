@@ -3,6 +3,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -309,7 +310,7 @@ func writeAppArmorProfile(rc *eos_io.RuntimeContext, config *AppArmorConfig, pro
 		zap.String("profile", profile.Name),
 		zap.String("path", profilePath))
 
-	if err := os.WriteFile(profilePath, []byte(profileContent), 0644); err != nil {
+	if err := os.WriteFile(profilePath, []byte(profileContent), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write profile file",
 			zap.String("path", profilePath),
 			zap.Error(err))
@@ -433,7 +434,7 @@ func configureAppArmorMonitoring(rc *eos_io.RuntimeContext, config *AppArmorConf
 
 	configPath := "/etc/rsyslog.d/50-apparmor.conf"
 	log.Info(" Configuring AppArmor logging", zap.String("path", configPath))
-	if err := os.WriteFile(configPath, []byte(rsyslogConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(rsyslogConfig), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write rsyslog config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write rsyslog config")
 	}
@@ -462,7 +463,7 @@ func configureAppArmorMonitoring(rc *eos_io.RuntimeContext, config *AppArmorConf
 
 	logrotataPath := "/etc/logrotate.d/apparmor"
 	log.Info(" Configuring log rotation", zap.String("path", logrotataPath))
-	if err := os.WriteFile(logrotataPath, []byte(logrotateConfig), 0644); err != nil {
+	if err := os.WriteFile(logrotataPath, []byte(logrotateConfig), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write logrotate config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write logrotate config")
 	}

@@ -1,6 +1,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -363,7 +364,7 @@ func executeFuzzing(rc *eos_io.RuntimeContext, config *fuzzing.Config, mode stri
 
 	// Save report to file
 	reportPath := filepath.Join(config.LogDir, fmt.Sprintf("fuzz-report-%s-%d.md", mode, time.Now().Unix()))
-	if err := os.WriteFile(reportPath, []byte(report), 0644); err != nil {
+	if err := os.WriteFile(reportPath, []byte(report), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to save report to file", zap.Error(err))
 	} else {
 		logger.Info("Report saved", zap.String("path", reportPath))

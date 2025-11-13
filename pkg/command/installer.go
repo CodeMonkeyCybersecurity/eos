@@ -2,6 +2,7 @@
 package command
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"context"
 	"fmt"
@@ -216,7 +217,7 @@ func (ci *CommandInstaller) writeScriptFile(ctx context.Context, path, content s
 	}
 
 	// Regular write for user directories
-	perm := os.FileMode(0644)
+	perm := shared.ConfigFilePerm
 	if executable {
 		perm = 0755
 	}

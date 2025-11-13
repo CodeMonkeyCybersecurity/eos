@@ -8,6 +8,7 @@
 package consultemplate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -90,7 +91,7 @@ func (m *SystemdManager) CreateService(config *SystemdServiceConfig) error {
 
 	// Write unit file
 	unitPath := m.getUnitFilePath(config.ServiceName)
-	if err := os.WriteFile(unitPath, []byte(unitContent), 0644); err != nil {
+	if err := os.WriteFile(unitPath, []byte(unitContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write unit file: %w", err)
 	}
 

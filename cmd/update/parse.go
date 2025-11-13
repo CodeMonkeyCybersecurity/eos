@@ -44,7 +44,7 @@ var ParseCmd = &cobra.Command{
 
 		// Create output dir if needed
 		outDir := "parsed_conversations"
-		if err := os.MkdirAll(outDir, 0755); err != nil {
+		if err := os.MkdirAll(outDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 

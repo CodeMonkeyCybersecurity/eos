@@ -1,6 +1,7 @@
 package read
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -179,7 +180,7 @@ func loadDiscoveryConfig(configFile string) (*discovery.InternalDiscoveryConfig,
 // saveDiscoveryConfig saves discovery configuration
 func saveDiscoveryConfig(_ *discovery.InternalDiscoveryConfig, filename string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -383,7 +384,7 @@ func displayResultsSummary(logger *otelzap.LoggerWithCtx, results []*discovery.D
 // saveDiscoveryResults saves results to a file
 func saveDiscoveryResults(results []*discovery.DiscoveryResult, filename, format string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), shared.ServiceDirPerm); err != nil {
 		return err
 	}
 

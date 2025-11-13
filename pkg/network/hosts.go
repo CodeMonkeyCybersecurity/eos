@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -91,7 +92,7 @@ func GenerateTailscaleHostsConfig(rc *eos_io.RuntimeContext, config *HostsConfig
 	}
 
 	// Write to file
-	if err := os.WriteFile(config.OutputFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(config.OutputFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		logger.Error("Failed to write hosts file", zap.Error(err))
 		return fmt.Errorf("failed to write hosts file: %w", err)
 	}
@@ -365,7 +366,7 @@ func GetTailscaleHostsForAnsible(rc *eos_io.RuntimeContext, outputFile string) e
 		outputFile = "/tmp/tailscale_inventory.ini"
 	}
 
-	if err := os.WriteFile(outputFile, []byte(content.String()), 0644); err != nil {
+	if err := os.WriteFile(outputFile, []byte(content.String()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Ansible inventory: %w", err)
 	}
 

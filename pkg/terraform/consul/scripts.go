@@ -1,6 +1,7 @@
 package consul
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func GenerateVaultSecretsSetup(rc *eos_io.RuntimeContext, outputDir string, data
 		zap.String("output_dir", outputDir),
 		zap.String("vault_addr", data.VaultAddr))
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 

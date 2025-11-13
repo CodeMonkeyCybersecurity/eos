@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -480,11 +481,11 @@ func configureGracefulPAM(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Apply graceful configurations
-	if err := os.WriteFile(sudoOriginal, []byte(gracefulPAMSudoConfig), 0644); err != nil {
+	if err := os.WriteFile(sudoOriginal, []byte(gracefulPAMSudoConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write graceful sudo PAM config: %w", err)
 	}
 
-	if err := os.WriteFile(suOriginal, []byte(pamSuMFAConfig), 0644); err != nil {
+	if err := os.WriteFile(suOriginal, []byte(pamSuMFAConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 
@@ -583,7 +584,7 @@ grace_period_end=%s
 enforce_mfa=false
 `, time.Now().Format(time.RFC3339), time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
-	if err := os.WriteFile("/etc/eos/mfa-enforcement.conf", []byte(config), 0644); err != nil {
+	if err := os.WriteFile("/etc/eos/mfa-enforcement.conf", []byte(config), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write grace period config: %w", err)
 	}
 
@@ -614,11 +615,11 @@ WantedBy=multi-user.target
 `
 
 	// Write timer and service files (but don't enable yet)
-	if err := os.WriteFile("/etc/systemd/system/enforce-mfa-strict.timer", []byte(timerContent), 0644); err != nil {
+	if err := os.WriteFile("/etc/systemd/system/enforce-mfa-strict.timer", []byte(timerContent), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to create MFA enforcement timer", zap.Error(err))
 	}
 
-	if err := os.WriteFile("/etc/systemd/system/enforce-mfa-strict.service", []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile("/etc/systemd/system/enforce-mfa-strict.service", []byte(serviceContent), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to create MFA enforcement service", zap.Error(err))
 	}
 
