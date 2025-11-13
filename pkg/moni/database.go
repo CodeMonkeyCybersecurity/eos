@@ -377,8 +377,8 @@ WHERE schemaname = 'public' AND rowsecurity = true;
 			"  • bionic_application user does not exist\n"+
 			"Fix: Ensure PostgreSQL is running and bionic_application user exists", err)
 	} else if isSuperuser == "t" || isSuperuser == "true" {
-		return fmt.Errorf("CRITICAL SECURITY FAILURE: bionic_application is a superuser and will BYPASS all RLS policies\n"+
-			"RLS is completely ineffective when the user is a superuser.\n"+
+		return fmt.Errorf("CRITICAL SECURITY FAILURE: bionic_application is a superuser and will BYPASS all RLS policies\n" +
+			"RLS is completely ineffective when the user is a superuser.\n" +
 			"Fix: Revoke superuser: ALTER USER bionic_application NOSUPERUSER;")
 	} else {
 		logger.Info("Verified: bionic_application is NOT a superuser (RLS will work correctly)")

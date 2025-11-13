@@ -382,22 +382,22 @@ func VerifyContentSecurityPolicy(rc *eos_io.RuntimeContext) (*CSPVerificationRes
 
 	// Expected secure CSP directives
 	recommendedDirectives := map[string]string{
-		"default-src":    "'self'",
-		"script-src":     "'self'",
-		"style-src":      "'self' 'unsafe-inline'",
-		"img-src":        "'self' data:",
-		"font-src":       "'self'",
-		"connect-src":    "'self'",
+		"default-src":     "'self'",
+		"script-src":      "'self'",
+		"style-src":       "'self' 'unsafe-inline'",
+		"img-src":         "'self' data:",
+		"font-src":        "'self'",
+		"connect-src":     "'self'",
 		"frame-ancestors": "'none'",
-		"base-uri":       "'self'",
-		"form-action":    "'self'",
+		"base-uri":        "'self'",
+		"form-action":     "'self'",
 	}
 
 	// Dangerous patterns
 	dangerousPatterns := map[string]string{
-		"'unsafe-eval'":                           "Allows eval() - major XSS risk",
-		"* 'unsafe-inline' 'unsafe-eval'":         "Extremely permissive - defeats CSP purpose",
-		"*":                                       "Wildcard allows any source - too permissive",
+		"'unsafe-eval'":                   "Allows eval() - major XSS risk",
+		"* 'unsafe-inline' 'unsafe-eval'": "Extremely permissive - defeats CSP purpose",
+		"*":                               "Wildcard allows any source - too permissive",
 	}
 
 	// Step 1: Check if app is responding
