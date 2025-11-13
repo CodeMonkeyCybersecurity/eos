@@ -72,6 +72,8 @@ func runCheck(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) erro
 
 				if fix {
 					logger.Info("terminal prompt:    Attempting to fix permissions...")
+					// INTENTIONAL EXCEPTION (P0-2): Bitwise OR operation, not hardcoded permission
+					// Adds execute bit to existing mode (equivalent to 'chmod +x')
 					if err := os.Chmod(execPath, mode|0111); err != nil {
 						logger.Info("terminal prompt:    Fix failed: " + err.Error())
 					} else {

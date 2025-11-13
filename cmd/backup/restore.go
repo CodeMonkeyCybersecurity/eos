@@ -172,6 +172,9 @@ Examples:
 
 				// Ensure directories are accessible
 				if info.IsDir() {
+					// INTENTIONAL EXCEPTION (P0-2): Bitwise OR operation, not hardcoded permission
+					// Adds owner rwx bits to existing mode during backup restore
+					// Preserves group/other bits while ensuring owner can access restored directories
 					if err := os.Chmod(path, info.Mode()|0700); err != nil {
 						logger.Warn("Failed to set directory permissions",
 							zap.String("path", path),
