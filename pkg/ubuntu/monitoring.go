@@ -421,7 +421,7 @@ func createMonitoringScript(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Creating security monitoring management script")
 
 	scriptPath := "/usr/local/bin/security-monitor"
-	if err := os.WriteFile(scriptPath, []byte(osqueryStatusScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(osqueryStatusScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write monitoring script: %w", err)
 	}
 

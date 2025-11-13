@@ -108,7 +108,7 @@ var CreateHeraCmd = &cobra.Command{
 		}
 
 		envPath := filepath.Join(shared.HeraDir, ".env")
-		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
+		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), shared.ConfigFilePerm); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to write .env file", zap.Error(err))
 		}
 		otelzap.Ctx(rc.Ctx).Info(" .env file created", zap.String("path", envPath))

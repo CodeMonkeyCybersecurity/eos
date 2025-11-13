@@ -59,5 +59,5 @@ func patchEnvInPlace(path string, updates map[string]string) error {
 		return err
 	}
 
-	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")+"\n"), 0644)
+	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")+"\n"), shared.ConfigFilePerm)
 }

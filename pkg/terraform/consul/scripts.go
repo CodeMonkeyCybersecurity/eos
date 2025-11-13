@@ -108,7 +108,7 @@ echo "You can now run: eos create consul-vault . --services --consul-kv"
 `, data.VaultAddr, data.SecretsMount, data.ConsulDatacenter)
 
 	scriptPath := filepath.Join(outputDir, "setup-consul-vault-secrets.sh")
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(script), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write setup script: %w", err)
 	}
 

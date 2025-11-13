@@ -372,7 +372,7 @@ func fixTemporalPath(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write to destination with correct permissions
-	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
+	if err := os.WriteFile(targetPath, sourceData, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write binary to %s: %w", targetPath, err)
 	}
 

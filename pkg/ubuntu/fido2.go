@@ -407,7 +407,7 @@ fi
 
 	enrollmentPath := "/usr/local/bin/setup-fido2"
 	log.Info(" Creating FIDO2 enrollment script", zap.String("path", enrollmentPath))
-	if err := os.WriteFile(enrollmentPath, []byte(enrollmentScript), 0755); err != nil {
+	if err := os.WriteFile(enrollmentPath, []byte(enrollmentScript), shared.ExecutablePerm); err != nil {
 		log.Error(" Failed to write enrollment script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write enrollment script")
 	}
@@ -458,7 +458,7 @@ esac
 
 	managementPath := "/usr/local/bin/manage-fido2"
 	log.Info(" Creating FIDO2 management script", zap.String("path", managementPath))
-	if err := os.WriteFile(managementPath, []byte(managementScript), 0755); err != nil {
+	if err := os.WriteFile(managementPath, []byte(managementScript), shared.ExecutablePerm); err != nil {
 		log.Error(" Failed to write management script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write management script")
 	}

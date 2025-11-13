@@ -337,5 +337,5 @@ func (lsm *LocalStorageManager) removeFromFstab(mountPoint string) error {
 		}
 	}
 
-	return os.WriteFile("/etc/fstab", []byte(strings.Join(newLines, "\n")), 0644)
+	return os.WriteFile("/etc/fstab", []byte(strings.Join(newLines, "\n")), shared.ConfigFilePerm)
 }

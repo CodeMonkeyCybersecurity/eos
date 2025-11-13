@@ -149,7 +149,7 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 		motdMsg := fmt.Sprintf("\n=== RAGEQUIT RECOVERY ===\n%s\nSee ~/RAGEQUIT-RECOVERY-PLAN.md for details\n\n", message)
 		if currentMotd, err := os.ReadFile(motdPath); err == nil {
 			_ = os.WriteFile(motdPath+".bak", currentMotd, shared.ConfigFilePerm)
-			_ = os.WriteFile(motdPath, append([]byte(motdMsg), currentMotd...), 0644)
+			_ = os.WriteFile(motdPath, append([]byte(motdMsg), currentMotd...), shared.ConfigFilePerm)
 		}
 	}
 

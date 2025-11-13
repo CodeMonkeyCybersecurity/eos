@@ -251,7 +251,7 @@ func installIntegrationScripts(rc *eos_io.RuntimeContext, config WazuhConfig) er
 	pythonPath := filepath.Join(config.IntegrationsDir, config.IntegrationName+".py")
 
 	// Write shell script
-	if err := os.WriteFile(shellPath, []byte(shellScript), 0750); err != nil {
+	if err := os.WriteFile(shellPath, []byte(shellScript), shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to write shell script: %w", err)
 	}
 

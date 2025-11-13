@@ -631,7 +631,7 @@ func createEnforcedMFASetupScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/setup-mfa"
-	if err := os.WriteFile(scriptPath, []byte(mfaEnforcementScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaEnforcementScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write enforced MFA setup script: %w", err)
 	}
 
@@ -643,7 +643,7 @@ func createMFAStatusScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/mfa-status"
-	if err := os.WriteFile(scriptPath, []byte(mfaStatusScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaStatusScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA status script: %w", err)
 	}
 
@@ -690,7 +690,7 @@ echo "   All sudo operations now require MFA authentication."
 `
 
 	scriptPath := "/usr/local/bin/enforce-mfa-strict"
-	if err := os.WriteFile(scriptPath, []byte(enforcementScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(enforcementScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA enforcement script: %w", err)
 	}
 
@@ -790,7 +790,7 @@ echo
 `
 
 	scriptPath := "/usr/local/bin/emergency-mfa-recovery"
-	if err := os.WriteFile(scriptPath, []byte(emergencyScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(emergencyScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write emergency recovery script: %w", err)
 	}
 

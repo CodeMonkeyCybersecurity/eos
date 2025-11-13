@@ -174,7 +174,7 @@ func createSecurityReportScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/security-report"
-	if err := os.WriteFile(scriptPath, []byte(securityReportScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(securityReportScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write security report script: %w", err)
 	}
 

@@ -142,7 +142,7 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 	// Create U2F mappings file
 	u2fMappingsPath := "/etc/u2f_mappings"
 	if _, err := os.Stat(u2fMappingsPath); os.IsNotExist(err) {
-		if err := os.WriteFile(u2fMappingsPath, []byte("# Format: username:keyhandle1,keyhandle2,...\n"), 0644); err != nil {
+		if err := os.WriteFile(u2fMappingsPath, []byte("# Format: username:keyhandle1,keyhandle2,...\n"), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to create U2F mappings file: %w", err)
 		}
 	}
@@ -237,7 +237,7 @@ fi
 `
 	
 	enrollScriptPath := "/usr/local/bin/eos-enroll-fido2"
-	if err := os.WriteFile(enrollScriptPath, []byte(enrollScript), 0755); err != nil {
+	if err := os.WriteFile(enrollScriptPath, []byte(enrollScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to create enrollment script: %w", err)
 	}
 	

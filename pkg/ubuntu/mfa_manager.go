@@ -268,7 +268,7 @@ func (m *MFAManager) createBackups() error {
 	// Create restore script
 	restoreScript := m.generateRestoreScript()
 	restorePath := filepath.Join(m.backupDir, "restore.sh")
-	if err := os.WriteFile(restorePath, []byte(restoreScript), 0700); err != nil {
+	if err := os.WriteFile(restorePath, []byte(restoreScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write restore script: %w", err)
 	}
 

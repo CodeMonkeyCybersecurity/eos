@@ -103,7 +103,7 @@ restic forget --prune \
     --keep-weekly 4 \
     --keep-monthly 12
 `
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write restic backup script: %w", err)
 	}
 

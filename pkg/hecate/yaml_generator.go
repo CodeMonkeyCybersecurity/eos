@@ -622,7 +622,7 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 
 	// Create logs directories
 	logsDir := filepath.Join(outputDir, "logs")
-	if err := os.MkdirAll(filepath.Join(logsDir, "caddy"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(logsDir, "caddy"), shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
 

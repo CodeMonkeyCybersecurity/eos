@@ -295,7 +295,7 @@ echo " All PAM configurations validated successfully"
 `
 
 	testPath := filepath.Join(a.backupDir, "test-pam.sh")
-	if err := os.WriteFile(testPath, []byte(testScript), 0755); err != nil {
+	if err := os.WriteFile(testPath, []byte(testScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("create test script: %w", err)
 	}
 

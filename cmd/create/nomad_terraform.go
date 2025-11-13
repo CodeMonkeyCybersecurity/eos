@@ -148,7 +148,7 @@ location = "%s"
 `, provider, serverType, location)
 	}
 
-	if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 	}
 
@@ -214,7 +214,7 @@ fi
 			return ""
 		}())
 
-	if err := os.WriteFile(filepath.Join(outputDir, "deploy.sh"), []byte(deployScript), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(outputDir, "deploy.sh"), []byte(deployScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to generate deploy script: %w", err)
 	}
 

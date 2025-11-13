@@ -244,7 +244,7 @@ esac
 `, m.config.EmergencyGroupName, int(m.config.EmergencyTimeout.Minutes()))
 
 	scriptPath := "/usr/local/bin/emergency-mfa-bypass"
-	if err := os.WriteFile(scriptPath, []byte(emergencyScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(emergencyScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write emergency script: %w", err)
 	}
 

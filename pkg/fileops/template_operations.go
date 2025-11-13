@@ -73,7 +73,7 @@ func (t *TemplateOperations) ReplaceTokensInFile(ctx context.Context, path strin
 	}
 
 	// Write back
-	if err := t.fileOps.WriteFile(ctx, path, []byte(contentStr), 0644); err != nil {
+	if err := t.fileOps.WriteFile(ctx, path, []byte(contentStr), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -235,7 +235,7 @@ func (t *TemplateOperations) ProcessTemplate(ctx context.Context, templatePath, 
 	}
 
 	// SECURITY: Write output with restrictive permissions (0640 instead of 0644)
-	if err := t.fileOps.WriteFile(ctx, outputPath, buf.Bytes(), 0640); err != nil {
+	if err := t.fileOps.WriteFile(ctx, outputPath, buf.Bytes(), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 

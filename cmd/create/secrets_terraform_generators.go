@@ -249,7 +249,7 @@ variable "ssh_key_name" {
 }
 `, data.VaultAddr, data.ClusterName, data.NodeCount, data.ServerType, data.Location, data.SSHKeyName)
 
-	return shared.SafeWriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), 0644)
+	return shared.SafeWriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), shared.ConfigFilePerm)
 }
 
 // TODO
@@ -292,7 +292,7 @@ variable "ssh_key_name" {
 }
 `, data.VaultAddr, data.ServerName, data.ServerType, data.Location, data.SSHKeyName)
 
-	return shared.SafeWriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), 0644)
+	return shared.SafeWriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), shared.ConfigFilePerm)
 }
 
 // TODO
@@ -323,7 +323,7 @@ runcmd:
   - echo "Server setup completed" > /var/log/setup.log
 `
 
-	return shared.SafeWriteFile(filepath.Join(outputDir, "cloud-init.yaml"), []byte(cloudInit), 0644)
+	return shared.SafeWriteFile(filepath.Join(outputDir, "cloud-init.yaml"), []byte(cloudInit), shared.ConfigFilePerm)
 }
 
 // TODO
@@ -391,7 +391,7 @@ echo "You can now run: eos create terraform-vault . --vault-secrets"
 `, data.VaultAddr, data.SecretsMount, outputDir)
 
 	scriptPath := filepath.Join(outputDir, "setup-vault-secrets.sh")
-	if err := shared.SafeWriteFile(scriptPath, []byte(script), 0755); err != nil {
+	if err := shared.SafeWriteFile(scriptPath, []byte(script), shared.ExecutablePerm); err != nil {
 		return err
 	}
 

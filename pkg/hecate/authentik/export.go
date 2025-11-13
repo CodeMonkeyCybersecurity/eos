@@ -601,7 +601,7 @@ func exportOutpostHealth(rc *eos_io.RuntimeContext, client *AuthentikClient, out
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(outputDir, "04_outpost_health.json"), data, 0644)
+	return os.WriteFile(filepath.Join(outputDir, "04_outpost_health.json"), data, shared.ConfigFilePerm)
 }
 
 // exportAuthorizationFlow exports the authorization flow
@@ -629,7 +629,7 @@ func exportAuthorizationFlow(rc *eos_io.RuntimeContext, client *AuthentikClient,
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(outputDir, "06_authorization_flow.json"), data, 0644)
+	return os.WriteFile(filepath.Join(outputDir, "06_authorization_flow.json"), data, shared.ConfigFilePerm)
 }
 
 // copyCaddyfile copies the Caddyfile to the export directory
@@ -639,7 +639,7 @@ func copyCaddyfile(outputDir string) error {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(outputDir, "19_Caddyfile.disk"), data, 0644)
+	return os.WriteFile(filepath.Join(outputDir, "19_Caddyfile.disk"), data, shared.ConfigFilePerm)
 }
 
 // exportCaddyfileFromAPI exports the live Caddy configuration from Admin API
@@ -686,7 +686,7 @@ func copyDockerCompose(outputDir string) error {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(outputDir, "20_docker-compose.disk.yml"), data, 0644)
+	return os.WriteFile(filepath.Join(outputDir, "20_docker-compose.disk.yml"), data, shared.ConfigFilePerm)
 }
 
 // exportDockerComposeFromRuntime exports the actual running container configuration
@@ -1051,7 +1051,7 @@ Command: eos update hecate --export
 Website: https://cybermonkey.net.au/
 `, time.Now().Format(time.RFC3339), baseURL)
 
-	return os.WriteFile(filepath.Join(outputDir, "00_README.md"), []byte(readme), 0644)
+	return os.WriteFile(filepath.Join(outputDir, "00_README.md"), []byte(readme), shared.ConfigFilePerm)
 }
 
 // exportAuthentikBlueprint exports Authentik configuration as Blueprint YAML

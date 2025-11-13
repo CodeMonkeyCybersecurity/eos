@@ -201,7 +201,7 @@ func createMFASetupScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/setup-mfa"
-	if err := os.WriteFile(scriptPath, []byte(mfaSetupScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaSetupScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA setup script: %w", err)
 	}
 
@@ -255,7 +255,7 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/disable-mfa-emergency"
-	if err := os.WriteFile(scriptPath, []byte(mfaBackupScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaBackupScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA backup script: %w", err)
 	}
 

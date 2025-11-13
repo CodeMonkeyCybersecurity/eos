@@ -28,7 +28,7 @@ func NewFilePipelineStore(basePath string, logger *zap.Logger) (*FilePipelineSto
 
 	// Create subdirectories
 	for _, subdir := range []string{"executions", "stages", "artifacts", "logs"} {
-		if err := os.MkdirAll(filepath.Join(basePath, subdir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(basePath, subdir), shared.ServiceDirPerm); err != nil {
 			return nil, fmt.Errorf("failed to create %s directory: %w", subdir, err)
 		}
 	}

@@ -179,7 +179,7 @@ func (tl *TraceLogger) Initialize() error {
 	// Create subdirectories for different trace types
 	traceDirs := []string{"system", "processes", "profiles", "logs"}
 	for _, dir := range traceDirs {
-		if err := os.MkdirAll(filepath.Join(sessionDir, dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Join(sessionDir, dir), shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", dir, err)
 		}
 	}

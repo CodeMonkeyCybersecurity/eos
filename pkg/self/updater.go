@@ -169,7 +169,7 @@ func (eu *EosUpdater) CreateBackup() error {
 		return fmt.Errorf("failed to read current binary: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, currentBinary, 0755); err != nil {
+	if err := os.WriteFile(backupPath, currentBinary, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write backup: %w", err)
 	}
 
@@ -367,7 +367,7 @@ func (eu *EosUpdater) InstallBinary(sourcePath string) error {
 			return fmt.Errorf("failed to read temp binary for copy: %w", err)
 		}
 
-		if err := os.WriteFile(eu.config.BinaryPath, input, 0755); err != nil {
+		if err := os.WriteFile(eu.config.BinaryPath, input, shared.ExecutablePerm); err != nil {
 			return fmt.Errorf("failed to copy new binary to destination: %w", err)
 		}
 	}

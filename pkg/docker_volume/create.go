@@ -143,7 +143,7 @@ func CreateBindMount(rc *eos_io.RuntimeContext, mount *BindMount) error {
 	// Create a marker file to indicate this is a Docker bind mount
 	markerPath := filepath.Join(mount.Source, ".docker-bind-mount")
 	markerContent := fmt.Sprintf("target=%s\n", mount.Target)
-	if err := shared.SafeWriteFile(markerPath, []byte(markerContent), 0644); err != nil {
+	if err := shared.SafeWriteFile(markerPath, []byte(markerContent), shared.ConfigFilePerm); err != nil {
 		logger.Debug("Failed to create marker file",
 			zap.Error(err))
 	}

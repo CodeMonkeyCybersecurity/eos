@@ -105,7 +105,7 @@ server_type = "%s"
 location = "%s"`, serverType, location)
 		}
 
-		if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 		}
 

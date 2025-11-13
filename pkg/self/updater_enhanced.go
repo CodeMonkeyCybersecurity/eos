@@ -922,7 +922,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 			return fmt.Errorf("failed to read new binary: %w", err)
 		}
 
-		if err := os.WriteFile(tempName, input, 0755); err != nil {
+		if err := os.WriteFile(tempName, input, shared.ExecutablePerm); err != nil {
 			return fmt.Errorf("failed to write temp binary: %w", err)
 		}
 
@@ -1037,7 +1037,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 
 				// Atomic write: write to temp, then rename
 				tempPath := eeu.config.BinaryPath + ".restore"
-				if err := os.WriteFile(tempPath, backup, 0755); err != nil {
+				if err := os.WriteFile(tempPath, backup, shared.ExecutablePerm); err != nil {
 					return fmt.Errorf("failed to write restored binary: %w", err)
 				}
 

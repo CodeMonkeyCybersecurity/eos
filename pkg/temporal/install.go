@@ -145,10 +145,10 @@ func createConfiguration(ctx context.Context, config *TemporalConfig) error {
 	_ = os.MkdirAll(config.DataDir, shared.ServiceDirPerm)
 
 	configYAML := generateConfigYAML(config)
-	_ = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), shared.ConfigFilePerm)
 
 	dynamicYAML := generateDynamicConfigYAML(config)
-	_ = os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), shared.ConfigFilePerm)
 
 	logger.Info("Configuration files created")
 	return nil

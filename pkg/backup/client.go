@@ -81,7 +81,7 @@ func (c *Client) runResticWithInitRetry(initAttempted bool, args ...string) ([]b
 	defer passwordFile.Close()
 
 	// Set restrictive permissions (owner read-only)
-	if err := os.Chmod(passwordFile.Name(), 0400); err != nil {
+	if err := os.Chmod(passwordFile.Name(), shared.ReadOnlySecretFilePerm); err != nil {
 		return nil, fmt.Errorf("setting password file permissions: %w", err)
 	}
 

@@ -272,7 +272,7 @@ echo "  - Email inbox for notification"
 `
 
 	testScriptPath := filepath.Join(projectDir, "scripts", "test-alert.sh")
-	if err := os.WriteFile(testScriptPath, []byte(testScript), 0755); err != nil {
+	if err := os.WriteFile(testScriptPath, []byte(testScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write test script: %w", err)
 	}
 	logger.Info("Test script created", zap.String("path", testScriptPath))
