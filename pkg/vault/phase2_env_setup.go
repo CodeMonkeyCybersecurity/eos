@@ -3,16 +3,17 @@
 package vault
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"fmt"
-	"net"
-	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"syscall"
-	"time"
+    "crypto/tls"
+    "crypto/x509"
+    "fmt"
+    "net"
+    "net/url"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "syscall"
+    "time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"

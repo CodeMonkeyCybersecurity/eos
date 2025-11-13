@@ -14,6 +14,7 @@ type ServiceOptions struct {
 	// Optional fields
 	SSO                 bool     // Enable SSO for this route
 	SSOProvider         string   // SSO provider to use (default: authentik)
+	AdminGroup          string   // Admin group name for authorization (used by Moni, default varies by service)
 	SAMLEntityID        string   // SAML entity ID (for SAML-based integrations like Wazuh)
 	AllowInsecureTLS    bool     // Allow InsecureSkipVerify for TLS connections (INSECURE - use with caution)
 	CustomDirectives    []string // Custom Caddy directives

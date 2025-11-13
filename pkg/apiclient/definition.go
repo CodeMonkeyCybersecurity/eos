@@ -88,16 +88,16 @@ func LoadDefinition(service string) (*APIDefinition, error) {
 	}
 
 	// 3. Try embedded definition (default)
-	def, err = loadEmbeddedDefinition(service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load API definition for %s: %w\n"+
-			"Searched:\n"+
-			"  - %s (not found or invalid)\n"+
-			"  - ~/.eos/api_definitions/%s.yaml (not found or invalid)\n"+
-			"  - embedded definitions (not found)\n"+
-			"Create API definition in one of these locations.",
-			service, systemPath, service)
-	}
+    def, err = loadEmbeddedDefinition(service)
+    if err != nil {
+        return nil, fmt.Errorf("failed to load API definition for %s: %w\n"+
+            "Searched:\n"+
+            "  - %s (not found or invalid)\n"+
+            "  - ~/.eos/api_definitions/%s.yaml (not found or invalid)\n"+
+            "  - embedded definitions (not found)\n"+
+            "Create API definition in one of these locations.",
+            service, err, systemPath, service)
+    }
 
 	// Cache and return
 	cacheMu.Lock()

@@ -14,16 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: refactor
-// getEnvOrDefault gets environment variable or returns default value
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	hetznerDNSDomain string
 	hetznerDNSIP     string
@@ -196,11 +186,11 @@ func runCreateHecateDNS(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// Initialize Hecate client
 	config := &hecate.ClientConfig{
-		CaddyAdminAddr:     getEnvOrDefault("CADDY_ADMIN_ADDR", "http://localhost:2019"),
-		ConsulAddr:         getEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
-		VaultAddr:          getEnvOrDefault("VAULT_ADDR", fmt.Sprintf("http://localhost:%d", shared.PortVault)),
-		VaultToken:         getEnvOrDefault("VAULT_TOKEN", ""),
-		TerraformWorkspace: getEnvOrDefault("TERRAFORM_WORKSPACE", "/var/lib/hecate/terraform"),
+		CaddyAdminAddr:     shared.GetEnvOrDefault("CADDY_ADMIN_ADDR", "http://localhost:2019"),
+		ConsulAddr:         shared.GetEnvOrDefault("CONSUL_ADDR", "localhost:8500"),
+		VaultAddr:          shared.GetEnvOrDefault("VAULT_ADDR", fmt.Sprintf("http://localhost:%d", shared.PortVault)),
+		VaultToken:         shared.GetEnvOrDefault("VAULT_TOKEN", ""),
+		TerraformWorkspace: shared.GetEnvOrDefault("TERRAFORM_WORKSPACE", "/var/lib/hecate/terraform"),
 	}
 
 	client, err := hecate.NewHecateClient(rc, config)

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package vault
@@ -6,7 +7,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -26,7 +26,7 @@ func TestCACertificateDiscovery_RealFilesystem(t *testing.T) {
 	// RATIONALE: Unit tests mock filesystem, integration tests use real paths
 	// COMPLIANCE: NIST 800-53 SC-8 (Transmission Confidentiality)
 
-	rc := createTestRuntimeContextForEnv(t)
+	_ = createTestRuntimeContextForEnv(t)
 
 	// Create temporary CA certificate in standard path
 	testCADir := t.TempDir()
@@ -276,7 +276,7 @@ func TestEnsureVaultEnv_WithCA_ShouldNotSetSkipVerify(t *testing.T) {
 	// SECURITY TEST: Verify P0-2 fix - no VAULT_SKIP_VERIFY with CA
 	// COMPLIANCE: NIST 800-53 SC-8 (Transmission Confidentiality)
 
-	rc := createTestRuntimeContextForEnv(t)
+	_ = createTestRuntimeContextForEnv(t)
 
 	// Create temporary CA certificate
 	tmpCA, err := os.CreateTemp("", "test-ca-*.crt")
@@ -346,13 +346,13 @@ func TestCanConnectTLS_WithTimeout(t *testing.T) {
 	// INTEGRATION TEST: Verify TLS connection check has reasonable timeout
 	// RATIONALE: Should not hang indefinitely
 
-	rc := createTestRuntimeContextForEnv(t)
+	_ = createTestRuntimeContextForEnv(t)
 
 	// Test connection to non-existent server (should timeout quickly)
 	nonExistentAddr := "https://127.0.0.1:19999"
 
 	start := time.Now()
-	canConnect := canConnectTLS(rc, nonExistentAddr, 2*time.Second)
+	canConnect := canConnectTLS(nil, nonExistentAddr, 2*time.Second)
 	duration := time.Since(start)
 
 	if canConnect {
@@ -374,10 +374,10 @@ func TestLocateVaultCACertificate_StandardPaths(t *testing.T) {
 	// INTEGRATION TEST: Verify CA cert discovery in standard paths
 	// PATHS TESTED: /etc/vault/tls/ca.crt, /etc/eos/ca.crt, /etc/ssl/certs/vault-ca.pem
 
-	rc := createTestRuntimeContextForEnv(t)
+	_ = createTestRuntimeContextForEnv(t)
 
 	// Try to locate CA certificate in standard paths
-	caPath, err := locateVaultCACertificate(rc)
+	caPath, err := locateVaultCACertificate(nil)
 
 	if err != nil {
 		// Not an error - CA may not exist in test environment
@@ -456,8 +456,8 @@ func createTestRuntimeContextForEnv(t *testing.T) *eos_io.RuntimeContext {
 	ctx := context.Background()
 
 	return &eos_io.RuntimeContext{
-		Ctx:    ctx,
-		Logger: logger,
+		Ctx: ctx,
+		Log: logger,
 	}
 }
 
@@ -546,13 +546,13 @@ func TestVaultAddrHTTPSEnforcement(t *testing.T) {
 	// RATIONALE: HTTP is unencrypted, should be rejected in production
 
 	testCases := []struct {
-		addr      string
+		addr       string
 		shouldWarn bool
 	}{
 		{"https://localhost:8200", false},
-		{"http://localhost:8200", true},  // Insecure
+		{"http://localhost:8200", true}, // Insecure
 		{"https://vault.example.com", false},
-		{"http://vault.example.com", true},  // Insecure
+		{"http://vault.example.com", true}, // Insecure
 	}
 
 	for _, tc := range testCases {
