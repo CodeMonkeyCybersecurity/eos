@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -316,7 +317,7 @@ func loadHistory(historyFile string) (map[string][]DiskUsage, error) {
 func saveHistory(historyFile string, history map[string][]DiskUsage) error {
 	// Create directory if needed
 	dir := filepath.Dir(historyFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -325,7 +326,7 @@ func saveHistory(historyFile string, history map[string][]DiskUsage) error {
 		return err
 	}
 
-	return os.WriteFile(historyFile, data, 0644)
+	return os.WriteFile(historyFile, data, shared.ConfigFilePerm)
 }
 
 func pruneHistory(history map[string][]DiskUsage, maxAge time.Duration) {

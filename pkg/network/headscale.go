@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -158,7 +159,7 @@ func InstallHeadscale(rc *eos_io.RuntimeContext, config *HeadscaleConfig) error 
 	}
 
 	// Create configuration directory
-	if err := os.MkdirAll(config.ConfigDir, 0755); err != nil {
+	if err := os.MkdirAll(config.ConfigDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -348,7 +349,7 @@ func downloadAndInstallHeadscale(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Make executable and move to /usr/local/bin
-	if err := os.Chmod("headscale", 0755); err != nil {
+	if err := os.Chmod("headscale", shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to make Headscale executable: %w", err)
 	}
 
@@ -384,7 +385,7 @@ func generateHeadscaleConfig(rc *eos_io.RuntimeContext, config *HeadscaleConfig)
 
 	// Write config to file
 	configPath := filepath.Join(config.ConfigDir, "headscale.conf")
-	if err := os.WriteFile(configPath, []byte(output), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(output), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -434,7 +435,7 @@ func setupHeadscaleDatabase(rc *eos_io.RuntimeContext) error {
 	logger.Info("Setting up Headscale database")
 
 	// Create database directory
-	if err := os.MkdirAll("/var/lib/headscale", 0755); err != nil {
+	if err := os.MkdirAll("/var/lib/headscale", shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create database directory: %w", err)
 	}
 
@@ -474,7 +475,7 @@ WantedBy=multi-user.target
 `
 
 	servicePath := "/etc/systemd/system/headscale.service"
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+	if err := os.WriteFile(servicePath, []byte(serviceContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create service file: %w", err)
 	}
 

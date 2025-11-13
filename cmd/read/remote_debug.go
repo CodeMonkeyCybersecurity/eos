@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/remotedebug"
 	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -58,6 +59,12 @@ func init() {
 
 func runRemoteDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	host := args[0]
 	
 	logger.Info("Starting remote debug session",

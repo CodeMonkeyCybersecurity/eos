@@ -5,6 +5,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"path/filepath"
 
@@ -192,7 +193,7 @@ COMPOSE_PORT_HTTPS=%s
 	)
 
 	envPath := filepath.Join(BaseDir, ".env")
-	if err := eos_unix.WriteFile(rc.Ctx, envPath, []byte(envContent), 0600, ""); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, envPath, []byte(envContent), shared.SecretFilePerm, ""); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 
@@ -332,7 +333,7 @@ volumes:
 `
 
 	composePath := filepath.Join(BaseDir, "docker-compose.yml")
-	if err := eos_unix.WriteFile(rc.Ctx, composePath, []byte(composeContent), 0644, ""); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, composePath, []byte(composeContent), shared.ConfigFilePerm, ""); err != nil {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 

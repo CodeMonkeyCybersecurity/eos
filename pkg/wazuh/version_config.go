@@ -105,7 +105,7 @@ func (cm *ConfigManager) SaveConfig(rc *eos_io.RuntimeContext, config *VersionCo
 
 	// Create config directory if it doesn't exist
 	configDir := filepath.Dir(cm.configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -114,7 +114,7 @@ func (cm *ConfigManager) SaveConfig(rc *eos_io.RuntimeContext, config *VersionCo
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(cm.configPath, data, 0644); err != nil {
+	if err := os.WriteFile(cm.configPath, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

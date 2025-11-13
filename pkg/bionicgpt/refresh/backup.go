@@ -2,6 +2,7 @@
 package refresh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -24,7 +25,7 @@ func (r *Refresher) createBackup(ctx context.Context) (string, error) {
 	backupName := fmt.Sprintf("%s%s", bionicgpt.BackupPrefixRefresh, timestamp)
 	backupPath := filepath.Join(r.backupDir, backupName)
 
-	if err := os.MkdirAll(backupPath, 0755); err != nil {
+	if err := os.MkdirAll(backupPath, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -117,7 +118,7 @@ func (r *Refresher) backupPostgresDB(ctx context.Context, containerName, user, d
 		return fmt.Errorf("pg_dump failed: %w", err)
 	}
 
-	if err := os.WriteFile(outputPath, output, 0600); err != nil {
+	if err := os.WriteFile(outputPath, output, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -207,7 +208,7 @@ func copyFile(src, dest string) error {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	if err := os.WriteFile(dest, data, 0600); err != nil {
+	if err := os.WriteFile(dest, data, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write destination file: %w", err)
 	}
 

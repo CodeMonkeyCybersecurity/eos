@@ -4,6 +4,7 @@
 package helen
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ func gitClone(rc *eos_io.RuntimeContext, repo, path, branch string) error {
 		zap.String("branch", branch))
 	
 	// Create parent directory
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 	

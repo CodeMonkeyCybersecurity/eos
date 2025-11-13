@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -202,5 +203,5 @@ func ConfigurePortMapping(port int) error {
 	newContent := strings.ReplaceAll(string(content), oldMapping, newMapping)
 
 	// EVALUATE - Write updated configuration
-	return os.WriteFile("docker-compose.yml", []byte(newContent), 0644)
+	return os.WriteFile("docker-compose.yml", []byte(newContent), shared.ConfigFilePerm)
 }

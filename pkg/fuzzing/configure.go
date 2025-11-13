@@ -1,6 +1,7 @@
 package fuzzing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -150,13 +151,13 @@ func setupLogDirectory(config *Config, logger otelzap.LoggerWithCtx) error {
 	}
 	
 	// Create log directory with proper permissions
-	if err := os.MkdirAll(config.LogDir, 0755); err != nil {
+	if err := os.MkdirAll(config.LogDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create log directory %s: %w", config.LogDir, err)
 	}
 	
 	// Check write permissions
 	testFile := filepath.Join(config.LogDir, ".write_test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("log directory is not writable: %w", err)
 	}
 	_ = os.Remove(testFile)

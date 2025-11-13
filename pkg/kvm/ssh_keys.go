@@ -5,6 +5,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -21,13 +22,13 @@ func PrepareTenantSSHKey(vmName string) (string, string, error) {
 	}
 
 	destKey := filepath.Join("/var/lib/eos/ssh_keys", vmName+".key")
-	if err := os.MkdirAll(filepath.Dir(destKey), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(destKey), shared.SecretDirPerm); err != nil {
 		return "", "", fmt.Errorf("failed to create key dir: %w", err)
 	}
 	if err := os.Rename(privTemp, destKey); err != nil {
 		return "", "", fmt.Errorf("failed to move private key: %w", err)
 	}
-	if err := os.Chmod(destKey, 0600); err != nil {
+	if err := os.Chmod(destKey, shared.SecretFilePerm); err != nil {
 		return "", "", fmt.Errorf("chmod failed: %w", err)
 	}
 
@@ -36,7 +37,7 @@ func PrepareTenantSSHKey(vmName string) (string, string, error) {
 
 func GenerateSSHKeyPair(vmName string) (pubPath, privPath string, err error) {
 	keyDir := filepath.Join("/tmp", "ssh_keys")
-	if err := os.MkdirAll(keyDir, 0700); err != nil {
+	if err := os.MkdirAll(keyDir, shared.SecretDirPerm); err != nil {
 		return "", "", fmt.Errorf("mkdir failed: %w", err)
 	}
 
@@ -53,7 +54,7 @@ func GenerateSSHKeyPair(vmName string) (pubPath, privPath string, err error) {
 
 // GenerateEd25519Keys generates ed25519 SSH key pair in specified directory
 func GenerateEd25519Keys(sshDir string) (publicKeyPath, privateKeyPath string, err error) {
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
+	if err := os.MkdirAll(sshDir, shared.SecretDirPerm); err != nil {
 		return "", "", fmt.Errorf("failed to create SSH directory: %w", err)
 	}
 
@@ -98,7 +99,7 @@ func GenerateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 	}
 
 	tempPath := filepath.Join(os.TempDir(), vmName+"-kickstart.ks")
-	if err := os.WriteFile(tempPath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(tempPath, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		return "", err
 	}
 

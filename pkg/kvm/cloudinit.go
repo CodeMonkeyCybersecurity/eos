@@ -5,6 +5,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -68,13 +69,13 @@ users:
     groups: sudo
     shell: /bin/bash
 `, key)
-	if err := os.WriteFile(userDataPath, []byte(userData), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(userData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	// Write meta-data
 	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vm, vm)
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 

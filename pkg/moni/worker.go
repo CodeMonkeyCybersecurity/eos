@@ -1,6 +1,7 @@
 package moni
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -425,13 +426,13 @@ func enableSSLInEnv(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to backup .env: %w", err)
 	}
 
-	if err := os.Chmod(backup, 0600); err != nil {
+	if err := os.Chmod(backup, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to set backup permissions: %w", err)
 	}
 
 	// Update
 	newContent := replace(contentStr, "sslmode=disable", "sslmode=require")
-	if err := os.WriteFile(MoniEnvFile, []byte(newContent), 0600); err != nil {
+	if err := os.WriteFile(MoniEnvFile, []byte(newContent), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env: %w", err)
 	}
 
@@ -672,7 +673,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0600)
+	return os.WriteFile(dst, data, shared.SecretFilePerm)
 }
 
 func min(a, b int) int {

@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"time"
@@ -152,7 +153,7 @@ func SaveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 		zap.String("path", configPath))
 
 	// Ensure directory exists
-	if err := os.MkdirAll("/etc/eos", 0755); err != nil {
+	if err := os.MkdirAll("/etc/eos", shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
@@ -166,7 +167,7 @@ func SaveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0640); err != nil {
+	if err := os.WriteFile(configPath, data, shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
 	}
 

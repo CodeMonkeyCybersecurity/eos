@@ -5,6 +5,7 @@
 package helen
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"fmt"
@@ -269,7 +270,7 @@ func DeployGhost(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	
 	// Write job file
 	jobFile := filepath.Join(config.WorkDir, fmt.Sprintf("helen-ghost-%s.nomad", config.Environment))
-	if err := os.WriteFile(jobFile, jobSpec, 0644); err != nil {
+	if err := os.WriteFile(jobFile, jobSpec, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write job file: %w", err)
 	}
 	

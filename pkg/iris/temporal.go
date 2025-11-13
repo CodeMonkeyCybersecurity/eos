@@ -3,6 +3,7 @@
 package iris
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -290,7 +291,7 @@ Fix Option 2: Add /usr/local/bin to PATH
 	}
 
 	// Write with executable permissions
-	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
+	if err := os.WriteFile(targetPath, sourceData, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write binary to %s: %w", targetPath, err)
 	}
 

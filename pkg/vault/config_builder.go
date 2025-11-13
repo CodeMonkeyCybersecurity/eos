@@ -212,12 +212,12 @@ func (vcb *VaultConfigBuilder) WriteServerConfig() error {
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(vcb.ConfigDir, 0755); err != nil {
+	if err := os.MkdirAll(vcb.ConfigDir, VaultBaseDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
 	// Write new config
-	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte(config), VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 

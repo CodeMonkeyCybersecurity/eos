@@ -3,6 +3,7 @@
 package database_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"compress/gzip"
 	"fmt"
@@ -188,7 +189,7 @@ func (dbm *DatabaseBackupManager) assessDatabaseBackup(rc *eos_io.RuntimeContext
 	}
 
 	// Ensure backup directory exists
-	if err := os.MkdirAll(dbm.config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(dbm.config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -328,7 +329,7 @@ func (dbm *DatabaseBackupManager) createPostgreSQLBackup(rc *eos_io.RuntimeConte
 		return fmt.Errorf("invalid backup path: %w", err)
 	}
 
-	if err := os.WriteFile(result.BackupPath, dataToWrite, 0600); err != nil {
+	if err := os.WriteFile(result.BackupPath, dataToWrite, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -412,7 +413,7 @@ func (dbm *DatabaseBackupManager) createMySQLBackup(rc *eos_io.RuntimeContext, r
 		return fmt.Errorf("invalid backup path: %w", err)
 	}
 
-	if err := os.WriteFile(result.BackupPath, dataToWrite, 0600); err != nil {
+	if err := os.WriteFile(result.BackupPath, dataToWrite, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 

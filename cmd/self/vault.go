@@ -9,6 +9,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault/auth"
@@ -144,6 +145,12 @@ func runSecretsHelp(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 // runSecretsConfiguration performs interactive Vault configuration
 func runSecretsConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	logger.Info("Starting Vault configuration setup")
 
 	reader := bufio.NewReader(os.Stdin)
@@ -246,6 +253,12 @@ func runSecretsConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 // runSecretsSet stores secrets in Vault
 func runSecretsSet(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	secretName := args[0]
 
 	logger.Info("Setting secret in Vault", zap.String("secret", secretName))
@@ -277,6 +290,12 @@ func runSecretsSet(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 // runSecretsTest tests Vault connectivity and authentication
 func runSecretsTest(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	logger.Info("Testing Vault connectivity")
 
 	logger.Info("terminal prompt:  Vault Connectivity Test")
@@ -324,6 +343,12 @@ func runSecretsTest(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 // runSecretsStatus shows Vault connection status and available secrets
 func runSecretsStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	logger.Info("Checking Vault status")
 
 	logger.Info("terminal prompt:  Vault Status")
@@ -411,6 +436,12 @@ func runSecretsStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 // runSecretsGet retrieves and displays secrets from Vault
 func runSecretsGet(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 	secretPath := args[0]
 	showValue, _ := cmd.Flags().GetBool("show-value")
 

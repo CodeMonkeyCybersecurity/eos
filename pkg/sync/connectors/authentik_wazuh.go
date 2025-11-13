@@ -2,6 +2,7 @@
 package connectors
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -257,7 +258,7 @@ func (c *AuthentikWazuhConnector) Backup(rc *eos_io.RuntimeContext, config *sync
 	timestamp := time.Now().Format("20060102-150405")
 	backupDir := filepath.Join("/opt/eos/backups/sync", fmt.Sprintf("authentik-wazuh-%s", timestamp))
 
-	if err := os.MkdirAll(backupDir, 0750); err != nil {
+	if err := os.MkdirAll(backupDir, shared.SecretDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -406,7 +407,7 @@ func (c *AuthentikWazuhConnector) Connect(rc *eos_io.RuntimeContext, config *syn
 
 	// Save metadata to Wazuh
 	metadataPath := "/etc/wazuh-indexer/opensearch-security/authentik-metadata.xml"
-	if err := os.WriteFile(metadataPath, metadata, 0644); err != nil {
+	if err := os.WriteFile(metadataPath, metadata, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write metadata file: %w", err)
 	}
 	logger.Debug("Wrote metadata file",
@@ -420,7 +421,7 @@ func (c *AuthentikWazuhConnector) Connect(rc *eos_io.RuntimeContext, config *syn
 
 	// Save exchange key
 	exchangeKeyPath := "/etc/wazuh-indexer/opensearch-security/exchange.key"
-	if err := os.WriteFile(exchangeKeyPath, []byte(exchangeKey), 0600); err != nil {
+	if err := os.WriteFile(exchangeKeyPath, []byte(exchangeKey), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write exchange key: %w", err)
 	}
 	logger.Debug("Generated exchange key",

@@ -30,7 +30,7 @@ func NewFileConfigRepository(configDir string, logger *zap.Logger) *FileConfigRe
 	}
 
 	// Ensure config directory exists
-	if err := os.MkdirAll(configDir, 0750); err != nil {
+	if err := os.MkdirAll(configDir, VaultDirPerm); err != nil {
 		logger.Error("Failed to create config directory",
 			zap.String("dir", configDir),
 			zap.Error(err))
@@ -155,7 +155,7 @@ func (r *FileConfigRepository) saveToFile() error {
 
 	// Write to temporary file first
 	tempFile := configFile + ".tmp"
-	if err := os.WriteFile(tempFile, data, 0640); err != nil {
+	if err := os.WriteFile(tempFile, data, VaultConfigPerm); err != nil {
 		return fmt.Errorf("failed to write temp config file: %w", err)
 	}
 

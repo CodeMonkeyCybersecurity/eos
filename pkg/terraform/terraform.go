@@ -78,6 +78,7 @@
 package terraform
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -119,7 +120,7 @@ func (m *Manager) Init(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Initializing Terraform", zap.String("dir", m.Config.WorkingDir))
 
-	if err := os.MkdirAll(m.Config.WorkingDir, 0755); err != nil {
+	if err := os.MkdirAll(m.Config.WorkingDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create working directory: %w", err)
 	}
 

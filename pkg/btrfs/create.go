@@ -1,6 +1,7 @@
 package btrfs
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -339,7 +340,7 @@ func mountVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create mount point
-	if err := os.MkdirAll(config.MountPoint, 0755); err != nil {
+	if err := os.MkdirAll(config.MountPoint, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create mount point: %w", err)
 	}
 

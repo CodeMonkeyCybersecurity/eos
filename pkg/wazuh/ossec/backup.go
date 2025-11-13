@@ -3,6 +3,7 @@
 package ossec
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,7 +45,7 @@ func CreateBackup(rc *eos_io.RuntimeContext, sourcePath string, customBackupPath
 		return "", fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, input, 0640); err != nil {
+	if err := os.WriteFile(backupPath, input, shared.SecureConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
@@ -90,7 +91,7 @@ func RestoreBackup(rc *eos_io.RuntimeContext, backupPath, originalPath string) e
 		return fmt.Errorf("failed to read backup file: %w", err)
 	}
 
-	if err := os.WriteFile(originalPath, input, 0640); err != nil {
+	if err := os.WriteFile(originalPath, input, shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write restored file: %w", err)
 	}
 

@@ -2,6 +2,7 @@
 package ceph
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -272,7 +273,7 @@ func WriteCephConf(logger otelzap.LoggerWithCtx, config *CephConfig, path string
 		}
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ceph.conf: %w", err)
 	}
 

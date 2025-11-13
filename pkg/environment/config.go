@@ -4,6 +4,7 @@
 package environment
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -83,7 +84,7 @@ func NewEnvironmentManager(rc *eos_io.RuntimeContext) (*EnvironmentManager, erro
 	}
 
 	configDir := filepath.Join(homeDir, ".eos", "environments")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -116,7 +117,7 @@ func (em *EnvironmentManager) SaveEnvironment(ctx context.Context, env *Deployme
 		return fmt.Errorf("failed to marshal environment config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write environment config: %w", err)
 	}
 
@@ -257,7 +258,7 @@ func (em *EnvironmentManager) SetCurrentEnvironment(ctx context.Context, envName
 
 	// Also write to local marker file
 	markerPath := filepath.Join(em.configDir, ".current")
-	if err := os.WriteFile(markerPath, []byte(envName), 0644); err != nil {
+	if err := os.WriteFile(markerPath, []byte(envName), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to write local environment marker",
 			zap.Error(err))
 	}

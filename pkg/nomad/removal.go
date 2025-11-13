@@ -1,6 +1,7 @@
 package nomad
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -477,7 +478,7 @@ func (nu *NomadUninstaller) CleanEnvironmentVariables() error {
 			}
 		}
 		if len(filtered) != len(lines) {
-			_ = os.WriteFile("/etc/environment", []byte(strings.Join(filtered, "\n")), 0644)
+			_ = os.WriteFile("/etc/environment", []byte(strings.Join(filtered, "\n")), shared.ConfigFilePerm)
 		}
 	}
 

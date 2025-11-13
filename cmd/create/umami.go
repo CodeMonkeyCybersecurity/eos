@@ -102,7 +102,7 @@ var CreateUmamiCmd = &cobra.Command{
 		logger.Info("Replaced 'changeme' with a generated password")
 
 		// Write the processed Docker Compose file to the destination directory
-		if err := os.WriteFile(destComposeFile, []byte(newData), 0644); err != nil {
+		if err := os.WriteFile(destComposeFile, []byte(newData), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write processed Docker Compose file: %w", err)
 		}
 		logger.Info("Docker Compose file processed and copied successfully")

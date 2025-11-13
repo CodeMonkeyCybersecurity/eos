@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -120,7 +121,7 @@ func CheckDatabases(rc *eos_io.RuntimeContext) error {
 	}
 
 	// EVALUATE - Write results
-	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
+	if err := os.WriteFile(outputFile, []byte(output.String()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write database diagnostics: %w", err)
 	}
 

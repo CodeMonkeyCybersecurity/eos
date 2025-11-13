@@ -4,6 +4,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -129,7 +130,7 @@ hera.%s {
 `, domain)
 
 	caddyfilePath := filepath.Join(BaseDir, "Caddyfile")
-	if err := eos_unix.WriteFile(rc.Ctx, caddyfilePath, []byte(caddyContent), 0644, ""); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, caddyfilePath, []byte(caddyContent), shared.ConfigFilePerm, ""); err != nil {
 		return fmt.Errorf("failed to write Caddyfile: %w", err)
 	}
 
@@ -214,7 +215,7 @@ func AppendRouteToMainCaddyfile(rc *eos_io.RuntimeContext, route *Route) error {
 	updatedContent := string(existingContent) + "\n" + routeBlock
 
 	// Write updated Caddyfile
-	if err := eos_unix.WriteFile(rc.Ctx, caddyfilePath, []byte(updatedContent), 0644, ""); err != nil {
+	if err := eos_unix.WriteFile(rc.Ctx, caddyfilePath, []byte(updatedContent), shared.ConfigFilePerm, ""); err != nil {
 		return fmt.Errorf("failed to write updated Caddyfile: %w", err)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hashicorp"
@@ -293,7 +294,7 @@ func (f *FileManager) BackupFile(path string) error {
 		return fmt.Errorf("failed to read %s for backup: %w", path, err)
 	}
 
-	if err := os.WriteFile(backupPath, input, 0644); err != nil {
+	if err := os.WriteFile(backupPath, input, consul.ConsulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write backup %s: %w", backupPath, err)
 	}
 

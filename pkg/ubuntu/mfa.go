@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -165,7 +166,7 @@ func configurePAMSudo(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write new sudo PAM configuration with MFA
-	if err := os.WriteFile(originalPath, []byte(pamSudoMFAConfig), 0644); err != nil {
+	if err := os.WriteFile(originalPath, []byte(pamSudoMFAConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write sudo PAM config: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func configurePAMSu(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write new su PAM configuration with MFA
-	if err := os.WriteFile(originalPath, []byte(pamSuMFAConfig), 0644); err != nil {
+	if err := os.WriteFile(originalPath, []byte(pamSuMFAConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 
@@ -200,7 +201,7 @@ func createMFASetupScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/setup-mfa"
-	if err := os.WriteFile(scriptPath, []byte(mfaSetupScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaSetupScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA setup script: %w", err)
 	}
 
@@ -254,7 +255,7 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/disable-mfa-emergency"
-	if err := os.WriteFile(scriptPath, []byte(mfaBackupScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(mfaBackupScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write MFA backup script: %w", err)
 	}
 

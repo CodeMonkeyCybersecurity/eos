@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -146,7 +147,7 @@ func (a *AtomicMFAConfig) BeginTransaction() error {
 	a.logger.Info(" Beginning atomic MFA configuration transaction")
 
 	// Create backup directory
-	if err := os.MkdirAll(a.backupDir, 0700); err != nil {
+	if err := os.MkdirAll(a.backupDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("create backup directory: %w", err)
 	}
 
@@ -167,7 +168,7 @@ func (a *AtomicMFAConfig) backupCurrentConfigs() error {
 
 		// Read current config
 		if content, err := os.ReadFile(path); err == nil {
-			if err := os.WriteFile(backupPath, content, 0644); err != nil {
+			if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 				return fmt.Errorf("backup %s: %w", name, err)
 			}
 			a.logger.Info(" Backed up PAM config",
@@ -242,7 +243,7 @@ func (a *AtomicMFAConfig) writeNewConfigs() error {
 		}
 
 		tempPath := filepath.Join(a.backupDir, name+".new")
-		if err := os.WriteFile(tempPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(tempPath, []byte(content), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("write temp config for %s: %w", name, err)
 		}
 
@@ -294,7 +295,7 @@ echo " All PAM configurations validated successfully"
 `
 
 	testPath := filepath.Join(a.backupDir, "test-pam.sh")
-	if err := os.WriteFile(testPath, []byte(testScript), 0755); err != nil {
+	if err := os.WriteFile(testPath, []byte(testScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("create test script: %w", err)
 	}
 

@@ -108,7 +108,7 @@ func assessAuditPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger.Debug("Checking audit directory", zap.String("path", auditDir))
 	if _, err := os.Stat(auditDir); os.IsNotExist(err) {
 		logger.Info("Creating audit log directory", zap.String("path", auditDir))
-		if err := os.MkdirAll(auditDir, 0750); err != nil {
+		if err := os.MkdirAll(auditDir, VaultDirPerm); err != nil {
 			return fmt.Errorf("failed to create audit directory: %w", err)
 		}
 
@@ -120,7 +120,7 @@ func assessAuditPrerequisites(rc *eos_io.RuntimeContext) error {
 
 	// Verify directory is writable
 	testFile := filepath.Join(auditDir, ".eos-audit-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0640); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), VaultConfigPerm); err != nil {
 		return fmt.Errorf("audit directory is not writable: %w\nPath: %s", err, auditDir)
 	}
 	_ = os.Remove(testFile)

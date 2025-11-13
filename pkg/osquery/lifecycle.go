@@ -3,6 +3,7 @@
 package osquery
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -84,7 +85,7 @@ func installDebianUbuntu(rc *eos_io.RuntimeContext, arch string) error {
 	logger.Info(" Adding osquery APT repository")
 	repoLine := fmt.Sprintf("deb [arch=%s signed-by=%s] https://pkg.osquery.io/deb deb main", arch, keyringPath)
 	repoPath := "/etc/apt/sources.list.d/osquery.list"
-	if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+	if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write repository file",
 			zap.Error(err),
 			zap.String("repo_path", repoPath))
@@ -143,7 +144,7 @@ gpgcheck=1
 gpgkey=https://pkg.osquery.io/rpm/pubkey.gpg
 `
 	repoPath := "/etc/yum.repos.d/osquery.repo"
-	if err := os.WriteFile(repoPath, []byte(repoContent), 0644); err != nil {
+	if err := os.WriteFile(repoPath, []byte(repoContent), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write repository file",
 			zap.Error(err),
 			zap.String("repo_path", repoPath))
@@ -177,7 +178,7 @@ func configureLinuxService(rc *eos_io.RuntimeContext) error {
 	configDir := filepath.Dir(paths.ConfigPath)
 	logger.Info(" Creating configuration directory",
 		zap.String("path", configDir))
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		logger.Error(" Failed to create config directory",
 			zap.Error(err),
 			zap.String("path", configDir))
@@ -187,7 +188,7 @@ func configureLinuxService(rc *eos_io.RuntimeContext) error {
 	// Write configuration
 	logger.Info(" Writing osquery configuration",
 		zap.String("path", paths.ConfigPath))
-	if err := os.WriteFile(paths.ConfigPath, []byte(defaultOsqueryConfig), 0644); err != nil {
+	if err := os.WriteFile(paths.ConfigPath, []byte(defaultOsqueryConfig), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write configuration",
 			zap.Error(err),
 			zap.String("path", paths.ConfigPath))

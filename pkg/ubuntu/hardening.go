@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -70,14 +71,14 @@ func applySystemHardening(rc *eos_io.RuntimeContext) error {
 
 	// Disable unused network protocols
 	blacklistPath := "/etc/modprobe.d/blacklist-rare-network.conf"
-	if err := os.WriteFile(blacklistPath, []byte(blacklistNetworkProtocols), 0644); err != nil {
+	if err := os.WriteFile(blacklistPath, []byte(blacklistNetworkProtocols), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write network blacklist: %w", err)
 	}
 	logger.Info("Disabled rare network protocols", zap.String("path", blacklistPath))
 
 	// Set kernel parameters for security
 	sysctlPath := "/etc/sysctl.d/99-security.conf"
-	if err := os.WriteFile(sysctlPath, []byte(sysctlSecurityConfig), 0644); err != nil {
+	if err := os.WriteFile(sysctlPath, []byte(sysctlSecurityConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write sysctl config: %w", err)
 	}
 	logger.Info("Security kernel parameters configured", zap.String("path", sysctlPath))
@@ -173,7 +174,7 @@ func createSecurityReportScript(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	scriptPath := "/usr/local/bin/security-report"
-	if err := os.WriteFile(scriptPath, []byte(securityReportScript), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(securityReportScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write security report script: %w", err)
 	}
 

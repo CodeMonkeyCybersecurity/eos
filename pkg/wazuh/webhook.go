@@ -3,6 +3,7 @@
 package wazuh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ func DeployWazuhWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targe
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		logger.Info("Creating target directory", zap.String("dir", targetDir))
 		if !dryRun {
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
+			if err := os.MkdirAll(targetDir, shared.ServiceDirPerm); err != nil {
 				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
 			}
 		}

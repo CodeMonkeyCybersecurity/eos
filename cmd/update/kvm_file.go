@@ -5,6 +5,7 @@
 package update
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"log"
 	"os"
@@ -30,7 +31,7 @@ Both VMs must be shut off for virt-copy to work.`,
 		timestamp := time.Now().Format("20060102_150405")
 		filename := filepath.Base(kvm.SourcePath)
 		tempDir := "/var/lib/eos/transfer"
-		if err := os.MkdirAll(tempDir, 0700); err != nil {
+		if err := os.MkdirAll(tempDir, shared.SecretDirPerm); err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
 		}
 

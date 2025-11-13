@@ -4,6 +4,7 @@
 package debug
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -209,7 +210,7 @@ func runBionicGPTDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 			zap.String("file", bionicgptDebugOutput),
 			zap.Int("size_bytes", len(output)))
 
-		if err := os.WriteFile(bionicgptDebugOutput, []byte(output), 0644); err != nil {
+		if err := os.WriteFile(bionicgptDebugOutput, []byte(output), shared.ConfigFilePerm); err != nil {
 			logger.Error("Failed to write output file",
 				zap.String("file", bionicgptDebugOutput),
 				zap.Error(err))

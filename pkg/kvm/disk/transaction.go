@@ -1,6 +1,7 @@
 package disk
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ type TransactionLog struct {
 // NewTransactionLog creates a new transaction log
 func NewTransactionLog() *TransactionLog {
 	logDir := "/var/log/eos/kvm-disk-transactions"
-	_ = os.MkdirAll(logDir, 0755)
+	_ = os.MkdirAll(logDir, shared.ServiceDirPerm)
 
 	return &TransactionLog{
 		logDir:       logDir,
@@ -60,7 +61,7 @@ func (tl *TransactionLog) Save(tx *Transaction) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, shared.ConfigFilePerm)
 }
 
 // GetLatest retrieves the most recent transaction for a VM

@@ -4,6 +4,7 @@
 package remotedebug
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -66,7 +67,7 @@ func NewEvidenceRepository() (*EvidenceRepository, error) {
 	}
 
 	baseDir := filepath.Join(homeDir, ".eos", "evidence")
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create evidence directory: %w", err)
 	}
 
@@ -83,7 +84,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 		session.StartTime.Format("20060102-150405"),
 		sanitizeFilename(session.Host)))
 
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+	if err := os.MkdirAll(sessionDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create session directory: %w", err)
 	}
 
@@ -103,7 +104,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(manifestPath, manifestData, 0644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -113,7 +114,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal evidence: %w", err)
 	}
-	if err := os.WriteFile(evidencePath, evidenceData, 0644); err != nil {
+	if err := os.WriteFile(evidencePath, evidenceData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write evidence: %w", err)
 	}
 
@@ -123,7 +124,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal issues: %w", err)
 	}
-	if err := os.WriteFile(issuesPath, issuesData, 0644); err != nil {
+	if err := os.WriteFile(issuesPath, issuesData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write issues: %w", err)
 	}
 
@@ -133,7 +134,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal warnings: %w", err)
 	}
-	if err := os.WriteFile(warningsPath, warningsData, 0644); err != nil {
+	if err := os.WriteFile(warningsPath, warningsData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write warnings: %w", err)
 	}
 
@@ -143,7 +144,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal report: %w", err)
 	}
-	if err := os.WriteFile(reportPath, reportData, 0644); err != nil {
+	if err := os.WriteFile(reportPath, reportData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write report: %w", err)
 	}
 
@@ -182,7 +183,7 @@ Evidence Location: %s
 		len(session.Warnings),
 		sessionDir,
 	)
-	if err := os.WriteFile(summaryPath, []byte(summary), 0644); err != nil {
+	if err := os.WriteFile(summaryPath, []byte(summary), shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write summary: %w", err)
 	}
 

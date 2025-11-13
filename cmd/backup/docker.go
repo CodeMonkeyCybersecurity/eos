@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -39,6 +40,12 @@ Examples:
 
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 		logger.Info("Starting comprehensive Docker backup")
 
 		// Parse command flags
@@ -86,6 +93,12 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 		backupPath := args[0]
 
 		logger.Info("Starting Docker environment restore",

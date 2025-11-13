@@ -225,7 +225,7 @@ locals {
 	}
 
 	dataSourcesFile := filepath.Join(m.Config.WorkingDir, "consul_discovery.tf")
-	if err := os.WriteFile(dataSourcesFile, []byte(dataSourcesHCL.String()), 0644); err != nil {
+	if err := os.WriteFile(dataSourcesFile, []byte(dataSourcesHCL.String()), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write consul service discovery: %w", err)
 	}
 
@@ -315,7 +315,7 @@ variable "consul_token" {
 `, config.ConsulAddr, config.Datacenter)
 
 	providerFile := filepath.Join(m.Config.WorkingDir, "consul_provider.tf")
-	if err := os.WriteFile(providerFile, []byte(providerHCL), 0644); err != nil {
+	if err := os.WriteFile(providerFile, []byte(providerHCL), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write consul provider configuration: %w", err)
 	}
 

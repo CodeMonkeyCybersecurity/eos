@@ -2,6 +2,7 @@
 package temporal
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -138,16 +139,16 @@ func installTemporalCLI(ctx context.Context, config *TemporalConfig) error {
 func createConfiguration(ctx context.Context, config *TemporalConfig) error {
 	logger := otelzap.Ctx(ctx)
 
-	_ = os.MkdirAll(config.InstallDir, 0755)
+	_ = os.MkdirAll(config.InstallDir, shared.ServiceDirPerm)
 	configDir := filepath.Join(config.InstallDir, "config")
-	_ = os.MkdirAll(configDir, 0755)
-	_ = os.MkdirAll(config.DataDir, 0755)
+	_ = os.MkdirAll(configDir, shared.ServiceDirPerm)
+	_ = os.MkdirAll(config.DataDir, shared.ServiceDirPerm)
 
 	configYAML := generateConfigYAML(config)
-	_ = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configYAML), shared.ConfigFilePerm)
 
 	dynamicYAML := generateDynamicConfigYAML(config)
-	_ = os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "dynamic_config.yaml"), []byte(dynamicYAML), shared.ConfigFilePerm)
 
 	logger.Info("Configuration files created")
 	return nil
@@ -215,7 +216,7 @@ SyslogIdentifier=temporal-iris
 WantedBy=multi-user.target
 `, config.InstallDir, config.InstallDir, config.UIPort)
 
-	_ = os.WriteFile("/etc/systemd/system/temporal-iris.service", []byte(serviceContent), 0644)
+	_ = os.WriteFile("/etc/systemd/system/temporal-iris.service", []byte(serviceContent), shared.ConfigFilePerm)
 	_ = exec.CommandContext(ctx, "systemctl", "daemon-reload").Run()
 
 	logger.Info("Systemd service created")
@@ -238,7 +239,7 @@ DATABASE_URL=postgresql://temporal:%s@localhost:5432/temporal
 		config.Host, config.Port, config.Host, config.UIPort, config.PostgreSQLPassword)
 
 	credPath := filepath.Join(config.InstallDir, ".credentials")
-	_ = os.WriteFile(credPath, []byte(credContent), 0600)
+	_ = os.WriteFile(credPath, []byte(credContent), shared.SecretFilePerm)
 
 	logger.Info("Credentials saved", zap.String("path", credPath))
 	return nil

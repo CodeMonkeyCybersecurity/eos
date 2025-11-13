@@ -66,7 +66,7 @@ func (e *Executor) InitWorkspace(rc *eos_io.RuntimeContext, component, environme
 	workspace := e.getWorkspace(component, environment)
 
 	// Create workspace directory
-	if err := os.MkdirAll(workspace.Path, 0755); err != nil {
+	if err := os.MkdirAll(workspace.Path, shared.ServiceDirPerm); err != nil {
 		if os.IsPermission(err) {
 			return eos_err.NewUserError("insufficient permissions to create workspace directory")
 		}
@@ -77,7 +77,7 @@ func (e *Executor) InitWorkspace(rc *eos_io.RuntimeContext, component, environme
 	if backendConfig != nil {
 		backendTF := e.generateBackendConfig(rc, backendConfig)
 		backendPath := filepath.Join(workspace.Path, "backend.tf")
-		if err := os.WriteFile(backendPath, []byte(backendTF), 0644); err != nil {
+		if err := os.WriteFile(backendPath, []byte(backendTF), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write backend configuration: %w", err)
 		}
 	}
@@ -147,7 +147,7 @@ func (e *Executor) Plan(rc *eos_io.RuntimeContext, component, environment string
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tfvars: %w", err)
 	}
-	if err := os.WriteFile(tfvarsPath, tfvarsData, 0644); err != nil {
+	if err := os.WriteFile(tfvarsPath, tfvarsData, shared.ConfigFilePerm); err != nil {
 		return nil, fmt.Errorf("failed to write tfvars: %w", err)
 	}
 
@@ -769,7 +769,7 @@ func (e *Executor) createStateSnapshot(_ *eos_io.RuntimeContext, component, envi
 	snapshotPath := filepath.Join(workspace.Path, fmt.Sprintf(".snapshots/%s.tfstate", snapshotID))
 
 	// Create snapshot directory
-	if err := os.MkdirAll(filepath.Dir(snapshotPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(snapshotPath), shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create snapshot directory: %w", err)
 	}
 
@@ -779,7 +779,7 @@ func (e *Executor) createStateSnapshot(_ *eos_io.RuntimeContext, component, envi
 		return "", fmt.Errorf("failed to read state file: %w", err)
 	}
 
-	if err := os.WriteFile(snapshotPath, data, 0644); err != nil {
+	if err := os.WriteFile(snapshotPath, data, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write snapshot: %w", err)
 	}
 
@@ -814,7 +814,7 @@ func (e *Executor) rollbackToSnapshot(rc *eos_io.RuntimeContext, component, envi
 		}
 	}
 
-	if err := os.WriteFile(stateFile, data, 0644); err != nil {
+	if err := os.WriteFile(stateFile, data, shared.ConfigFilePerm); err != nil {
 		return &RollbackResult{
 			Success: false,
 			Error:   fmt.Sprintf("failed to restore state: %v", err),

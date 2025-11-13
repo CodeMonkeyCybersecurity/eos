@@ -382,7 +382,7 @@ func (ca *InternalCA) storeToFilesystem() error {
 
 	// Create CA directory
 	caDir := filepath.Dir(ca.config.CACertPath)
-	if err := os.MkdirAll(caDir, 0755); err != nil {
+	if err := os.MkdirAll(caDir, VaultBaseDirPerm); err != nil {
 		return fmt.Errorf("failed to create CA directory: %w", err)
 	}
 
@@ -396,7 +396,7 @@ func (ca *InternalCA) storeToFilesystem() error {
 	// SECURITY NOTE: Direct os.WriteFile used here due to CA struct not having RuntimeContext
 	// Lower risk than AppRole credentials since CA operations are less frequent and typically
 	// happen during initial setup, not during runtime operations
-	if err := os.WriteFile(ca.config.CACertPath, certPEM, 0644); err != nil {
+	if err := os.WriteFile(ca.config.CACertPath, certPEM, VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write CA certificate: %w", err)
 	}
 
@@ -409,7 +409,7 @@ func (ca *InternalCA) storeToFilesystem() error {
 	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
 	// SECURITY NOTE: Private key write - higher risk, but CA operations are infrequent
 	// Recommendation: Add `rc *eos_io.RuntimeContext` field to InternalCA struct
-	if err := os.WriteFile(ca.config.CAKeyPath, keyPEM, 0600); err != nil {
+	if err := os.WriteFile(ca.config.CAKeyPath, keyPEM, VaultSecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write CA private key: %w", err)
 	}
 
@@ -631,7 +631,7 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 
 	// INTERVENE - Write server certificate to file
 	certDir := filepath.Dir(config.CertPath)
-	if err := os.MkdirAll(certDir, 0755); err != nil {
+	if err := os.MkdirAll(certDir, VaultBaseDirPerm); err != nil {
 		return fmt.Errorf("failed to create certificate directory: %w", err)
 	}
 
@@ -642,7 +642,7 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 
 	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
 	// SECURITY NOTE: Direct os.WriteFile used here due to CA struct not having RuntimeContext
-	if err := os.WriteFile(config.CertPath, certPEM, 0644); err != nil {
+	if err := os.WriteFile(config.CertPath, certPEM, VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write server certificate: %w", err)
 	}
 
@@ -654,7 +654,7 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 
 	// TODO (Phase 2): Migrate to SecureWriteCredential once InternalCA stores RuntimeContext
 	// SECURITY NOTE: Private key write - should be secured but CA struct lacks RuntimeContext
-	if err := os.WriteFile(config.KeyPath, keyPEM, 0600); err != nil {
+	if err := os.WriteFile(config.KeyPath, keyPEM, VaultSecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write server private key: %w", err)
 	}
 
@@ -665,7 +665,7 @@ func (ca *InternalCA) IssueServerCertificate(config *CertificateConfig) error {
 			Bytes: ca.caCert.Raw,
 		})
 
-		if err := os.WriteFile(config.CAPath, caPEM, 0644); err != nil {
+		if err := os.WriteFile(config.CAPath, caPEM, VaultTLSCertPerm); err != nil {
 			return fmt.Errorf("failed to write CA certificate: %w", err)
 		}
 
@@ -756,11 +756,11 @@ func (ca *InternalCA) DistributeCAToClients() error {
 
 	// Store in system CA bundle directory
 	systemCAPath := "/usr/local/share/ca-certificates/code-monkey-internal-ca.crt"
-	if err := os.MkdirAll(filepath.Dir(systemCAPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(systemCAPath), VaultBaseDirPerm); err != nil {
 		return fmt.Errorf("failed to create CA directory: %w", err)
 	}
 
-	if err := os.WriteFile(systemCAPath, caPEM, 0644); err != nil {
+	if err := os.WriteFile(systemCAPath, caPEM, VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write CA to system trust store: %w", err)
 	}
 

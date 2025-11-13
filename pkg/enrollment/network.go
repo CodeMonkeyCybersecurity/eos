@@ -365,7 +365,7 @@ func ConfigureHostname(rc *eos_io.RuntimeContext, hostname string) error {
 	}
 
 	// Fallback to /etc/hostname
-	if err := os.WriteFile("/etc/hostname", []byte(hostname+"\n"), 0644); err != nil {
+	if err := os.WriteFile("/etc/hostname", []byte(hostname+"\n"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write /etc/hostname: %w", err)
 	}
 
@@ -403,7 +403,7 @@ func updateHostsFile(hostname string) error {
 
 	// Write back to file
 	newContent := strings.Join(lines, "\n")
-	if err := os.WriteFile(hostsPath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(hostsPath, []byte(newContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write %s: %w", hostsPath, err)
 	}
 

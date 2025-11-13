@@ -29,6 +29,7 @@
 package wazuh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -203,7 +204,7 @@ func (m *VersionManager) getCachedVersion(rc *eos_io.RuntimeContext, key string)
 
 func (m *VersionManager) cacheVersion(rc *eos_io.RuntimeContext, key string, version *VersionInfo) error {
 	// Create cache directory if it doesn't exist
-	if err := os.MkdirAll(m.cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(m.cacheDir, shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -215,7 +216,7 @@ func (m *VersionManager) cacheVersion(rc *eos_io.RuntimeContext, key string, ver
 	}
 
 	cacheFile := filepath.Join(m.cacheDir, key+".json")
-	return os.WriteFile(cacheFile, data, 0644)
+	return os.WriteFile(cacheFile, data, shared.ConfigFilePerm)
 }
 
 func (m *VersionManager) fetchVersionsFromGitHub(ctx context.Context) ([]*VersionInfo, error) {

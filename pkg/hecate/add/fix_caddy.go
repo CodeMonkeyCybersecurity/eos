@@ -19,6 +19,7 @@
 package add
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -235,14 +236,14 @@ func (f *CaddyFixer) fixCaddyfileAdmin(rc *eos_io.RuntimeContext) error {
 
 	// Backup existing Caddyfile
 	backupPath := caddyfilePath + ".backup"
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to create Caddyfile backup", zap.Error(err))
 	} else {
 		logger.Debug("Created Caddyfile backup", zap.String("path", backupPath))
 	}
 
 	// Write updated Caddyfile
-	if err := os.WriteFile(caddyfilePath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(caddyfilePath, []byte(newContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Caddyfile: %w", err)
 	}
 
@@ -291,14 +292,14 @@ func (f *CaddyFixer) fixDockerComposeNetwork(rc *eos_io.RuntimeContext) error {
 
 	// Backup existing docker-compose.yml
 	backupPath := composeFilePath + ".backup"
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to create docker-compose.yml backup", zap.Error(err))
 	} else {
 		logger.Debug("Created docker-compose.yml backup", zap.String("path", backupPath))
 	}
 
 	// Write updated docker-compose.yml
-	if err := os.WriteFile(composeFilePath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(composeFilePath, []byte(newContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 

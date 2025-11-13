@@ -1,6 +1,7 @@
 package clusterfuzz
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -119,7 +120,7 @@ func initializeStorage(rc *eos_io.RuntimeContext, config *Config) error {
 	case "local":
 		logger.Info("Initializing local storage...")
 		localPath := filepath.Join(config.ConfigDir, "storage")
-		if err := os.MkdirAll(localPath, 0755); err != nil {
+		if err := os.MkdirAll(localPath, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create local storage directory: %w", err)
 		}
 		

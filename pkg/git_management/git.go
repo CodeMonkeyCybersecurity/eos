@@ -2,6 +2,7 @@
 package git_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -267,7 +268,7 @@ func InitRepository(rc *eos_io.RuntimeContext, options *GitInitOptions) error {
 	logger.Info("Initializing Git repository", zap.String("path", options.Path))
 
 	// Ensure directory exists
-	if err := os.MkdirAll(options.Path, 0755); err != nil {
+	if err := os.MkdirAll(options.Path, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 

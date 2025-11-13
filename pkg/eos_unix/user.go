@@ -285,7 +285,7 @@ func createSSHKey(rc *eos_io.RuntimeContext, username, keyPath string) error {
 
 	// Create .ssh directory
 	sshDir := filepath.Dir(keyPath)
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
+	if err := os.MkdirAll(sshDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to create .ssh directory: %w", err)
 	}
 
@@ -427,7 +427,7 @@ func SavePasswordToSecrets(ctx context.Context, username, password string) error
 		zap.String("username", username))
 
 	// Create directory if it doesn't exist
-	if err := os.MkdirAll(shared.SecretsDir, 0700); err != nil {
+	if err := os.MkdirAll(shared.SecretsDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to create secrets directory: %w", err)
 	}
 
@@ -441,7 +441,7 @@ func SavePasswordToSecrets(ctx context.Context, username, password string) error
 		return fmt.Errorf("failed to marshal credentials: %w", err)
 	}
 
-	if err := os.WriteFile(secretsPath, data, 0600); err != nil {
+	if err := os.WriteFile(secretsPath, data, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write secrets file: %w", err)
 	}
 

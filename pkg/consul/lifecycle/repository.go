@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -81,7 +82,7 @@ func (ri *RepositoryInstaller) addRepository() error {
 	repoLine := fmt.Sprintf("deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com %s main",
 		codename)
 
-	if err := os.WriteFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), 0644); err != nil {
+	if err := os.WriteFile("/etc/apt/sources.list.d/hashicorp.list", []byte(repoLine), consul.ConsulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write repository file: %w", err)
 	}
 

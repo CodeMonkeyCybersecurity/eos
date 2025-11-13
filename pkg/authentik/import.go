@@ -2,6 +2,7 @@
 package authentik
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -370,7 +371,7 @@ func runCompare(cmd *cobra.Command, args []string) error {
 	// Output results
 	if output != "" {
 		data, _ := json.MarshalIndent(comparison, "", "  ")
-		if err := os.WriteFile(output, data, 0644); err != nil {
+		if err := os.WriteFile(output, data, shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write output: %w", err)
 		}
 		fmt.Printf("\n Comparison saved to: %s\n", output)

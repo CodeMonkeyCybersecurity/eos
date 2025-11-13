@@ -39,7 +39,7 @@ func ExportToJSON(rc *eos_io.RuntimeContext, info *VaultInitInfo, options *ReadI
 	// Handle output destination
 	if options.OutputPath != "" {
 		// Write to file
-		if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
+		if err := os.WriteFile(options.OutputPath, data, VaultSecretFilePerm); err != nil {
 			logger.Error(" Failed to write JSON file",
 				zap.String("path", options.OutputPath),
 				zap.Error(err))
@@ -77,7 +77,7 @@ func ExportToSecureFile(rc *eos_io.RuntimeContext, info *VaultInitInfo, options 
 
 	// Create secure directory
 	dir := filepath.Dir(options.OutputPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, VaultDataDirPerm); err != nil {
 		logger.Error(" Failed to create output directory",
 			zap.String("directory", dir),
 			zap.Error(err))
@@ -92,7 +92,7 @@ func ExportToSecureFile(rc *eos_io.RuntimeContext, info *VaultInitInfo, options 
 	}
 
 	// Write with secure permissions
-	if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
+	if err := os.WriteFile(options.OutputPath, data, VaultSecretFilePerm); err != nil {
 		logger.Error(" Failed to write secure file",
 			zap.String("path", options.OutputPath),
 			zap.Error(err))

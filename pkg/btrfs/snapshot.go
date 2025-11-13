@@ -1,6 +1,7 @@
 package btrfs
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +41,7 @@ func CreateSnapshot(rc *eos_io.RuntimeContext, config *SnapshotConfig) error {
 
 	// Ensure parent directory exists
 	parentDir := filepath.Dir(config.SnapshotPath)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 

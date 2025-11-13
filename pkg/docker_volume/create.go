@@ -110,7 +110,7 @@ func CreateBindMount(rc *eos_io.RuntimeContext, mount *BindMount) error {
 		if os.IsNotExist(err) {
 			// Create source directory if it doesn't exist
 			logger.Debug("Creating source directory")
-			if err := os.MkdirAll(mount.Source, 0755); err != nil {
+			if err := os.MkdirAll(mount.Source, shared.ServiceDirPerm); err != nil {
 				return fmt.Errorf("failed to create source directory: %w", err)
 			}
 		} else {
@@ -134,7 +134,7 @@ func CreateBindMount(rc *eos_io.RuntimeContext, mount *BindMount) error {
 	// Set appropriate permissions if needed
 	if sourceInfo != nil && sourceInfo.IsDir() {
 		// Ensure directory has appropriate permissions
-		if err := os.Chmod(mount.Source, 0755); err != nil {
+		if err := os.Chmod(mount.Source, shared.ExecutablePerm); err != nil {
 			logger.Warn("Failed to set directory permissions",
 				zap.Error(err))
 		}
@@ -143,7 +143,7 @@ func CreateBindMount(rc *eos_io.RuntimeContext, mount *BindMount) error {
 	// Create a marker file to indicate this is a Docker bind mount
 	markerPath := filepath.Join(mount.Source, ".docker-bind-mount")
 	markerContent := fmt.Sprintf("target=%s\n", mount.Target)
-	if err := shared.SafeWriteFile(markerPath, []byte(markerContent), 0644); err != nil {
+	if err := shared.SafeWriteFile(markerPath, []byte(markerContent), shared.ConfigFilePerm); err != nil {
 		logger.Debug("Failed to create marker file",
 			zap.Error(err))
 	}
