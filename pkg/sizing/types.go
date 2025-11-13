@@ -8,25 +8,25 @@ import (
 type ServiceType string
 
 const (
-	ServiceTypeWebServer      ServiceType = "web_server"
-	ServiceTypeDatabase       ServiceType = "database"
-	ServiceTypeCache          ServiceType = "cache"
-	ServiceTypeQueue          ServiceType = "queue"
-	ServiceTypeWorker         ServiceType = "worker"
-	ServiceTypeProxy          ServiceType = "proxy"
-	ServiceTypeMonitoring     ServiceType = "monitoring"
-	ServiceTypeLogging        ServiceType = "logging"
-	ServiceTypeStorage        ServiceType = "storage"
-	ServiceTypeContainer      ServiceType = "container"
-	ServiceTypeOrchestrator   ServiceType = "orchestrator"
-	ServiceTypeVault          ServiceType = "vault"
+	ServiceTypeWebServer    ServiceType = "web_server"
+	ServiceTypeDatabase     ServiceType = "database"
+	ServiceTypeCache        ServiceType = "cache"
+	ServiceTypeQueue        ServiceType = "queue"
+	ServiceTypeWorker       ServiceType = "worker"
+	ServiceTypeProxy        ServiceType = "proxy"
+	ServiceTypeMonitoring   ServiceType = "monitoring"
+	ServiceTypeLogging      ServiceType = "logging"
+	ServiceTypeStorage      ServiceType = "storage"
+	ServiceTypeContainer    ServiceType = "container"
+	ServiceTypeOrchestrator ServiceType = "orchestrator"
+	ServiceTypeVault        ServiceType = "vault"
 )
 
 // ResourceRequirements defines the resource needs for a service
 type ResourceRequirements struct {
-	CPU    CPURequirements    `json:"cpu"`
-	Memory MemoryRequirements `json:"memory"`
-	Disk   DiskRequirements   `json:"disk"`
+	CPU     CPURequirements     `json:"cpu"`
+	Memory  MemoryRequirements  `json:"memory"`
+	Disk    DiskRequirements    `json:"disk"`
 	Network NetworkRequirements `json:"network,omitempty"`
 }
 
@@ -39,9 +39,9 @@ type CPURequirements struct {
 
 // MemoryRequirements defines memory needs
 type MemoryRequirements struct {
-	GB         float64 `json:"gb"`
-	Type       string  `json:"type,omitempty"` // "standard", "high-performance"
-	SwapRatio  float64 `json:"swap_ratio,omitempty"`
+	GB        float64 `json:"gb"`
+	Type      string  `json:"type,omitempty"` // "standard", "high-performance"
+	SwapRatio float64 `json:"swap_ratio,omitempty"`
 }
 
 // DiskRequirements defines storage needs
@@ -61,17 +61,17 @@ type NetworkRequirements struct {
 
 // ServiceDefinition contains the sizing parameters for a service
 type ServiceDefinition struct {
-	Name                 string               `json:"name"`
-	Type                 ServiceType          `json:"type"`
-	BaseRequirements     ResourceRequirements `json:"base_requirements"`
-	ScalingFactor        float64              `json:"scaling_factor"`
-	LoadFactor           float64              `json:"load_factor"`
-	RedundancyFactor     int                  `json:"redundancy_factor"`
-	Description          string               `json:"description"`
-	Dependencies         []string             `json:"dependencies,omitempty"`
-	Ports                []int                `json:"ports,omitempty"`
-	HealthCheckInterval  time.Duration        `json:"health_check_interval,omitempty"`
-	MaxInstancesPerNode  int                  `json:"max_instances_per_node,omitempty"`
+	Name                string               `json:"name"`
+	Type                ServiceType          `json:"type"`
+	BaseRequirements    ResourceRequirements `json:"base_requirements"`
+	ScalingFactor       float64              `json:"scaling_factor"`
+	LoadFactor          float64              `json:"load_factor"`
+	RedundancyFactor    int                  `json:"redundancy_factor"`
+	Description         string               `json:"description"`
+	Dependencies        []string             `json:"dependencies,omitempty"`
+	Ports               []int                `json:"ports,omitempty"`
+	HealthCheckInterval time.Duration        `json:"health_check_interval,omitempty"`
+	MaxInstancesPerNode int                  `json:"max_instances_per_node,omitempty"`
 }
 
 // WorkloadProfile represents the expected workload characteristics
@@ -104,11 +104,11 @@ type SizingResult struct {
 
 // ServiceRequirements contains the calculated requirements for a specific service
 type ServiceRequirements struct {
-	Service          ServiceDefinition    `json:"service"`
-	InstanceCount    int                  `json:"instance_count"`
-	TotalResources   ResourceRequirements `json:"total_resources"`
-	PerInstance      ResourceRequirements `json:"per_instance"`
-	PlacementStrategy string              `json:"placement_strategy"`
+	Service           ServiceDefinition    `json:"service"`
+	InstanceCount     int                  `json:"instance_count"`
+	TotalResources    ResourceRequirements `json:"total_resources"`
+	PerInstance       ResourceRequirements `json:"per_instance"`
+	PlacementStrategy string               `json:"placement_strategy"`
 }
 
 // NodeSpecification defines the recommended node configuration
@@ -134,13 +134,13 @@ type CostEstimate struct {
 
 // SizingConfig contains configuration for the sizing calculator
 type SizingConfig struct {
-	Environment        string           `json:"environment"` // "development", "staging", "production"
-	OverprovisionRatio float64          `json:"overprovision_ratio"`
-	GrowthBuffer       float64          `json:"growth_buffer"`
+	Environment        string            `json:"environment"` // "development", "staging", "production"
+	OverprovisionRatio float64           `json:"overprovision_ratio"`
+	GrowthBuffer       float64           `json:"growth_buffer"`
 	MaxNodeSize        NodeSpecification `json:"max_node_size"`
 	MinNodeSize        NodeSpecification `json:"min_node_size"`
-	Provider           string           `json:"provider,omitempty"` // "aws", "hetzner", "digitalocean", etc.
-	Region             string           `json:"region,omitempty"`
+	Provider           string            `json:"provider,omitempty"` // "aws", "hetzner", "digitalocean", etc.
+	Region             string            `json:"region,omitempty"`
 }
 
 // ValidationError represents a validation error
@@ -224,9 +224,9 @@ var ServiceDefinitions = map[ServiceType]ServiceDefinition{
 		Name: "Reverse Proxy",
 		Type: ServiceTypeProxy,
 		BaseRequirements: ResourceRequirements{
-			CPU:    CPURequirements{Cores: 2, Type: "general"},
-			Memory: MemoryRequirements{GB: 2, Type: "standard"},
-			Disk:   DiskRequirements{GB: 20, Type: "ssd"},
+			CPU:     CPURequirements{Cores: 2, Type: "general"},
+			Memory:  MemoryRequirements{GB: 2, Type: "standard"},
+			Disk:    DiskRequirements{GB: 20, Type: "ssd"},
 			Network: NetworkRequirements{BandwidthMbps: 1000, PublicIP: true},
 		},
 		ScalingFactor:    0.0005,

@@ -52,7 +52,7 @@ func checkRunningEosProcesses(rc *eos_io.RuntimeContext) ([]RunningProcessInfo, 
 		runningProcesses = append(runningProcesses, RunningProcessInfo{
 			PID:     mustAtoi(pidStr),
 			Command: "eos (details not available)", // pgrep doesn't give us full command
-			User:    "unknown",                      // pgrep doesn't give us user
+			User:    "unknown",                     // pgrep doesn't give us user
 			IsSelf:  false,
 		})
 	}

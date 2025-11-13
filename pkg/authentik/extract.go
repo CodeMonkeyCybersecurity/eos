@@ -240,7 +240,7 @@ func runExtract(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 			zap.Error(err))
 	} else {
 		config.Metadata.AuthentikVersion = version
-		logger.Info("  Version: " + version,
+		logger.Info("  Version: "+version,
 			zap.String("authentik_version", version))
 	}
 
@@ -257,7 +257,7 @@ func runExtract(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) er
 			zap.Strings("export_types", exportTypes),
 			zap.Bool("dry_run", true))
 		for _, t := range exportTypes {
-			logger.Info("  - " + t,
+			logger.Info("  - "+t,
 				zap.String("resource_type", t))
 		}
 		if len(apps) > 0 {

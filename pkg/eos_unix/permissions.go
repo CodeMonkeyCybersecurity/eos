@@ -108,7 +108,7 @@ func CheckSudoersMembership(username string) bool {
 	if !isValidUsername(username) {
 		return false
 	}
-	
+
 	// Use sudo to safely check sudoers membership
 	cmd := exec.Command("sudo", "grep", "-r", "--", username, "/etc/sudoers", "/etc/sudoers.d")
 	out, err := cmd.CombinedOutput()

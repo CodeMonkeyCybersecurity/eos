@@ -14,20 +14,20 @@ type NomadJobConfig struct {
 	Replicas    int    `json:"replicas" yaml:"replicas"`
 
 	// Container configuration
-	Driver string `json:"driver" yaml:"driver"` // docker, exec, raw_exec
-	Image  string `json:"image" yaml:"image"`
-	Command string `json:"command,omitempty" yaml:"command,omitempty"`
-	Args   []string `json:"args,omitempty" yaml:"args,omitempty"`
+	Driver  string   `json:"driver" yaml:"driver"` // docker, exec, raw_exec
+	Image   string   `json:"image" yaml:"image"`
+	Command string   `json:"command,omitempty" yaml:"command,omitempty"`
+	Args    []string `json:"args,omitempty" yaml:"args,omitempty"`
 
 	// Networking
-	Networks     []NetworkConfig `json:"networks,omitempty" yaml:"networks,omitempty"`
-	ServicePort  string          `json:"service_port,omitempty" yaml:"service_port,omitempty"`
-	ServiceTags  []string        `json:"service_tags,omitempty" yaml:"service_tags,omitempty"`
-	Ports        []string        `json:"ports,omitempty" yaml:"ports,omitempty"`
+	Networks    []NetworkConfig `json:"networks,omitempty" yaml:"networks,omitempty"`
+	ServicePort string          `json:"service_port,omitempty" yaml:"service_port,omitempty"`
+	ServiceTags []string        `json:"service_tags,omitempty" yaml:"service_tags,omitempty"`
+	Ports       []string        `json:"ports,omitempty" yaml:"ports,omitempty"`
 
 	// Storage
-	Volumes       []VolumeConfig       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
-	DockerVolumes []string             `json:"docker_volumes,omitempty" yaml:"docker_volumes,omitempty"`
+	Volumes       []VolumeConfig `json:"volumes,omitempty" yaml:"volumes,omitempty"`
+	DockerVolumes []string       `json:"docker_volumes,omitempty" yaml:"docker_volumes,omitempty"`
 
 	// Environment and configuration
 	EnvVars   map[string]string `json:"env_vars,omitempty" yaml:"env_vars,omitempty"`
@@ -49,11 +49,11 @@ type NomadJobConfig struct {
 	ConsulConnect bool `json:"consul_connect" yaml:"consul_connect"`
 
 	// Migration-specific fields for K3s replacement
-	Domain           string   `json:"domain,omitempty" yaml:"domain,omitempty"`
-	BackendServices  []string `json:"backend_services,omitempty" yaml:"backend_services,omitempty"`
-	MailBackend      string   `json:"mail_backend,omitempty" yaml:"mail_backend,omitempty"`
-	EnableACL        bool     `json:"enable_acl" yaml:"enable_acl"`
-	HostVolumes      []HostVolumeConfig `json:"host_volumes,omitempty" yaml:"host_volumes,omitempty"`
+	Domain          string             `json:"domain,omitempty" yaml:"domain,omitempty"`
+	BackendServices []string           `json:"backend_services,omitempty" yaml:"backend_services,omitempty"`
+	MailBackend     string             `json:"mail_backend,omitempty" yaml:"mail_backend,omitempty"`
+	EnableACL       bool               `json:"enable_acl" yaml:"enable_acl"`
+	HostVolumes     []HostVolumeConfig `json:"host_volumes,omitempty" yaml:"host_volumes,omitempty"`
 }
 
 // NetworkConfig represents network configuration for Nomad jobs
@@ -63,7 +63,7 @@ type NetworkConfig struct {
 	Static bool   `json:"static" yaml:"static"`
 }
 
-// VolumeConfig represents volume configuration for Nomad jobs  
+// VolumeConfig represents volume configuration for Nomad jobs
 type VolumeConfig struct {
 	Name     string `json:"name" yaml:"name"`
 	Type     string `json:"type" yaml:"type"` // host, csi
@@ -81,8 +81,8 @@ type TemplateConfig struct {
 
 // ResourceConfig represents resource requirements for Nomad jobs
 type ResourceConfig struct {
-	CPU    int `json:"cpu" yaml:"cpu"`       // MHz
-	Memory int `json:"memory" yaml:"memory"` // MB
+	CPU    int `json:"cpu" yaml:"cpu"`                       // MHz
+	Memory int `json:"memory" yaml:"memory"`                 // MB
 	Disk   int `json:"disk,omitempty" yaml:"disk,omitempty"` // MB
 }
 
@@ -119,15 +119,15 @@ type HostVolumeConfig struct {
 
 // CaddyIngressConfig represents Caddy ingress configuration
 type CaddyIngressConfig struct {
-	Region            string   `json:"region" yaml:"region"`
-	Datacenter        string   `json:"datacenter" yaml:"datacenter"`
-	CaddyReplicas     int      `json:"caddy_replicas" yaml:"caddy_replicas"`
-	CaddyVersion      string   `json:"caddy_version" yaml:"caddy_version"`
-	CaddyAdminEnabled bool     `json:"caddy_admin_enabled" yaml:"caddy_admin_enabled"`
-	Domain            string   `json:"domain" yaml:"domain"`
-	BackendServices   []BackendService `json:"backend_services" yaml:"backend_services"`
-	CaddyCPURequest   int      `json:"caddy_cpu_request" yaml:"caddy_cpu_request"`
-	CaddyMemoryRequest int     `json:"caddy_memory_request" yaml:"caddy_memory_request"`
+	Region             string           `json:"region" yaml:"region"`
+	Datacenter         string           `json:"datacenter" yaml:"datacenter"`
+	CaddyReplicas      int              `json:"caddy_replicas" yaml:"caddy_replicas"`
+	CaddyVersion       string           `json:"caddy_version" yaml:"caddy_version"`
+	CaddyAdminEnabled  bool             `json:"caddy_admin_enabled" yaml:"caddy_admin_enabled"`
+	Domain             string           `json:"domain" yaml:"domain"`
+	BackendServices    []BackendService `json:"backend_services" yaml:"backend_services"`
+	CaddyCPURequest    int              `json:"caddy_cpu_request" yaml:"caddy_cpu_request"`
+	CaddyMemoryRequest int              `json:"caddy_memory_request" yaml:"caddy_memory_request"`
 }
 
 // NginxMailConfig represents Nginx mail proxy configuration
@@ -160,10 +160,10 @@ type NomadClusterConfig struct {
 // Constants for Nomad job generation
 const (
 	// Default resource allocations (replacing K3s defaults)
-	DefaultCaddyCPU       = 200 // MHz
-	DefaultCaddyMemory    = 256 // MB
-	DefaultNginxCPU       = 100 // MHz
-	DefaultNginxMemory    = 128 // MB
+	DefaultCaddyCPU    = 200 // MHz
+	DefaultCaddyMemory = 256 // MB
+	DefaultNginxCPU    = 100 // MHz
+	DefaultNginxMemory = 128 // MB
 
 	// Default replica counts
 	DefaultCaddyReplicas = 2
@@ -200,14 +200,14 @@ const (
 // GetDefaultCaddyConfig returns default Caddy ingress configuration
 func GetDefaultCaddyConfig() *CaddyIngressConfig {
 	return &CaddyIngressConfig{
-		Region:            "global",
-		Datacenter:        "dc1",
-		CaddyReplicas:     DefaultCaddyReplicas,
-		CaddyVersion:      DefaultCaddyVersion,
-		CaddyAdminEnabled: true,
-		Domain:            "",
-		BackendServices:   []BackendService{},
-		CaddyCPURequest:   DefaultCaddyCPU,
+		Region:             "global",
+		Datacenter:         "dc1",
+		CaddyReplicas:      DefaultCaddyReplicas,
+		CaddyVersion:       DefaultCaddyVersion,
+		CaddyAdminEnabled:  true,
+		Domain:             "",
+		BackendServices:    []BackendService{},
+		CaddyCPURequest:    DefaultCaddyCPU,
 		CaddyMemoryRequest: DefaultCaddyMemory,
 	}
 }

@@ -20,7 +20,7 @@ func ConfigureFIDO2SSH(rc *eos_io.RuntimeContext) error {
 
 	// ASSESS - Check prerequisites
 	logger.Info("Checking prerequisites for FIDO2 SSH setup")
-	
+
 	// Check OpenSSH version (needs 8.2+)
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "ssh",
@@ -30,9 +30,9 @@ func ConfigureFIDO2SSH(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to check SSH version: %w", err)
 	}
-	
+
 	logger.Info("SSH version check", zap.String("version", output))
-	
+
 	// Install required packages
 	logger.Info("Installing required packages for FIDO2 support")
 	packages := []string{
@@ -40,7 +40,7 @@ func ConfigureFIDO2SSH(rc *eos_io.RuntimeContext) error {
 		"pamu2fcfg",       // Configuration tool
 		"yubikey-manager", // YubiKey management
 	}
-	
+
 	for _, pkg := range packages {
 		logger.Info("Installing package", zap.String("package", pkg))
 		if _, err := execute.Run(rc.Ctx, execute.Options{
@@ -53,13 +53,13 @@ func ConfigureFIDO2SSH(rc *eos_io.RuntimeContext) error {
 
 	// INTERVENE - Configure SSH for FIDO2
 	logger.Info("Configuring SSH for FIDO2 authentication")
-	
+
 	// Create SSH config directory if it doesn't exist
 	sshConfigDir := "/etc/ssh/sshd_config.d"
 	if err := os.MkdirAll(sshConfigDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create SSH config directory: %w", err)
 	}
-	
+
 	// Create FIDO2 SSH configuration
 	fido2SSHConfig := `# Eos FIDO2 SSH Configuration
 # Require FIDO2 hardware keys for SSH authentication
@@ -90,15 +90,15 @@ ClientAliveCountMax 2
 # Only allow specific key types (including sk- variants for FIDO2)
 PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp256-cert-v01@openssh.com,sk-ecdsa-sha2-nistp256@openssh.com,sk-ecdsa-sha2-nistp256-cert-v01@openssh.com
 `
-	
+
 	configPath := filepath.Join(sshConfigDir, "99-eos-fido2.conf")
 	if err := os.WriteFile(configPath, []byte(fido2SSHConfig), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write SSH FIDO2 config: %w", err)
 	}
-	
+
 	// Configure PAM for SSH with FIDO2
 	logger.Info("Configuring PAM for SSH FIDO2 authentication")
-	
+
 	// Backup original PAM SSH config
 	pamSSHPath := "/etc/pam.d/sshd"
 	backupPath := pamSSHPath + ".eos-backup"
@@ -110,18 +110,18 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 			return fmt.Errorf("failed to backup PAM SSH config: %w", err)
 		}
 	}
-	
+
 	// Read current PAM SSH config
 	pamContent, err := os.ReadFile(pamSSHPath)
 	if err != nil {
 		return fmt.Errorf("failed to read PAM SSH config: %w", err)
 	}
-	
+
 	// Add FIDO2 authentication to PAM SSH config
 	lines := strings.Split(string(pamContent), "\n")
 	var newLines []string
 	fido2Added := false
-	
+
 	for _, line := range lines {
 		// Add FIDO2 auth before common-auth include
 		if strings.Contains(line, "@include common-auth") && !fido2Added {
@@ -132,13 +132,13 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 		}
 		newLines = append(newLines, line)
 	}
-	
+
 	// Write updated PAM config
 	newPAMContent := strings.Join(newLines, "\n")
 	if err := os.WriteFile(pamSSHPath, []byte(newPAMContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write PAM SSH config: %w", err)
 	}
-	
+
 	// Create U2F mappings file
 	u2fMappingsPath := "/etc/u2f_mappings"
 	if _, err := os.Stat(u2fMappingsPath); os.IsNotExist(err) {
@@ -146,7 +146,7 @@ PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed2
 			return fmt.Errorf("failed to create U2F mappings file: %w", err)
 		}
 	}
-	
+
 	// Create enrollment helper script
 	logger.Info("Creating FIDO2 enrollment helper script")
 	enrollScript := `#!/bin/bash
@@ -235,12 +235,12 @@ else
     exit 1
 fi
 `
-	
+
 	enrollScriptPath := "/usr/local/bin/eos-enroll-fido2"
 	if err := os.WriteFile(enrollScriptPath, []byte(enrollScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to create enrollment script: %w", err)
 	}
-	
+
 	// Create recovery mechanism documentation
 	recoveryDoc := `# Eos FIDO2 SSH Recovery Procedures
 
@@ -304,12 +304,12 @@ Remember to re-enable after resolving the issue.
 4. Test with: pamtester sshd username authenticate
 
 `
-	
+
 	recoveryPath := "/etc/ssh/FIDO2_RECOVERY.md"
 	if err := os.WriteFile(recoveryPath, []byte(recoveryDoc), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create recovery documentation: %w", err)
 	}
-	
+
 	// Restart SSH service
 	logger.Info("Restarting SSH service to apply FIDO2 configuration")
 	if _, err := execute.Run(rc.Ctx, execute.Options{
@@ -318,10 +318,10 @@ Remember to re-enable after resolving the issue.
 	}); err != nil {
 		return fmt.Errorf("failed to restart SSH service: %w", err)
 	}
-	
+
 	// EVALUATE - Verify configuration
 	logger.Info("Verifying FIDO2 SSH configuration")
-	
+
 	// Check SSH config syntax
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "sshd",
@@ -331,7 +331,7 @@ Remember to re-enable after resolving the issue.
 		logger.Error("SSH configuration syntax error", zap.String("output", output), zap.Error(err))
 		return fmt.Errorf("SSH configuration syntax error: %w", err)
 	}
-	
+
 	// Check if required services are running
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -339,13 +339,13 @@ Remember to re-enable after resolving the issue.
 	}); err != nil {
 		return fmt.Errorf("SSH service is not active: %w", err)
 	}
-	
+
 	logger.Info("FIDO2 SSH configuration completed successfully")
 	logger.Info("Next steps:",
 		zap.String("enroll", "Users should run 'eos-enroll-fido2' to enroll their FIDO2 keys"),
 		zap.String("recovery", "Review /etc/ssh/FIDO2_RECOVERY.md for recovery procedures"),
 		zap.String("test", "Test SSH access before closing current session"))
-	
+
 	return nil
 }
 
@@ -353,19 +353,19 @@ Remember to re-enable after resolving the issue.
 func HardenUbuntuWithFIDO2(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Starting Ubuntu hardening with FIDO2 SSH authentication")
-	
+
 	// Call the enhanced hardening but with MFA disabled
 	// This will run all the security tools and hardening steps
 	if err := SecureUbuntuEnhanced(rc, "disabled"); err != nil {
 		return fmt.Errorf("ubuntu hardening failed: %w", err)
 	}
-	
+
 	// Now configure FIDO2 for SSH
 	logger.Info("Adding FIDO2 SSH authentication layer")
 	if err := ConfigureFIDO2SSH(rc); err != nil {
 		return fmt.Errorf("FIDO2 SSH configuration failed: %w", err)
 	}
-	
+
 	logger.Info("Ubuntu hardening with FIDO2 completed successfully")
 	return nil
 }

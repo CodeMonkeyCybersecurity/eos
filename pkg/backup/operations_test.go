@@ -601,7 +601,7 @@ func BenchmarkHookOperation_Execute(b *testing.B) {
 	executor := patterns.NewExecutor(otelLogger)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := executor.Execute(ctx, hook, "benchmark_hook")
 		if err != nil {
 			b.Fatal(err)
@@ -632,7 +632,7 @@ func BenchmarkBackupOperation_Assess(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := operation.Assess(ctx)
 		if err != nil {
 			b.Fatal(err)

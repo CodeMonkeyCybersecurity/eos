@@ -239,7 +239,7 @@ func (c *Calculator) calculateDiskGrowth(service *ServiceDefinition) float64 {
 
 	// Calculate months of retention
 	months := c.workloadProfile.RetentionPeriod.Hours() / (24 * 30)
-	
+
 	// Calculate total growth
 	totalGrowth := c.workloadProfile.DataGrowthRate * months
 
@@ -256,7 +256,7 @@ func (c *Calculator) applyEnvironmentAdjustments(result *SizingResult) {
 	// Apply overprovision ratio
 	result.TotalCPUCores *= c.config.OverprovisionRatio
 	result.TotalMemoryGB *= c.config.OverprovisionRatio
-	
+
 	// Apply growth buffer
 	result.TotalCPUCores *= c.config.GrowthBuffer
 	result.TotalMemoryGB *= c.config.GrowthBuffer
@@ -275,7 +275,7 @@ func (c *Calculator) calculateNodeRequirements(result *SizingResult) {
 		math.Max(result.TotalCPUCores/4, float64(c.config.MinNodeSize.CPUCores)),
 		float64(c.config.MaxNodeSize.CPUCores),
 	)
-	
+
 	optimalMemory := math.Min(
 		math.Max(result.TotalMemoryGB/4, float64(c.config.MinNodeSize.MemoryGB)),
 		float64(c.config.MaxNodeSize.MemoryGB),
@@ -306,7 +306,7 @@ func (c *Calculator) calculateNodeRequirements(result *SizingResult) {
 	nodesByDisk := int(math.Ceil(result.TotalDiskGB / float64(nodeDisk)))
 
 	nodeCount := c.maxInt(nodesByCPU, nodesByMemory, nodesByDisk)
-	
+
 	// Ensure minimum node count for HA
 	if c.config.Environment == "production" && nodeCount < 3 {
 		nodeCount = 3
@@ -401,7 +401,7 @@ func (c *Calculator) maxInt(values ...int) int {
 func (c *Calculator) generateWarningsAndRecommendations(result *SizingResult) {
 	// Check CPU utilization
 	if result.NodeSpecs.CPUUtilization > 80 {
-		result.Warnings = append(result.Warnings, 
+		result.Warnings = append(result.Warnings,
 			fmt.Sprintf("High CPU utilization (%.1f%%) - consider adding more nodes", result.NodeSpecs.CPUUtilization))
 	}
 
@@ -451,9 +451,9 @@ func (c *Calculator) generateWarningsAndRecommendations(result *SizingResult) {
 // estimateCosts estimates infrastructure costs based on provider
 func (c *Calculator) estimateCosts(result *SizingResult) {
 	// Basic cost estimation - would need provider-specific pricing data
-	costPerCore := 20.0    // $20/core/month estimate
-	costPerGB := 5.0       // $5/GB RAM/month estimate
-	costPerTBDisk := 50.0  // $50/TB disk/month estimate
+	costPerCore := 20.0   // $20/core/month estimate
+	costPerGB := 5.0      // $5/GB RAM/month estimate
+	costPerTBDisk := 50.0 // $50/TB disk/month estimate
 
 	if c.config.Provider == "hetzner" {
 		costPerCore = 15.0

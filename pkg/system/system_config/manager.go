@@ -267,16 +267,16 @@ func CheckFileExists(filePath string) bool {
 // DEPRECATED: Use shared.ServiceManager instead
 func CheckServiceStatus(serviceName string) (ServiceState, error) {
 	var state ServiceState
-	
+
 	// Use simple service manager for compatibility
 	// This is a bridge function until full migration is complete
 	sm := shared.NewSimpleServiceManager()
-	
+
 	// Use shared service manager
 	if active, err := sm.IsActive(serviceName); err == nil {
 		state.Active = active
 	}
-	
+
 	if enabled, err := sm.IsEnabled(serviceName); err == nil {
 		state.Enabled = enabled
 	}
@@ -324,7 +324,6 @@ func GenerateSecureToken(length int) (string, error) {
 
 	return string(token), nil
 }
-
 
 // CheckRoot verifies if the current user has root privileges
 func CheckRoot() error {

@@ -471,7 +471,7 @@ func BenchmarkGet(b *testing.B) {
 	defer func() { _ = os.Unsetenv(envVar) }()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = Get(key)
 	}
 }
@@ -485,7 +485,7 @@ func BenchmarkSanitizeKey(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = sanitizeKey(keys[i%len(keys)])
 	}
 }

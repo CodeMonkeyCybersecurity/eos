@@ -120,8 +120,8 @@ func (v *Validator) ValidateServicePlacement(rc *eos_io.RuntimeContext, serviceT
 	}
 
 	// Check network bandwidth if specified
-	if serviceReq.PerInstance.Network.BandwidthMbps > 0 && 
-	   nodeResources.Network.BandwidthMbps < serviceReq.PerInstance.Network.BandwidthMbps {
+	if serviceReq.PerInstance.Network.BandwidthMbps > 0 &&
+		nodeResources.Network.BandwidthMbps < serviceReq.PerInstance.Network.BandwidthMbps {
 		return fmt.Errorf(
 			"insufficient network bandwidth: node has %d Mbps available, service requires %d Mbps",
 			nodeResources.Network.BandwidthMbps, serviceReq.PerInstance.Network.BandwidthMbps)

@@ -12,7 +12,7 @@ import (
 
 // LVMDriver implements StorageDriver for LVM volumes
 type LVMDriver struct {
-	rc  *eos_io.RuntimeContext
+	rc *eos_io.RuntimeContext
 }
 
 // Type returns the storage type this driver handles
@@ -177,16 +177,16 @@ func (d *LVMDriver) Resize(ctx context.Context, id string, newSize int64) error 
 
 	// Calculate size difference
 	sizeDiff := newSize - info.Size
-	
+
 	if sizeDiff <= 0 {
 		return fmt.Errorf("new size must be larger than current size")
 	}
-	
+
 	// TODO: Use existing lvm package functionality
 	logger.Info("LVM resize operation requires administrator intervention",
 		zap.Int64("size_diff", sizeDiff),
 		zap.String("id", id))
-	
+
 	return fmt.Errorf("LVM resize operation requires administrator intervention - size change: %d bytes", sizeDiff)
 }
 

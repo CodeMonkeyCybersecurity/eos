@@ -398,8 +398,8 @@ func GetBackendHealth(rc *eos_io.RuntimeContext, backendID string) (*ConnectionS
 
 	// For now, return a mock status
 	status := &ConnectionStatus{
-		Connected:    true,
-		LastSeen:     time.Now(),
+		Connected: true,
+		LastSeen:  time.Now(),
 		HealthChecks: map[string]bool{
 			"service":  true,
 			"dns":      true,
@@ -436,12 +436,12 @@ type AlertManager struct {
 
 // Alert represents a health alert
 type Alert struct {
-	BackendID   string    `json:"backend_id"`
-	AlertType   string    `json:"alert_type"`
-	Severity    string    `json:"severity"`
-	Message     string    `json:"message"`
-	Timestamp   time.Time `json:"timestamp"`
-	Resolved    bool      `json:"resolved"`
+	BackendID string    `json:"backend_id"`
+	AlertType string    `json:"alert_type"`
+	Severity  string    `json:"severity"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+	Resolved  bool      `json:"resolved"`
 }
 
 // NewAlertManager creates a new alert manager

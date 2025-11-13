@@ -31,7 +31,7 @@ type Config struct {
 
 	// Resource limits
 	Resources ResourceConfig `yaml:"resources" json:"resources"`
-	
+
 	// Hecate integration
 	Domain string `yaml:"domain" json:"domain"`
 }
@@ -302,7 +302,6 @@ type ServiceRegistration struct {
 	HealthCheck *HealthCheck      `json:"health_check"`
 }
 
-
 // UpdateStrategy defines how services are updated
 type UpdateStrategy struct {
 	MaxParallel     int    `json:"max_parallel"`
@@ -360,4 +359,3 @@ type WebhookConfig struct {
 	Events   []string          `json:"events"`
 	Actions  map[string]string `json:"actions"`
 }
-

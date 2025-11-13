@@ -21,13 +21,13 @@ import (
 
 // GuestAgentAddConfig contains configuration for adding guest agent channels
 type GuestAgentAddConfig struct {
-	VMNames      []string
-	DryRun       bool
-	Force        bool
-	BatchSize    int
-	WaitBetween  int
-	NoBackup     bool
-	NoRestart    bool
+	VMNames     []string
+	DryRun      bool
+	Force       bool
+	BatchSize   int
+	WaitBetween int
+	NoBackup    bool
+	NoRestart   bool
 }
 
 // GuestAgentAddResult contains results of guest agent addition

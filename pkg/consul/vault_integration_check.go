@@ -16,19 +16,19 @@ import (
 
 // VaultIntegrationStatus represents the integration status between Vault and Consul
 type VaultIntegrationStatus struct {
-	VaultInstalled      bool
-	VaultRunning        bool
-	VaultRegistered     bool
-	VaultHealthy        bool
-	VaultServiceID      string
-	VaultAddress        string
-	HealthChecks        []VaultHealthCheck
-	KVStoreUsed         bool
-	KVPath              string
-	KVKeyCount          int
-	StorageBackend      string
-	IntegrationHealthy  bool
-	Issues              []string
+	VaultInstalled     bool
+	VaultRunning       bool
+	VaultRegistered    bool
+	VaultHealthy       bool
+	VaultServiceID     string
+	VaultAddress       string
+	HealthChecks       []VaultHealthCheck
+	KVStoreUsed        bool
+	KVPath             string
+	KVKeyCount         int
+	StorageBackend     string
+	IntegrationHealthy bool
+	Issues             []string
 }
 
 // VaultHealthCheck represents a single health check for Vault service

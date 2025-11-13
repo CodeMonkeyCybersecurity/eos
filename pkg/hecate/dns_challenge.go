@@ -131,11 +131,11 @@ func generateProviderConfig(config *DNSChallengeConfig) (string, error) {
 		clientSecret, ok3 := config.Credentials["client_secret"]
 		subscriptionID, ok4 := config.Credentials["subscription_id"]
 		resourceGroup, ok5 := config.Credentials["resource_group_name"]
-		
+
 		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
 			return "", fmt.Errorf("missing Azure credentials")
 		}
-		
+
 		return fmt.Sprintf(`{
           "name": "azuredns",
           "tenant_id": "%s",
@@ -165,7 +165,7 @@ func ConfigureDNSChallenge(rc *eos_io.RuntimeContext, provider DNSChallengeProvi
 
 	// Retrieve provider credentials from secrets
 	credentials := make(map[string]string)
-	
+
 	switch provider {
 	case DNSProviderCloudflare:
 		token, err := secretManager.GetSecret("dns", "cloudflare_api_token")
@@ -219,7 +219,7 @@ func isValidProvider(provider DNSChallengeProvider) bool {
 		DNSProviderGoogleCloud,
 		DNSProviderAzure,
 	}
-	
+
 	for _, valid := range validProviders {
 		if provider == valid {
 			return true
@@ -239,9 +239,9 @@ func formatDomains(domains []string) string {
 func applyCaddyConfig(rc *eos_io.RuntimeContext, config string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Debug("Applying Caddy configuration")
-	
+
 	// TODO: Implement actual Caddy API call
 	// This would POST to http://localhost:2019/load
-	
+
 	return nil
 }

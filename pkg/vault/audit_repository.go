@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
 )
 
 // FileAuditRepository implements vault.AuditRepository using file system storage

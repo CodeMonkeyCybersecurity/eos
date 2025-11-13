@@ -116,13 +116,13 @@ func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.Assessmen
 	if u.VaultClient != nil {
 		vaultPath := fmt.Sprintf("secret/users/pending/%s", u.Username)
 		data := map[string]interface{}{
-			"username":    u.Username,
-			"groups":      u.Groups,
-			"shell":       u.Shell,
-			"home_dir":    u.HomeDir,
-			"target":      u.Target,
-			"status":      "pending_creation",
-			"requires":    "administrator_intervention",
+			"username": u.Username,
+			"groups":   u.Groups,
+			"shell":    u.Shell,
+			"home_dir": u.HomeDir,
+			"target":   u.Target,
+			"status":   "pending_creation",
+			"requires": "administrator_intervention",
 		}
 
 		if err := u.VaultClient.Write(vaultPath, data); err != nil {
@@ -139,9 +139,9 @@ func (u *UserCreationOperation) Assess(ctx context.Context) (*patterns.Assessmen
 		CanProceed: false,
 		Reason:     "user creation requires administrator intervention - HashiCorp stack cannot create system users",
 		Prerequisites: map[string]bool{
-			"requires_escalation":   true,
-			"system_level_access":   false,
-			"config_stored_vault":   true,
+			"requires_escalation": true,
+			"system_level_access": false,
+			"config_stored_vault": true,
 		},
 	}, nil
 }

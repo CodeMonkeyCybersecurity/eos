@@ -77,7 +77,6 @@ func Detect(rc *eos_io.RuntimeContext) (*Environment, error) {
 	return env, nil
 }
 
-
 // assignRoles determines the role of each machine based on count and naming
 func (e *Environment) assignRoles() error {
 	switch e.MachineCount {

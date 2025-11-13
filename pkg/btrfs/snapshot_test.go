@@ -279,7 +279,7 @@ func TestParseSubvolumeListLine(t *testing.T) {
 
 func TestSortSnapshotsByTime(t *testing.T) {
 	now := time.Now()
-	
+
 	snapshots := []*SubvolumeInfo{
 		{ID: 1, Path: "/snap1", SendTime: now.Add(-3 * time.Hour)},
 		{ID: 2, Path: "/snap2", SendTime: now.Add(-1 * time.Hour)},
@@ -299,7 +299,7 @@ func TestSortSnapshotsByTime(t *testing.T) {
 
 	// Verify ordering
 	for i := 0; i < len(snapshots)-1; i++ {
-		assert.True(t, snapshots[i].SendTime.After(snapshots[i+1].SendTime) || 
+		assert.True(t, snapshots[i].SendTime.After(snapshots[i+1].SendTime) ||
 			snapshots[i].SendTime.Equal(snapshots[i+1].SendTime))
 	}
 }
@@ -357,7 +357,7 @@ func TestSnapshotConfig_SecurityValidation(t *testing.T) {
 			issues: []string{"path traversal"},
 		},
 		{
-			name: "command injection attempt", 
+			name: "command injection attempt",
 			config: &SnapshotConfig{
 				SourcePath:   "/mnt/data/$(whoami)",
 				SnapshotPath: "/mnt/snapshots/snap;rm -rf /",
@@ -425,11 +425,11 @@ func TestRotateSnapshots_EdgeCases(t *testing.T) {
 
 func TestSnapshotTimeHandling(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
-		name     string
-		snapshot *SubvolumeInfo
-		maxAge   time.Duration
+		name         string
+		snapshot     *SubvolumeInfo
+		maxAge       time.Duration
 		shouldDelete bool
 	}{
 		{

@@ -337,7 +337,7 @@ func GatherInteractiveConfig(rc *eos_io.RuntimeContext, config *IrisConfiguratio
 
 	// Email From
 	defaultFrom := fmt.Sprintf("Wazuh Notify <%s>", config.Email.Username)
-	logger.Info("terminal prompt: From Email Address [default: "+defaultFrom+"]")
+	logger.Info("terminal prompt: From Email Address [default: " + defaultFrom + "]")
 	fmt.Print("From Email: ")
 	fromInput := strings.TrimSpace(mustReadLine(reader))
 	if fromInput != "" {
@@ -362,12 +362,12 @@ func GatherInteractiveConfig(rc *eos_io.RuntimeContext, config *IrisConfiguratio
 	// Confirmation
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: === Configuration Summary ===")
-	logger.Info("terminal prompt: Azure Endpoint: "+config.Azure.Endpoint)
-	logger.Info("terminal prompt: Azure Deployment: "+config.Azure.DeploymentName)
-	logger.Info("terminal prompt: SMTP Host: "+config.Email.SMTPHost)
-	logger.Info("terminal prompt: SMTP User: "+config.Email.Username)
-	logger.Info("terminal prompt: Email From: "+config.Email.From)
-	logger.Info("terminal prompt: Email To: "+config.Email.To)
+	logger.Info("terminal prompt: Azure Endpoint: " + config.Azure.Endpoint)
+	logger.Info("terminal prompt: Azure Deployment: " + config.Azure.DeploymentName)
+	logger.Info("terminal prompt: SMTP Host: " + config.Email.SMTPHost)
+	logger.Info("terminal prompt: SMTP User: " + config.Email.Username)
+	logger.Info("terminal prompt: Email From: " + config.Email.From)
+	logger.Info("terminal prompt: Email To: " + config.Email.To)
 	logger.Info("terminal prompt: ")
 	logger.Info("terminal prompt: Proceed with this configuration? (y/n)")
 	fmt.Print("Proceed? (y/n): ")

@@ -18,12 +18,12 @@ import (
 // CheckPermissions checks permissions for specified categories following Assess → Intervene → Evaluate pattern
 func CheckPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categories []string) (*PermissionFixResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
-	
+
 	logger.Info("Assessing permission check requirements",
 		zap.Strings("categories", categories),
 		zap.Bool("dry_run", true))
@@ -66,7 +66,7 @@ func CheckPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categor
 
 	// EVALUATE
 	result.Summary.Success = len(result.Summary.Errors) == 0
-	
+
 	logger.Info("Permission check completed successfully",
 		zap.Int("total_files", result.Summary.TotalFiles),
 		zap.Int("files_need_fixing", result.Summary.FilesFixed),
@@ -78,12 +78,12 @@ func CheckPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categor
 // FixPermissions fixes permissions for specified categories following Assess → Intervene → Evaluate pattern
 func FixPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categories []string) (*PermissionFixResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
-	
+
 	logger.Info("Assessing permission fix requirements",
 		zap.Strings("categories", categories),
 		zap.Bool("dry_run", config.DryRun))
@@ -122,7 +122,7 @@ func FixPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categorie
 
 	// EVALUATE
 	result.Summary.Success = len(result.Summary.Errors) == 0
-	
+
 	logger.Info("Permission fix completed successfully",
 		zap.Int("total_files", result.Summary.TotalFiles),
 		zap.Int("files_fixed", result.Summary.FilesFixed),
@@ -134,12 +134,12 @@ func FixPermissions(rc *eos_io.RuntimeContext, config *SecurityConfig, categorie
 // ScanSSHDirectory scans SSH directory for permission issues following Assess → Intervene → Evaluate pattern
 func ScanSSHDirectory(rc *eos_io.RuntimeContext, config *SecurityConfig, sshDir string) (*PermissionScanResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultSecurityConfig()
 	}
-	
+
 	logger.Info("Assessing SSH directory scan", zap.String("ssh_dir", sshDir))
 
 	result := &PermissionScanResult{

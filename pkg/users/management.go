@@ -735,7 +735,6 @@ func RunUpdateUserPassword(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 	return ChangeUserPassword(rc, username, newPassword)
 }
 
-
 // RunUpdateUserSSHAccess handles SSH access grant operations
 func RunUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)

@@ -98,7 +98,7 @@ func VerifyCommitSignature(rc *eos_io.RuntimeContext, repoDir, commitHash string
 
 	if err != nil {
 		// Signature verification failed or commit not signed
-		result.SignatureVerified = true  // We attempted verification
+		result.SignatureVerified = true // We attempted verification
 		result.SignatureValid = false
 
 		if strings.Contains(outputStr, "no signature found") {
@@ -120,7 +120,7 @@ func VerifyCommitSignature(rc *eos_io.RuntimeContext, repoDir, commitHash string
 					zap.String("note", "GPG signatures provide cryptographic proof of authenticity"))
 			}
 
-			return result, nil  // Warn but allow
+			return result, nil // Warn but allow
 		}
 
 		// Signature exists but is invalid

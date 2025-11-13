@@ -90,10 +90,10 @@ func getSecureTLSConfig() *tls.Config {
 	// SECURITY: Try to load custom CA certificate for self-signed LDAP servers
 	// This supports both system-trusted CAs and custom enterprise CAs
 	caPaths := []string{
-		"/etc/eos/ldap-ca.crt",        // Eos LDAP-specific CA
-		"/etc/eos/ca.crt",              // Eos general CA
-		"/etc/ldap/tls/ca.crt",         // LDAP standard location
-		"/etc/ssl/certs/ldap-ca.crt",   // Alternative location
+		"/etc/eos/ldap-ca.crt",       // Eos LDAP-specific CA
+		"/etc/eos/ca.crt",            // Eos general CA
+		"/etc/ldap/tls/ca.crt",       // LDAP standard location
+		"/etc/ssl/certs/ldap-ca.crt", // Alternative location
 	}
 
 	for _, caPath := range caPaths {

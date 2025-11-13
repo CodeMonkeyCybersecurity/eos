@@ -365,7 +365,7 @@ func TestSafeFileOperations(t *testing.T) {
 
 		err = safeOps.WithTransaction(ctx, operations2)
 		assert.Error(t, err)
-		
+
 		// Verify rollback (file3 should still exist)
 		assert.FileExists(t, file3)
 	})
@@ -378,11 +378,11 @@ func TestPathTraversal(t *testing.T) {
 	ctx := context.Background()
 
 	tempDir := t.TempDir()
-	
+
 	// Create a safe zone
 	safeDir := filepath.Join(tempDir, "safe")
 	require.NoError(t, os.MkdirAll(safeDir, 0755))
-	
+
 	// Create test file in safe zone
 	safeFile := filepath.Join(safeDir, "test.txt")
 	require.NoError(t, os.WriteFile(safeFile, []byte("safe content"), 0644))
@@ -450,37 +450,37 @@ func TestConcurrentFileOperations(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Each goroutine creates its own file
 			filename := filepath.Join(tempDir, fmt.Sprintf("file_%d.txt", id))
 			content := []byte(fmt.Sprintf("content from goroutine %d", id))
-			
+
 			// Write file
 			if err := fileOps.WriteFile(ctx, filename, content, 0644); err != nil {
 				errors <- err
 				return
 			}
-			
+
 			// Read it back
 			data, err := fileOps.ReadFile(ctx, filename)
 			if err != nil {
 				errors <- err
 				return
 			}
-			
+
 			// Verify content
 			if string(data) != string(content) {
 				errors <- fmt.Errorf("content mismatch in goroutine %d", id)
 				return
 			}
-			
+
 			// Copy file
 			copyDest := filepath.Join(tempDir, fmt.Sprintf("copy_%d.txt", id))
 			if err := fileOps.CopyFile(ctx, filename, copyDest, 0644); err != nil {
 				errors <- err
 				return
 			}
-			
+
 			// Delete original
 			if err := fileOps.DeleteFile(ctx, filename); err != nil {
 				errors <- err
@@ -497,7 +497,7 @@ func TestConcurrentFileOperations(t *testing.T) {
 	for err := range errors {
 		t.Errorf("Concurrent operation failed: %v", err)
 	}
-	
+
 	// Verify all copy files exist
 	for i := 0; i < numGoroutines; i++ {
 		copyFile := filepath.Join(tempDir, fmt.Sprintf("copy_%d.txt", i))
@@ -539,7 +539,7 @@ func TestSymlinkHandling(t *testing.T) {
 	// Test symlink to directory
 	targetDir := filepath.Join(tempDir, "targetdir")
 	require.NoError(t, os.MkdirAll(targetDir, 0755))
-	
+
 	linkDir := filepath.Join(tempDir, "linkdir")
 	require.NoError(t, os.Symlink(targetDir, linkDir))
 

@@ -400,7 +400,7 @@ func (p *PortKillOperation) Assess(ctx context.Context) (*patterns.AssessmentRes
 
 	// Find processes using the port
 	// TODO: Replace with Nomad client implementation
-	output := "none"  // placeholder
+	output := "none" // placeholder
 	// TODO: Implement actual service status check
 	// For now, assume services are running correctly
 

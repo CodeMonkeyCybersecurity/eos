@@ -379,7 +379,7 @@ func TestConcurrentHashStore(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func(id int) {
 			hash := "hash" + string(rune(id))
-			
+
 			// Each goroutine does a Seen followed by Mark
 			mock.ExpectQuery("select exists").
 				WithArgs(hash).

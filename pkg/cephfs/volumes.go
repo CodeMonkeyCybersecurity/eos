@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/ceph/go-ceph/cephfs/admin"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -119,8 +119,8 @@ func (c *CephClient) DeleteVolume(rc *eos_io.RuntimeContext, volumeName string, 
 
 	// Delete volume using 'ceph fs volume rm' command via mon
 	cmd := map[string]interface{}{
-		"prefix":      "fs volume rm",
-		"vol_name":    volumeName,
+		"prefix":               "fs volume rm",
+		"vol_name":             volumeName,
 		"yes_i_really_mean_it": true,
 	}
 

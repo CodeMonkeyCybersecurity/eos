@@ -20,35 +20,35 @@ import (
 
 // BootstrapConfig contains configuration for bootstrapping a Ceph monitor
 type BootstrapConfig struct {
-	Hostname      string // Monitor hostname (e.g., "vhost5")
-	MonitorIP     string // Monitor IP address (e.g., "192.168.6.77")
-	PublicNetwork string // Public network CIDR (e.g., "192.168.6.0/24")
+	Hostname       string // Monitor hostname (e.g., "vhost5")
+	MonitorIP      string // Monitor IP address (e.g., "192.168.6.77")
+	PublicNetwork  string // Public network CIDR (e.g., "192.168.6.0/24")
 	ClusterNetwork string // Cluster network CIDR (optional, defaults to PublicNetwork)
-	ClusterName   string // Cluster name (default: "ceph")
-	FSID          string // Cluster UUID (generated if empty)
+	ClusterName    string // Cluster name (default: "ceph")
+	FSID           string // Cluster UUID (generated if empty)
 }
 
 // BootstrapState tracks bootstrap progress for resumability
 type BootstrapState string
 
 const (
-	StateUninitialized       BootstrapState = "uninitialized"
-	StateFSIDGenerated       BootstrapState = "fsid_generated"
-	StateConfigWritten       BootstrapState = "config_written"
-	StateKeyringsCreated     BootstrapState = "keyrings_created"
-	StateMonmapGenerated     BootstrapState = "monmap_generated"
-	StateMonitorInitialized  BootstrapState = "monitor_initialized"
-	StateOwnershipFixed      BootstrapState = "ownership_fixed"
-	StateMonitorStarted      BootstrapState = "monitor_started"
-	StateBootstrapComplete   BootstrapState = "complete"
+	StateUninitialized      BootstrapState = "uninitialized"
+	StateFSIDGenerated      BootstrapState = "fsid_generated"
+	StateConfigWritten      BootstrapState = "config_written"
+	StateKeyringsCreated    BootstrapState = "keyrings_created"
+	StateMonmapGenerated    BootstrapState = "monmap_generated"
+	StateMonitorInitialized BootstrapState = "monitor_initialized"
+	StateOwnershipFixed     BootstrapState = "ownership_fixed"
+	StateMonitorStarted     BootstrapState = "monitor_started"
+	StateBootstrapComplete  BootstrapState = "complete"
 )
 
 // BootstrapStateData contains state data for resumption
 type BootstrapStateData struct {
-	State          BootstrapState     `json:"state"`
-	Config         *BootstrapConfig   `json:"config"`
-	Timestamp      time.Time          `json:"timestamp"`
-	CompletedSteps []string           `json:"completed_steps"`
+	State          BootstrapState   `json:"state"`
+	Config         *BootstrapConfig `json:"config"`
+	Timestamp      time.Time        `json:"timestamp"`
+	CompletedSteps []string         `json:"completed_steps"`
 }
 
 // BootstrapFirstMonitor creates a new Ceph cluster with the first monitor

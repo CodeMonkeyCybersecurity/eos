@@ -10,27 +10,27 @@ import (
 // Config represents HTTP client configuration options
 type Config struct {
 	// Basic configuration
-	Timeout         time.Duration     `json:"timeout" yaml:"timeout"`
-	UserAgent       string           `json:"user_agent" yaml:"user_agent"`
-	Headers         map[string]string `json:"headers" yaml:"headers"`
-	
+	Timeout   time.Duration     `json:"timeout" yaml:"timeout"`
+	UserAgent string            `json:"user_agent" yaml:"user_agent"`
+	Headers   map[string]string `json:"headers" yaml:"headers"`
+
 	// Retry configuration
-	RetryConfig     *RetryConfig     `json:"retry" yaml:"retry"`
-	
+	RetryConfig *RetryConfig `json:"retry" yaml:"retry"`
+
 	// TLS configuration
-	TLSConfig       *TLSConfig       `json:"tls" yaml:"tls"`
-	
+	TLSConfig *TLSConfig `json:"tls" yaml:"tls"`
+
 	// Authentication configuration
-	AuthConfig      *AuthConfig      `json:"auth" yaml:"auth"`
-	
+	AuthConfig *AuthConfig `json:"auth" yaml:"auth"`
+
 	// Rate limiting configuration
 	RateLimitConfig *RateLimitConfig `json:"rate_limit" yaml:"rate_limit"`
-	
+
 	// Connection pool configuration
-	PoolConfig      *PoolConfig      `json:"pool" yaml:"pool"`
-	
+	PoolConfig *PoolConfig `json:"pool" yaml:"pool"`
+
 	// Observability configuration
-	LogConfig       *LogConfig       `json:"log" yaml:"log"`
+	LogConfig *LogConfig `json:"log" yaml:"log"`
 }
 
 // RetryConfig defines retry behavior for failed requests
@@ -111,7 +111,7 @@ func DefaultConfig() *Config {
 		Timeout:   30 * time.Second,
 		UserAgent: "Eos/1.0 (https://cybermonkey.net.au)",
 		Headers:   make(map[string]string),
-		
+
 		RetryConfig: &RetryConfig{
 			MaxRetries:      3,
 			InitialDelay:    2 * time.Second,
@@ -120,7 +120,7 @@ func DefaultConfig() *Config {
 			Jitter:          true,
 			RetryableStatus: []int{429, 500, 502, 503, 504},
 		},
-		
+
 		TLSConfig: &TLSConfig{
 			InsecureSkipVerify: false,
 			MinVersion:         tls.VersionTLS12,
@@ -131,20 +131,20 @@ func DefaultConfig() *Config {
 				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
 			},
 		},
-		
+
 		AuthConfig: &AuthConfig{
 			Type:          AuthTypeNone,
 			CustomHeaders: make(map[string]string),
 			TokenHeader:   "Authorization",
 			TokenPrefix:   "Bearer",
 		},
-		
+
 		RateLimitConfig: &RateLimitConfig{
 			RequestsPerSecond: 10.0,
 			BurstSize:         20,
 			WindowSize:        time.Minute,
 		},
-		
+
 		PoolConfig: &PoolConfig{
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 10,
@@ -153,7 +153,7 @@ func DefaultConfig() *Config {
 			DialTimeout:         5 * time.Second,
 			KeepAlive:           30 * time.Second,
 		},
-		
+
 		LogConfig: &LogConfig{
 			LogRequests:  false,
 			LogResponses: false,
@@ -166,7 +166,7 @@ func DefaultConfig() *Config {
 // SecurityConfig returns a high-security configuration
 func SecurityConfig() *Config {
 	config := DefaultConfig()
-	
+
 	// Enhanced TLS security
 	config.TLSConfig.MinVersion = tls.VersionTLS13
 	config.TLSConfig.CipherSuites = []uint16{
@@ -174,42 +174,42 @@ func SecurityConfig() *Config {
 		tls.TLS_CHACHA20_POLY1305_SHA256,
 		tls.TLS_AES_128_GCM_SHA256,
 	}
-	
+
 	// Strict timeouts
 	config.Timeout = 10 * time.Second
 	config.PoolConfig.DialTimeout = 3 * time.Second
 	config.PoolConfig.KeepAlive = 15 * time.Second
-	
+
 	// Conservative retry settings
 	config.RetryConfig.MaxRetries = 2
 	config.RetryConfig.InitialDelay = 1 * time.Second
 	config.RetryConfig.MaxDelay = 10 * time.Second
-	
+
 	// Lower rate limits for security
 	config.RateLimitConfig.RequestsPerSecond = 5.0
 	config.RateLimitConfig.BurstSize = 10
-	
+
 	return config
 }
 
 // TestConfig returns a configuration suitable for testing
 func TestConfig() *Config {
 	config := DefaultConfig()
-	
+
 	// Allow insecure TLS for testing
 	config.TLSConfig.InsecureSkipVerify = true
-	
+
 	// Shorter timeouts for faster tests
 	config.Timeout = 5 * time.Second
 	config.PoolConfig.DialTimeout = 1 * time.Second
-	
+
 	// No retries in tests
 	config.RetryConfig.MaxRetries = 0
-	
+
 	// Enable logging for debugging
 	config.LogConfig.LogRequests = true
 	config.LogConfig.LogResponses = true
-	
+
 	return config
 }
 
@@ -218,7 +218,7 @@ func (c *Config) Validate() error {
 	if c.Timeout <= 0 {
 		return &ConfigError{Field: "Timeout", Message: "must be positive"}
 	}
-	
+
 	if c.RetryConfig != nil {
 		if c.RetryConfig.MaxRetries < 0 {
 			return &ConfigError{Field: "RetryConfig.MaxRetries", Message: "cannot be negative"}
@@ -230,7 +230,7 @@ func (c *Config) Validate() error {
 			return &ConfigError{Field: "RetryConfig.Multiplier", Message: "must be greater than 1.0"}
 		}
 	}
-	
+
 	if c.RateLimitConfig != nil {
 		if c.RateLimitConfig.RequestsPerSecond <= 0 {
 			return &ConfigError{Field: "RateLimitConfig.RequestsPerSecond", Message: "must be positive"}
@@ -239,7 +239,7 @@ func (c *Config) Validate() error {
 			return &ConfigError{Field: "RateLimitConfig.BurstSize", Message: "must be positive"}
 		}
 	}
-	
+
 	return nil
 }
 

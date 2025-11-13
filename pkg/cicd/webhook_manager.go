@@ -68,13 +68,13 @@ type GitHubWebhookPayload struct {
 
 // GitLabWebhookPayload represents a GitLab webhook payload
 type GitLabWebhookPayload struct {
-	ObjectKind   string `json:"object_kind"`
-	EventName    string `json:"event_name"`
-	Ref          string `json:"ref"`
-	CheckoutSHA  string `json:"checkout_sha"`
-	UserName     string `json:"user_name"`
-	UserEmail    string `json:"user_email"`
-	Project      struct {
+	ObjectKind  string `json:"object_kind"`
+	EventName   string `json:"event_name"`
+	Ref         string `json:"ref"`
+	CheckoutSHA string `json:"checkout_sha"`
+	UserName    string `json:"user_name"`
+	UserEmail   string `json:"user_email"`
+	Project     struct {
 		ID                int    `json:"id"`
 		Name              string `json:"name"`
 		PathWithNamespace string `json:"path_with_namespace"`
@@ -404,9 +404,9 @@ func (h *WebhookTriggerHandler) handleGitHubPush(event WebhookEvent, payload *Gi
 
 	// Create trigger info
 	trigger := TriggerInfo{
-		Type:   "git_push",
-		Source: "github",
-		User:   payload.Pusher.Name,
+		Type:    "git_push",
+		Source:  "github",
+		User:    payload.Pusher.Name,
 		Message: payload.HeadCommit.Message,
 		Metadata: map[string]string{
 			"repository": payload.Repository.FullName,
@@ -437,9 +437,9 @@ func (h *WebhookTriggerHandler) handleGitLabPush(event WebhookEvent, payload *Gi
 
 	// Create trigger info
 	trigger := TriggerInfo{
-		Type:   "git_push",
-		Source: "gitlab",
-		User:   payload.UserName,
+		Type:    "git_push",
+		Source:  "gitlab",
+		User:    payload.UserName,
 		Message: "GitLab push event",
 		Metadata: map[string]string{
 			"repository": payload.Project.PathWithNamespace,

@@ -62,11 +62,12 @@ type ServiceAddress struct {
 // FindService discovers healthy instances of a service
 //
 // Example:
-//   client := discovery.NewClient(rc, consulClient)
-//   addresses, err := client.FindService("vault")
-//   for _, addr := range addresses {
-//       fmt.Printf("Found vault at %s:%d\n", addr.Address, addr.Port)
-//   }
+//
+//	client := discovery.NewClient(rc, consulClient)
+//	addresses, err := client.FindService("vault")
+//	for _, addr := range addresses {
+//	    fmt.Printf("Found vault at %s:%d\n", addr.Address, addr.Port)
+//	}
 func (c *Client) FindService(serviceName string) ([]*ServiceAddress, error) {
 	c.logger.Debug("Finding service",
 		zap.String("service", serviceName))
@@ -104,8 +105,9 @@ func (c *Client) FindService(serviceName string) ([]*ServiceAddress, error) {
 // FindServiceWithTag discovers services with a specific tag
 //
 // Example:
-//   // Find all Vault instances with "primary" tag
-//   addresses, err := client.FindServiceWithTag("vault", "primary")
+//
+//	// Find all Vault instances with "primary" tag
+//	addresses, err := client.FindServiceWithTag("vault", "primary")
 func (c *Client) FindServiceWithTag(serviceName, tag string) ([]*ServiceAddress, error) {
 	c.logger.Debug("Finding service with tag",
 		zap.String("service", serviceName),
@@ -142,8 +144,9 @@ func (c *Client) FindServiceWithTag(serviceName, tag string) ([]*ServiceAddress,
 // GetServiceURL returns a complete URL for a service
 //
 // Example:
-//   vaultURL, err := client.GetServiceURL("vault", "https")
-//   // Returns: "https://10.0.1.5:8200"
+//
+//	vaultURL, err := client.GetServiceURL("vault", "https")
+//	// Returns: "https://10.0.1.5:8200"
 func (c *Client) GetServiceURL(serviceName, scheme string) (string, error) {
 	addresses, err := c.FindService(serviceName)
 	if err != nil {
@@ -158,8 +161,9 @@ func (c *Client) GetServiceURL(serviceName, scheme string) (string, error) {
 // GetServiceEndpoint returns the address:port string for a service
 //
 // Example:
-//   consulAddr, err := client.GetServiceEndpoint("consul")
-//   // Returns: "10.0.1.5:8500"
+//
+//	consulAddr, err := client.GetServiceEndpoint("consul")
+//	// Returns: "10.0.1.5:8500"
 func (c *Client) GetServiceEndpoint(serviceName string) (string, error) {
 	addresses, err := c.FindService(serviceName)
 	if err != nil {
@@ -176,10 +180,11 @@ func (c *Client) GetServiceEndpoint(serviceName string) (string, error) {
 // the service configuration changes (instances added/removed, health changes).
 //
 // Example:
-//   err := client.WatchService("vault", func(addresses []*ServiceAddress) {
-//       logger.Info("Vault instances changed", zap.Int("count", len(addresses)))
-//       // Update load balancer, connection pool, etc.
-//   })
+//
+//	err := client.WatchService("vault", func(addresses []*ServiceAddress) {
+//	    logger.Info("Vault instances changed", zap.Int("count", len(addresses)))
+//	    // Update load balancer, connection pool, etc.
+//	})
 func (c *Client) WatchService(serviceName string, callback func([]*ServiceAddress)) error {
 	c.logger.Info("Starting service watch",
 		zap.String("service", serviceName))
@@ -213,18 +218,19 @@ func (c *Client) WatchService(serviceName string, callback func([]*ServiceAddres
 // RegisterService registers a service with Consul
 //
 // Example:
-//   err := client.RegisterService(&discovery.ServiceRegistration{
-//       Name:    "myapp",
-//       Address: "10.0.1.10",
-//       Port:    8080,
-//       Tags:    []string{"v1", "production"},
-//       HealthCheck: &discovery.HealthCheck{
-//           Type:     discovery.HealthCheckHTTP,
-//           HTTP:     "http://10.0.1.10:8080/health",
-//           Interval: 10 * time.Second,
-//           Timeout:  2 * time.Second,
-//       },
-//   })
+//
+//	err := client.RegisterService(&discovery.ServiceRegistration{
+//	    Name:    "myapp",
+//	    Address: "10.0.1.10",
+//	    Port:    8080,
+//	    Tags:    []string{"v1", "production"},
+//	    HealthCheck: &discovery.HealthCheck{
+//	        Type:     discovery.HealthCheckHTTP,
+//	        HTTP:     "http://10.0.1.10:8080/health",
+//	        Interval: 10 * time.Second,
+//	        Timeout:  2 * time.Second,
+//	    },
+//	})
 func (c *Client) RegisterService(service *ServiceRegistration) error {
 	c.logger.Info("Registering service",
 		zap.String("name", service.Name),
@@ -288,8 +294,9 @@ func (c *Client) DeregisterService(serviceID string) error {
 // This method performs standard DNS lookup via Consul DNS server.
 //
 // Example:
-//   ips, err := client.ResolveServiceDNS("vault")
-//   // Queries: vault.service.consul
+//
+//	ips, err := client.ResolveServiceDNS("vault")
+//	// Queries: vault.service.consul
 func (c *Client) ResolveServiceDNS(serviceName string) ([]net.IP, error) {
 	dnsName := fmt.Sprintf("%s.service.consul", serviceName)
 
@@ -324,7 +331,8 @@ func (c *Client) ResolveServiceDNS(serviceName string) ([]net.IP, error) {
 // Returns both IP addresses and port numbers from SRV records.
 //
 // Example:
-//   addresses, err := client.ResolveServiceSRV("vault")
+//
+//	addresses, err := client.ResolveServiceSRV("vault")
 func (c *Client) ResolveServiceSRV(serviceName string) ([]*ServiceAddress, error) {
 	dnsName := fmt.Sprintf("%s.service.consul", serviceName)
 

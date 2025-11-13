@@ -26,30 +26,30 @@ import (
 
 // AgentUpdateConfig configures Vault Agent update operations
 type AgentUpdateConfig struct {
-	ForceRestart      bool // Force restart even if service appears healthy
-	FixPermissions    bool // Fix credential file permissions
-	UpdatePolicies    bool // Update Agent policies (future feature)
-	DryRun            bool // Preview changes without applying
-	WaitForRenewal    bool // Wait for token renewal after restart
-	MaxWaitSeconds    int  // Maximum seconds to wait for token renewal (default: 30)
+	ForceRestart   bool // Force restart even if service appears healthy
+	FixPermissions bool // Fix credential file permissions
+	UpdatePolicies bool // Update Agent policies (future feature)
+	DryRun         bool // Preview changes without applying
+	WaitForRenewal bool // Wait for token renewal after restart
+	MaxWaitSeconds int  // Maximum seconds to wait for token renewal (default: 30)
 }
 
 // AgentHealthStatus represents the health assessment of Vault Agent
 type AgentHealthStatus struct {
-	ServiceRunning       bool
-	TokenFileExists      bool
-	TokenFilePopulated   bool
-	TokenValid           bool
-	TokenTTL             int64
-	TokenExpired         bool
-	TokenExpiresSoon     bool // TTL < 5 minutes
-	TokenIsPeriodic      bool   // Token has period set (auto-renewable)
-	AppRoleHasPeriod     bool   // AppRole config has token_period set
-	ConfigMismatch       bool   // Token config doesn't match AppRole config (needs restart)
-	CredentialsExist     bool
-	CredentialsReadable  bool
-	PermissionsCorrect   bool
-	Issues               []string
+	ServiceRunning      bool
+	TokenFileExists     bool
+	TokenFilePopulated  bool
+	TokenValid          bool
+	TokenTTL            int64
+	TokenExpired        bool
+	TokenExpiresSoon    bool // TTL < 5 minutes
+	TokenIsPeriodic     bool // Token has period set (auto-renewable)
+	AppRoleHasPeriod    bool // AppRole config has token_period set
+	ConfigMismatch      bool // Token config doesn't match AppRole config (needs restart)
+	CredentialsExist    bool
+	CredentialsReadable bool
+	PermissionsCorrect  bool
+	Issues              []string
 }
 
 // UpdateAgent performs comprehensive Vault Agent health check and recovery

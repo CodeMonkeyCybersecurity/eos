@@ -16,7 +16,7 @@ func CleanupAPTPackages(rc *eos_io.RuntimeContext) error {
 	logger.Info("Performing system-wide APT package cleanup")
 
 	cli := eos_cli.New(rc)
-	
+
 	// Run apt autoremove to remove packages that were automatically
 	// installed to satisfy dependencies but are no longer needed
 	logger.Info("Running apt-get autoremove")
@@ -49,9 +49,9 @@ func UpdateAPTCache(rc *eos_io.RuntimeContext) error {
 	logger.Info("Updating APT package cache")
 
 	cli := eos_cli.New(rc)
-	
+
 	if output, err := cli.ExecString("apt-get", "update"); err != nil {
-		logger.Error("Failed to update APT cache", 
+		logger.Error("Failed to update APT cache",
 			zap.Error(err),
 			zap.String("output", output))
 		return err
@@ -78,7 +78,7 @@ func CleanupSystemPackages(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Future: Add support for other package managers (snap, flatpak, etc.)
-	
+
 	logger.Info("System package cleanup completed")
 	return nil
 }

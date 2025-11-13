@@ -30,11 +30,11 @@ type ConfigManager struct {
 
 // ConfigOptions holds options for configuration operations
 type ConfigOptions struct {
-	Path         string      `json:"path"`
+	Path         string       `json:"path"`
 	Format       ConfigFormat `json:"format"`
-	CreateBackup bool        `json:"create_backup"`
-	Validate     bool        `json:"validate"`
-	Permissions  uint32      `json:"permissions"`
+	CreateBackup bool         `json:"create_backup"`
+	Validate     bool         `json:"validate"`
+	Permissions  uint32       `json:"permissions"`
 }
 
 // NewConfigManager creates a new configuration manager with dependency injection
@@ -212,7 +212,7 @@ func (cm *ConfigManager) ValidateConfigFile(path string, schema interface{}) err
 func (cm *ConfigManager) GetConfigValue(path, key string) (interface{}, error) {
 	opts := &ConfigOptions{Path: path}
 	var config map[string]interface{}
-	
+
 	if err := cm.LoadConfig(opts, &config); err != nil {
 		return nil, err
 	}
@@ -293,25 +293,25 @@ func (cm *ConfigManager) parseEnvFormat(content []byte, target interface{}) erro
 	// Each line: KEY=VALUE
 	lines := strings.Split(string(content), "\n")
 	envMap := make(map[string]string)
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) == 2 {
 			envMap[parts[0]] = parts[1]
 		}
 	}
-	
+
 	// Convert to JSON for standard unmarshaling
 	jsonData, err := json.Marshal(envMap)
 	if err != nil {
 		return err
 	}
-	
+
 	return json.Unmarshal(jsonData, target)
 }
 
@@ -321,17 +321,17 @@ func (cm *ConfigManager) serializeEnvFormat(source interface{}) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var envMap map[string]interface{}
 	if err := json.Unmarshal(jsonData, &envMap); err != nil {
 		return nil, err
 	}
-	
+
 	var lines []string
 	for key, value := range envMap {
 		lines = append(lines, fmt.Sprintf("%s=%v", key, value))
 	}
-	
+
 	return []byte(strings.Join(lines, "\n")), nil
 }
 
@@ -340,19 +340,19 @@ func (cm *ConfigManager) validateConfig(config interface{}) error {
 	if validator, ok := config.(interface{ Validate() error }); ok {
 		return validator.Validate()
 	}
-	
+
 	// Basic validation - check for nil
 	if config == nil {
 		return fmt.Errorf("configuration is nil")
 	}
-	
+
 	return nil
 }
 
 func (cm *ConfigManager) setNestedValue(config map[string]interface{}, key string, value interface{}) {
 	keys := strings.Split(key, ".")
 	current := config
-	
+
 	for _, k := range keys[:len(keys)-1] {
 		if _, exists := current[k]; !exists {
 			current[k] = make(map[string]interface{})
@@ -366,14 +366,14 @@ func (cm *ConfigManager) setNestedValue(config map[string]interface{}, key strin
 			current = newMap
 		}
 	}
-	
+
 	current[keys[len(keys)-1]] = value
 }
 
 func (cm *ConfigManager) getNestedValue(config map[string]interface{}, key string) interface{} {
 	keys := strings.Split(key, ".")
 	current := config
-	
+
 	for _, k := range keys[:len(keys)-1] {
 		if next, ok := current[k].(map[string]interface{}); ok {
 			current = next
@@ -381,7 +381,7 @@ func (cm *ConfigManager) getNestedValue(config map[string]interface{}, key strin
 			return nil
 		}
 	}
-	
+
 	return current[keys[len(keys)-1]]
 }
 
@@ -438,7 +438,7 @@ func (cm *ConfigManager) LoadYAMLConfig(path string, target interface{}) error {
 	return cm.LoadConfig(opts, target)
 }
 
-// SaveYAMLConfig saves a YAML configuration file  
+// SaveYAMLConfig saves a YAML configuration file
 func (cm *ConfigManager) SaveYAMLConfig(path string, source interface{}) error {
 	opts := &ConfigOptions{
 		Path:         path,

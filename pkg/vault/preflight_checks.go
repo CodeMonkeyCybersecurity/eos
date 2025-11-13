@@ -21,44 +21,44 @@ import (
 func PreflightChecks(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Running pre-flight checks for Vault installation")
-	
+
 	// Check if running as root
 	if err := checkRootPrivileges(rc); err != nil {
 		return err
 	}
-	
+
 	// Check if required directories can be created
 	if err := checkDirectoryPermissions(rc); err != nil {
 		return err
 	}
-	
+
 	// Check if required system tools are available
 	if err := checkSystemTools(rc); err != nil {
 		return err
 	}
-	
+
 	// Check if Vault is already installed and configured
 	if err := checkVaultStatus(rc); err != nil {
 		return err
 	}
-	
+
 	// Check available disk space
 	if err := checkDiskSpace(rc); err != nil {
 		return err
 	}
-	
+
 	// Check network connectivity requirements
 	if err := checkNetworkRequirements(rc); err != nil {
 		return err
 	}
-	
+
 	logger.Info("Pre-flight checks completed successfully")
 	return nil
 }
 
 func checkRootPrivileges(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if os.Geteuid() != 0 {
 		logger.Error("Vault installation requires root privileges")
 		return eos_err.NewUserError(
@@ -70,26 +70,26 @@ func checkRootPrivileges(rc *eos_io.RuntimeContext) error {
 				"• Configure systemd services\n" +
 				"• Set up proper file permissions for security")
 	}
-	
+
 	logger.Debug("Root privileges confirmed")
 	return nil
 }
 
 func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// List of directories that need to be created
 	requiredDirs := []string{
-		VaultBaseDir,           // /opt/vault
-		shared.TLSDir,             // /opt/vault/tls
-		shared.SecretsDir,         // /var/lib/eos/secret
-		shared.EosRunDir,          // /var/run/eos
+		VaultBaseDir,      // /opt/vault
+		shared.TLSDir,     // /opt/vault/tls
+		shared.SecretsDir, // /var/lib/eos/secret
+		shared.EosRunDir,  // /var/run/eos
 		filepath.Dir(shared.VaultAgentCACopyPath), // /opt/vault/agent
 	}
-	
+
 	for _, dir := range requiredDirs {
 		parentDir := filepath.Dir(dir)
-		
+
 		// Check if parent directory exists and is writable
 		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 			// Check if we can create the parent directory
@@ -102,7 +102,7 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 			// Clean up the test directory
 			_ = os.RemoveAll(parentDir)
 		}
-		
+
 		// Test if we can create the target directory
 		if err := os.MkdirAll(dir, VaultBaseDirPerm); err != nil {
 			logger.Error("Cannot create required directory",
@@ -110,11 +110,11 @@ func checkDirectoryPermissions(rc *eos_io.RuntimeContext) error {
 				zap.Error(err))
 			return eos_err.NewUserError("Cannot create required directory: %s\nError: %v\n\nThis usually means you need to run with sudo privileges.", dir, err)
 		}
-		
+
 		// Clean up the test directory
 		_ = os.RemoveAll(dir)
 	}
-	
+
 	logger.Debug("Directory permissions check passed")
 	return nil
 }
@@ -238,11 +238,11 @@ func checkVaultStatus(rc *eos_io.RuntimeContext) error {
 
 func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check available disk space in /opt and /var
 	checkPaths := []string{"/opt", "/var"}
 	minSpaceGB := int64(2) // Minimum 2GB required
-	
+
 	for _, path := range checkPaths {
 		if available, err := getDiskSpaceGB(path); err == nil {
 			if available < minSpaceGB {
@@ -254,7 +254,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 			}
 		}
 	}
-	
+
 	logger.Debug("Disk space check passed")
 	return nil
 }
@@ -293,7 +293,7 @@ func getDiskSpaceGB(path string) (int64, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	
+
 	// Available space in bytes
 	available := stat.Bavail * uint64(stat.Bsize)
 	// Convert to GB

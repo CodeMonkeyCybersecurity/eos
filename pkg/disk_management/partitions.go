@@ -130,7 +130,7 @@ func FormatPartition(rc *eos_io.RuntimeContext, device string, filesystem string
 		return operation, nil
 	}
 
-	logger.Info("Formatting partition", 
+	logger.Info("Formatting partition",
 		zap.String("device", device),
 		zap.String("filesystem", filesystem))
 
@@ -229,7 +229,7 @@ func MountPartition(rc *eos_io.RuntimeContext, device string, mountPoint string,
 		return operation, nil
 	}
 
-	logger.Info("Mounting partition", 
+	logger.Info("Mounting partition",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint))
 
@@ -308,5 +308,7 @@ func backupPartitionTable(rc *eos_io.RuntimeContext, device string) error {
 		return fmt.Errorf("failed to dump partition table: %w", err)
 	}
 
+	return os.WriteFile(backupFile, output, 0644)
+}
 	return os.WriteFile(backupFile, output, shared.ConfigFilePerm)
 }

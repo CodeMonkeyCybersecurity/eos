@@ -349,12 +349,12 @@ func ConvertFromHecateRoute(route *hecate.Route) RouteResponse {
 	if route.Upstream != nil {
 		upstreams = []string{route.Upstream.URL}
 	}
-	
+
 	var authPolicy string
 	if route.AuthPolicy != nil {
 		authPolicy = route.AuthPolicy.Name
 	}
-	
+
 	return RouteResponse{
 		ID:         route.Domain, // Use domain as ID for now
 		Domain:     route.Domain,
@@ -398,7 +398,7 @@ func ConvertToHecateRoute(req CreateRouteRequest) *hecate.Route {
 			URL: req.Upstreams[0],
 		}
 	}
-	
+
 	if req.AuthPolicy != "" {
 		route.AuthPolicy = &hecate.AuthPolicy{
 			Name: req.AuthPolicy,

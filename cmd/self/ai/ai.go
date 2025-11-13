@@ -123,7 +123,7 @@ Examples:
 		}
 
 		// Display response
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 		logger.Info("terminal prompt:  AI Assistant Response")
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 		logger.Info("")
@@ -217,7 +217,7 @@ Examples:
 			if err != nil {
 				logger.Warn("AI analysis failed", zap.Error(err))
 			} else if len(response.Choices) > 0 {
-				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 				logger.Info("terminal prompt:  AI Analysis & Recommendations")
 				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 				logger.Info("")
@@ -300,7 +300,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		}
 
 		// Display response
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 		logger.Info("terminal prompt:  Diagnostic Results & Fix Recommendations")
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 		logger.Info("")

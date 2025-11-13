@@ -31,16 +31,16 @@ func (f DataFormat) String() string {
 type FormatDetector interface {
 	// DetectFormat detects the format of input data
 	DetectFormat(ctx context.Context, input string) (DataFormat, float64, error)
-	
+
 	// DetectFromBytes detects format from byte data
 	DetectFromBytes(ctx context.Context, data []byte) (DataFormat, float64, error)
-	
+
 	// DetectFromReader detects format from an io.Reader
 	DetectFromReader(ctx context.Context, reader io.Reader) (DataFormat, float64, error)
-	
+
 	// DetectFromFilename detects format from filename extension
 	DetectFromFilename(filename string) (DataFormat, float64, error)
-	
+
 	// SupportedFormats returns the list of supported formats
 	SupportedFormats() []DataFormat
 }
@@ -49,10 +49,10 @@ type FormatDetector interface {
 type Parser interface {
 	// Parse parses input data into a structured format
 	Parse(ctx context.Context, input string, format DataFormat) (interface{}, error)
-	
+
 	// ParseBytes parses byte data into a structured format
 	ParseBytes(ctx context.Context, data []byte, format DataFormat) (interface{}, error)
-	
+
 	// ParseReader parses data from an io.Reader into a structured format
 	ParseReader(ctx context.Context, reader io.Reader, format DataFormat) (interface{}, error)
 }
@@ -61,7 +61,7 @@ type Parser interface {
 type FormatConverter interface {
 	// Convert converts data from one format to another
 	Convert(ctx context.Context, input string, fromFormat, toFormat DataFormat) (string, error)
-	
+
 	// ConvertBytes converts byte data from one format to another
 	ConvertBytes(ctx context.Context, data []byte, fromFormat, toFormat DataFormat) ([]byte, error)
 }

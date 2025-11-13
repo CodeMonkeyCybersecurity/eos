@@ -70,22 +70,22 @@ func (c *DataClassifier) ClassifyPath(path string) DataClass {
 	if c.matchesPatterns(path, c.expendablePaths) {
 		return ClassExpendable
 	}
-	
+
 	// Check critical paths
 	if c.matchesPatterns(path, c.criticalPaths) {
 		return ClassCritical
 	}
-	
+
 	// Check important paths
 	if c.matchesPatterns(path, c.importantPaths) {
 		return ClassImportant
 	}
-	
+
 	// Check standard paths
 	if c.matchesPatterns(path, c.standardPaths) {
 		return ClassStandard
 	}
-	
+
 	// Default to standard if no match
 	return ClassStandard
 }
@@ -111,14 +111,14 @@ func (c *DataClassifier) matchesPatterns(path string, patterns []string) bool {
 // GetCleanupCandidates returns paths that can be cleaned up based on class
 func (c *DataClassifier) GetCleanupCandidates(basePath string, aggressive bool) []string {
 	candidates := []string{}
-	
+
 	// Always include expendable paths
 	for _, path := range c.expendablePaths {
 		if !strings.Contains(path, "*") {
 			candidates = append(candidates, filepath.Join(basePath, path))
 		}
 	}
-	
+
 	// In aggressive mode, include some standard paths
 	if aggressive {
 		candidates = append(candidates,
@@ -127,7 +127,7 @@ func (c *DataClassifier) GetCleanupCandidates(basePath string, aggressive bool) 
 			filepath.Join(basePath, "/var/log/*.old"),
 		)
 	}
-	
+
 	return candidates
 }
 
@@ -149,7 +149,7 @@ func GetClassDescription(class DataClass) string {
 		ClassStandard:   "Standard operational data",
 		ClassExpendable: "Temporary and cache files that can be deleted",
 	}
-	
+
 	if desc, ok := descriptions[class]; ok {
 		return desc
 	}

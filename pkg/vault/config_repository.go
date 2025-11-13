@@ -10,7 +10,6 @@ import (
 	"sync"
 
 	"go.uber.org/zap"
-
 )
 
 // FileConfigRepository implements vault.ConfigRepository using file system storage
@@ -250,12 +249,12 @@ func (r *VaultConfigRepository) GetAllConfig(ctx context.Context) (map[string]st
 		// Get the actual secret value
 		secret, err := r.secretStore.Get(ctx, secretPath)
 		if err != nil {
-			r.logger.Warn("Failed to get secret during list", 
+			r.logger.Warn("Failed to get secret during list",
 				zap.String("path", secretPath),
 				zap.Error(err))
 			continue
 		}
-		
+
 		// Extract key name from full key path
 		if len(secretPath) > len(r.keyPrefix)+1 {
 			key := secretPath[len(r.keyPrefix)+1:]

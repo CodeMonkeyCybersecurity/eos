@@ -69,7 +69,7 @@ func FuzzConfigSecurity(f *testing.F) {
 			if !strings.HasPrefix(device, "/dev/") && !strings.HasPrefix(device, "/") {
 				t.Logf("Suspicious device path: %q", device)
 			}
-			
+
 			// Check for device manipulation
 			if strings.Count(device, "/") > 4 {
 				t.Logf("Deeply nested device path: %q", device)
@@ -96,12 +96,12 @@ func FuzzConfigSecurity(f *testing.F) {
 		// Validate mount options
 		dangerousMountOptions := []string{
 			"exec", "suid", "dev", // Security-sensitive options
-			"users", "owner",      // Permission-related
+			"users", "owner", // Permission-related
 		}
 
 		for _, opt := range config.MountOptions {
 			opt = strings.TrimSpace(opt)
-			
+
 			// Check for injection in options
 			if strings.ContainsAny(opt, ";|&`$()") {
 				t.Logf("Injection characters in mount option: %q", opt)
@@ -168,7 +168,7 @@ func FuzzVolumeInfoSecurity(f *testing.F) {
 			MountPoints: []string{mountPoint},
 			CreatedAt:   time.Now(),
 		}
-		
+
 		// Use info to avoid unused variable error
 		_ = info
 
@@ -240,7 +240,7 @@ func FuzzSubvolumeInfoSecurity(f *testing.F) {
 			ParentUUID:   parentUUID,
 			ReceivedUUID: receivedUUID,
 		}
-		
+
 		// Use info to avoid unused variable error
 		_ = info
 
@@ -319,7 +319,7 @@ func FuzzSnapshotConfigSecurity(f *testing.F) {
 			Readonly:     readonly,
 			Recursive:    recursive,
 		}
-		
+
 		// Use config to avoid unused variable error
 		_ = config
 
@@ -405,10 +405,10 @@ func FuzzMountOptionsSecurity(f *testing.F) {
 
 		// Security validation
 		dangerousOptions := []string{
-			"exec", "suid", "dev",           // Allow code execution
-			"user", "users", "owner",        // User-controlled mounts
-			"defaults",                      // Includes exec, suid, dev
-			"user_subvol_rm_allowed",        // Allows subvolume deletion
+			"exec", "suid", "dev", // Allow code execution
+			"user", "users", "owner", // User-controlled mounts
+			"defaults",               // Includes exec, suid, dev
+			"user_subvol_rm_allowed", // Allows subvolume deletion
 		}
 
 		compressOptions := []string{
@@ -447,12 +447,12 @@ func FuzzMountOptionsSecurity(f *testing.F) {
 			for _, compOpt := range compressOptions {
 				if strings.HasPrefix(opt, compOpt+"=") {
 					value := strings.TrimPrefix(opt, compOpt+"=")
-					
+
 					// Check compression algorithm
 					validAlgos := []string{"zlib", "lzo", "zstd", "no", "none"}
 					parts := strings.Split(value, ":")
 					algo := parts[0]
-					
+
 					valid := false
 					for _, v := range validAlgos {
 						if algo == v {
@@ -460,7 +460,7 @@ func FuzzMountOptionsSecurity(f *testing.F) {
 							break
 						}
 					}
-					
+
 					if !valid {
 						t.Logf("Invalid compression algorithm: %q", algo)
 					}

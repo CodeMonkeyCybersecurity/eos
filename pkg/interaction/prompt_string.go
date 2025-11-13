@@ -36,9 +36,9 @@ var (
 
 	// Dangerous patterns to reject (shell injection, path traversal)
 	dangerousPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`[;&|<>$\x60\\]`),                 // Shell metacharacters
-		regexp.MustCompile(`\.\./`),                          // Path traversal
-		regexp.MustCompile(`\x00`),                           // Null bytes
+		regexp.MustCompile(`[;&|<>$\x60\\]`),                    // Shell metacharacters
+		regexp.MustCompile(`\.\./`),                             // Path traversal
+		regexp.MustCompile(`\x00`),                              // Null bytes
 		regexp.MustCompile(`[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]`), // Control characters
 	}
 )
@@ -132,9 +132,9 @@ func PromptString(rc *eos_io.RuntimeContext, config *PromptConfig) (*PromptResul
 // P0 EXCEPTION: fmt.Printf required for interactive prompting UX
 // JUSTIFICATION: Interactive survey-style prompts require unbuffered terminal I/O
 // Cannot use logger.Info() because:
-//   1. Logger adds timestamps/prefixes that break the interactive prompt UX
-//   2. Logger adds newlines that prevent inline prompting (we need "? Message: " on same line as input)
-//   3. Survey-style prompts expect clean "? Message [default]: " format without log metadata
+//  1. Logger adds timestamps/prefixes that break the interactive prompt UX
+//  2. Logger adds newlines that prevent inline prompting (we need "? Message: " on same line as input)
+//  3. Survey-style prompts expect clean "? Message [default]: " format without log metadata
 func displayPrompt(config *PromptConfig) {
 	if config.HelpText != "" {
 		fmt.Printf("   %s\n", config.HelpText)

@@ -14,8 +14,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -27,12 +27,12 @@ type WazuhIntegrator struct {
 
 // WazuhIntegrationResources tracks resources created during Wazuh integration
 type WazuhIntegrationResources struct {
-	SAMLProviderPK       string   // Authentik SAML provider PK (for cleanup)
-	PropertyMappingPKs   []string // SAML property mappings created (for cleanup)
-	ApplicationPK        string   // Authentik application PK (for cleanup)
-	ApplicationSlug      string   // Authentik application slug (for cleanup)
-	MetadataStored       bool     // Whether metadata was stored in Consul KV
-	ConsulKVKeysCreated  []string // All Consul KV keys created (for cleanup)
+	SAMLProviderPK      string   // Authentik SAML provider PK (for cleanup)
+	PropertyMappingPKs  []string // SAML property mappings created (for cleanup)
+	ApplicationPK       string   // Authentik application PK (for cleanup)
+	ApplicationSlug     string   // Authentik application slug (for cleanup)
+	MetadataStored      bool     // Whether metadata was stored in Consul KV
+	ConsulKVKeysCreated []string // All Consul KV keys created (for cleanup)
 }
 
 func init() {
@@ -302,7 +302,7 @@ func (w *WazuhIntegrator) ConfigureAuthentication(rc *eos_io.RuntimeContext, opt
 
 	if opts.DryRun {
 		logger.Info("    [DRY RUN] Would create Authentik SAML property mappings (username, email, Roles)")
-		logger.Info("    [DRY RUN] Would create SAML provider with ACS URL: https://"+opts.DNS+"/_opendistro/_security/saml/acs")
+		logger.Info("    [DRY RUN] Would create SAML provider with ACS URL: https://" + opts.DNS + "/_opendistro/_security/saml/acs")
 		logger.Info("    [DRY RUN] Would create Authentik application 'Wazuh SIEM'")
 		logger.Info("    [DRY RUN] Would download SAML metadata XML")
 		logger.Info("    [DRY RUN] Would store metadata in Consul KV: service/wazuh/sso/metadata_xml")

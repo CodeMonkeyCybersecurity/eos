@@ -26,10 +26,10 @@ type OrchestrationResult struct {
 
 // OrchestrationOptions represents options for orchestration
 type OrchestrationOptions struct {
-	Mode    OrchestrationMode `json:"mode"`
-	Target  string            `json:"target"`
+	Mode    OrchestrationMode      `json:"mode"`
+	Target  string                 `json:"target"`
 	Config  map[string]interface{} `json:"config,omitempty"`
-	Timeout time.Duration     `json:"timeout,omitempty"`
+	Timeout time.Duration          `json:"timeout,omitempty"`
 }
 
 // DirectExecutor represents a direct execution interface
@@ -37,11 +37,9 @@ type DirectExecutor interface {
 	Execute(target string, command string) error
 }
 
-
-
 // NomadOperation represents a Nomad operation
 type NomadOperation struct {
-	Target  string
-	Job     string
-	Config  map[string]interface{}
+	Target string
+	Job    string
+	Config map[string]interface{}
 }

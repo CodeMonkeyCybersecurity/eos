@@ -23,7 +23,7 @@ type DriverRegistry struct {
 // ZFSDriverFactory creates ZFS storage drivers
 type ZFSDriverFactory struct{}
 
-// CephFSDriverFactory creates CephFS storage drivers  
+// CephFSDriverFactory creates CephFS storage drivers
 type CephFSDriverFactory struct{}
 
 // NewDriverRegistry creates a new driver registry
@@ -85,8 +85,6 @@ func (r *DriverRegistry) registerDefaultDrivers() {
 	logger := otelzap.Ctx(r.rc.Ctx)
 	logger.Info("Registering default storage drivers")
 
-
-
 	// Register Docker Volume driver
 	_ = r.Register(StorageType("docker"), &DockerVolumeDriverFactory{})
 }
@@ -99,7 +97,7 @@ type LVMDriverFactory struct {
 func (f *LVMDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
 	// Use existing LVM package functionality
 	return &LVMDriver{
-		rc:   rc,
+		rc: rc,
 	}, nil
 }
 
@@ -117,7 +115,7 @@ func (f *BTRFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driv
 	// The BTRFSDriver uses NomadClient for orchestration
 	// Storage operations are handled through Nomad job scheduling
 	return &BTRFSDriver{
-		rc:   rc,
+		rc: rc,
 	}, nil
 }
 
@@ -125,8 +123,6 @@ func (f *BTRFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Driv
 func (f *BTRFSDriverFactory) SupportsType(storageType StorageType) bool {
 	return storageType == StorageTypeBTRFS
 }
-
-
 
 // CreateDriver creates a ZFS storage driver
 func (f *ZFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config DriverConfig) (StorageDriver, error) {
@@ -149,7 +145,7 @@ func (f *CephFSDriverFactory) CreateDriver(rc *eos_io.RuntimeContext, config Dri
 	// The CephFSDriver uses NomadClient for distributed storage orchestration
 	// CephFS operations are handled through Nomad job scheduling
 	return &CephFSDriver{
-		rc:   rc,
+		rc: rc,
 	}, nil
 }
 

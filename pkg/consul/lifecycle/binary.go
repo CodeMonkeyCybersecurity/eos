@@ -431,4 +431,3 @@ func getUbuntuCodename() (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
-

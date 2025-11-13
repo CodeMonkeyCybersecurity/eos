@@ -16,11 +16,11 @@ import (
 
 // MFATestFramework provides comprehensive testing for MFA configurations
 type MFATestFramework struct {
-	rc             *eos_io.RuntimeContext
-	logger         otelzap.LoggerWithCtx
-	testUser       string
-	hasGoogleAuth  bool
-	_              string
+	rc            *eos_io.RuntimeContext
+	logger        otelzap.LoggerWithCtx
+	testUser      string
+	hasGoogleAuth bool
+	_             string
 }
 
 // NewMFATestFramework creates a new MFA testing framework

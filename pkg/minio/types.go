@@ -2,7 +2,6 @@ package minio
 
 import "time"
 
-
 // Config represents MinIO configuration
 type Config struct {
 	Version       string

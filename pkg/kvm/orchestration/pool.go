@@ -270,8 +270,8 @@ func (pm *VMPoolManager) getPoolMetrics(poolName string) (*PoolMetrics, error) {
 	// In production, you would query actual metrics from monitoring systems
 
 	metrics := &PoolMetrics{
-		VMCount: 0,
-		AvgCPU:  0,
+		VMCount:   0,
+		AvgCPU:    0,
 		AvgMemory: 0,
 	}
 

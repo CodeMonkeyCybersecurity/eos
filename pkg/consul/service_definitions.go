@@ -29,19 +29,19 @@ import (
 
 // ServiceInfo holds extracted service metadata from a container.
 type ServiceInfo struct {
-	ID              string            // Service ID (e.g., "hecate-caddy")
-	Name            string            // Service name (e.g., "caddy")
-	Port            int               // Primary service port
-	Address         string            // Service address (default: localhost)
-	Tags            []string          // Service tags
-	HealthEndpoint  string            // Health check endpoint
-	HealthType      string            // Health check type (http, tcp, script)
-	HealthInterval  string            // Health check interval (default: 10s)
-	HealthTimeout   string            // Health check timeout (default: 2s)
-	Meta            map[string]string // Service metadata
-	ContainerID     string            // Docker container ID
-	ContainerName   string            // Docker container name
-	DockerNetwork   string            // Docker network name
+	ID             string            // Service ID (e.g., "hecate-caddy")
+	Name           string            // Service name (e.g., "caddy")
+	Port           int               // Primary service port
+	Address        string            // Service address (default: localhost)
+	Tags           []string          // Service tags
+	HealthEndpoint string            // Health check endpoint
+	HealthType     string            // Health check type (http, tcp, script)
+	HealthInterval string            // Health check interval (default: 10s)
+	HealthTimeout  string            // Health check timeout (default: 2s)
+	Meta           map[string]string // Service metadata
+	ContainerID    string            // Docker container ID
+	ContainerName  string            // Docker container name
+	DockerNetwork  string            // Docker network name
 }
 
 // ServiceOverrides allows manual override of auto-detected service info.

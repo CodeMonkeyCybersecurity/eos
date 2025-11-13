@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
-
 )
 
 // VaultManagerImpl implements vault.VaultManager

@@ -24,12 +24,12 @@ import (
 // AgentTemplateConfig defines a Vault Agent template configuration
 // NOTE: Renamed from TemplateConfig to avoid conflict with template_bionicgpt.go:TemplateConfig
 type AgentTemplateConfig struct {
-	ServiceName      string // e.g., "bionicgpt"
-	SourceTemplate   string // Path to .ctmpl file
-	DestinationFile  string // Where to write rendered file
-	FilePermissions  string // e.g., "0640"
-	CommandOnChange  string // Command to run when template changes
-	TemplateContent  string // Actual template content (if not reading from file)
+	ServiceName     string // e.g., "bionicgpt"
+	SourceTemplate  string // Path to .ctmpl file
+	DestinationFile string // Where to write rendered file
+	FilePermissions string // e.g., "0640"
+	CommandOnChange string // Command to run when template changes
+	TemplateContent string // Actual template content (if not reading from file)
 }
 
 // EnableTemplatesConfig configures template rendering enablement

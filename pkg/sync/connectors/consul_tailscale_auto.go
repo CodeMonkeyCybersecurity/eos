@@ -20,9 +20,9 @@ import (
 //
 // When user runs "eos sync consul tailscale" or "eos sync tailscale consul",
 // this connector:
-//   1. Gets this node's Tailscale IP
-//   2. Configures local Consul to bind to the Tailscale IP
-//   3. Restarts Consul with the new configuration
+//  1. Gets this node's Tailscale IP
+//  2. Configures local Consul to bind to the Tailscale IP
+//  3. Restarts Consul with the new configuration
 //
 // This is a LOCAL operation that prepares Consul to communicate over Tailscale.
 // To join multiple Consul nodes together, use: eos sync consul --vhostX --vhostY
@@ -63,14 +63,14 @@ func (c *ConsulTailscaleAutoConnector) PreflightCheck(rc *eos_io.RuntimeContext,
 	// Check if Tailscale is authenticated
 	tsClient, err := tailscale.NewClient(rc)
 	if err != nil {
-		return fmt.Errorf("tailscale client error: %w\n\n" +
+		return fmt.Errorf("tailscale client error: %w\n\n"+
 			"Is Tailscale authenticated? Run: sudo tailscale up", err)
 	}
 
 	// Get self IP to verify connectivity
 	_, err = tsClient.GetSelfIP()
 	if err != nil {
-		return fmt.Errorf("tailscale is not connected: %w\n\n" +
+		return fmt.Errorf("tailscale is not connected: %w\n\n"+
 			"Please authenticate with: sudo tailscale up", err)
 	}
 

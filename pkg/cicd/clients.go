@@ -29,7 +29,7 @@ func (c *MockBuildClient) BuildHugo(ctx context.Context, config HugoConfig) (*Bu
 		zap.Bool("minify", config.Minify))
 
 	start := time.Now()
-	
+
 	// Simulate build time
 	select {
 	case <-ctx.Done():
@@ -100,7 +100,7 @@ func (c *MockBuildClient) BuildDockerImage(ctx context.Context, config BuildConf
 	}
 
 	imageTag := fmt.Sprintf("%s/%s:latest", config.Registry, config.Image)
-	
+
 	artifacts := []ArtifactInfo{
 		{
 			Name:      "docker-image",
@@ -206,11 +206,11 @@ func (c *MockNomadClient) SubmitJob(ctx context.Context, jobSpec string) (*Nomad
 		zap.String("job_id", jobID))
 
 	status := &NomadJobStatus{
-		ID:      jobID,
-		Status:  "pending",
-		Running: 0,
-		Desired: 1,
-		Failed:  0,
+		ID:          jobID,
+		Status:      "pending",
+		Running:     0,
+		Desired:     1,
+		Failed:      0,
 		Allocations: []*NomadAllocation{},
 	}
 
@@ -263,11 +263,11 @@ func (c *MockNomadClient) GetAllocations(ctx context.Context, jobID string) ([]*
 func (c *MockNomadClient) simulateJobLifecycle(jobID string) {
 	// Wait a bit, then mark as running
 	time.Sleep(2 * time.Second)
-	
+
 	if status, exists := c.jobs[jobID]; exists {
 		status.Status = "running"
 		status.Running = 1
-		
+
 		allocation := &NomadAllocation{
 			ID:     fmt.Sprintf("alloc-%s", jobID),
 			JobID:  jobID,
@@ -276,7 +276,7 @@ func (c *MockNomadClient) simulateJobLifecycle(jobID string) {
 			Tasks:  map[string]string{"web": "running"},
 		}
 		status.Allocations = []*NomadAllocation{allocation}
-		
+
 		c.logger.Info("Mock job transitioned to running",
 			zap.String("job_id", jobID))
 	}
@@ -374,7 +374,7 @@ func NewRealBuildClient(logger *zap.Logger) *RealBuildClient {
 // BuildHugo builds a Hugo site
 func (c *RealBuildClient) BuildHugo(ctx context.Context, config HugoConfig) (*BuildResult, error) {
 	start := time.Now()
-	
+
 	c.logger.Info("Starting Hugo build",
 		zap.String("environment", config.Environment),
 		zap.Bool("minify", config.Minify))
@@ -443,7 +443,7 @@ func (c *RealBuildClient) BuildDockerImage(ctx context.Context, config BuildConf
 	start := time.Now()
 
 	imageTag := fmt.Sprintf("%s/%s:latest", config.Registry, config.Image)
-	
+
 	c.logger.Info("Starting Docker build",
 		zap.String("image", imageTag),
 		zap.String("dockerfile", config.DockerFile))

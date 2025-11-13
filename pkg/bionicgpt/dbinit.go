@@ -141,8 +141,7 @@ echo "  Privileges: ALL (tables, sequences, schema)"
 echo "════════════════════════════════════════════════════════════════"
 `,
 		bgi.config.PostgresPassword, // Password for bionic_application user
-		bgi.config.PostgresDB,        // Database name in CREATE USER notice
-		bgi.config.PostgresDB,        // Database name in final echo
+		bgi.config.PostgresDB,       // Database name in CREATE USER notice
+		bgi.config.PostgresDB,       // Database name in final echo
 	)
 }
-

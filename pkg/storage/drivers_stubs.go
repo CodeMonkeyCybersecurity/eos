@@ -10,7 +10,7 @@ import (
 
 // BTRFSDriver implements StorageDriver for BTRFS volumes
 type BTRFSDriver struct {
-	rc   *eos_io.RuntimeContext
+	rc *eos_io.RuntimeContext
 }
 
 func (d *BTRFSDriver) Type() StorageType { return StorageTypeBTRFS }
@@ -137,7 +137,7 @@ func (d *ZFSDriver) RestoreSnapshot(ctx context.Context, id string, snapshotName
 
 // CephFSDriver implements StorageDriver for CephFS
 type CephFSDriver struct {
-	rc   *eos_io.RuntimeContext
+	rc *eos_io.RuntimeContext
 }
 
 func (d *CephFSDriver) Type() StorageType { return StorageTypeCephFS }

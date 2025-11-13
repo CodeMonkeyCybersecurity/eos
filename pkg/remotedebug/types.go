@@ -25,9 +25,9 @@ const (
 
 // DiagnosticOptions configures what diagnostics to run
 type DiagnosticOptions struct {
-	CheckType   string // all, disk, memory, network, auth
-	KernelLogs  bool
-	Since       string
+	CheckType  string // all, disk, memory, network, auth
+	KernelLogs bool
+	Since      string
 }
 
 // SystemInfo holds comprehensive system information
@@ -78,11 +78,11 @@ type MemoryInfo struct {
 
 // ProcessInfo holds information about a process
 type ProcessInfo struct {
-	PID         string
-	User        string
-	CPUPercent  float64
-	MemPercent  float64
-	Command     string
+	PID        string
+	User       string
+	CPUPercent float64
+	MemPercent float64
+	Command    string
 }
 
 // NetworkInfo holds network-related information
@@ -152,10 +152,10 @@ type FixAction struct {
 
 // SSHHealthCheck result
 type SSHHealthResult struct {
-	Healthy      bool
-	Issues       []Issue
-	Warnings     []Warning
-	Diagnostics  map[string]interface{}
+	Healthy     bool
+	Issues      []Issue
+	Warnings    []Warning
+	Diagnostics map[string]interface{}
 }
 
 // KernelLogs holds kernel log information
@@ -210,7 +210,7 @@ const (
 	SeverityHigh     = "high"
 	SeverityMedium   = "medium"
 	SeverityLow      = "low"
-	
+
 	CategoryDisk     = "disk"
 	CategoryMemory   = "memory"
 	CategoryNetwork  = "network"

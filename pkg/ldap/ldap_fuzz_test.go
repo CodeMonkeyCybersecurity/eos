@@ -14,43 +14,43 @@ func FuzzLDAPQuery(f *testing.F) {
 		"*)(uid=*))(|(uid=*",
 		"admin)(|(password=*)",
 		"*)(cn=*))(|(cn=*",
-		
+
 		// Boolean-based injection
 		"admin)(&(|)(password=*))",
 		"*)(|(objectClass=*)",
 		"admin)(|(password=*))",
-		
+
 		// Blind injection
 		"admin)(|(password=a*))",
 		"admin)(|(password=ab*))",
 		"admin)(|(password=abc*))",
-		
+
 		// Time-based attacks
 		"admin)(|(password=*))(|(password=*",
-		
+
 		// Unicode attacks
 		"admiñ", // Unicode variations
 		"ADMIN", // Case variations
 		"ädmin", // Diacritics
-		
+
 		// Special characters
 		"admin\\29", // Escaped parenthesis
 		"admin\\2a", // Escaped asterisk
 		"admin\\5c", // Escaped backslash
 		"admin\\00", // Null byte
-		
+
 		// DN injection
 		"cn=admin,ou=users,dc=example,dc=com",
 		"cn=admin\\2cou=users",
-		
+
 		// Filter bypass attempts
 		"*))(|(cn=*",
 		"*))%00(|(cn=*",
-		
+
 		// Buffer overflow attempts
 		strings.Repeat("A", 1024),
 		strings.Repeat("(", 100) + strings.Repeat(")", 100),
-		
+
 		// Valid inputs (should pass)
 		"admin",
 		"user123",
@@ -58,33 +58,33 @@ func FuzzLDAPQuery(f *testing.F) {
 		"user_test",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, username string) {
 		// Test LDAP filter construction
 		filter := constructLDAPFilter(username)
-		
+
 		// Validate filter syntax
 		if err := validateLDAPFilter(filter); err != nil {
 			// Invalid filters should not crash but should be rejected
 			return
 		}
-		
+
 		// Test DN construction
 		dn := constructUserDN(username)
 		if err := validateLDAPDN(dn); err != nil {
 			return
 		}
-		
+
 		// Test search query construction
 		query := constructSearchQuery(username)
 		if err := validateSearchQuery(query); err != nil {
 			return
 		}
-		
+
 		// Test attribute escaping
 		escaped := escapeLDAPAttribute(username)
 		if !isValidEscapedAttribute(escaped) {
@@ -101,28 +101,28 @@ func FuzzLDAPSearchFilter(f *testing.F) {
 		"(cn=John Doe)",
 		"(&(uid=john)(objectClass=person))",
 		"(|(uid=john)(mail=john@example.com))",
-		
+
 		// Complex filters
 		"(&(objectClass=person)(|(uid=john)(cn=john*)))",
 		"(!(uid=disabled))",
-		
+
 		// Injection attempts
 		"(uid=john)(|(uid=*))",
 		"(uid=*)(uid=admin)",
 		"(uid=john))((uid=admin)",
-		
+
 		// Malformed filters
 		"(uid=john",
 		"uid=john)",
 		"((uid=john))",
 		"(uid=)",
 		"(=john)",
-		
+
 		// Unicode in filters
 		"(cn=José)",
 		"(uid=中文)",
 		"(description=café)",
-		
+
 		// Special LDAP characters
 		"(uid=user\\2a)", // Escaped *
 		"(uid=user\\28)", // Escaped (
@@ -130,11 +130,11 @@ func FuzzLDAPSearchFilter(f *testing.F) {
 		"(uid=user\\5c)", // Escaped \
 		"(uid=user\\00)", // Null byte
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, filter string) {
 		// Test filter parsing
 		parsed, err := parseLDAPFilter(filter)
@@ -142,18 +142,18 @@ func FuzzLDAPSearchFilter(f *testing.F) {
 			// Invalid filters should be rejected gracefully
 			return
 		}
-		
+
 		// Test filter validation
 		if err := validateParsedFilter(parsed); err != nil {
 			return
 		}
-		
+
 		// Test filter normalization
 		normalized := normalizeLDAPFilter(filter)
 		if len(normalized) > len(filter)*2 {
 			t.Error("Normalized filter too large, possible DoS")
 		}
-		
+
 		// Test filter sanitization
 		sanitized := sanitizeLDAPFilter(filter)
 		if containsInjectionPatterns(sanitized) {
@@ -169,60 +169,60 @@ func FuzzLDAPCredentials(f *testing.F) {
 		"password123",
 		"P@ssw0rd!",
 		"verylongpasswordwithmanychars",
-		
+
 		// Unicode passwords
 		"pássw🔒rd",
 		"пароль123",
 		"密码123",
-		
+
 		// Special characters
 		"pass word",
 		"pass\tword",
 		"pass\nword",
 		"pass\rword",
-		
+
 		// Control characters
 		"pass\x00word",
 		"pass\x01word",
 		"pass\x1fword",
-		
+
 		// Injection attempts
 		"'; DROP TABLE users; --",
 		"admin' OR '1'='1",
 		"password); rm -rf /; echo ('",
-		
+
 		// Buffer overflow
 		strings.Repeat("A", 10000),
-		
+
 		// Empty/null
 		"",
 		"\x00",
 		strings.Repeat("\x00", 100),
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, password string) {
 		// Test password validation
 		isValid := validateLDAPPassword(password)
 		_ = isValid
-		
+
 		// Test password sanitization
 		sanitized := sanitizeLDAPPassword(password)
-		
+
 		// Verify sanitization
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized password contains null bytes")
 		}
-		
+
 		// Test credential encoding
 		encoded := encodeLDAPCredential(password)
 		if !isValidEncodedCredential(encoded) {
 			t.Error("Encoded credential validation failed")
 		}
-		
+
 		// Test bind DN construction with password
 		bindDN := constructBindDN("testuser", password)
 		if err := validateBindDN(bindDN); err != nil {
@@ -238,49 +238,49 @@ func FuzzLDAPAttributes(f *testing.F) {
 		// Standard attributes
 		"uid", "cn", "sn", "givenName", "mail",
 		"objectClass", "dn", "distinguishedName",
-		
+
 		// Custom attributes
 		"customAttr", "x-custom", "myAttribute",
-		
+
 		// Injection attempts in attribute names
 		"uid;rm -rf /", "cn|cat /etc/passwd",
 		"attr$(whoami)", "attr`id`",
-		
+
 		// Special characters
 		"attr-name", "attr_name", "attr.name",
 		"attr@name", "attr#name", "attr%name",
-		
+
 		// Unicode attributes
 		"атрибут", "属性", "atribúto",
-		
+
 		// Long attributes
 		strings.Repeat("a", 1000),
-		
+
 		// Empty/null
 		"", "\x00", " ",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, attribute string) {
 		// Test attribute name validation
 		isValidName := validateLDAPAttributeName(attribute)
 		_ = isValidName
-		
+
 		// Test attribute value validation
 		isValidValue := validateLDAPAttributeValue(attribute)
 		_ = isValidValue
-		
+
 		// Test attribute encoding
 		encoded := encodeLDAPAttribute(attribute)
 		if !utf8.ValidString(encoded) {
 			t.Error("Encoded attribute is not valid UTF-8")
 		}
-		
+
 		// Test attribute in search filter
-		filter := "("+attribute+"=value)"
+		filter := "(" + attribute + "=value)"
 		if err := validateLDAPFilter(filter); err != nil {
 			// Invalid attributes should be rejected
 			return

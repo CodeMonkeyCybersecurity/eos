@@ -9,43 +9,43 @@ import (
 
 // Route represents a reverse proxy route configuration
 type Route struct {
-	ID           string            `json:"id" yaml:"id"`
-	Domain       string            `json:"domain" yaml:"domain"`
-	Upstream     *Upstream         `json:"upstream" yaml:"upstream"`
-	AuthPolicy   *AuthPolicy       `json:"auth_policy,omitempty" yaml:"auth_policy,omitempty"`
-	RequireAuth  bool              `json:"require_auth" yaml:"require_auth"` // Enable Authentik forward_auth
-	Headers      map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	HealthCheck  *HealthCheck      `json:"health_check,omitempty" yaml:"health_check,omitempty"`
-	RateLimit    *RateLimit        `json:"rate_limit,omitempty" yaml:"rate_limit,omitempty"`
-	TLS          *TLSConfig        `json:"tls,omitempty" yaml:"tls,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	CreatedAt    time.Time         `json:"created_at" yaml:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at" yaml:"updated_at"`
-	Status       RouteStatus       `json:"status" yaml:"status"`
+	ID          string            `json:"id" yaml:"id"`
+	Domain      string            `json:"domain" yaml:"domain"`
+	Upstream    *Upstream         `json:"upstream" yaml:"upstream"`
+	AuthPolicy  *AuthPolicy       `json:"auth_policy,omitempty" yaml:"auth_policy,omitempty"`
+	RequireAuth bool              `json:"require_auth" yaml:"require_auth"` // Enable Authentik forward_auth
+	Headers     map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+	HealthCheck *HealthCheck      `json:"health_check,omitempty" yaml:"health_check,omitempty"`
+	RateLimit   *RateLimit        `json:"rate_limit,omitempty" yaml:"rate_limit,omitempty"`
+	TLS         *TLSConfig        `json:"tls,omitempty" yaml:"tls,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	CreatedAt   time.Time         `json:"created_at" yaml:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at" yaml:"updated_at"`
+	Status      RouteStatus       `json:"status" yaml:"status"`
 }
 
 // Upstream represents the backend service configuration
 type Upstream struct {
-	URL                 string        `json:"url" yaml:"url"`
-	TLSSkipVerify      bool          `json:"tls_skip_verify,omitempty" yaml:"tls_skip_verify,omitempty"`
-	LoadBalancePolicy  string        `json:"lb_policy,omitempty" yaml:"lb_policy,omitempty"`
-	HealthCheckPath    string        `json:"health_check_path,omitempty" yaml:"health_check_path,omitempty"`
-	Timeout            time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
-	MaxIdleConns       int           `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty"`
-	MaxConnsPerHost    int           `json:"max_conns_per_host,omitempty" yaml:"max_conns_per_host,omitempty"`
-	KeepAlive          time.Duration `json:"keep_alive,omitempty" yaml:"keep_alive,omitempty"`
+	URL               string        `json:"url" yaml:"url"`
+	TLSSkipVerify     bool          `json:"tls_skip_verify,omitempty" yaml:"tls_skip_verify,omitempty"`
+	LoadBalancePolicy string        `json:"lb_policy,omitempty" yaml:"lb_policy,omitempty"`
+	HealthCheckPath   string        `json:"health_check_path,omitempty" yaml:"health_check_path,omitempty"`
+	Timeout           time.Duration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
+	MaxIdleConns      int           `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty"`
+	MaxConnsPerHost   int           `json:"max_conns_per_host,omitempty" yaml:"max_conns_per_host,omitempty"`
+	KeepAlive         time.Duration `json:"keep_alive,omitempty" yaml:"keep_alive,omitempty"`
 }
 
 // AuthPolicy represents authentication and authorization configuration
 type AuthPolicy struct {
-	Name         string            `json:"name" yaml:"name"`
-	Provider     string            `json:"provider" yaml:"provider"` // authentik, etc
-	Flow         string            `json:"flow,omitempty" yaml:"flow,omitempty"`
-	Groups       []string          `json:"groups,omitempty" yaml:"groups,omitempty"`
-	RequireMFA   bool              `json:"require_mfa" yaml:"require_mfa"`
-	SessionTTL   time.Duration     `json:"session_ttl,omitempty" yaml:"session_ttl,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Permissions  []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	Name        string            `json:"name" yaml:"name"`
+	Provider    string            `json:"provider" yaml:"provider"` // authentik, etc
+	Flow        string            `json:"flow,omitempty" yaml:"flow,omitempty"`
+	Groups      []string          `json:"groups,omitempty" yaml:"groups,omitempty"`
+	RequireMFA  bool              `json:"require_mfa" yaml:"require_mfa"`
+	SessionTTL  time.Duration     `json:"session_ttl,omitempty" yaml:"session_ttl,omitempty"`
+	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Permissions []Permission      `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
 // Permission represents a specific permission requirement
@@ -57,18 +57,18 @@ type Permission struct {
 
 // HealthCheck represents health check configuration
 type HealthCheck struct {
-	Path            string        `json:"path" yaml:"path"`
-	Interval        time.Duration `json:"interval" yaml:"interval"`
-	Timeout         time.Duration `json:"timeout" yaml:"timeout"`
-	UnhealthyStatus []int         `json:"unhealthy_status,omitempty" yaml:"unhealthy_status,omitempty"`
-	HealthyStatus   []int         `json:"healthy_status,omitempty" yaml:"healthy_status,omitempty"`
-	ExpectedStatus  []int         `json:"expected_status,omitempty" yaml:"expected_status,omitempty"`
-	FailureThreshold int          `json:"failure_threshold" yaml:"failure_threshold"`
-	SuccessThreshold int          `json:"success_threshold" yaml:"success_threshold"`
+	Path             string            `json:"path" yaml:"path"`
+	Interval         time.Duration     `json:"interval" yaml:"interval"`
+	Timeout          time.Duration     `json:"timeout" yaml:"timeout"`
+	UnhealthyStatus  []int             `json:"unhealthy_status,omitempty" yaml:"unhealthy_status,omitempty"`
+	HealthyStatus    []int             `json:"healthy_status,omitempty" yaml:"healthy_status,omitempty"`
+	ExpectedStatus   []int             `json:"expected_status,omitempty" yaml:"expected_status,omitempty"`
+	FailureThreshold int               `json:"failure_threshold" yaml:"failure_threshold"`
+	SuccessThreshold int               `json:"success_threshold" yaml:"success_threshold"`
 	Headers          map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	Method           string        `json:"method,omitempty" yaml:"method,omitempty"`
-	Body             string        `json:"body,omitempty" yaml:"body,omitempty"`
-	Enabled          bool          `json:"enabled" yaml:"enabled"`
+	Method           string            `json:"method,omitempty" yaml:"method,omitempty"`
+	Body             string            `json:"body,omitempty" yaml:"body,omitempty"`
+	Enabled          bool              `json:"enabled" yaml:"enabled"`
 }
 
 // RateLimit represents rate limiting configuration
@@ -82,15 +82,15 @@ type RateLimit struct {
 
 // TLSConfig represents TLS/SSL configuration
 type TLSConfig struct {
-	Enabled           bool     `json:"enabled" yaml:"enabled"`
-	MinVersion        string   `json:"min_version,omitempty" yaml:"min_version,omitempty"`
-	MaxVersion        string   `json:"max_version,omitempty" yaml:"max_version,omitempty"`
-	CipherSuites      []string `json:"cipher_suites,omitempty" yaml:"cipher_suites,omitempty"`
-	CertFile          string   `json:"cert_file,omitempty" yaml:"cert_file,omitempty"`
-	KeyFile           string   `json:"key_file,omitempty" yaml:"key_file,omitempty"`
-	CAFile            string   `json:"ca_file,omitempty" yaml:"ca_file,omitempty"`
-	InsecureSkipVerify bool    `json:"insecure_skip_verify,omitempty" yaml:"insecure_skip_verify,omitempty"`
-	HSTS              *HSTS    `json:"hsts,omitempty" yaml:"hsts,omitempty"`
+	Enabled            bool     `json:"enabled" yaml:"enabled"`
+	MinVersion         string   `json:"min_version,omitempty" yaml:"min_version,omitempty"`
+	MaxVersion         string   `json:"max_version,omitempty" yaml:"max_version,omitempty"`
+	CipherSuites       []string `json:"cipher_suites,omitempty" yaml:"cipher_suites,omitempty"`
+	CertFile           string   `json:"cert_file,omitempty" yaml:"cert_file,omitempty"`
+	KeyFile            string   `json:"key_file,omitempty" yaml:"key_file,omitempty"`
+	CAFile             string   `json:"ca_file,omitempty" yaml:"ca_file,omitempty"`
+	InsecureSkipVerify bool     `json:"insecure_skip_verify,omitempty" yaml:"insecure_skip_verify,omitempty"`
+	HSTS               *HSTS    `json:"hsts,omitempty" yaml:"hsts,omitempty"`
 }
 
 // HSTS represents HTTP Strict Transport Security configuration
@@ -102,7 +102,7 @@ type HSTS struct {
 
 // RouteStatus represents the current status of a route
 type RouteStatus struct {
-	State       string    `json:"state" yaml:"state"` // active, inactive, error, pending
+	State       string    `json:"state" yaml:"state"`   // active, inactive, error, pending
 	Health      string    `json:"health" yaml:"health"` // healthy, unhealthy, unknown
 	LastChecked time.Time `json:"last_checked" yaml:"last_checked"`
 	ErrorCount  int       `json:"error_count" yaml:"error_count"`
@@ -123,24 +123,24 @@ type RouteMetrics struct {
 
 // ConnectionTestResult represents the result of testing a route connection
 type ConnectionTestResult struct {
-	Success      bool          `json:"success" yaml:"success"`
-	StatusCode   int           `json:"status_code" yaml:"status_code"`
-	ResponseTime time.Duration `json:"response_time" yaml:"response_time"`
-	Error        string        `json:"error,omitempty" yaml:"error,omitempty"`
+	Success      bool              `json:"success" yaml:"success"`
+	StatusCode   int               `json:"status_code" yaml:"status_code"`
+	ResponseTime time.Duration     `json:"response_time" yaml:"response_time"`
+	Error        string            `json:"error,omitempty" yaml:"error,omitempty"`
 	Headers      map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	Body         string        `json:"body,omitempty" yaml:"body,omitempty"`
-	SSL          *SSLInfo      `json:"ssl,omitempty" yaml:"ssl,omitempty"`
+	Body         string            `json:"body,omitempty" yaml:"body,omitempty"`
+	SSL          *SSLInfo          `json:"ssl,omitempty" yaml:"ssl,omitempty"`
 }
 
 // SSLInfo represents SSL certificate information
 type SSLInfo struct {
-	Valid      bool      `json:"valid" yaml:"valid"`
-	Issuer     string    `json:"issuer" yaml:"issuer"`
-	Subject    string    `json:"subject" yaml:"subject"`
-	NotBefore  time.Time `json:"not_before" yaml:"not_before"`
-	NotAfter   time.Time `json:"not_after" yaml:"not_after"`
-	DNSNames   []string  `json:"dns_names" yaml:"dns_names"`
-	SerialNumber string  `json:"serial_number" yaml:"serial_number"`
+	Valid        bool      `json:"valid" yaml:"valid"`
+	Issuer       string    `json:"issuer" yaml:"issuer"`
+	Subject      string    `json:"subject" yaml:"subject"`
+	NotBefore    time.Time `json:"not_before" yaml:"not_before"`
+	NotAfter     time.Time `json:"not_after" yaml:"not_after"`
+	DNSNames     []string  `json:"dns_names" yaml:"dns_names"`
+	SerialNumber string    `json:"serial_number" yaml:"serial_number"`
 }
 
 // HecateConfig represents the main configuration for Hecate
@@ -161,42 +161,42 @@ type HecateConfig struct {
 
 // BackupConfig represents backup configuration for routes
 type BackupConfig struct {
-	Enabled       bool          `json:"enabled" yaml:"enabled"`
-	Directory     string        `json:"directory" yaml:"directory"`
-	Retention     time.Duration `json:"retention" yaml:"retention"`
-	Compression   bool          `json:"compression" yaml:"compression"`
-	IncludeState  bool          `json:"include_state" yaml:"include_state"`
-	ScheduleEnabled bool        `json:"schedule_enabled" yaml:"schedule_enabled"`
-	Schedule      string        `json:"schedule,omitempty" yaml:"schedule,omitempty"` // cron format
+	Enabled         bool          `json:"enabled" yaml:"enabled"`
+	Directory       string        `json:"directory" yaml:"directory"`
+	Retention       time.Duration `json:"retention" yaml:"retention"`
+	Compression     bool          `json:"compression" yaml:"compression"`
+	IncludeState    bool          `json:"include_state" yaml:"include_state"`
+	ScheduleEnabled bool          `json:"schedule_enabled" yaml:"schedule_enabled"`
+	Schedule        string        `json:"schedule,omitempty" yaml:"schedule,omitempty"` // cron format
 }
 
 // DeleteOptions represents options for route deletion
 type DeleteOptions struct {
-	Force           bool `json:"force" yaml:"force"`
-	Backup          bool `json:"backup" yaml:"backup"`
-	RemoveDNS       bool `json:"remove_dns" yaml:"remove_dns"`
-	RemoveSSL       bool `json:"remove_ssl" yaml:"remove_ssl"`
-	CleanupOrphans  bool `json:"cleanup_orphans" yaml:"cleanup_orphans"`
-	DryRun          bool `json:"dry_run" yaml:"dry_run"`
+	Force          bool `json:"force" yaml:"force"`
+	Backup         bool `json:"backup" yaml:"backup"`
+	RemoveDNS      bool `json:"remove_dns" yaml:"remove_dns"`
+	RemoveSSL      bool `json:"remove_ssl" yaml:"remove_ssl"`
+	CleanupOrphans bool `json:"cleanup_orphans" yaml:"cleanup_orphans"`
+	DryRun         bool `json:"dry_run" yaml:"dry_run"`
 }
 
 // ReconcileResult represents the result of a state reconciliation
 type ReconcileResult struct {
-	Added     []string          `json:"added" yaml:"added"`
-	Updated   []string          `json:"updated" yaml:"updated"`
-	Removed   []string          `json:"removed" yaml:"removed"`
-	Errors    []ReconcileError  `json:"errors,omitempty" yaml:"errors,omitempty"`
-	Duration  time.Duration     `json:"duration" yaml:"duration"`
-	Summary   map[string]int    `json:"summary" yaml:"summary"`
-	DryRun    bool              `json:"dry_run" yaml:"dry_run"`
+	Added    []string         `json:"added" yaml:"added"`
+	Updated  []string         `json:"updated" yaml:"updated"`
+	Removed  []string         `json:"removed" yaml:"removed"`
+	Errors   []ReconcileError `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Duration time.Duration    `json:"duration" yaml:"duration"`
+	Summary  map[string]int   `json:"summary" yaml:"summary"`
+	DryRun   bool             `json:"dry_run" yaml:"dry_run"`
 }
 
 // ReconcileError represents an error during reconciliation
 type ReconcileError struct {
-	Type    string `json:"type" yaml:"type"`
+	Type     string `json:"type" yaml:"type"`
 	Resource string `json:"resource" yaml:"resource"`
-	Message string `json:"message" yaml:"message"`
-	Fatal   bool   `json:"fatal" yaml:"fatal"`
+	Message  string `json:"message" yaml:"message"`
+	Fatal    bool   `json:"fatal" yaml:"fatal"`
 }
 
 // AuthProvider represents an authentication provider configuration
@@ -227,8 +227,8 @@ type DNSProvider struct {
 type BackendType string
 
 const (
-	BackendTypeCaddy  BackendType = "caddy"
-	BackendTypeNginx  BackendType = "nginx"
+	BackendTypeCaddy   BackendType = "caddy"
+	BackendTypeNginx   BackendType = "nginx"
 	BackendTypeHAProxy BackendType = "haproxy"
 	BackendTypeTraefik BackendType = "traefik"
 )
@@ -269,8 +269,8 @@ const (
 
 // ValidationResult represents the result of route validation
 type ValidationResult struct {
-	Valid   bool              `json:"valid" yaml:"valid"`
-	Errors  []ValidationError `json:"errors,omitempty" yaml:"errors,omitempty"`
+	Valid    bool              `json:"valid" yaml:"valid"`
+	Errors   []ValidationError `json:"errors,omitempty" yaml:"errors,omitempty"`
 	Warnings []ValidationError `json:"warnings,omitempty" yaml:"warnings,omitempty"`
 }
 
@@ -333,4 +333,3 @@ type State struct {
 	LastUpdated   time.Time                `json:"last_updated" yaml:"last_updated"`
 	Fingerprint   string                   `json:"fingerprint" yaml:"fingerprint"`
 }
-

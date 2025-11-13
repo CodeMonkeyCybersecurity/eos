@@ -44,15 +44,15 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 			if step.Command == "useradd" {
 				errStr := err.Error()
 				// Check for exit status 9 (user already exists) or text indicators
-				if strings.Contains(errStr, "exit status 9") || 
-				   strings.Contains(errStr, "already exists") || 
-				   strings.Contains(errStr, "user 'consul' already exists") ||
-				   strings.Contains(errStr, "useradd: user 'consul' already exists") {
+				if strings.Contains(errStr, "exit status 9") ||
+					strings.Contains(errStr, "already exists") ||
+					strings.Contains(errStr, "user 'consul' already exists") ||
+					strings.Contains(errStr, "useradd: user 'consul' already exists") {
 					log.Debug("Consul user already exists", zap.String("error", errStr))
 					continue
 				}
 			}
-			// Ignore mkdir errors if directories already exist  
+			// Ignore mkdir errors if directories already exist
 			if step.Command == "mkdir" && strings.Contains(err.Error(), "File exists") {
 				log.Debug("Consul directories already exist")
 				continue
@@ -110,7 +110,7 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 				zap.String("directory", dir),
 				zap.String("output", output),
 				zap.Int("fields_count", len(fields)))
-			
+
 			// TODO: Consider using stat -c %U:%G instead of ls -ld for more reliable parsing
 			// For now, assume ownership is correct if we can't parse
 			continue
@@ -120,13 +120,13 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 		group := fields[3]
 		actualOwnership := owner + ":" + group
 		expectedOwner := "consul:consul"
-		
+
 		if actualOwnership != expectedOwner {
 			log.Warn("Directory ownership mismatch, attempting to fix",
 				zap.String("directory", dir),
 				zap.String("expected", expectedOwner),
 				zap.String("actual", actualOwnership))
-			
+
 			// Attempt to fix ownership
 			fixCmd := execute.Options{
 				Command: "chown",
@@ -135,7 +135,7 @@ func SystemUser(rc *eos_io.RuntimeContext) error {
 			if _, err := execute.Run(rc.Ctx, fixCmd); err != nil {
 				return fmt.Errorf("failed to fix ownership for directory %s: %w", dir, err)
 			}
-			
+
 			log.Info("Fixed directory ownership",
 				zap.String("directory", dir),
 				zap.String("ownership", expectedOwner))

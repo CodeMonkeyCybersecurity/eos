@@ -29,12 +29,12 @@ type UpgradeAndRebootConfig struct {
 	KeepSnapshotDays int    // Days to keep snapshot (default: 7)
 
 	// Operation control
-	DryRun           bool // Show what would be done (default: false)
-	SkipUpgrade      bool // Just reboot, skip package upgrade
-	SkipReboot       bool // Just upgrade, skip reboot
+	DryRun      bool // Show what would be done (default: false)
+	SkipUpgrade bool // Just reboot, skip package upgrade
+	SkipReboot  bool // Just upgrade, skip reboot
 
 	// Batch processing
-	ContinueOnError  bool // Continue with other VMs if one fails
+	ContinueOnError bool // Continue with other VMs if one fails
 }
 
 // DefaultUpgradeAndRebootConfig returns sensible defaults
@@ -53,15 +53,15 @@ func DefaultUpgradeAndRebootConfig() *UpgradeAndRebootConfig {
 
 // UpgradeAndRebootResult contains results of the full operation
 type UpgradeAndRebootResult struct {
-	Success          bool                  `json:"success"`
-	VMName           string                `json:"vm_name"`
-	SnapshotCreated  bool                  `json:"snapshot_created"`
-	SnapshotName     string                `json:"snapshot_name,omitempty"`
-	PackageResult    *PackageUpgradeResult `json:"package_result,omitempty"`
-	RestartedVM      bool                  `json:"restarted_vm"`
-	DriftResolved    bool                  `json:"drift_resolved"`
-	Duration         time.Duration         `json:"duration"`
-	ErrorMessage     string                `json:"error_message,omitempty"`
+	Success         bool                  `json:"success"`
+	VMName          string                `json:"vm_name"`
+	SnapshotCreated bool                  `json:"snapshot_created"`
+	SnapshotName    string                `json:"snapshot_name,omitempty"`
+	PackageResult   *PackageUpgradeResult `json:"package_result,omitempty"`
+	RestartedVM     bool                  `json:"restarted_vm"`
+	DriftResolved   bool                  `json:"drift_resolved"`
+	Duration        time.Duration         `json:"duration"`
+	ErrorMessage    string                `json:"error_message,omitempty"`
 }
 
 // UpgradeAndRebootVM performs the complete upgrade cycle for a single VM

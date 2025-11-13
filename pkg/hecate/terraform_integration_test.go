@@ -254,7 +254,7 @@ func BenchmarkRouteCreation(b *testing.B) {
 	_ = NewRouteManager(client) // Create manager for benchmark setup
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		route := &RouteInfo{
 			ID:         generateRouteID("test.example.com"),
 			Domain:     "test.example.com",

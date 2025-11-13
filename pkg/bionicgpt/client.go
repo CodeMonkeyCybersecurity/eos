@@ -27,10 +27,10 @@ import (
 
 // Client provides access to BionicGPT API
 type Client struct {
-	rc         *eos_io.RuntimeContext
+	rc           *eos_io.RuntimeContext
 	openaiClient *openai.Client
-	baseURL    string
-	apiKey     string
+	baseURL      string
+	apiKey       string
 }
 
 // ClientConfig contains configuration for BionicGPT API client

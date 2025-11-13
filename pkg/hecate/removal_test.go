@@ -14,7 +14,7 @@ func TestAssessHecateComponents(t *testing.T) {
 	// Create test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx:       ctx,
 		Component: "test",
@@ -31,7 +31,7 @@ func TestRemoveHecateVaultSecrets(t *testing.T) {
 	// Create test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx:       ctx,
 		Component: "test",
@@ -48,7 +48,7 @@ func TestRemoveHecateDirectories(t *testing.T) {
 	// Create test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx:       ctx,
 		Component: "test",
@@ -68,10 +68,10 @@ func TestRemoveHecateDirectories(t *testing.T) {
 }
 
 func TestStopHecateNomadJobs(t *testing.T) {
-	// Create test runtime context  
+	// Create test runtime context
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx:       ctx,
 		Component: "test",
@@ -86,9 +86,9 @@ func TestStopHecateNomadJobs(t *testing.T) {
 
 func TestRemoveHecateSystemdServices(t *testing.T) {
 	// Create test runtime context
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)  
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	rc := &eos_io.RuntimeContext{
 		Ctx:       ctx,
 		Component: "test",

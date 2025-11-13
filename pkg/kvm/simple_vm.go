@@ -41,9 +41,9 @@ var (
 // SimpleVMConfig holds simplified configuration for quick VM creation
 type SimpleVMConfig struct {
 	Name     string
-	Memory   string   // in MB
+	Memory   string // in MB
 	VCPUs    string
-	DiskSize string   // in GB
+	DiskSize string // in GB
 	Network  string
 	SSHKeys  []string // Additional SSH public keys to inject
 }

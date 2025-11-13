@@ -1,5 +1,6 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
+go 1.24
 go 1.24.6
 
 toolchain go1.24.7
@@ -9,6 +10,7 @@ require (
 	cuelang.org/go v0.14.2
 	filippo.io/mlkem768 v0.0.0-20250818110517-29047ffe79fb
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/bradleyjkemp/cupaloy/v2 v2.8.0
 	github.com/ceph/go-ceph v0.36.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10

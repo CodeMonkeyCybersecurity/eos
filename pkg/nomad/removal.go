@@ -47,9 +47,9 @@ type UninstallState struct {
 	RunningJobs    []string
 
 	// File system status
-	ConfigExists bool
-	DataExists   bool
-	UserExists   bool
+	ConfigExists  bool
+	DataExists    bool
+	UserExists    bool
 	ExistingPaths []string
 	ConfigValid   bool
 }

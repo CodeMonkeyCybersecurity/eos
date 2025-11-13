@@ -114,8 +114,8 @@ func (c *APIClient) GetBrand(ctx context.Context, pk string) (*BrandResponse, er
 func (c *APIClient) CreateBrand(ctx context.Context, domain, title string, optionalFields map[string]interface{}) (*BrandResponse, error) {
 	// Build request body with required fields
 	reqBody := map[string]interface{}{
-		"domain":          domain,
-		"branding_title":  title,
+		"domain":         domain,
+		"branding_title": title,
 	}
 
 	// Merge optional fields

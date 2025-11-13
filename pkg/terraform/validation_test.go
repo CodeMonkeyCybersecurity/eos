@@ -19,7 +19,7 @@ func TestTerraformValidationTypes(t *testing.T) {
 			ProviderSHA:  "test-sha",
 			Architecture: "amd64",
 		}
-		
+
 		assert.Equal(t, "1.6.0", info.Version)
 		assert.Equal(t, "linux_amd64", info.Platform)
 	})
@@ -30,10 +30,10 @@ func TestTerraformValidationTypes(t *testing.T) {
 			ProvidersValid:    false,
 			StateValid:        true,
 			QuotasValid:       true,
-			Errors:           []string{"test error"},
-			Warnings:         []string{"test warning"},
+			Errors:            []string{"test error"},
+			Warnings:          []string{"test warning"},
 		}
-		
+
 		assert.True(t, result.VersionCompatible)
 		assert.False(t, result.ProvidersValid)
 		assert.Len(t, result.Errors, 1)
@@ -89,8 +89,8 @@ func TestVersionComparison(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isVersionInRange(tt.current, tt.min, tt.max)
-			assert.Equal(t, tt.expected, result, 
-				"Version %s should be %v for range %s-%s", 
+			assert.Equal(t, tt.expected, result,
+				"Version %s should be %v for range %s-%s",
 				tt.current, tt.expected, tt.min, tt.max)
 		})
 	}
@@ -122,7 +122,7 @@ func TestProviderValidationHelpers(t *testing.T) {
 			{Name: "hetzner", Authenticated: true, Error: ""},
 			{Name: "consul", Authenticated: true, Error: ""},
 		}
-		
+
 		assert.True(t, allProvidersValid(validations))
 	})
 
@@ -131,7 +131,7 @@ func TestProviderValidationHelpers(t *testing.T) {
 			{Name: "hetzner", Authenticated: false, Error: ""},
 			{Name: "consul", Authenticated: true, Error: ""},
 		}
-		
+
 		assert.False(t, allProvidersValid(validations))
 	})
 
@@ -140,7 +140,7 @@ func TestProviderValidationHelpers(t *testing.T) {
 			{Name: "hetzner", Authenticated: true, Error: "API error"},
 			{Name: "consul", Authenticated: true, Error: ""},
 		}
-		
+
 		assert.False(t, allProvidersValid(validations))
 	})
 }
@@ -148,7 +148,7 @@ func TestProviderValidationHelpers(t *testing.T) {
 func TestDefaultHecatePrerequisites(t *testing.T) {
 	t.Run("DefaultHecatePrerequisites structure", func(t *testing.T) {
 		prereqs := DefaultHecatePrerequisites
-		
+
 		assert.Equal(t, "1.0.0", prereqs.MinVersion)
 		assert.Equal(t, "2.0.0", prereqs.MaxVersion)
 		assert.Contains(t, prereqs.RequiredProviders, "hetzner/hcloud")
@@ -168,7 +168,7 @@ func TestValidateTerraformForHecate(t *testing.T) {
 		// This test just ensures the function can be called
 		// In a real environment, it would test actual validation
 		result, err := ValidateTerraformForHecate(rc)
-		
+
 		// We expect this to fail in test environment due to missing terraform
 		// but the function should exist and return proper error structure
 		if err != nil {
@@ -193,7 +193,7 @@ func TestProviderValidationStructure(t *testing.T) {
 			LastValidated: time.Now(),
 			Error:         "",
 		}
-		
+
 		assert.Equal(t, "test-provider", validation.Name)
 		assert.True(t, validation.Authenticated)
 		assert.Len(t, validation.Permissions, 2)
@@ -214,7 +214,7 @@ func TestStateValidationStructure(t *testing.T) {
 			ResourceCount:  5,
 			Error:          "",
 		}
-		
+
 		assert.True(t, validation.Exists)
 		assert.True(t, validation.IntegrityValid)
 		assert.Equal(t, int64(1024), validation.Size)
@@ -232,7 +232,7 @@ func TestQuotaValidationStructure(t *testing.T) {
 			RateLimitStatus:   "ok",
 			Error:             "",
 		}
-		
+
 		assert.Equal(t, 10, validation.DNSRecordsUsed)
 		assert.Equal(t, 100, validation.DNSRecordsLimit)
 		assert.Equal(t, 3600, validation.APICallsRemaining)

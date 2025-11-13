@@ -227,18 +227,18 @@ var (
 	// SECURITY: Defense in depth - user must explicitly request dangerous operations
 	// THREAT MODEL: Accidental restore to root destroys system (CVSS 8.2)
 	CriticalSystemPaths = []string{
-		"/",       // Root filesystem
-		"/etc",    // System configuration
-		"/usr",    // System binaries and libraries
-		"/var",    // System state and logs
-		"/boot",   // Bootloader and kernel
-		"/home",   // All user home directories
-		"/opt",    // Optional software
-		"/root",   // Root user home directory
-		"/bin",    // Essential binaries
-		"/sbin",   // System binaries
-		"/lib",    // Shared libraries
-		"/lib64",  // 64-bit shared libraries
+		"/",      // Root filesystem
+		"/etc",   // System configuration
+		"/usr",   // System binaries and libraries
+		"/var",   // System state and logs
+		"/boot",  // Bootloader and kernel
+		"/home",  // All user home directories
+		"/opt",   // Optional software
+		"/root",  // Root user home directory
+		"/bin",   // Essential binaries
+		"/sbin",  // System binaries
+		"/lib",   // Shared libraries
+		"/lib64", // 64-bit shared libraries
 	}
 )
 

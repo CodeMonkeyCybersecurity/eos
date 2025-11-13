@@ -84,10 +84,10 @@ func CreateRouteWithWorkflow(rc *eos_io.RuntimeContext, request RouteCreationReq
 
 	// Step 5: Create the route
 	route := &hecate.Route{
-		Domain:     request.Domain,
+		Domain: request.Domain,
 		// TODO: Convert string to AuthPolicy if needed
 		// AuthPolicy: request.AuthPolicy,
-		Headers:    request.Headers,
+		Headers: request.Headers,
 		// TODO: Add middleware field to Route type if needed
 		// Middleware: request.Middleware,
 	}
@@ -98,9 +98,9 @@ func CreateRouteWithWorkflow(rc *eos_io.RuntimeContext, request RouteCreationReq
 
 	if request.HealthCheckPath != "" {
 		route.HealthCheck = &hecate.HealthCheck{
-			Path:               request.HealthCheckPath,
-			Interval:           30 * time.Second,
-			Timeout:            5 * time.Second,
+			Path:             request.HealthCheckPath,
+			Interval:         30 * time.Second,
+			Timeout:          5 * time.Second,
 			FailureThreshold: 3,
 			SuccessThreshold: 2,
 		}

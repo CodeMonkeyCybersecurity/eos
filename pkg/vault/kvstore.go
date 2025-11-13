@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/vault/api"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
@@ -40,9 +40,10 @@ func NewEosKVv2Store(client *api.Client, mount string, log *zap.Logger) *EosKVv2
 // Path should NOT include mount or /data/ prefix (e.g., "eos/bootstrap")
 //
 // Example:
-//   kv := NewEosKVv2Store(client, "secret", log)
-//   data, err := kv.Get(ctx, "eos/bootstrap")
-//   // Reads from: secret/data/eos/bootstrap (handled automatically)
+//
+//	kv := NewEosKVv2Store(client, "secret", log)
+//	data, err := kv.Get(ctx, "eos/bootstrap")
+//	// Reads from: secret/data/eos/bootstrap (handled automatically)
 func (kv *EosKVv2Store) Get(ctx context.Context, path string) (map[string]interface{}, error) {
 	kv.log.Debug("Reading KV v2 secret",
 		zap.String("mount", kv.mount),
@@ -75,9 +76,10 @@ func (kv *EosKVv2Store) Get(ctx context.Context, path string) (map[string]interf
 // - Path mismatches (write to one path, read from another due to API inconsistency)
 //
 // Example:
-//   data := map[string]interface{}{"password": "secret", "created_at": "2025-01-24"}
-//   err := kv.Put(ctx, "eos/bootstrap", data)
-//   // Writes to secret/data/eos/bootstrap AND verifies it's readable
+//
+//	data := map[string]interface{}{"password": "secret", "created_at": "2025-01-24"}
+//	err := kv.Put(ctx, "eos/bootstrap", data)
+//	// Writes to secret/data/eos/bootstrap AND verifies it's readable
 func (kv *EosKVv2Store) Put(ctx context.Context, path string, data map[string]interface{}) error {
 	kv.log.Info("Writing KV v2 secret",
 		zap.String("mount", kv.mount),

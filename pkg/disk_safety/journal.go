@@ -16,7 +16,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // JournalStorage manages disk operation journaling
 type JournalStorage struct {
 	mu       sync.RWMutex
@@ -304,12 +303,12 @@ func (js *JournalStorage) save(entry *JournalEntry) error {
 // generateChecksum creates a simple checksum for integrity verification
 func (js *JournalStorage) generateChecksum(entry *JournalEntry) string {
 	// Simple checksum based on key fields
-	content := fmt.Sprintf("%s-%s-%s-%v", 
-		entry.ID, 
-		entry.OperationType, 
+	content := fmt.Sprintf("%s-%s-%s-%v",
+		entry.ID,
+		entry.OperationType,
 		entry.StartTime.Format(time.RFC3339),
 		entry.Status)
-	
+
 	// In a production system, you'd use a proper hash function
 	return fmt.Sprintf("%x", len(content))
 }
@@ -347,7 +346,7 @@ func NewJournalWrapper(rc *eos_io.RuntimeContext) (*JournalWrapper, error) {
 // WrapCommand wraps command execution with journaling
 func (jw *JournalWrapper) WrapCommand(journalID string, cmd *exec.Cmd) error {
 	logger := otelzap.Ctx(jw.rc.Ctx)
-	
+
 	logger.Debug("Executing command with journaling",
 		zap.String("journal_id", journalID),
 		zap.String("command", cmd.Path),

@@ -13,7 +13,7 @@ import (
 // ExecuteNuke performs the complete infrastructure nuke operation following AIE pattern
 func ExecuteNuke(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Evaluate what needs to be removed
 	logger.Info("Starting infrastructure nuke operation",
 		zap.Bool("remove_all", config.RemoveAll),
@@ -41,7 +41,7 @@ func ExecuteNuke(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// INTERVENE - Execute the removal
 	logger.Info("Beginning infrastructure destruction sequence")
-	
+
 	phaseResults, err := ExecuteRemoval(rc, config, plan)
 	if err != nil {
 		return fmt.Errorf("removal execution failed: %w", err)
@@ -66,7 +66,7 @@ func ExecuteNuke(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Infrastructure nuke operation completed",
 		zap.Float64("success_rate", result.SuccessRate),
 		zap.Int("remaining_components", result.RemainingComponents))
-	
+
 	return nil
 }
 

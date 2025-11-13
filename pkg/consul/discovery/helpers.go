@@ -22,8 +22,9 @@ import (
 // GetVaultAddress discovers the Vault service and returns its HTTPS URL
 //
 // Example:
-//   vaultAddr, err := discovery.GetVaultAddress(rc, consulClient)
-//   // Returns: "https://10.0.1.5:8200"
+//
+//	vaultAddr, err := discovery.GetVaultAddress(rc, consulClient)
+//	// Returns: "https://10.0.1.5:8200"
 func GetVaultAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Client) (string, error) {
 	client, err := NewClient(rc, consulClient)
 	if err != nil {
@@ -36,8 +37,9 @@ func GetVaultAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Client) 
 // GetConsulAddress discovers the Consul service and returns its HTTP URL
 //
 // Example:
-//   consulAddr, err := discovery.GetConsulAddress(rc, consulClient)
-//   // Returns: "http://10.0.1.5:8500"
+//
+//	consulAddr, err := discovery.GetConsulAddress(rc, consulClient)
+//	// Returns: "http://10.0.1.5:8500"
 func GetConsulAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Client) (string, error) {
 	client, err := NewClient(rc, consulClient)
 	if err != nil {
@@ -62,8 +64,9 @@ func GetNomadAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Client) 
 // Returns: host, port, error
 //
 // Example:
-//   host, port, err := discovery.GetPostgresAddress(rc, consulClient)
-//   connStr := fmt.Sprintf("postgres://user:pass@%s:%d/dbname", host, port)
+//
+//	host, port, err := discovery.GetPostgresAddress(rc, consulClient)
+//	connStr := fmt.Sprintf("postgres://user:pass@%s:%d/dbname", host, port)
 func GetPostgresAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Client) (string, int, error) {
 	client, err := NewClient(rc, consulClient)
 	if err != nil {
@@ -82,8 +85,9 @@ func GetPostgresAddress(rc *eos_io.RuntimeContext, consulClient *consulapi.Clien
 // GetServicesByTag finds all services with a specific tag
 //
 // Example:
-//   // Find all services tagged "production"
-//   services, err := discovery.GetServicesByTag(rc, consulClient, "production")
+//
+//	// Find all services tagged "production"
+//	services, err := discovery.GetServicesByTag(rc, consulClient, "production")
 func GetServicesByTag(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, tag string) (map[string][]*ServiceAddress, error) {
 	client, err := NewClient(rc, consulClient)
 	if err != nil {
@@ -114,9 +118,10 @@ func GetServicesByTag(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 // BuildConnectionString builds a database connection string for discovered services
 //
 // Example:
-//   connStr, err := discovery.BuildConnectionString(rc, consulClient,
-//       "postgres", "myuser", "mypass", "mydb")
-//   // Returns: "postgres://myuser:mypass@10.0.1.5:5432/mydb"
+//
+//	connStr, err := discovery.BuildConnectionString(rc, consulClient,
+//	    "postgres", "myuser", "mypass", "mydb")
+//	// Returns: "postgres://myuser:mypass@10.0.1.5:5432/mydb"
 func BuildConnectionString(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 	serviceName, username, password, database string) (string, error) {
 
@@ -156,7 +161,8 @@ func BuildConnectionString(rc *eos_io.RuntimeContext, consulClient *consulapi.Cl
 // Polls until the service is discovered or timeout is reached.
 //
 // Example:
-//   err := discovery.WaitForService(rc, consulClient, "vault", 30*time.Second)
+//
+//	err := discovery.WaitForService(rc, consulClient, "vault", 30*time.Second)
 func WaitForService(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 	serviceName string, timeout time.Duration) error {
 
@@ -202,8 +208,9 @@ func WaitForService(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 // GetServiceMetadata retrieves metadata for a service instance
 //
 // Example:
-//   meta, err := discovery.GetServiceMetadata(rc, consulClient, "vault")
-//   version := meta["version"]
+//
+//	meta, err := discovery.GetServiceMetadata(rc, consulClient, "vault")
+//	version := meta["version"]
 func GetServiceMetadata(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 	serviceName string) (map[string]string, error) {
 
@@ -229,7 +236,8 @@ func GetServiceMetadata(rc *eos_io.RuntimeContext, consulClient *consulapi.Clien
 // Uses round-robin selection across healthy instances.
 //
 // Example:
-//   addr, err := discovery.LoadBalanceServices(rc, consulClient, "api")
+//
+//	addr, err := discovery.LoadBalanceServices(rc, consulClient, "api")
 func LoadBalanceServices(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 	serviceName string) (*ServiceAddress, error) {
 
@@ -257,7 +265,8 @@ func LoadBalanceServices(rc *eos_io.RuntimeContext, consulClient *consulapi.Clie
 // Looks for a service tagged with "primary" or returns the first instance.
 //
 // Example:
-//   primary, err := discovery.GetPrimaryInstance(rc, consulClient, "postgres")
+//
+//	primary, err := discovery.GetPrimaryInstance(rc, consulClient, "postgres")
 func GetPrimaryInstance(rc *eos_io.RuntimeContext, consulClient *consulapi.Client,
 	serviceName string) (*ServiceAddress, error) {
 

@@ -78,11 +78,12 @@ type VersionInfo struct {
 // Use vault.GetVaultClient(rc) to obtain a properly configured client.
 //
 // Example:
-//   client, err := vault.GetVaultClient(rc)
-//   if err != nil {
-//       return err
-//   }
-//   secretMgr := vault.NewVaultSecretManager(rc, client)
+//
+//	client, err := vault.GetVaultClient(rc)
+//	if err != nil {
+//	    return err
+//	}
+//	secretMgr := vault.NewVaultSecretManager(rc, client)
 func NewVaultSecretManager(rc *eos_io.RuntimeContext, client *vaultapi.Client) *VaultSecretManager {
 	return &VaultSecretManager{
 		rc:     rc,
@@ -96,8 +97,9 @@ func NewVaultSecretManager(rc *eos_io.RuntimeContext, client *vaultapi.Client) *
 // This performs a Vault LIST operation on the environment's metadata path.
 //
 // Example:
-//   services, err := secretMgr.ListServicesInEnvironment(ctx, vault.EnvironmentProduction)
-//   // Returns: [consul, authentik, bionicgpt, wazuh]
+//
+//	services, err := secretMgr.ListServicesInEnvironment(ctx, vault.EnvironmentProduction)
+//	// Returns: [consul, authentik, bionicgpt, wazuh]
 //
 // Returns:
 //   - []Service: List of services found in the environment
@@ -177,7 +179,8 @@ func (v *VaultSecretManager) ListServicesInEnvironment(ctx context.Context, env 
 // Does NOT include the actual secret values (use GetServiceSecrets for that).
 //
 // Example:
-//   metadata, err := secretMgr.GetServiceMetadata(ctx, vault.EnvironmentProduction, vault.ServiceConsul)
+//
+//	metadata, err := secretMgr.GetServiceMetadata(ctx, vault.EnvironmentProduction, vault.ServiceConsul)
 //
 // Returns:
 //   - *ServiceMetadata: Complete metadata information
@@ -332,8 +335,9 @@ func (v *VaultSecretManager) GetServiceMetadata(ctx context.Context, env sharedv
 // WARNING: This exposes sensitive data. Use with caution.
 //
 // Example:
-//   secrets, err := secretMgr.GetServiceSecrets(ctx, vault.EnvironmentProduction, vault.ServiceConsul)
-//   bootstrapToken := secrets["bootstrap-token"].(string)
+//
+//	secrets, err := secretMgr.GetServiceSecrets(ctx, vault.EnvironmentProduction, vault.ServiceConsul)
+//	bootstrapToken := secrets["bootstrap-token"].(string)
 //
 // Returns:
 //   - map[string]interface{}: Secret key-value pairs

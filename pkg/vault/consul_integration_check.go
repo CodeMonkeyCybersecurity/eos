@@ -16,16 +16,16 @@ import (
 
 // ConsulIntegrationStatus represents Vault's integration with Consul
 type ConsulIntegrationStatus struct {
-	ConsulInstalled       bool
-	ConsulRunning         bool
-	UsingConsulStorage    bool
-	ConsulAddress         string
-	ConsulPath            string
-	RegisteredInConsul    bool
-	HealthChecksEnabled   bool
-	ConfigurationPath     string
-	IntegrationHealthy    bool
-	Issues                []string
+	ConsulInstalled     bool
+	ConsulRunning       bool
+	UsingConsulStorage  bool
+	ConsulAddress       string
+	ConsulPath          string
+	RegisteredInConsul  bool
+	HealthChecksEnabled bool
+	ConfigurationPath   string
+	IntegrationHealthy  bool
+	Issues              []string
 }
 
 // CheckConsulIntegration checks if Vault is using Consul as storage backend

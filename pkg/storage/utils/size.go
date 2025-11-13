@@ -12,7 +12,7 @@ func ParseStorageSize(size string) (uint64, error) {
 	}
 
 	size = strings.ToUpper(strings.TrimSpace(size))
-	
+
 	var multiplier uint64 = 1
 	var numStr string
 
@@ -47,7 +47,7 @@ func ParseMemorySize(memory string) (uint, error) {
 	}
 
 	memory = strings.ToUpper(strings.TrimSpace(memory))
-	
+
 	var multiplier uint = 1
 	var numStr string
 

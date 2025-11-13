@@ -28,21 +28,21 @@ type CleanerConfig struct {
 
 // CleanupAnalysis holds the analysis of what will be cleaned
 type CleanupAnalysis struct {
-	Artifacts   []CleanupItem `json:"artifacts"`
-	CacheItems  []CleanupItem `json:"cache_items"`
-	Images      []ImageItem   `json:"images"`
-	Containers  []ContainerItem `json:"containers"`
-	TotalSize   int64         `json:"total_size"`
-	TotalItems  int           `json:"total_items"`
+	Artifacts  []CleanupItem   `json:"artifacts"`
+	CacheItems []CleanupItem   `json:"cache_items"`
+	Images     []ImageItem     `json:"images"`
+	Containers []ContainerItem `json:"containers"`
+	TotalSize  int64           `json:"total_size"`
+	TotalItems int             `json:"total_items"`
 }
 
 // CleanupItem represents an item to be cleaned
 type CleanupItem struct {
-	Path        string    `json:"path"`
-	Type        string    `json:"type"`
-	Size        int64     `json:"size"`
-	LastAccess  time.Time `json:"last_access"`
-	Component   string    `json:"component,omitempty"`
+	Path       string    `json:"path"`
+	Type       string    `json:"type"`
+	Size       int64     `json:"size"`
+	LastAccess time.Time `json:"last_access"`
+	Component  string    `json:"component,omitempty"`
 }
 
 // ImageItem represents a Docker image to be cleaned
@@ -57,10 +57,10 @@ type ImageItem struct {
 
 // ContainerItem represents a Docker container to be cleaned
 type ContainerItem struct {
-	Name    string `json:"name"`
-	ID      string `json:"id"`
-	Status  string `json:"status"`
-	Image   string `json:"image"`
+	Name   string `json:"name"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Image  string `json:"image"`
 }
 
 // CleanupResult holds the result of a cleanup operation
@@ -139,7 +139,7 @@ func (bc *BuildCleaner) AnalyzeCleanup(rc *eos_io.RuntimeContext) (*CleanupAnaly
 	}
 
 	// Calculate totals
-	analysis.TotalItems = len(analysis.Artifacts) + len(analysis.CacheItems) + 
+	analysis.TotalItems = len(analysis.Artifacts) + len(analysis.CacheItems) +
 		len(analysis.Images) + len(analysis.Containers)
 
 	for _, item := range analysis.Artifacts {

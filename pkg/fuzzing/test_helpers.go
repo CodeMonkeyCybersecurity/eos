@@ -13,7 +13,7 @@ import (
 func NewTestContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t)
 	ctx := context.Background()
-	
+
 	return &eos_io.RuntimeContext{
 		Ctx:        ctx,
 		Log:        logger,

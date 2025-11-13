@@ -191,7 +191,7 @@ func (c *Client) JobExists(ctx context.Context, jobID string) (bool, error) {
 		// Check if it's a "not found" error by checking the error message
 		// Nomad API returns an error for non-existent jobs
 		if err.Error() == "Unexpected response code: 404" ||
-		   err.Error() == "job not found" {
+			err.Error() == "job not found" {
 			return false, nil
 		}
 		// For other errors, return them

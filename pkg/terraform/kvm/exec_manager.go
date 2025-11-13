@@ -335,7 +335,6 @@ func (em *ExecManager) CreateWorkspace(name string) error {
 	return em.tf.WorkspaceNew(em.ctx, name)
 }
 
-
 // ListVMs lists all VMs managed by Terraform
 func (em *ExecManager) ListVMs() ([]*VMInfo, error) {
 	em.logger.Debug("Listing all VMs from Terraform state")

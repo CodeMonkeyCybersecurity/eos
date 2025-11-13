@@ -97,7 +97,7 @@ func NewHashiCorpStorageManager(rc *eos_io.RuntimeContext, nomadAddr, consulAddr
 
 // CreateVolume creates a new storage volume using Nomad CSI
 func (hsm *HashiCorpStorageManager) CreateVolume(ctx context.Context, req *VolumeRequest) (*Volume, error) {
-	hsm.logger.Info("Creating volume", 
+	hsm.logger.Info("Creating volume",
 		zap.String("id", req.ID),
 		zap.String("name", req.Name),
 		zap.Int64("size", req.SizeBytes))
@@ -154,7 +154,7 @@ func (hsm *HashiCorpStorageManager) DeleteVolume(ctx context.Context, volumeID s
 // ListVolumes returns all managed volumes
 func (hsm *HashiCorpStorageManager) ListVolumes(ctx context.Context) ([]*Volume, error) {
 	hsm.logger.Info("Would list CSI volumes from Nomad")
-	
+
 	// Return empty list for now
 	return []*Volume{}, nil
 }
@@ -162,7 +162,7 @@ func (hsm *HashiCorpStorageManager) ListVolumes(ctx context.Context) ([]*Volume,
 // getStorageCredentials retrieves cloud provider credentials from Vault
 func (hsm *HashiCorpStorageManager) getStorageCredentials(ctx context.Context, provider string) (*StorageCredentials, error) {
 	path := fmt.Sprintf("aws/creds/storage-%s-role", provider)
-	
+
 	secret, err := hsm.vault.Logical().Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read credentials from Vault: %w", err)
@@ -181,7 +181,7 @@ func (hsm *HashiCorpStorageManager) getStorageCredentials(ctx context.Context, p
 // registerVolumeInConsul registers volume metadata in Consul KV store
 func (hsm *HashiCorpStorageManager) registerVolumeInConsul(ctx context.Context, volumeID string, metadata map[string]string) error {
 	key := fmt.Sprintf("storage/volumes/%s", volumeID)
-	
+
 	volumeInfo := map[string]interface{}{
 		"id":         volumeID,
 		"created_at": time.Now().Unix(),

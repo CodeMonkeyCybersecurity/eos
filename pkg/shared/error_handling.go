@@ -9,10 +9,10 @@ import (
 
 // InstallationError represents standardized installation errors
 type InstallationError struct {
-	Tool    string
-	Method  string
-	Stage   string
-	Err     error
+	Tool   string
+	Method string
+	Stage  string
+	Err    error
 }
 
 func (e *InstallationError) Error() string {
@@ -89,27 +89,27 @@ type ErrorCode string
 
 const (
 	// Installation related errors
-	ErrorCodeInstallationFailed    ErrorCode = "INSTALLATION_FAILED"
-	ErrorCodePrerequisiteFailed    ErrorCode = "PREREQUISITE_FAILED"
-	ErrorCodeConfigurationFailed   ErrorCode = "CONFIGURATION_FAILED"
-	
+	ErrorCodeInstallationFailed  ErrorCode = "INSTALLATION_FAILED"
+	ErrorCodePrerequisiteFailed  ErrorCode = "PREREQUISITE_FAILED"
+	ErrorCodeConfigurationFailed ErrorCode = "CONFIGURATION_FAILED"
+
 	// Validation related errors
-	ErrorCodeValidationFailed      ErrorCode = "VALIDATION_FAILED"
-	ErrorCodeRequiredFieldMissing  ErrorCode = "REQUIRED_FIELD_MISSING"
-	
+	ErrorCodeValidationFailed     ErrorCode = "VALIDATION_FAILED"
+	ErrorCodeRequiredFieldMissing ErrorCode = "REQUIRED_FIELD_MISSING"
+
 	// File operation errors
-	ErrorCodeFileNotFound          ErrorCode = "FILE_NOT_FOUND"
-	ErrorCodePermissionDenied      ErrorCode = "PERMISSION_DENIED"
-	ErrorCodeFileOperationFailed   ErrorCode = "FILE_OPERATION_FAILED"
-	
+	ErrorCodeFileNotFound        ErrorCode = "FILE_NOT_FOUND"
+	ErrorCodePermissionDenied    ErrorCode = "PERMISSION_DENIED"
+	ErrorCodeFileOperationFailed ErrorCode = "FILE_OPERATION_FAILED"
+
 	// Network related errors
-	ErrorCodeNetworkTimeout        ErrorCode = "NETWORK_TIMEOUT"
-	ErrorCodeConnectionFailed      ErrorCode = "CONNECTION_FAILED"
-	ErrorCodeUnauthorized          ErrorCode = "UNAUTHORIZED"
-	
+	ErrorCodeNetworkTimeout   ErrorCode = "NETWORK_TIMEOUT"
+	ErrorCodeConnectionFailed ErrorCode = "CONNECTION_FAILED"
+	ErrorCodeUnauthorized     ErrorCode = "UNAUTHORIZED"
+
 	// Service related errors
-	ErrorCodeServiceUnavailable    ErrorCode = "SERVICE_UNAVAILABLE"
-	ErrorCodeHealthCheckFailed     ErrorCode = "HEALTH_CHECK_FAILED"
+	ErrorCodeServiceUnavailable ErrorCode = "SERVICE_UNAVAILABLE"
+	ErrorCodeHealthCheckFailed  ErrorCode = "HEALTH_CHECK_FAILED"
 )
 
 // CodedError represents an error with a specific error code
@@ -170,9 +170,9 @@ func GetErrorCode(err error) ErrorCode {
 type ErrorCategory string
 
 const (
-	CategoryUser    ErrorCategory = "USER"      // User correctable errors
-	CategorySystem  ErrorCategory = "SYSTEM"    // System/environment errors  
-	CategoryNetwork ErrorCategory = "NETWORK"   // Network related errors
+	CategoryUser     ErrorCategory = "USER"     // User correctable errors
+	CategorySystem   ErrorCategory = "SYSTEM"   // System/environment errors
+	CategoryNetwork  ErrorCategory = "NETWORK"  // Network related errors
 	CategorySecurity ErrorCategory = "SECURITY" // Security related errors
 )
 
@@ -181,11 +181,11 @@ func CategorizeError(err error) ErrorCategory {
 	if err == nil {
 		return ""
 	}
-	
+
 	// Check for specific error types
 	// Note: This would need to check for user error types without importing eos_err
 	// For now, use message-based detection
-	
+
 	if codedErr, ok := err.(*CodedError); ok {
 		switch codedErr.Code {
 		case ErrorCodeNetworkTimeout, ErrorCodeConnectionFailed:
@@ -198,7 +198,7 @@ func CategorizeError(err error) ErrorCategory {
 			return CategorySystem
 		}
 	}
-	
+
 	// Check error message content for hints
 	errMsg := strings.ToLower(err.Error())
 	if strings.Contains(errMsg, "permission denied") || strings.Contains(errMsg, "unauthorized") {
@@ -210,7 +210,7 @@ func CategorizeError(err error) ErrorCategory {
 	if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "invalid") {
 		return CategoryUser
 	}
-	
+
 	return CategorySystem
 }
 
@@ -219,7 +219,7 @@ func FormatErrorForUser(err error) string {
 	if err == nil {
 		return ""
 	}
-	
+
 	category := CategorizeError(err)
 	switch category {
 	case CategoryUser:
@@ -235,27 +235,27 @@ func FormatErrorForUser(err error) string {
 
 // MultiError represents multiple errors that occurred during an operation
 type MultiError struct {
-	Errors []error `json:"errors"`
-	Context string `json:"context,omitempty"`
+	Errors  []error `json:"errors"`
+	Context string  `json:"context,omitempty"`
 }
 
 func (e *MultiError) Error() string {
 	if len(e.Errors) == 0 {
 		return "no errors"
 	}
-	
+
 	if len(e.Errors) == 1 {
 		if e.Context != "" {
 			return fmt.Sprintf("%s: %s", e.Context, e.Errors[0].Error())
 		}
 		return e.Errors[0].Error()
 	}
-	
+
 	var msgs []string
 	for _, err := range e.Errors {
 		msgs = append(msgs, err.Error())
 	}
-	
+
 	result := fmt.Sprintf("multiple errors (%d): %s", len(e.Errors), strings.Join(msgs, "; "))
 	if e.Context != "" {
 		result = e.Context + ": " + result

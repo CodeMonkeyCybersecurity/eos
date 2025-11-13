@@ -153,6 +153,7 @@ func scaleCustomerTier(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 
 	return nil
 }
+
 // TODO: refactor
 func updatePlatformConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -270,6 +271,7 @@ func updateCustomerConfiguration(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 
 	return nil
 }
+
 // TODO: refactor
 func applySecurityUpdates(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)

@@ -121,9 +121,9 @@ func (pm *PromotionManager) PromoteStack(rc *eos_io.RuntimeContext, request *Sta
 		zap.String("to", request.ToEnvironment))
 
 	result := &StackPromotionResult{
-		Request:    request,
-		Results:    []PromotionResult{},
-		StartTime:  time.Now(),
+		Request:   request,
+		Results:   []PromotionResult{},
+		StartTime: time.Now(),
 	}
 
 	// Assessment: Validate stack promotion prerequisites
@@ -165,14 +165,14 @@ func (pm *PromotionManager) PromoteStack(rc *eos_io.RuntimeContext, request *Sta
 	// Calculate final result
 	result.EndTime = time.Now()
 	result.Duration = result.EndTime.Sub(result.StartTime)
-	
+
 	successful := 0
 	for _, componentResult := range result.Results {
 		if componentResult.Success {
 			successful++
 		}
 	}
-	
+
 	result.Success = successful == len(request.Components)
 	result.ComponentsPromoted = successful
 	result.ComponentsFailed = len(request.Components) - successful
@@ -299,7 +299,7 @@ func (pm *PromotionManager) executePromotion(rc *eos_io.RuntimeContext, request 
 	for i, step := range steps {
 		step.Status = StepStatusRunning
 		step.StartTime = time.Now()
-		
+
 		logger.Debug("Executing promotion step",
 			zap.String("step", step.Name),
 			zap.String("component", request.Component))

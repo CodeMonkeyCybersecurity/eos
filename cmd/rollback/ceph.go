@@ -80,7 +80,7 @@ func init() {
 	rollbackCephCmd.Flags().StringVar(&cephSubVolume, "subvolume", "", "Specific subvolume to rollback")
 
 	// Mark required flags
-	_ = rollbackCephCmd.MarkFlagRequired("snapshot")       // Error only if flag doesn't exist (build-time error)
+	_ = rollbackCephCmd.MarkFlagRequired("snapshot")        // Error only if flag doesn't exist (build-time error)
 	_ = rollbackCephCmd.MarkFlagRequired("snapshot-volume") // Error only if flag doesn't exist (build-time error)
 
 	RollbackCmd.AddCommand(rollbackCephCmd)

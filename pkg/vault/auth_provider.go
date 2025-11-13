@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
-
 )
 
 // VaultAuthProvider implements vault.VaultAuthenticator

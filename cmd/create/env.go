@@ -105,11 +105,11 @@ Examples:
 			env.DisplayName = displayName
 		} else if env.DisplayName == "" || env.DisplayName == "Development" {
 			// Capitalize first letter only (strings.Title is deprecated)
-		if len(envName) > 0 && envName[0] >= 'a' && envName[0] <= 'z' {
-			env.DisplayName = string(envName[0]-32) + envName[1:]
-		} else {
-			env.DisplayName = envName
-		}
+			if len(envName) > 0 && envName[0] >= 'a' && envName[0] <= 'z' {
+				env.DisplayName = string(envName[0]-32) + envName[1:]
+			} else {
+				env.DisplayName = envName
+			}
 		}
 
 		if description != "" {

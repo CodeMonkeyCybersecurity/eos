@@ -8,6 +8,7 @@ import (
 )
 
 func TestSetDebugMode(t *testing.T) {
+	t.Parallel()
 	// Save original state
 	originalDebug := debugMode
 	defer func() { debugMode = originalDebug }()
@@ -26,6 +27,7 @@ func TestSetDebugMode(t *testing.T) {
 }
 
 func TestExtractSummary(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	tests := []struct {
@@ -98,6 +100,7 @@ func TestExtractSummary(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := ExtractSummary(ctx, tt.output, tt.maxCandidates)
 			if got != tt.want {
 				t.Errorf("ExtractSummary() = %q, want %q", got, tt.want)
@@ -107,6 +110,7 @@ func TestExtractSummary(t *testing.T) {
 }
 
 func TestNewExpectedError(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Test with nil error
@@ -135,6 +139,7 @@ func TestNewExpectedError(t *testing.T) {
 }
 
 func TestIsExpectedUserError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  error
@@ -164,6 +169,7 @@ func TestIsExpectedUserError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := IsExpectedUserError(tt.err); got != tt.want {
 				t.Errorf("IsExpectedUserError() = %v, want %v", got, tt.want)
 			}
@@ -172,6 +178,7 @@ func TestIsExpectedUserError(t *testing.T) {
 }
 
 func TestExtractSummary_EdgeCases(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Test with very long lines

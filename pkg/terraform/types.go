@@ -217,11 +217,11 @@ type Workspace struct {
 
 // PlanResult represents the result of a Terraform plan
 type PlanResult struct {
-	Success         bool                   `json:"success"`
-	ChangesPresent  bool                   `json:"changes_present"`
-	ResourceChanges []ResourceChange       `json:"resource_changes"`
-	PlanFile        string                 `json:"plan_file,omitempty"`
-	Error           string                 `json:"error,omitempty"`
+	Success         bool             `json:"success"`
+	ChangesPresent  bool             `json:"changes_present"`
+	ResourceChanges []ResourceChange `json:"resource_changes"`
+	PlanFile        string           `json:"plan_file,omitempty"`
+	Error           string           `json:"error,omitempty"`
 }
 
 // ResourceChange represents a single resource change in a plan
@@ -270,13 +270,13 @@ type ResourceState struct {
 
 // DeploymentStatus represents the status of a deployment
 type DeploymentStatus struct {
-	DeploymentID string                       `json:"deployment_id"`
-	Environment  string                       `json:"environment"`
-	StartedAt    time.Time                    `json:"started_at"`
-	CompletedAt  *time.Time                   `json:"completed_at,omitempty"`
-	Status       string                       `json:"status"`
-	Components   map[string]ComponentStatus   `json:"components"`
-	Error        string                       `json:"error,omitempty"`
+	DeploymentID string                     `json:"deployment_id"`
+	Environment  string                     `json:"environment"`
+	StartedAt    time.Time                  `json:"started_at"`
+	CompletedAt  *time.Time                 `json:"completed_at,omitempty"`
+	Status       string                     `json:"status"`
+	Components   map[string]ComponentStatus `json:"components"`
+	Error        string                     `json:"error,omitempty"`
 }
 
 // ComponentStatus represents the status of a single component deployment
@@ -289,20 +289,20 @@ type ComponentStatus struct {
 
 // ServiceDefinition defines a service that can be deployed with Hecate
 type ServiceDefinition struct {
-	Name           string            `json:"name"`
-	DisplayName    string            `json:"display_name"`
-	Description    string            `json:"description"`
-	Category       string            `json:"category"`
-	Icon           string            `json:"icon,omitempty"`
-	NomadJobPath   string            `json:"nomad_job_path,omitempty"`
-	TerraformPath  string            `json:"terraform_path,omitempty"`
-	Dependencies   []string          `json:"dependencies"`
-	Ports          []ServicePort     `json:"ports"`
-	AuthPolicy     string            `json:"auth_policy"`
-	HealthEndpoint string            `json:"health_endpoint"`
-	Subdomain      string            `json:"subdomain"`
+	Name           string               `json:"name"`
+	DisplayName    string               `json:"display_name"`
+	Description    string               `json:"description"`
+	Category       string               `json:"category"`
+	Icon           string               `json:"icon,omitempty"`
+	NomadJobPath   string               `json:"nomad_job_path,omitempty"`
+	TerraformPath  string               `json:"terraform_path,omitempty"`
+	Dependencies   []string             `json:"dependencies"`
+	Ports          []ServicePort        `json:"ports"`
+	AuthPolicy     string               `json:"auth_policy"`
+	HealthEndpoint string               `json:"health_endpoint"`
+	Subdomain      string               `json:"subdomain"`
 	Resources      ResourceRequirements `json:"resources"`
-	Configuration  map[string]any    `json:"configuration"`
+	Configuration  map[string]any       `json:"configuration"`
 }
 
 // ServicePort defines a port used by a service
@@ -323,26 +323,26 @@ type ResourceRequirements struct {
 // Constants for common values
 const (
 	// Backend types
-	BackendS3       = "s3"
-	BackendAzure    = "azurerm"
-	BackendGCS      = "gcs"
-	BackendConsul   = "consul"
-	BackendLocal    = "local"
-	
+	BackendS3     = "s3"
+	BackendAzure  = "azurerm"
+	BackendGCS    = "gcs"
+	BackendConsul = "consul"
+	BackendLocal  = "local"
+
 	// Provider types
 	ProviderAWS        = "aws"
 	ProviderAzure      = "azurerm"
 	ProviderGoogle     = "google"
 	ProviderHetzner    = "hcloud"
 	ProviderCloudflare = "cloudflare"
-	
+
 	// Component types
 	ComponentVault    = "vault"
 	ComponentConsul   = "consul"
 	ComponentBoundary = "boundary"
 	ComponentHecate   = "hecate"
 	ComponentHera     = "hera"
-	
+
 	// Deployment statuses
 	StatusInitializing = "initializing"
 	StatusPlanning     = "planning"
@@ -350,7 +350,7 @@ const (
 	StatusCompleted    = "completed"
 	StatusFailed       = "failed"
 	StatusRollingBack  = "rolling_back"
-	
+
 	// Service categories
 	CategoryMonitoring = "monitoring"
 	CategorySecurity   = "security"

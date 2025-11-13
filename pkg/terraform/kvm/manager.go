@@ -22,20 +22,20 @@ type KVMManager struct {
 
 // VMConfig represents VM configuration
 type VMConfig struct {
-	Name         string            `json:"name"`
-	Memory       uint              `json:"memory"`       // MB
-	VCPUs        uint              `json:"vcpus"`
-	DiskSize     uint64            `json:"disk_size"`    // bytes
-	NetworkName  string            `json:"network_name"`
-	OSVariant    string            `json:"os_variant"`
-	ImagePath    string            `json:"image_path"`
-	SSHKeys      []string          `json:"ssh_keys"`
-	UserData     string            `json:"user_data"`
-	MetaData     string            `json:"meta_data"`
-	Volumes      []VolumeConfig    `json:"volumes"`
-	Tags         map[string]string `json:"tags"`
-	StoragePool  string            `json:"storage_pool"`
-	AutoStart    bool              `json:"auto_start"`
+	Name        string            `json:"name"`
+	Memory      uint              `json:"memory"` // MB
+	VCPUs       uint              `json:"vcpus"`
+	DiskSize    uint64            `json:"disk_size"` // bytes
+	NetworkName string            `json:"network_name"`
+	OSVariant   string            `json:"os_variant"`
+	ImagePath   string            `json:"image_path"`
+	SSHKeys     []string          `json:"ssh_keys"`
+	UserData    string            `json:"user_data"`
+	MetaData    string            `json:"meta_data"`
+	Volumes     []VolumeConfig    `json:"volumes"`
+	Tags        map[string]string `json:"tags"`
+	StoragePool string            `json:"storage_pool"`
+	AutoStart   bool              `json:"auto_start"`
 
 	// Security settings
 	EnableTPM      bool   `json:"enable_tpm"`      // Enable TPM 2.0 emulation

@@ -196,11 +196,11 @@ const (
 	LiteLLMDefaultMasterKey = "sk-" // Must start with sk-
 
 	// Backup configuration
-	BackupDirName          = "backups"
-	BackupTimestampFormat  = "20060102_150405"
-	BackupPrefixRefresh    = "refresh-"
-	RollbackScriptName     = "rollback.sh"
-	RollbackScriptPerm     = 0755
+	BackupDirName         = "backups"
+	BackupTimestampFormat = "20060102_150405"
+	BackupPrefixRefresh   = "refresh-"
+	RollbackScriptName    = "rollback.sh"
+	RollbackScriptPerm    = 0755
 
 	// File paths
 	DockerComposeFileName = "docker-compose.yml"
@@ -233,21 +233,21 @@ const (
 	ModelLLMRPMLimit       = 500   // LLM RPM
 
 	// Prompt configuration
-	PromptVisibility      = "Company"
-	PromptName            = "moni"
-	PromptMaxHistory      = 3
-	PromptMaxChunks       = 10
-	PromptMaxTokens       = 4096
-	PromptTrimRatio       = 80
-	PromptTemperature     = 0.7
-	PromptType            = "Model"
-	PromptCategoryID      = 1
-	PromptDescription     = "Moni - Powered by Azure OpenAI o3-mini"
+	PromptVisibility  = "Company"
+	PromptName        = "moni"
+	PromptMaxHistory  = 3
+	PromptMaxChunks   = 10
+	PromptMaxTokens   = 4096
+	PromptTrimRatio   = 80
+	PromptTemperature = 0.7
+	PromptType        = "Model"
+	PromptCategoryID  = 1
+	PromptDescription = "Moni - Powered by Azure OpenAI o3-mini"
 
 	// Docker Compose service names
-	ServiceApp      = "app"
-	ServiceLiteLLM  = "litellm-proxy"
-	ServicePostgres = "postgres"
+	ServiceApp       = "app"
+	ServiceLiteLLM   = "litellm-proxy"
+	ServicePostgres  = "postgres"
 	ServiceLiteLLMDB = "litellm-db"
 
 	// Environment variable names (for validation)

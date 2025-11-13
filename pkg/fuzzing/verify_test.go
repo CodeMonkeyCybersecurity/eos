@@ -65,7 +65,7 @@ func TestCalculateHealthScore(t *testing.T) {
 			desc:     "Fuzzing works but no tests found",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			score := calculateHealthScore(tt.status)
@@ -77,7 +77,7 @@ func TestCalculateHealthScore(t *testing.T) {
 func TestEvaluateFuzzingHealth(t *testing.T) {
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	tests := []struct {
 		name    string
 		status  *FuzzingStatus
@@ -143,7 +143,7 @@ func TestEvaluateFuzzingHealth(t *testing.T) {
 			wantErr: false, // Should only warn, not error
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := evaluateFuzzingHealth(tt.status, logger)
@@ -162,10 +162,10 @@ func TestEvaluateFuzzingHealth(t *testing.T) {
 func TestVerifyEnvironment(t *testing.T) {
 	// This is an integration test that requires a real Go environment
 	rc := NewTestContext(t)
-	
+
 	// Run full verification
 	err := Verify(rc)
-	
+
 	// This should pass on any properly configured Go 1.18+ system
 	if err != nil {
 		t.Logf("Verification failed (might be environment-specific): %v", err)
@@ -175,15 +175,15 @@ func TestVerifyEnvironment(t *testing.T) {
 func TestFuzzingStatusCapabilities(t *testing.T) {
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Test status assessment
 	status, err := assessFuzzingStatus(rc.Ctx, logger)
 	require.NoError(t, err)
-	
+
 	// Should have some capabilities
 	assert.NotNil(t, status)
 	assert.NotEmpty(t, status.Capabilities, "Should detect some capabilities")
-	
+
 	// Verify timestamp is recent
 	assert.WithinDuration(t, time.Now(), status.LastVerified, 5*time.Second)
 }
@@ -212,12 +212,12 @@ func TestVerificationTests(t *testing.T) {
 			testFunc: verifyOutputHandling,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := NewTestContext(t)
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			err := tt.testFunc(logger)
 			if err != nil && tt.skipMsg != "" {
 				t.Skipf("%s: %v", tt.skipMsg, err)
@@ -231,11 +231,11 @@ func TestVerificationTests(t *testing.T) {
 func TestCountFuzzTests(t *testing.T) {
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// This will count actual fuzz tests in the current directory
 	count, err := countFuzzTests(logger)
 	require.NoError(t, err)
-	
+
 	// We should find at least our own test files
 	assert.GreaterOrEqual(t, count, 0, "Should not error even if no tests found")
 }
@@ -243,10 +243,10 @@ func TestCountFuzzTests(t *testing.T) {
 func TestCheckFuzzingSupportDetailed(t *testing.T) {
 	rc := NewTestContext(t)
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	supported, err := checkFuzzingSupportDetailed(logger)
 	require.NoError(t, err)
-	
+
 	// Should be true on Go 1.18+ systems
 	if !supported {
 		t.Log("Fuzzing not supported (might be running on Go < 1.18)")

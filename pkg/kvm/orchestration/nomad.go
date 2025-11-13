@@ -260,10 +260,10 @@ func (no *NomadOrchestrator) CreateVMPoolJob(pool *VMPool) error {
 		Priority:    intPtr(50),
 		Datacenters: []string{"dc1"},
 		Meta: map[string]string{
-			"pool_name":    pool.Name,
-			"min_size":     fmt.Sprintf("%d", pool.MinSize),
-			"max_size":     fmt.Sprintf("%d", pool.MaxSize),
-			"vm_template":  pool.VMTemplate,
+			"pool_name":   pool.Name,
+			"min_size":    fmt.Sprintf("%d", pool.MinSize),
+			"max_size":    fmt.Sprintf("%d", pool.MaxSize),
+			"vm_template": pool.VMTemplate,
 		},
 	}
 

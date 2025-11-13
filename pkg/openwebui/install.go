@@ -1062,8 +1062,8 @@ func (owi *OpenWebUIInstaller) verifyInstallation(ctx context.Context) error {
 	healthURL := fmt.Sprintf("http://localhost:%d/health", owi.config.Port)
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	maxRetries := 12     // 12 attempts
-	retryInterval := 10 * time.Second  // Every 10 seconds = 120 seconds total
+	maxRetries := 12                  // 12 attempts
+	retryInterval := 10 * time.Second // Every 10 seconds = 120 seconds total
 	logger.Info("Waiting for Open WebUI to become healthy",
 		zap.Duration("max_wait", time.Duration(maxRetries)*retryInterval),
 		zap.String("url", healthURL))

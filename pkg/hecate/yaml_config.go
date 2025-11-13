@@ -28,7 +28,7 @@ type RawAppConfig struct {
 
 // RawYAMLConfig represents the top-level YAML structure
 type RawYAMLConfig struct {
-	BaseDomain string                   `yaml:"base_domain,omitempty"` // Base domain for constructing subdomains
+	BaseDomain string                  `yaml:"base_domain,omitempty"` // Base domain for constructing subdomains
 	Apps       map[string]RawAppConfig `yaml:"apps"`
 }
 

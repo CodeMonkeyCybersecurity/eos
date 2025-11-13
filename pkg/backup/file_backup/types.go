@@ -88,14 +88,14 @@ type BackupInfo struct {
 
 // RestoreOperation represents a file restore operation
 type RestoreOperation struct {
-	BackupPath    string        `json:"backup_path"`
-	RestorePath   string        `json:"restore_path"`
-	Success       bool          `json:"success"`
-	Message       string        `json:"message"`
-	Timestamp     time.Time     `json:"timestamp"`
-	Duration      time.Duration `json:"duration"`
-	DryRun        bool          `json:"dry_run"`
-	Overwritten   bool          `json:"overwritten"`
-	BackupSize    int64         `json:"backup_size"`
-	RestoredSize  int64         `json:"restored_size"`
+	BackupPath   string        `json:"backup_path"`
+	RestorePath  string        `json:"restore_path"`
+	Success      bool          `json:"success"`
+	Message      string        `json:"message"`
+	Timestamp    time.Time     `json:"timestamp"`
+	Duration     time.Duration `json:"duration"`
+	DryRun       bool          `json:"dry_run"`
+	Overwritten  bool          `json:"overwritten"`
+	BackupSize   int64         `json:"backup_size"`
+	RestoredSize int64         `json:"restored_size"`
 }

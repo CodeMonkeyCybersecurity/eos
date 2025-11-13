@@ -92,7 +92,7 @@ func TestIsPortInUse(t *testing.T) {
 
 func TestCanReachInternet(t *testing.T) {
 	rc := eos_io.NewContext(context.Background(), "test")
-	
+
 	// This test might fail in isolated environments
 	// Just verify it returns a boolean without error
 	result := canReachInternet(rc)

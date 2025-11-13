@@ -131,14 +131,14 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	// Use Consul storage backend (recommended)
 	// Provides HA without Raft complexity
 	params := shared.VaultConfigParams{
-		Port:          shared.VaultDefaultPort,
-		ClusterPort:   shared.VaultClusterPort,
-		TLSCrt:        shared.TLSCrt,
-		TLSKey:        shared.TLSKey,
-		APIAddr:       vaultAddr,
-		ClusterAddr:   shared.GetVaultClusterAddr(),
-		LogLevel:      logLevel,
-		LogFormat:     logFormat,
+		Port:        shared.VaultDefaultPort,
+		ClusterPort: shared.VaultClusterPort,
+		TLSCrt:      shared.TLSCrt,
+		TLSKey:      shared.TLSKey,
+		APIAddr:     vaultAddr,
+		ClusterAddr: shared.GetVaultClusterAddr(),
+		LogLevel:    logLevel,
+		LogFormat:   logFormat,
 		// Consul backend configuration
 		ConsulAddress: shared.GetConsulHostPort(),
 		ConsulPath:    "vault/",

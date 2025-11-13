@@ -38,8 +38,8 @@ type PullProgress struct {
 type LayerProgress struct {
 	ID              string
 	Status          string
-	DownloadCurrent int64  // Bytes downloaded (stable, doesn't reset during extraction)
-	DownloadTotal   int64  // Total download size (stable once discovered)
+	DownloadCurrent int64 // Bytes downloaded (stable, doesn't reset during extraction)
+	DownloadTotal   int64 // Total download size (stable once discovered)
 	Complete        bool
 	Phase           string // "waiting", "downloading", "extracting", "complete"
 }

@@ -32,15 +32,15 @@ func shellEscape(command string) string {
 	if command == "" {
 		return "''"
 	}
-	
+
 	// If the command contains our safe placeholders, it's been sanitized
 	if strings.Contains(command, "_SAFE_") {
 		return command
 	}
-	
+
 	// Escape single quotes by ending the quote, adding escaped quote, and starting new quote
 	escaped := strings.ReplaceAll(command, "'", "'\"'\"'")
-	
+
 	// Wrap in single quotes for shell safety
 	return "'" + escaped + "'"
 }
@@ -51,20 +51,20 @@ func isSafelyEscaped(escaped string) bool {
 	if escaped == "" || escaped == "''" {
 		return true
 	}
-	
+
 	// If it contains our safe placeholders, it's been sanitized
 	if strings.Contains(escaped, "_SAFE_") {
 		return true
 	}
-	
+
 	// Must be properly quoted (starts and ends with single quotes)
 	if !strings.HasPrefix(escaped, "'") || !strings.HasSuffix(escaped, "'") {
 		return false
 	}
-	
+
 	// Check that any internal single quotes are properly escaped
 	internal := escaped[1 : len(escaped)-1] // Remove outer quotes
-	
+
 	// Look for unescaped single quotes
 	i := 0
 	for i < len(internal) {
@@ -79,7 +79,7 @@ func isSafelyEscaped(escaped string) bool {
 			i++
 		}
 	}
-	
+
 	return true
 }
 
@@ -87,11 +87,11 @@ func isSafelyEscaped(escaped string) bool {
 func createSafeExecutionContext(command string) interface{} {
 	// Simple validation context
 	return map[string]interface{}{
-		"command":     command,
-		"escaped":     shellEscape(command),
-		"safe":        isSafelyEscaped(shellEscape(command)),
-		"sanitized":   !containsInjectionPatterns(command),
-		"validated":   validateCommand(command),
+		"command":   command,
+		"escaped":   shellEscape(command),
+		"safe":      isSafelyEscaped(shellEscape(command)),
+		"sanitized": !containsInjectionPatterns(command),
+		"validated": validateCommand(command),
 	}
 }
 
@@ -100,17 +100,17 @@ func isSecureContext(context interface{}) bool {
 	if context == nil {
 		return false
 	}
-	
+
 	ctx, ok := context.(map[string]interface{})
 	if !ok {
 		return false
 	}
-	
+
 	// Check all security flags
 	safe, _ := ctx["safe"].(bool)
 	sanitized, _ := ctx["sanitized"].(bool)
 	validated, _ := ctx["validated"].(bool)
-	
+
 	return safe && sanitized && validated
 }
 
@@ -120,7 +120,7 @@ func containsInjectionPatterns(command string) bool {
 	if strings.Contains(command, "_SAFE_") {
 		return false
 	}
-	
+
 	// Standard command injection patterns
 	patterns := []string{
 		";", "|", "&", "$(", "`", "&&", "||", ">", "<", ">>", "<<",
@@ -130,32 +130,32 @@ func containsInjectionPatterns(command string) bool {
 		"wget", "curl", "nc ", "netcat", "telnet", "ssh", "scp",
 		"python -c", "perl -e", "ruby -e", "php -r",
 	}
-	
+
 	// Unicode command injection patterns
 	unicodePatterns := []string{
-		"；",  // Unicode semicolon (U+FF1B)
-		"｜",  // Unicode pipe (U+FF5C)
-		"＆",  // Unicode ampersand (U+FF06)
-		"＜",  // Unicode less-than (U+FF1C)
-		"＞",  // Unicode greater-than (U+FF1E)
+		"；", // Unicode semicolon (U+FF1B)
+		"｜", // Unicode pipe (U+FF5C)
+		"＆", // Unicode ampersand (U+FF06)
+		"＜", // Unicode less-than (U+FF1C)
+		"＞", // Unicode greater-than (U+FF1E)
 	}
-	
+
 	lower := strings.ToLower(command)
-	
+
 	// Check standard patterns
 	for _, pattern := range patterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) {
 			return true
 		}
 	}
-	
+
 	// Check Unicode patterns
 	for _, pattern := range unicodePatterns {
 		if strings.Contains(command, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

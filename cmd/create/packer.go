@@ -3,7 +3,7 @@ package create
 
 import (
 	"fmt"
-	
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
@@ -30,7 +30,7 @@ Examples:
 
 func init() {
 	CreateCmd.AddCommand(CreatePackerCmd)
-	
+
 	// Packer flags
 	CreatePackerCmd.Flags().String("version", "latest", "Packer version to install")
 	CreatePackerCmd.Flags().String("plugin-dir", "/var/lib/packer/plugins", "Plugin directory")

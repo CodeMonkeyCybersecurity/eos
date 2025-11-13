@@ -741,7 +741,7 @@ func BenchmarkTokenFileCreation(b *testing.B) {
 	token := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		tokenFile, err := createTemporaryTokenFile(rc, token)
 		if err != nil {
 			b.Fatalf("Token file creation failed: %v", err)
@@ -761,7 +761,7 @@ func BenchmarkTokenFileVsEnvVar(b *testing.B) {
 	token := "hvs.CAESIJ1234567890abcdefghijklmnopqrstuvwxyz"
 
 	b.Run("TokenFile", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			tokenFile, _ := createTemporaryTokenFile(rc, token)
 			cmd := exec.Command("echo", "test")
 			cmd.Env = append(os.Environ(), fmt.Sprintf("VAULT_TOKEN_FILE=%s", tokenFile.Name()))
@@ -771,7 +771,7 @@ func BenchmarkTokenFileVsEnvVar(b *testing.B) {
 	})
 
 	b.Run("EnvVar", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			cmd := exec.Command("echo", "test")
 			cmd.Env = append(os.Environ(), fmt.Sprintf("VAULT_TOKEN=%s", token))
 			cmd.Run()

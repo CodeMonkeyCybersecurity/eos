@@ -60,7 +60,6 @@ func InstallServer(ctx context.Context, postgresPassword string) error {
 	return nil
 }
 
-
 func installPostgreSQL(ctx context.Context, config *TemporalConfig) error {
 	logger := otelzap.Ctx(ctx)
 

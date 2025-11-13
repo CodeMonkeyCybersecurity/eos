@@ -19,10 +19,10 @@ import (
 
 // Provider manages Terraform operations
 type Provider struct {
-	rc       *eos_io.RuntimeContext
-	workDir  string
-	vars     map[string]interface{}
-	config   Config
+	rc      *eos_io.RuntimeContext
+	workDir string
+	vars    map[string]interface{}
+	config  Config
 }
 
 // Config holds Terraform provider configuration
@@ -190,7 +190,7 @@ func (p *Provider) renderTemplate(tmplStr string, data interface{}) (string, err
 // Apply applies Terraform configuration
 func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) error {
 	logger := otelzap.Ctx(p.rc.Ctx)
-	
+
 	// Create component directory
 	componentDir := filepath.Join(p.workDir, component.Name)
 	if err := os.MkdirAll(componentDir, shared.ServiceDirPerm); err != nil {
@@ -227,10 +227,10 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	// Initialize Terraform
 	logger.Info("Initializing Terraform")
 	initCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"init", "-upgrade"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"init", "-upgrade"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, initCmd)
@@ -244,10 +244,10 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	// Plan
 	logger.Info("Planning Terraform changes")
 	planCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"plan", "-out=tfplan"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"plan", "-out=tfplan"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err = execute.Run(p.rc.Ctx, planCmd)
@@ -267,10 +267,10 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	applyArgs = append(applyArgs, "tfplan")
 
 	applyCmd := execute.Options{
-		Command:    "terraform",
-		Args:       applyArgs,
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    applyArgs,
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	_, err = execute.Run(p.rc.Ctx, applyCmd)
@@ -429,14 +429,14 @@ EOH
 // Destroy destroys Terraform-managed resources
 func (p *Provider) Destroy(ctx context.Context, component orchestrator.Component) error {
 	logger := otelzap.Ctx(p.rc.Ctx)
-	
+
 	componentDir := filepath.Join(p.workDir, component.Name)
-	
+
 	destroyCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"destroy", "-auto-approve"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"destroy", "-auto-approve"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, destroyCmd)
@@ -456,12 +456,12 @@ func (p *Provider) Destroy(ctx context.Context, component orchestrator.Component
 // GetOutputs retrieves Terraform outputs
 func (p *Provider) GetOutputs(ctx context.Context, component orchestrator.Component) (map[string]string, error) {
 	componentDir := filepath.Join(p.workDir, component.Name)
-	
+
 	outputCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"output", "-json"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"output", "-json"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, outputCmd)
@@ -473,7 +473,7 @@ func (p *Provider) GetOutputs(ctx context.Context, component orchestrator.Compon
 	outputs := make(map[string]string)
 	// TODO: Implement JSON parsing of Terraform outputs
 	_ = output // Suppress unused variable warning
-	
+
 	return outputs, nil
 }
 

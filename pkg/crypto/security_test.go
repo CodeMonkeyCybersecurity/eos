@@ -14,6 +14,7 @@ import (
 
 // TestPasswordSecurityRequirements validates password generation meets security standards
 func TestPasswordSecurityRequirements(t *testing.T) {
+	t.Parallel()
 	t.Run("password_length_security", func(t *testing.T) {
 		// Current minimum is 12, but security best practice is 14+
 		if MinPasswordLen < 14 {
@@ -31,6 +32,7 @@ func TestPasswordSecurityRequirements(t *testing.T) {
 	})
 
 	t.Run("password_entropy_validation", func(t *testing.T) {
+		t.Parallel()
 		// Generate multiple passwords and ensure they're different
 		passwords := make(map[string]bool)
 
@@ -49,6 +51,7 @@ func TestPasswordSecurityRequirements(t *testing.T) {
 	})
 
 	t.Run("password_character_set_security", func(t *testing.T) {
+		t.Parallel()
 		// Ensure symbol characters don't include shell injection risks
 		dangerousChars := []string{"`", "$", "\\", "\"", "'"}
 
@@ -101,6 +104,7 @@ func validatePasswordComplexity(t *testing.T, password string) {
 
 // TestPasswordValidationSecurity tests strong password validation
 func TestPasswordValidationSecurity(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		password    string
@@ -159,6 +163,7 @@ func TestPasswordValidationSecurity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateStrongPassword(context.Background(), tt.password)
 
 			if tt.shouldPass {
@@ -176,6 +181,7 @@ func TestPasswordValidationSecurity(t *testing.T) {
 
 // TestBcryptSecurityConfiguration validates bcrypt security settings
 func TestBcryptSecurityConfiguration(t *testing.T) {
+	t.Parallel()
 	t.Run("bcrypt_cost_security", func(t *testing.T) {
 		password := "testPassword123!"
 
@@ -198,6 +204,7 @@ func TestBcryptSecurityConfiguration(t *testing.T) {
 	})
 
 	t.Run("bcrypt_timing_attack_resistance", func(t *testing.T) {
+		t.Parallel()
 		// Generate a known hash
 		password := "testPassword123!"
 		hash, err := HashPassword(password)
@@ -220,9 +227,11 @@ func TestBcryptSecurityConfiguration(t *testing.T) {
 
 // TestSecureEraseEffectiveness tests secure deletion functionality
 func TestSecureEraseEffectiveness(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	t.Run("secure_erase_file_deletion", func(t *testing.T) {
+		t.Parallel()
 		// Skip this test in CI environments that may not have shred command
 		if os.Getenv("CI") != "" {
 			t.Skip("Skipping secure erase test in CI environment")
@@ -257,6 +266,7 @@ func TestSecureEraseEffectiveness(t *testing.T) {
 	})
 
 	t.Run("secure_zero_memory", func(t *testing.T) {
+		t.Parallel()
 		// Test memory zeroing functionality
 		sensitiveData := []byte("SENSITIVE_MEMORY_DATA_987654321")
 		originalData := make([]byte, len(sensitiveData))
@@ -279,6 +289,7 @@ func TestSecureEraseEffectiveness(t *testing.T) {
 
 // TestHashFunctionSecurity validates hash function security
 func TestHashFunctionSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("hash_consistency", func(t *testing.T) {
 		input := "test string for hashing"
 
@@ -292,6 +303,7 @@ func TestHashFunctionSecurity(t *testing.T) {
 	})
 
 	t.Run("hash_different_inputs", func(t *testing.T) {
+		t.Parallel()
 		inputs := []string{
 			"input1",
 			"input2",
@@ -317,6 +329,7 @@ func TestHashFunctionSecurity(t *testing.T) {
 	})
 
 	t.Run("hash_length_consistency", func(t *testing.T) {
+		t.Parallel()
 		// All hashes should have consistent length
 		inputs := []string{"short", "medium length input", "very long input string with lots of characters"}
 		var expectedLength int
@@ -335,6 +348,7 @@ func TestHashFunctionSecurity(t *testing.T) {
 
 // TestCertificateGenerationSecurity tests certificate generation security
 func TestCertificateGenerationSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("certificate_input_validation", func(t *testing.T) {
 		// Test cases with potentially dangerous inputs
 		dangerousInputs := []struct {
@@ -366,6 +380,7 @@ func TestCertificateGenerationSecurity(t *testing.T) {
 
 		for _, tt := range dangerousInputs {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 				// In a real implementation, you'd test the actual certificate generation function
 				// For now, we're validating that such inputs would be properly sanitized
 
@@ -392,6 +407,7 @@ func TestCertificateGenerationSecurity(t *testing.T) {
 
 // TestSecretInjectionSecurity tests secret replacement functionality
 func TestSecretInjectionSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("secret_injection_from_placeholders", func(t *testing.T) {
 		// Test the actual InjectSecretsFromPlaceholders function
 		template := []byte("username: changeme\npassword: changeme1\napi_key: changeme2")
@@ -423,6 +439,7 @@ func TestSecretInjectionSecurity(t *testing.T) {
 	})
 
 	t.Run("secret_injection_password_strength", func(t *testing.T) {
+		t.Parallel()
 		// Test that generated secrets meet security requirements
 		template := []byte("secret1: changeme\nsecret2: changeme1")
 
@@ -431,6 +448,7 @@ func TestSecretInjectionSecurity(t *testing.T) {
 
 		for placeholder, password := range replacements {
 			t.Run("password_for_"+placeholder, func(t *testing.T) {
+				t.Parallel()
 				// Each generated password should be strong
 				err := ValidateStrongPassword(context.Background(), password)
 				testutil.AssertNoError(t, err)

@@ -14,46 +14,46 @@ import (
 
 // MigrationManager handles migration from K3s/Kubernetes to Nomad
 type MigrationManager struct {
-	logger otelzap.LoggerWithCtx
-	jobGenerator *JobGenerator
+	logger           otelzap.LoggerWithCtx
+	jobGenerator     *JobGenerator
 	serviceDiscovery *ServiceDiscoveryManager
 }
 
 // NewMigrationManager creates a new migration manager
 func NewMigrationManager(logger otelzap.LoggerWithCtx) *MigrationManager {
 	return &MigrationManager{
-		logger: logger,
-		jobGenerator: NewJobGenerator(logger),
+		logger:           logger,
+		jobGenerator:     NewJobGenerator(logger),
 		serviceDiscovery: NewServiceDiscoveryManager(logger, ""),
 	}
 }
 
 // MigrationResult represents the result of a K3s to Nomad migration
 type MigrationResult struct {
-	ServicesConverted   int      `json:"services_converted"`
-	JobsCreated         int      `json:"jobs_created"`
-	IngressSetup        bool     `json:"ingress_setup"`
-	MailProxySetup      bool     `json:"mail_proxy_setup"`
-	Errors              []string `json:"errors,omitempty"`
-	MigrationSummary    string   `json:"migration_summary"`
+	ServicesConverted int      `json:"services_converted"`
+	JobsCreated       int      `json:"jobs_created"`
+	IngressSetup      bool     `json:"ingress_setup"`
+	MailProxySetup    bool     `json:"mail_proxy_setup"`
+	Errors            []string `json:"errors,omitempty"`
+	MigrationSummary  string   `json:"migration_summary"`
 }
 
 // K3sMigrationConfig represents configuration for K3s migration
 type K3sMigrationConfig struct {
-	SourceClusterPath   string   `json:"source_cluster_path"`
-	PreservePVCs        bool     `json:"preserve_pvcs"`
-	MigrateIngress      bool     `json:"migrate_ingress"`
-	MigrateMailProxy    bool     `json:"migrate_mail_proxy"`
-	Domain              string   `json:"domain,omitempty"`
-	TargetDatacenter    string   `json:"target_datacenter"`
-	TargetRegion        string   `json:"target_region"`
-	DryRun              bool     `json:"dry_run"`
+	SourceClusterPath string `json:"source_cluster_path"`
+	PreservePVCs      bool   `json:"preserve_pvcs"`
+	MigrateIngress    bool   `json:"migrate_ingress"`
+	MigrateMailProxy  bool   `json:"migrate_mail_proxy"`
+	Domain            string `json:"domain,omitempty"`
+	TargetDatacenter  string `json:"target_datacenter"`
+	TargetRegion      string `json:"target_region"`
+	DryRun            bool   `json:"dry_run"`
 }
 
 // MigrateK3sToNomad migrates an existing K3s cluster to Nomad
 func (mm *MigrationManager) MigrateK3sToNomad(rc *eos_io.RuntimeContext, config K3sMigrationConfig) (*MigrationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting K3s to Nomad migration",
 		zap.String("source_cluster", config.SourceClusterPath),
 		zap.Bool("dry_run", config.DryRun),
@@ -65,7 +65,7 @@ func (mm *MigrationManager) MigrateK3sToNomad(rc *eos_io.RuntimeContext, config 
 
 	// ASSESS - Check K3s cluster and Nomad readiness
 	logger.Info("Assessing migration prerequisites")
-	
+
 	if err := mm.assessMigrationPrerequisites(rc, config); err != nil {
 		return nil, fmt.Errorf("migration prerequisites assessment failed: %w", err)
 	}
@@ -119,7 +119,7 @@ func (mm *MigrationManager) MigrateK3sToNomad(rc *eos_io.RuntimeContext, config 
 
 	// EVALUATE - Verify migration success
 	logger.Info("Evaluating migration results")
-	
+
 	if err := mm.verifyMigration(rc, result); err != nil {
 		result.Errors = append(result.Errors, fmt.Sprintf("migration verification failed: %v", err))
 	}
@@ -139,19 +139,19 @@ func (mm *MigrationManager) MigrateK3sToNomad(rc *eos_io.RuntimeContext, config 
 // UninstallK3s safely removes K3s after migration to Nomad
 func (mm *MigrationManager) UninstallK3s(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting K3s uninstallation after Nomad migration")
 
 	// ASSESS - Check if K3s is installed and migration is complete
 	logger.Info("Assessing K3s uninstallation prerequisites")
-	
+
 	if err := mm.checkMigrationComplete(rc); err != nil {
 		return fmt.Errorf("cannot uninstall K3s: migration not complete: %w", err)
 	}
 
 	// INTERVENE - Stop and remove K3s components
 	logger.Info("Removing K3s components")
-	
+
 	if err := mm.stopK3sServices(rc); err != nil {
 		logger.Warn("Failed to stop K3s services", zap.Error(err))
 	}
@@ -166,7 +166,7 @@ func (mm *MigrationManager) UninstallK3s(rc *eos_io.RuntimeContext) error {
 
 	// EVALUATE - Verify K3s removal
 	logger.Info("Verifying K3s removal")
-	
+
 	if err := mm.verifyK3sRemoval(rc); err != nil {
 		logger.Warn("K3s removal verification failed", zap.Error(err))
 		return fmt.Errorf("K3s removal verification failed: %w", err)
@@ -179,7 +179,7 @@ func (mm *MigrationManager) UninstallK3s(rc *eos_io.RuntimeContext) error {
 // assessMigrationPrerequisites checks if migration can proceed
 func (mm *MigrationManager) assessMigrationPrerequisites(rc *eos_io.RuntimeContext, config K3sMigrationConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if K3s is running
 	if !mm.isK3sRunning(rc) {
 		return fmt.Errorf("K3s is not running - cannot migrate")
@@ -202,31 +202,31 @@ func (mm *MigrationManager) assessMigrationPrerequisites(rc *eos_io.RuntimeConte
 // extractK3sWorkloads extracts workloads from K3s cluster
 func (mm *MigrationManager) extractK3sWorkloads(rc *eos_io.RuntimeContext, config K3sMigrationConfig) ([]map[string]interface{}, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Extracting K3s workloads")
-	
+
 	// This would implement actual kubectl commands to extract:
 	// - Deployments
-	// - Services 
+	// - Services
 	// - ConfigMaps
 	// - Secrets
 	// - PersistentVolumeClaims
 	// - Ingress resources
-	
+
 	// For now, return mock workloads
 	workloads := []map[string]interface{}{
 		{
-			"kind": "Deployment",
-			"name": "web-app",
-			"image": "nginx:1.20",
+			"kind":     "Deployment",
+			"name":     "web-app",
+			"image":    "nginx:1.20",
 			"replicas": 2,
-			"ports": []int{80},
+			"ports":    []int{80},
 			"env": map[string]string{
 				"ENV": "production",
 			},
 		},
 		{
-			"kind": "Service", 
+			"kind": "Service",
 			"name": "web-app-service",
 			"type": "ClusterIP",
 			"ports": []map[string]interface{}{
@@ -237,17 +237,17 @@ func (mm *MigrationManager) extractK3sWorkloads(rc *eos_io.RuntimeContext, confi
 			},
 		},
 	}
-	
+
 	logger.Info("K3s workloads extracted",
 		zap.Int("workload_count", len(workloads)))
-	
+
 	return workloads, nil
 }
 
 // convertK3sWorkloadsToNomad converts K3s workloads to Nomad job specifications
 func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext, workloads []map[string]interface{}, config K3sMigrationConfig) ([]string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Converting K3s workloads to Nomad jobs",
 		zap.Int("workload_count", len(workloads)))
 
@@ -255,7 +255,7 @@ func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext
 
 	for _, workload := range workloads {
 		kind, _ := workload["kind"].(string)
-		
+
 		switch kind {
 		case "Deployment":
 			jobConfig, err := mm.jobGenerator.ConvertK3sToNomadConfig(rc, workload)
@@ -263,7 +263,7 @@ func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext
 				logger.Error("Failed to convert K3s deployment", zap.Error(err))
 				continue
 			}
-			
+
 			// Set migration-specific fields
 			jobConfig.Datacenter = config.TargetDatacenter
 			jobConfig.Region = config.TargetRegion
@@ -274,7 +274,7 @@ func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext
 				logger.Error("Failed to generate Nomad job", zap.Error(err))
 				continue
 			}
-			
+
 			nomadJobs = append(nomadJobs, jobSpec)
 
 		case "Service":
@@ -284,7 +284,7 @@ func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext
 				logger.Error("Failed to convert K3s service", zap.Error(err))
 				continue
 			}
-			
+
 			if err := mm.serviceDiscovery.RegisterService(rc, consulService); err != nil {
 				logger.Error("Failed to register Consul service", zap.Error(err))
 			}
@@ -304,7 +304,7 @@ func (mm *MigrationManager) convertK3sWorkloadsToNomad(rc *eos_io.RuntimeContext
 // setupNomadIngress sets up Caddy ingress to replace K3s ingress
 func (mm *MigrationManager) setupNomadIngress(rc *eos_io.RuntimeContext, config K3sMigrationConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Setting up Nomad ingress with Caddy")
 
 	caddyConfig := GetDefaultCaddyConfig()
@@ -331,7 +331,7 @@ func (mm *MigrationManager) setupNomadIngress(rc *eos_io.RuntimeContext, config 
 // setupNomadMailProxy sets up Nginx mail proxy
 func (mm *MigrationManager) setupNomadMailProxy(rc *eos_io.RuntimeContext, config K3sMigrationConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Setting up Nomad mail proxy with Nginx")
 
 	nginxConfig := GetDefaultNginxConfig()
@@ -358,7 +358,7 @@ func (mm *MigrationManager) setupNomadMailProxy(rc *eos_io.RuntimeContext, confi
 // deployNomadJobs deploys the generated Nomad jobs
 func (mm *MigrationManager) deployNomadJobs(rc *eos_io.RuntimeContext, nomadJobs []string) (int, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Deploying Nomad jobs",
 		zap.Int("job_count", len(nomadJobs)))
 
@@ -389,7 +389,7 @@ func (mm *MigrationManager) deployNomadJobs(rc *eos_io.RuntimeContext, nomadJobs
 // verifyMigration verifies migration success
 func (mm *MigrationManager) verifyMigration(rc *eos_io.RuntimeContext, result *MigrationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Verifying migration success")
 
 	// Check if Nomad jobs are running
@@ -421,7 +421,7 @@ func (mm *MigrationManager) checkMigrationComplete(rc *eos_io.RuntimeContext) er
 func (mm *MigrationManager) stopK3sServices(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Stopping K3s services")
-	
+
 	// This would implement actual service stopping
 	return nil
 }
@@ -429,7 +429,7 @@ func (mm *MigrationManager) stopK3sServices(rc *eos_io.RuntimeContext) error {
 func (mm *MigrationManager) removeK3sBinaries(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Removing K3s binaries")
-	
+
 	binaries := []string{
 		"/usr/local/bin/k3s",
 		"/usr/local/bin/k3s-uninstall.sh",
@@ -453,7 +453,7 @@ func (mm *MigrationManager) removeK3sBinaries(rc *eos_io.RuntimeContext) error {
 func (mm *MigrationManager) cleanupK3sData(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Cleaning up K3s data")
-	
+
 	dataDirs := []string{
 		"/var/lib/rancher/k3s",
 		"/etc/rancher/k3s",
@@ -474,7 +474,7 @@ func (mm *MigrationManager) cleanupK3sData(rc *eos_io.RuntimeContext) error {
 
 func (mm *MigrationManager) verifyK3sRemoval(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if K3s binaries are removed
 	if shared.FileExists("/usr/local/bin/k3s") {
 		return fmt.Errorf("K3s binary still exists")
@@ -486,13 +486,13 @@ func (mm *MigrationManager) verifyK3sRemoval(rc *eos_io.RuntimeContext) error {
 
 func (mm *MigrationManager) generateMigrationSummary(result *MigrationResult) string {
 	var summary strings.Builder
-	
+
 	summary.WriteString("K3s to Nomad Migration Summary:\n")
 	summary.WriteString(fmt.Sprintf("- Services converted: %d\n", result.ServicesConverted))
 	summary.WriteString(fmt.Sprintf("- Nomad jobs created: %d\n", result.JobsCreated))
 	summary.WriteString(fmt.Sprintf("- Ingress setup: %t\n", result.IngressSetup))
 	summary.WriteString(fmt.Sprintf("- Mail proxy setup: %t\n", result.MailProxySetup))
-	
+
 	if len(result.Errors) > 0 {
 		summary.WriteString(fmt.Sprintf("- Errors encountered: %d\n", len(result.Errors)))
 		for _, err := range result.Errors {
@@ -501,21 +501,21 @@ func (mm *MigrationManager) generateMigrationSummary(result *MigrationResult) st
 	} else {
 		summary.WriteString("- Migration completed successfully with no errors\n")
 	}
-	
+
 	return summary.String()
 }
 
 // UninstallNomad safely removes Nomad from the system
 func (mm *MigrationManager) UninstallNomad(rc *eos_io.RuntimeContext, force bool, preserveData bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting Nomad uninstallation",
 		zap.Bool("force", force),
 		zap.Bool("preserve_data", preserveData))
 
 	// ASSESS - Check Nomad status
 	logger.Info("Assessing Nomad status for uninstallation")
-	
+
 	if !mm.isNomadAvailable(rc) {
 		logger.Info("Nomad is not installed, nothing to uninstall")
 		return nil
@@ -523,7 +523,7 @@ func (mm *MigrationManager) UninstallNomad(rc *eos_io.RuntimeContext, force bool
 
 	// INTERVENE - Stop and remove Nomad
 	logger.Info("Stopping Nomad services")
-	
+
 	if err := mm.stopNomadServices(rc, force); err != nil {
 		logger.Warn("Failed to stop Nomad services gracefully", zap.Error(err))
 		if !force {
@@ -547,7 +547,7 @@ func (mm *MigrationManager) UninstallNomad(rc *eos_io.RuntimeContext, force bool
 
 	// EVALUATE - Verify Nomad removal
 	logger.Info("Verifying Nomad removal")
-	
+
 	if err := mm.verifyNomadRemoval(rc); err != nil {
 		logger.Warn("Nomad removal verification failed", zap.Error(err))
 		return fmt.Errorf("Nomad removal verification failed: %w", err)
@@ -560,12 +560,12 @@ func (mm *MigrationManager) UninstallNomad(rc *eos_io.RuntimeContext, force bool
 // Helper methods for Nomad uninstallation
 func (mm *MigrationManager) stopNomadServices(rc *eos_io.RuntimeContext, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if !force {
 		logger.Info("Gracefully draining Nomad jobs")
 		// This would implement graceful job draining
 	}
-	
+
 	logger.Info("Stopping Nomad systemd service")
 	// This would implement actual service stopping
 	return nil
@@ -574,7 +574,7 @@ func (mm *MigrationManager) stopNomadServices(rc *eos_io.RuntimeContext, force b
 func (mm *MigrationManager) removeNomadBinaries(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Removing Nomad binaries")
-	
+
 	binaries := []string{
 		"/usr/local/bin/nomad",
 		"/usr/bin/nomad",
@@ -596,7 +596,7 @@ func (mm *MigrationManager) removeNomadBinaries(rc *eos_io.RuntimeContext) error
 func (mm *MigrationManager) removeNomadConfiguration(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Removing Nomad configuration")
-	
+
 	configDirs := []string{
 		"/etc/nomad.d",
 		"/etc/nomad",
@@ -634,7 +634,7 @@ func (mm *MigrationManager) removeNomadConfiguration(rc *eos_io.RuntimeContext) 
 func (mm *MigrationManager) cleanupNomadData(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Cleaning up Nomad data directories")
-	
+
 	dataDirs := []string{
 		"/opt/nomad",
 		"/var/lib/nomad",
@@ -656,7 +656,7 @@ func (mm *MigrationManager) cleanupNomadData(rc *eos_io.RuntimeContext) error {
 
 func (mm *MigrationManager) verifyNomadRemoval(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if Nomad binaries are removed
 	if shared.FileExists("/usr/local/bin/nomad") {
 		return fmt.Errorf("Nomad binary still exists")

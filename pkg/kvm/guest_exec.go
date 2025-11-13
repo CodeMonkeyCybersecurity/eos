@@ -29,13 +29,13 @@ type GuestExecResult struct {
 
 // GuestExecConfig configures guest-exec command execution
 type GuestExecConfig struct {
-	Command        string        // Command to execute (full path)
-	Args           []string      // Command arguments
-	Timeout        time.Duration // Overall timeout (default 30min)
-	PollInterval   time.Duration // Status polling interval (default 2s)
-	CaptureOutput  bool          // Capture stdout/stderr (default true)
-	WorkingDir     string        // Working directory (optional)
-	Environment    []string      // Environment variables (optional)
+	Command       string        // Command to execute (full path)
+	Args          []string      // Command arguments
+	Timeout       time.Duration // Overall timeout (default 30min)
+	PollInterval  time.Duration // Status polling interval (default 2s)
+	CaptureOutput bool          // Capture stdout/stderr (default true)
+	WorkingDir    string        // Working directory (optional)
+	Environment   []string      // Environment variables (optional)
 }
 
 // DefaultGuestExecConfig returns default configuration

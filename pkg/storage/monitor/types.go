@@ -44,41 +44,41 @@ type IOMetrics struct {
 
 // MountInfo represents mount point information
 type MountInfo struct {
-	Device      string
-	MountPoint  string
-	Filesystem  string
-	Options     []string
-	DumpFreq    int
-	PassNumber  int
-	Timestamp   time.Time
+	Device     string
+	MountPoint string
+	Filesystem string
+	Options    []string
+	DumpFreq   int
+	PassNumber int
+	Timestamp  time.Time
 }
 
 // SMARTData represents disk health information
 type SMARTData struct {
-	Device           string
-	Model            string
-	SerialNumber     string
-	Capacity         int64
-	PowerOnHours     uint64
-	PowerCycleCount  uint64
-	Temperature      int
-	HealthStatus     string
-	Attributes       []SMARTAttribute
-	OverallHealth    string
-	Timestamp        time.Time
+	Device          string
+	Model           string
+	SerialNumber    string
+	Capacity        int64
+	PowerOnHours    uint64
+	PowerCycleCount uint64
+	Temperature     int
+	HealthStatus    string
+	Attributes      []SMARTAttribute
+	OverallHealth   string
+	Timestamp       time.Time
 }
 
 // SMARTAttribute represents individual SMART attributes
 type SMARTAttribute struct {
-	ID          int
-	Name        string
-	Value       int
-	Worst       int
-	Threshold   int
-	Type        string
-	Updated     string
-	WhenFailed  string
-	RawValue    string
+	ID         int
+	Name       string
+	Value      int
+	Worst      int
+	Threshold  int
+	Type       string
+	Updated    string
+	WhenFailed string
+	RawValue   string
 }
 
 // PartitionInfo represents disk partition information
@@ -98,15 +98,15 @@ type PartitionInfo struct {
 
 // DiskCleanupResult represents cleanup operation results
 type DiskCleanupResult struct {
-	Path           string
-	InitialSize    int64
-	FinalSize      int64
-	FreedBytes     int64
-	FilesRemoved   int
-	DirsRemoved    int
-	Errors         []string
-	Duration       time.Duration
-	Timestamp      time.Time
+	Path         string
+	InitialSize  int64
+	FinalSize    int64
+	FreedBytes   int64
+	FilesRemoved int
+	DirsRemoved  int
+	Errors       []string
+	Duration     time.Duration
+	Timestamp    time.Time
 }
 
 // GrowthMetrics represents storage growth tracking

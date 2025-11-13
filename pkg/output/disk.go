@@ -51,8 +51,8 @@ func DiskUsageTable(usage []monitor.DiskUsage, showInodes bool) error {
 		}
 
 		if err := w.Flush(); err != nil {
-		fmt.Printf("Warning: Failed to flush output: %v\n", err)
-	}
+			fmt.Printf("Warning: Failed to flush output: %v\n", err)
+		}
 	}
 
 	return nil

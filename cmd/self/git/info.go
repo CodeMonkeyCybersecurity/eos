@@ -144,7 +144,7 @@ func outputTableInfo(logger otelzap.LoggerWithCtx, repo *git_management.GitRepos
 		logger.Info("terminal prompt:   No remotes configured")
 	} else {
 		for name, url := range repo.RemoteURLs {
-			logger.Info("terminal prompt: Remote", 
+			logger.Info("terminal prompt: Remote",
 				zap.String("name", name),
 				zap.String("url", url))
 		}
@@ -164,7 +164,7 @@ func outputTableInfo(logger otelzap.LoggerWithCtx, repo *git_management.GitRepos
 			}
 		}
 		if !detailed && len(repo.Branches) > 5 {
-			logger.Info("terminal prompt: More branches available", 
+			logger.Info("terminal prompt: More branches available",
 				zap.Int("additional", len(repo.Branches)-5))
 		}
 	}

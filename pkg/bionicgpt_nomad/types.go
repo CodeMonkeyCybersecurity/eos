@@ -8,13 +8,14 @@
 //   - Secrets: HashiCorp Vault
 //
 // Deployment Flow:
-//   Phase 0: Check prerequisites (Tailscale, Vault secrets)
-//   Phase 3: Preflight checks (Nomad, Consul, Docker, etc.)
-//   Phase 4: Configure Authentik (OAuth2 provider, groups, application)
-//   Phase 5: Setup Consul (WAN join, service discovery)
-//   Phase 6: Deploy to Nomad (BionicGPT, PostgreSQL, LiteLLM, oauth2-proxy)
-//   Phase 7: Configure Hecate (Caddy routing to oauth2-proxy)
-//   Phase 8: Wait for health checks
+//
+//	Phase 0: Check prerequisites (Tailscale, Vault secrets)
+//	Phase 3: Preflight checks (Nomad, Consul, Docker, etc.)
+//	Phase 4: Configure Authentik (OAuth2 provider, groups, application)
+//	Phase 5: Setup Consul (WAN join, service discovery)
+//	Phase 6: Deploy to Nomad (BionicGPT, PostgreSQL, LiteLLM, oauth2-proxy)
+//	Phase 7: Configure Hecate (Caddy routing to oauth2-proxy)
+//	Phase 8: Wait for health checks
 //
 // Code Monkey Cybersecurity - "Cybersecurity. With humans."
 package bionicgpt_nomad
@@ -69,9 +70,9 @@ type InstallState struct {
 	VaultSecretsExist  bool
 
 	// Infrastructure
-	NomadAccessible  bool
-	ConsulAccessible bool
-	DockerAvailable  bool
+	NomadAccessible    bool
+	ConsulAccessible   bool
+	DockerAvailable    bool
 	AuthentikReachable bool
 
 	// Authentik configuration
@@ -83,19 +84,19 @@ type InstallState struct {
 	ApplicationCreated    bool
 
 	// Consul configuration
-	ConsulWANJoined       bool
-	ServicesRegistered    bool
+	ConsulWANJoined    bool
+	ServicesRegistered bool
 
 	// Nomad deployment
-	JobsDeployed          bool
-	AllocationsHealthy    bool
+	JobsDeployed       bool
+	AllocationsHealthy bool
 
 	// Hecate configuration
-	CaddyConfigured       bool
+	CaddyConfigured bool
 
 	// Overall status
-	Healthy               bool
-	DeploymentTime        string
+	Healthy        bool
+	DeploymentTime string
 }
 
 // PreflightCheck represents a single preflight check

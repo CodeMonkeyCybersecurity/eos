@@ -45,8 +45,8 @@ func FuzzAIRequest(f *testing.F) {
 
 		// Test request creation
 		request := AIRequest{
-			Model:    "gpt-3.5-turbo",
-			Messages: []AIMessage{message},
+			Model:     "gpt-3.5-turbo",
+			Messages:  []AIMessage{message},
 			MaxTokens: 100,
 		}
 
@@ -138,7 +138,10 @@ func FuzzAPIKeyValidation(f *testing.F) {
 			baseURL:   config.BaseURL,
 			model:     config.Model,
 			maxTokens: 4096,
-			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		// Test that API key handling doesn't crash
@@ -246,7 +249,10 @@ func FuzzURLValidation(f *testing.F) {
 			apiKey:   config.APIKey,
 			baseURL:  config.BaseURL,
 			model:    config.Model,
-			client:   func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
+			client: func() *httpclient.Client {
+				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				return c
+			}(),
 		}
 
 		// Validate URL is stored correctly
@@ -255,9 +261,9 @@ func FuzzURLValidation(f *testing.F) {
 		}
 
 		// Test that malicious URLs are handled safely
-		if strings.Contains(baseURL, "javascript:") || 
-		   strings.Contains(baseURL, "data:") ||
-		   strings.Contains(baseURL, "file:") {
+		if strings.Contains(baseURL, "javascript:") ||
+			strings.Contains(baseURL, "data:") ||
+			strings.Contains(baseURL, "file:") {
 			t.Logf("Potentially dangerous URL detected: %q", baseURL)
 		}
 	})

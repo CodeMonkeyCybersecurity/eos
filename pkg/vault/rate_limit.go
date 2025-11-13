@@ -20,9 +20,9 @@ import (
 
 var (
 	// Global rate limiters for different Vault operation types
-	unsealLimiter = rate.NewLimiter(rate.Every(12*time.Second), 5)  // 5/min
-	initLimiter   = rate.NewLimiter(rate.Every(20*time.Second), 3)  // 3/min
-	authLimiter   = rate.NewLimiter(rate.Every(6*time.Second), 10)  // 10/min
+	unsealLimiter = rate.NewLimiter(rate.Every(12*time.Second), 5) // 5/min
+	initLimiter   = rate.NewLimiter(rate.Every(20*time.Second), 3) // 3/min
+	authLimiter   = rate.NewLimiter(rate.Every(6*time.Second), 10) // 10/min
 	rateLimitMu   sync.Mutex
 )
 

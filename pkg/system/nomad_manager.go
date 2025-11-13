@@ -125,7 +125,7 @@ type SystemAssessment struct {
 // NewNomadManager creates a new NomadManager instance
 func NewNomadManager(config *NomadConfig) (*NomadManager, error) {
 	logger := zap.L().With(zap.String("component", "nomad_manager"))
-	
+
 	if config == nil {
 		return nil, fmt.Errorf("nomad config cannot be nil")
 	}

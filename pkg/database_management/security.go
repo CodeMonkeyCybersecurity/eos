@@ -47,26 +47,26 @@ func validateSQLQuerySafety(query string) error {
 		"' UNION ", " UNION ", "UNION SELECT", // Union-based injection
 		"' AND ", " AND '", // Boolean logic
 		"'='", "'<>'", "'!='", // Comparison operators
-		
+
 		// Advanced injection patterns
 		"CHR(", "ASCII(", "CHAR(", "CONCAT(", // Function-based injection
 		"SUBSTRING(", "SUBSTR(", "MID(", "LEFT(", "RIGHT(", // String manipulation
 		"IF(", "CASE WHEN", "IIF(", // Conditional injection
 		"CAST(", "CONVERT(", // Type conversion injection
-		"@@", // System variables
+		"@@",                                             // System variables
 		"INFORMATION_SCHEMA", "SYS.TABLES", "SYSOBJECTS", // System catalogs
-		
+
 		// Hex/Unicode encoding attempts
 		"0X", "\\U", "\\X", // Hex encoding
 		"%2", "%3", "%5", "%7", // URL encoding
 		"&#", // HTML entity encoding
-		
+
 		// Time-based blind injection
 		"SLEEP(", "BENCHMARK(", "PG_SLEEP(", "WAITFOR DELAY",
-		
+
 		// Error-based injection indicators
 		"EXTRACTVALUE(", "UPDATEXML(", "EXP(~(", "POLYGON(",
-		
+
 		// Suspicious system access patterns (not general SELECT patterns)
 		"FROM INFORMATION_SCHEMA", "FROM SYS", "FROM DUAL",
 	}
@@ -80,8 +80,8 @@ func validateSQLQuerySafety(query string) error {
 	// Block dangerous characters that could be used for injection
 	dangerousChars := []string{
 		"'", "\"", // Quote characters
-		";", // Statement separator
-		"--", // SQL comments
+		";",        // Statement separator
+		"--",       // SQL comments
 		"/*", "*/", // Block comments
 		"\\x00", "\\0", // Null bytes
 		"\\n", "\\r", "\\t", // Control characters that could hide injection
@@ -137,7 +137,7 @@ func validateSQLQuerySafety(query string) error {
 	}
 
 	if !startsWithAllowed {
-		return fmt.Errorf("only SELECT, WITH, EXPLAIN, DESCRIBE, and SHOW queries are allowed. Query starts with: %s", 
+		return fmt.Errorf("only SELECT, WITH, EXPLAIN, DESCRIBE, and SHOW queries are allowed. Query starts with: %s",
 			strings.Fields(upperQuery)[0])
 	}
 
@@ -150,9 +150,9 @@ func validateSQLQuerySafety(query string) error {
 		} else {
 			// For regular SELECT queries, only allow specific patterns
 			allowed := strings.Contains(upperQuery, "UNION SELECT") ||
-					  strings.Contains(upperQuery, "EXISTS (SELECT") ||
-					  strings.Contains(upperQuery, "IN (SELECT")
-			
+				strings.Contains(upperQuery, "EXISTS (SELECT") ||
+				strings.Contains(upperQuery, "IN (SELECT")
+
 			if !allowed {
 				return fmt.Errorf("nested queries detected - potential injection attempt")
 			}
@@ -161,7 +161,7 @@ func validateSQLQuerySafety(query string) error {
 
 	// Final check: ensure no obvious obfuscation attempts
 	suspiciousPatterns := []string{
-		"/**/", // Empty comments used for obfuscation
+		"/**/",       // Empty comments used for obfuscation
 		"''", "\"\"", // Empty strings
 		"++", "--+", "+-", "-+", // Arithmetic obfuscation
 		"  ", "   ", // Excessive whitespace

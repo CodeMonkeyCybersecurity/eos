@@ -108,7 +108,7 @@ func validateTerraformVersion(rc *eos_io.RuntimeContext, prereqs TerraformPrereq
 	// Validate version range
 	currentVersion := versionInfo.Version
 	if !isVersionInRange(currentVersion, prereqs.MinVersion, prereqs.MaxVersion) {
-		return eos_err.NewUserError("Terraform version %s is not compatible. Required: %s - %s", 
+		return eos_err.NewUserError("Terraform version %s is not compatible. Required: %s - %s",
 			currentVersion, prereqs.MinVersion, prereqs.MaxVersion)
 	}
 

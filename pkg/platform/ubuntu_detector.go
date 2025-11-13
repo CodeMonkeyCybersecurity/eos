@@ -216,4 +216,3 @@ func IsDebianBased(rc *eos_io.RuntimeContext) (bool, error) {
 
 	return id == "ubuntu" || id == "debian" || strings.Contains(idLike, "debian"), nil
 }
-

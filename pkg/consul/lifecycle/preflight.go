@@ -295,7 +295,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 		}
 
 		if spaceGB < float64(minSpaceGB) {
-			return fmt.Errorf("insufficient disk space in %s: %.1fGB available, %dGB required", 
+			return fmt.Errorf("insufficient disk space in %s: %.1fGB available, %dGB required",
 				dir, spaceGB, minSpaceGB)
 		}
 
@@ -372,7 +372,7 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 	}
 
 	if len(inaccessible) > 0 {
-		return fmt.Errorf("insufficient permissions for directories: %s (try running with sudo)", 
+		return fmt.Errorf("insufficient permissions for directories: %s (try running with sudo)",
 			strings.Join(inaccessible, ", "))
 	}
 
@@ -435,7 +435,7 @@ func getMemoryInfo() (*MemoryInfo, error) {
 
 	memInfo := &MemoryInfo{}
 	lines := strings.Split(string(data), "\n")
-	
+
 	for _, line := range lines {
 		if strings.HasPrefix(line, "MemTotal:") {
 			fields := strings.Fields(line)

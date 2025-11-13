@@ -17,11 +17,11 @@ import (
 
 // ConsulOrchestrator manages VM orchestration through Consul
 type ConsulOrchestrator struct {
-	client      *api.Client
-	logger      otelzap.LoggerWithCtx
-	rc          *eos_io.RuntimeContext
-	ipAllocMux  sync.Mutex
-	ipRange     *IPRange
+	client     *api.Client
+	logger     otelzap.LoggerWithCtx
+	rc         *eos_io.RuntimeContext
+	ipAllocMux sync.Mutex
+	ipRange    *IPRange
 }
 
 // NewConsulOrchestrator creates a new Consul orchestrator
