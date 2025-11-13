@@ -11,10 +11,10 @@ type InstallConfig struct {
 	EnvFile     string // Path to .env file
 
 	// Azure OpenAI Configuration
-	AzureEndpoint    string // Azure OpenAI endpoint URL
-	AzureDeployment  string // Azure OpenAI deployment name
-	AzureAPIKey      string // Azure OpenAI API key
-	AzureAPIVersion  string // Azure OpenAI API version (default: 2024-02-15-preview)
+	AzureEndpoint   string // Azure OpenAI endpoint URL
+	AzureDeployment string // Azure OpenAI deployment name
+	AzureAPIKey     string // Azure OpenAI API key
+	AzureAPIVersion string // Azure OpenAI API version (default: 2024-02-15-preview)
 
 	// Open WebUI Settings
 	WebUIName      string // Display name for the web UI
@@ -55,7 +55,7 @@ type InstallState struct {
 	Running           bool
 	ComposeFileExists bool
 	EnvFileExists     bool
-	VolumeExists      bool     // Docker volume exists
+	VolumeExists      bool // Docker volume exists
 	ContainerID       string
 	HealthStatus      string
 	Version           string

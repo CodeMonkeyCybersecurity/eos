@@ -155,7 +155,7 @@ func TestSanitizeInput(t *testing.T) {
 		{"with ANSI color", "\x1b[31mred text\x1b[0m", "red text"},
 		{"with ANSI clear", "\x1b[2Jclear", "clear"},
 		{"with control chars", "hello\x00\x01world", "helloworld"},
-		{"with tabs", "hello\tworld", "hello\tworld"}, // Tabs allowed
+		{"with tabs", "hello\tworld", "hello\tworld"},   // Tabs allowed
 		{"with newlines", "hello\nworld", "helloworld"}, // Newlines stripped
 		{"mixed", "\x1b[1mbold\x1b[0m and \x00clean", "bold and clean"},
 		{"empty", "", ""},

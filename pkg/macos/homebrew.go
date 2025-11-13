@@ -2,6 +2,7 @@
 package macos
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -106,7 +107,7 @@ func runHomebrewInstaller() error {
 		"rm -rf /",
 		"dd if=/dev/zero",
 		":(){ :|:& };:", // Fork bomb
-		"wget http://", // Should use HTTPS
+		"wget http://",  // Should use HTTPS
 		"curl http://",  // Should use HTTPS
 	}
 
@@ -117,7 +118,7 @@ func runHomebrewInstaller() error {
 	}
 
 	// Write to temp file
-	if err := os.WriteFile(installerPath, installerContent, 0700); err != nil {
+	if err := os.WriteFile(installerPath, installerContent, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write installer: %w", err)
 	}
 	defer func() { _ = os.Remove(installerPath) }()

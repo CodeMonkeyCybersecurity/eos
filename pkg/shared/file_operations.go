@@ -44,15 +44,15 @@ func EnsureDirectoryExists(path string, perm os.FileMode) error {
 	if path == "" {
 		return fmt.Errorf("directory path cannot be empty")
 	}
-	
+
 	if DirectoryExists(path) {
 		return nil
 	}
-	
+
 	if err := os.MkdirAll(path, perm); err != nil {
 		return WrapFileOperationError("create directory", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -67,17 +67,17 @@ func CheckFilePermissions(path string, expectedPerm os.FileMode) error {
 	if !FileExists(path) {
 		return fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return WrapFileOperationError("check permissions", path, err)
 	}
-	
+
 	actualPerm := info.Mode().Perm()
 	if actualPerm != expectedPerm {
 		return fmt.Errorf("file %s has permissions %o, expected %o", path, actualPerm, expectedPerm)
 	}
-	
+
 	return nil
 }
 
@@ -86,11 +86,11 @@ func SetFilePermissions(path string, perm os.FileMode) error {
 	if !FileExists(path) {
 		return fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	if err := os.Chmod(path, perm); err != nil {
 		return WrapFileOperationError("set permissions", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -99,12 +99,12 @@ func CopyFile(src, dst string) error {
 	if !FileExists(src) {
 		return fmt.Errorf("source file does not exist: %s", src)
 	}
-	
+
 	// Ensure destination directory exists
 	if err := EnsureFileDirectoryExists(dst, 0755); err != nil {
 		return err
 	}
-	
+
 	// Open source file
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -113,7 +113,7 @@ func CopyFile(src, dst string) error {
 	defer func() {
 		_ = srcFile.Close() // Ignore error in cleanup
 	}()
-	
+
 	// Create destination file
 	dstFile, err := os.Create(dst)
 	if err != nil {
@@ -122,22 +122,22 @@ func CopyFile(src, dst string) error {
 	defer func() {
 		_ = dstFile.Close() // Ignore error in cleanup
 	}()
-	
+
 	// Copy contents
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
 		return WrapFileOperationError("copy", fmt.Sprintf("%s to %s", src, dst), err)
 	}
-	
+
 	// Copy permissions
 	srcInfo, err := srcFile.Stat()
 	if err != nil {
 		return WrapFileOperationError("get source info", src, err)
 	}
-	
+
 	if err := dstFile.Chmod(srcInfo.Mode()); err != nil {
 		return WrapFileOperationError("set destination permissions", dst, err)
 	}
-	
+
 	return nil
 }
 
@@ -146,26 +146,26 @@ func MoveFile(src, dst string) error {
 	if !FileExists(src) {
 		return fmt.Errorf("source file does not exist: %s", src)
 	}
-	
+
 	// Ensure destination directory exists
 	if err := EnsureFileDirectoryExists(dst, 0755); err != nil {
 		return err
 	}
-	
+
 	// Try rename first (works if on same filesystem)
 	if err := os.Rename(src, dst); err == nil {
 		return nil
 	}
-	
+
 	// If rename fails, copy and delete
 	if err := CopyFile(src, dst); err != nil {
 		return err
 	}
-	
+
 	if err := os.Remove(src); err != nil {
 		return WrapFileOperationError("remove source after move", src, err)
 	}
-	
+
 	return nil
 }
 
@@ -174,14 +174,14 @@ func BackupFile(path string) (string, error) {
 	if !FileExists(path) {
 		return "", fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	timestamp := time.Now().Format("20060102_150405")
 	backupPath := fmt.Sprintf("%s.backup_%s", path, timestamp)
-	
+
 	if err := CopyFile(path, backupPath); err != nil {
 		return "", fmt.Errorf("failed to create backup: %w", err)
 	}
-	
+
 	return backupPath, nil
 }
 
@@ -190,11 +190,11 @@ func RestoreFromBackup(originalPath, backupPath string) error {
 	if !FileExists(backupPath) {
 		return fmt.Errorf("backup file does not exist: %s", backupPath)
 	}
-	
+
 	if err := CopyFile(backupPath, originalPath); err != nil {
 		return fmt.Errorf("failed to restore from backup: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -203,12 +203,12 @@ func ReadFileContents(path string) ([]byte, error) {
 	if !FileExists(path) {
 		return nil, fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, WrapFileOperationError("read", path, err)
 	}
-	
+
 	return content, nil
 }
 
@@ -218,11 +218,11 @@ func WriteFileContents(path string, content []byte, perm os.FileMode) error {
 	if err := EnsureFileDirectoryExists(path, 0755); err != nil {
 		return err
 	}
-	
+
 	if err := os.WriteFile(path, content, perm); err != nil {
 		return WrapFileOperationError("write", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -235,11 +235,11 @@ func AppendToFile(path string, content []byte) error {
 	defer func() {
 		_ = file.Close() // Ignore error in cleanup
 	}()
-	
+
 	if _, err := file.Write(content); err != nil {
 		return WrapFileOperationError("append", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -248,12 +248,12 @@ func GetFileSize(path string) (int64, error) {
 	if !FileExists(path) {
 		return 0, fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return 0, WrapFileOperationError("get file info", path, err)
 	}
-	
+
 	return info.Size(), nil
 }
 
@@ -262,7 +262,7 @@ func GetFileHash(path string) (string, error) {
 	if !FileExists(path) {
 		return "", fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	file, err := os.Open(path)
 	if err != nil {
 		return "", WrapFileOperationError("open for hashing", path, err)
@@ -270,12 +270,12 @@ func GetFileHash(path string) (string, error) {
 	defer func() {
 		_ = file.Close() // Ignore error in cleanup
 	}()
-	
+
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
 		return "", WrapFileOperationError("calculate hash", path, err)
 	}
-	
+
 	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
 }
 
@@ -287,33 +287,33 @@ func CompareFiles(path1, path2 string) (bool, error) {
 	if !FileExists(path2) {
 		return false, fmt.Errorf("second file does not exist: %s", path2)
 	}
-	
+
 	// Compare file sizes first
 	info1, err := os.Stat(path1)
 	if err != nil {
 		return false, WrapFileOperationError("get info", path1, err)
 	}
-	
+
 	info2, err := os.Stat(path2)
 	if err != nil {
 		return false, WrapFileOperationError("get info", path2, err)
 	}
-	
+
 	if info1.Size() != info2.Size() {
 		return false, nil
 	}
-	
+
 	// Compare hashes
 	hash1, err := GetFileHash(path1)
 	if err != nil {
 		return false, err
 	}
-	
+
 	hash2, err := GetFileHash(path2)
 	if err != nil {
 		return false, err
 	}
-	
+
 	return hash1 == hash2, nil
 }
 
@@ -322,34 +322,34 @@ func FindFiles(rootDir, pattern string) ([]string, error) {
 	if !DirectoryExists(rootDir) {
 		return nil, fmt.Errorf("directory does not exist: %s", rootDir)
 	}
-	
+
 	var matchedFiles []string
-	
+
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if info.IsDir() {
 			return nil
 		}
-		
+
 		matched, err := filepath.Match(pattern, filepath.Base(path))
 		if err != nil {
 			return err
 		}
-		
+
 		if matched {
 			matchedFiles = append(matchedFiles, path)
 		}
-		
+
 		return nil
 	})
-	
+
 	if err != nil {
 		return nil, WrapFileOperationError("search files", rootDir, err)
 	}
-	
+
 	return matchedFiles, nil
 }
 
@@ -358,18 +358,18 @@ func CleanupOldFiles(dir string, maxAge time.Duration, pattern string) error {
 	if !DirectoryExists(dir) {
 		return fmt.Errorf("directory does not exist: %s", dir)
 	}
-	
+
 	cutoff := time.Now().Add(-maxAge)
-	
+
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		
+
 		if info.IsDir() {
 			return nil
 		}
-		
+
 		// Check pattern if provided
 		if pattern != "" {
 			matched, err := filepath.Match(pattern, filepath.Base(path))
@@ -380,14 +380,14 @@ func CleanupOldFiles(dir string, maxAge time.Duration, pattern string) error {
 				return nil
 			}
 		}
-		
+
 		// Check age
 		if info.ModTime().Before(cutoff) {
 			if err := os.Remove(path); err != nil {
 				return WrapFileOperationError("remove old file", path, err)
 			}
 		}
-		
+
 		return nil
 	})
 }
@@ -399,42 +399,42 @@ func SafeWriteFile(path string, content []byte, perm os.FileMode) error {
 	if err := EnsureDirectoryExists(dir, 0755); err != nil {
 		return err
 	}
-	
+
 	tmpFile, err := os.CreateTemp(dir, ".tmp_"+filepath.Base(path)+"_*")
 	if err != nil {
 		return WrapFileOperationError("create temporary file", path, err)
 	}
 	tmpPath := tmpFile.Name()
-	
+
 	// Clean up temp file on error
 	defer func() {
 		if FileExists(tmpPath) {
 			_ = os.Remove(tmpPath) // Ignore error in cleanup
 		}
 	}()
-	
+
 	// Write content to temp file
 	if _, err := tmpFile.Write(content); err != nil {
 		_ = tmpFile.Close() // Ignore error in cleanup
 		return WrapFileOperationError("write to temporary file", tmpPath, err)
 	}
-	
+
 	// Set permissions
 	if err := tmpFile.Chmod(perm); err != nil {
 		_ = tmpFile.Close() // Ignore error in cleanup
 		return WrapFileOperationError("set permissions on temporary file", tmpPath, err)
 	}
-	
+
 	// Close temp file
 	if err := tmpFile.Close(); err != nil {
 		return WrapFileOperationError("close temporary file", tmpPath, err)
 	}
-	
+
 	// Atomic move to final location
 	if err := os.Rename(tmpPath, path); err != nil {
 		return WrapFileOperationError("move temporary file to final location", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -451,7 +451,7 @@ func IsExecutable(path string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	mode := info.Mode()
 	return mode&0111 != 0 // Check if any execute bit is set
 }
@@ -461,19 +461,19 @@ func MakeExecutable(path string) error {
 	if !FileExists(path) {
 		return fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return WrapFileOperationError("get file info", path, err)
 	}
-	
+
 	// Add execute permission for owner, group, and others
 	newMode := info.Mode() | 0111
-	
+
 	if err := os.Chmod(path, newMode); err != nil {
 		return WrapFileOperationError("make executable", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -482,13 +482,13 @@ func SecureDelete(path string) error {
 	if !FileExists(path) {
 		return fmt.Errorf("file does not exist: %s", path)
 	}
-	
+
 	// Get file size
 	size, err := GetFileSize(path)
 	if err != nil {
 		return err
 	}
-	
+
 	// Open file for writing
 	file, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
@@ -497,35 +497,35 @@ func SecureDelete(path string) error {
 	defer func() {
 		_ = file.Close() // Ignore error in cleanup
 	}()
-	
+
 	// Overwrite with zeros
 	zeros := make([]byte, 1024)
 	remaining := size
-	
+
 	for remaining > 0 {
 		writeSize := int64(len(zeros))
 		if remaining < writeSize {
 			writeSize = remaining
 		}
-		
+
 		if _, err := file.Write(zeros[:writeSize]); err != nil {
 			return WrapFileOperationError("overwrite for secure delete", path, err)
 		}
-		
+
 		remaining -= writeSize
 	}
-	
+
 	// Sync to disk
 	if err := file.Sync(); err != nil {
 		return WrapFileOperationError("sync for secure delete", path, err)
 	}
-	
+
 	// Close and delete
 	_ = file.Close() // Ignore error in cleanup
 	if err := os.Remove(path); err != nil {
 		return WrapFileOperationError("remove after secure delete", path, err)
 	}
-	
+
 	return nil
 }
 
@@ -534,13 +534,13 @@ func IsPathSafe(basePath, targetPath string) bool {
 	// Clean and make absolute
 	basePath = filepath.Clean(basePath)
 	targetPath = filepath.Clean(targetPath)
-	
+
 	// Check if target is within base
 	rel, err := filepath.Rel(basePath, targetPath)
 	if err != nil {
 		return false
 	}
-	
+
 	// Check for directory traversal
 	return !strings.HasPrefix(rel, "..") && !strings.Contains(rel, "/../")
 }

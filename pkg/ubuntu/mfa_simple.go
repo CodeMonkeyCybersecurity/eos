@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -104,7 +105,7 @@ func addMFAToPAMFile(filePath string) error {
 
 	// Create backup
 	backupPath := filePath + ".backup-before-mfa"
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("create backup of %s: %w", filePath, err)
 	}
 
@@ -129,7 +130,7 @@ func addMFAToPAMFile(filePath string) error {
 
 	// Write updated configuration
 	newContent := strings.Join(newLines, "\n")
-	if err := os.WriteFile(filePath, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(newContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write updated PAM file %s: %w", filePath, err)
 	}
 

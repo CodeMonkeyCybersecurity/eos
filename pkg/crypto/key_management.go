@@ -2,6 +2,7 @@
 package crypto
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -55,7 +56,7 @@ func (f *FileBasedKeyManagement) StoreKey(ctx context.Context, keyID string, key
 	keyPath := f.pathOps.JoinPath(f.keyDir, keyID+".key")
 
 	// Store key with restrictive permissions
-	if err := f.fileOps.WriteFile(ctx, keyPath, key, 0600); err != nil {
+	if err := f.fileOps.WriteFile(ctx, keyPath, key, int(shared.SecretFilePerm)); err != nil {
 		return fmt.Errorf("failed to store key: %w", err)
 	}
 
@@ -113,7 +114,7 @@ func (f *FileBasedKeyManagement) DeleteKey(ctx context.Context, keyID string) er
 		for i := range key {
 			key[i] = 0
 		}
-		_ = f.fileOps.WriteFile(ctx, keyPath, key, 0600)
+		_ = f.fileOps.WriteFile(ctx, keyPath, key, int(shared.SecretFilePerm))
 	}
 
 	// Delete file
@@ -186,4 +187,3 @@ func (f *FileBasedKeyManagement) ListKeys(ctx context.Context) ([]string, error)
 
 	return keyIDs, nil
 }
-

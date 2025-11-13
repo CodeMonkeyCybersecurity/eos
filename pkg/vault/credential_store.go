@@ -27,7 +27,7 @@ type VaultCredentialStore struct {
 // Returns nil if Vault is not available (fail-closed behavior)
 func NewVaultCredentialStore(rc *eos_io.RuntimeContext, pathPrefix string) (*VaultCredentialStore, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Try to get Vault client
 	client, err := GetVaultClient(rc)
 	if err != nil {
@@ -74,7 +74,7 @@ func (vcs *VaultCredentialStore) SaveCredential(ctx context.Context, app, userna
 
 	// Construct Vault path
 	vaultPath := vcs.constructVaultPath(app, username)
-	
+
 	// Prepare secret data
 	secretData := map[string]interface{}{
 		"username": username,
@@ -239,7 +239,7 @@ func (vcs *VaultCredentialStore) constructVaultPath(app, username string) string
 	// Sanitize components to prevent path traversal
 	safeApp := sanitizeVaultPathComponent(app)
 	safeUsername := sanitizeVaultPathComponent(username)
-	
+
 	// Use KV v2 data path
 	return fmt.Sprintf("%s/data/%s/%s", vcs.prefix, safeApp, safeUsername)
 }

@@ -17,7 +17,8 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-//TODO: refactor
+
+// TODO: refactor
 var (
 	nomadAddress        string
 	consulAddress       string
@@ -71,7 +72,7 @@ EXAMPLES:
   eos create clusterfuzz --bot-count 5 --preemptible-bot-count 10`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// ASSESS - Check prerequisites and validate configuration
 		logger.Info("Assessing ClusterFuzz deployment requirements",
 			zap.String("nomad_address", nomadAddress),
@@ -82,7 +83,7 @@ EXAMPLES:
 		if (storageBackend == "s3" || storageBackend == "minio") && (s3AccessKey == "" || s3SecretKey == "") {
 			logger.Info("S3 credentials required for storage backend",
 				zap.String("backend", storageBackend))
-			
+
 			if s3AccessKey == "" {
 				logger.Info("terminal prompt: Please enter S3 access key")
 				accessKey, err := eos_io.PromptInput(rc, "S3 Access Key: ", "s3_access_key")
@@ -91,7 +92,7 @@ EXAMPLES:
 				}
 				s3AccessKey = accessKey
 			}
-			
+
 			if s3SecretKey == "" {
 				logger.Info("terminal prompt: Please enter S3 secret key")
 				secretKey, err := eos_io.PromptSecurePassword(rc, "S3 Secret Key: ")
@@ -127,7 +128,7 @@ EXAMPLES:
 		// Create configuration directory
 		logger.Info("Creating configuration directory",
 			zap.String("path", configDir))
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}
 
@@ -177,7 +178,7 @@ EXAMPLES:
 
 		// EVALUATE - Verify the deployment was successful
 		logger.Info("Evaluating ClusterFuzz deployment success")
-		
+
 		if err := clusterfuzz.VerifyDeployment(rc, cfg); err != nil {
 			return fmt.Errorf("deployment verification failed: %w", err)
 		}

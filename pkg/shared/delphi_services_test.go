@@ -421,7 +421,7 @@ func BenchmarkGetActiveServices(b *testing.B) {
 	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = registry.GetActiveServices()
 	}
 }
@@ -430,7 +430,7 @@ func BenchmarkGetService(b *testing.B) {
 	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = registry.GetService("wazuh-listener")
 	}
 }
@@ -439,7 +439,7 @@ func BenchmarkValidateService(b *testing.B) {
 	registry := GetWazuhServiceRegistry()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = registry.ValidateService("wazuh-listener")
 	}
 }

@@ -81,13 +81,13 @@ func (nh *NetworkHelper) IsNetworkMount(path string) (bool, error) {
 
 	// Network filesystem types
 	networkFS := []string{
-		"nfs", "nfs4", "nfs3",     // NFS
-		"cifs", "smb", "smbfs",    // CIFS/SMB
-		"glusterfs",               // GlusterFS
-		"ceph", "cephfs",          // Ceph
-		"9p",                      // Plan 9 (QEMU shared folders)
-		"fuse.sshfs",              // SSHFS
-		"davfs", "fuse.davfs2",    // WebDAV
+		"nfs", "nfs4", "nfs3", // NFS
+		"cifs", "smb", "smbfs", // CIFS/SMB
+		"glusterfs",      // GlusterFS
+		"ceph", "cephfs", // Ceph
+		"9p",                   // Plan 9 (QEMU shared folders)
+		"fuse.sshfs",           // SSHFS
+		"davfs", "fuse.davfs2", // WebDAV
 	}
 
 	for _, nfs := range networkFS {

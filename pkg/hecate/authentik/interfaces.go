@@ -20,10 +20,10 @@ type APIClient interface {
 type FileWriter interface {
 	// WriteFile writes data to a file
 	WriteFile(path string, data []byte, perm os.FileMode) error
-	
+
 	// ReadFile reads data from a file
 	ReadFile(path string) ([]byte, error)
-	
+
 	// MkdirAll creates a directory and all parent directories
 	MkdirAll(path string, perm os.FileMode) error
 }

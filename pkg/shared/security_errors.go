@@ -11,15 +11,15 @@ import (
 
 // SecurityError represents a security-related error with proper audit logging
 type SecurityError struct {
-	Code      string                 `json:"code"`
-	Message   string                 `json:"message"`
-	Details   string                 `json:"details,omitempty"`
-	UserID    string                 `json:"user_id,omitempty"`
-	Resource  string                 `json:"resource,omitempty"`
-	Action    string                 `json:"action,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
-	Severity  SecuritySeverity       `json:"severity"`
-	Category  SecurityCategory       `json:"category"`
+	Code     string                 `json:"code"`
+	Message  string                 `json:"message"`
+	Details  string                 `json:"details,omitempty"`
+	UserID   string                 `json:"user_id,omitempty"`
+	Resource string                 `json:"resource,omitempty"`
+	Action   string                 `json:"action,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Severity SecuritySeverity       `json:"severity"`
+	Category SecurityCategory       `json:"category"`
 }
 
 // SecuritySeverity defines the severity levels for security errors
@@ -42,8 +42,8 @@ const (
 	CategorySystemIntegrity SecurityCategory = "system_integrity"
 	CategoryNetworkSecurity SecurityCategory = "network_security"
 	CategoryCryptography    SecurityCategory = "cryptography"
-	CategoryAudit          SecurityCategory = "audit"
-	CategoryCompliance     SecurityCategory = "compliance"
+	CategoryAudit           SecurityCategory = "audit"
+	CategoryCompliance      SecurityCategory = "compliance"
 )
 
 // Error implements the error interface
@@ -54,7 +54,7 @@ func (se *SecurityError) Error() string {
 // NewSecurityError creates a new security error with proper audit logging
 func NewSecurityError(ctx context.Context, code, message string, severity SecuritySeverity, category SecurityCategory) *SecurityError {
 	logger := otelzap.Ctx(ctx)
-	
+
 	err := &SecurityError{
 		Code:     code,
 		Message:  message,
@@ -62,7 +62,7 @@ func NewSecurityError(ctx context.Context, code, message string, severity Securi
 		Category: category,
 		Metadata: make(map[string]interface{}),
 	}
-	
+
 	// Log security event for audit trail
 	logger.Error("Security error occurred",
 		zap.String("security_code", code),
@@ -70,7 +70,7 @@ func NewSecurityError(ctx context.Context, code, message string, severity Securi
 		zap.String("security_severity", string(severity)),
 		zap.String("message", message),
 		zap.String("event_type", "security_error"))
-	
+
 	return err
 }
 
@@ -144,19 +144,19 @@ func NewComplianceError(ctx context.Context, message string) *SecurityError {
 // LogSecurityEvent logs a security event for audit purposes
 func LogSecurityEvent(ctx context.Context, eventType, action, resource string, metadata map[string]interface{}) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	fields := []zap.Field{
 		zap.String("event_type", eventType),
 		zap.String("action", action),
 		zap.String("resource", resource),
 		zap.Time("timestamp", time.Now()),
 	}
-	
+
 	// Add metadata fields
 	for key, value := range metadata {
 		fields = append(fields, zap.Any(key, value))
 	}
-	
+
 	logger.Info("Security event", fields...)
 }
 
@@ -168,7 +168,7 @@ func LogSecuritySuccess(ctx context.Context, action, resource string, metadata m
 // LogSecurityWarning logs a security warning
 func LogSecurityWarning(ctx context.Context, action, resource, warning string, metadata map[string]interface{}) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	fields := []zap.Field{
 		zap.String("event_type", "security_warning"),
 		zap.String("action", action),
@@ -176,11 +176,11 @@ func LogSecurityWarning(ctx context.Context, action, resource, warning string, m
 		zap.String("warning", warning),
 		zap.Time("timestamp", time.Now()),
 	}
-	
+
 	// Add metadata fields
 	for key, value := range metadata {
 		fields = append(fields, zap.Any(key, value))
 	}
-	
+
 	logger.Warn("Security warning", fields...)
 }

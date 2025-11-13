@@ -261,7 +261,7 @@ func (p *ConsulStatusProvider) getNetworkInfo(rc *eos_io.RuntimeContext) Network
 			{
 				Name:     "HTTP API",
 				Protocol: "http",
-				Address:  hostname, // Use internal hostname (e.g., vhost11)
+				Address:  hostname,          // Use internal hostname (e.g., vhost11)
 				Port:     shared.PortConsul, // 8161
 				Healthy:  true,
 			},

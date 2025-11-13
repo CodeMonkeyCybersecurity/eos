@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -94,7 +95,7 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 		zap.Int("total_size_bytes", len(finalContent)),
 		zap.String("permissions", "0644"))
 
-	if err := os.WriteFile(outputPath, []byte(finalContent), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(finalContent), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write YAML file",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
@@ -309,7 +310,7 @@ locals {
 		zap.Int("total_size_bytes", len(finalContent)),
 		zap.String("permissions", "0644"))
 
-	if err := os.WriteFile(outputPath, []byte(finalContent), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(finalContent), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write Terraform file",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
@@ -438,7 +439,7 @@ func createTerraformDirectories(baseDir string) error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}

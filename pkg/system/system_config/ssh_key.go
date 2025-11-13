@@ -211,7 +211,7 @@ func (skm *SSHKeyManager) createSSHDirectory(result *ConfigurationResult) error 
 	}
 
 	// Set proper permissions for .ssh directory
-	if err := os.Chmod(sshDir, 0700); err != nil {
+	if err := os.Chmod(sshDir, shared.SecretDirPerm); err != nil {
 		step.Status = "failed"
 		step.Error = err.Error()
 		step.Duration = time.Since(stepStart)
@@ -300,7 +300,7 @@ func (skm *SSHKeyManager) setPermissions(result *ConfigurationResult) error {
 	stepStart := time.Now()
 
 	// Set permissions on private key (600 - read/write for owner only)
-	if err := os.Chmod(skm.config.FilePath, 0600); err != nil {
+	if err := os.Chmod(skm.config.FilePath, shared.SecretFilePerm); err != nil {
 		step.Status = "failed"
 		step.Error = err.Error()
 		step.Duration = time.Since(stepStart)
@@ -311,7 +311,7 @@ func (skm *SSHKeyManager) setPermissions(result *ConfigurationResult) error {
 	// Set permissions on public key (644 - read for all, write for owner)
 	pubKeyPath := skm.config.FilePath + ".pub"
 	if shared.FileExists(pubKeyPath) {
-		if err := os.Chmod(pubKeyPath, 0644); err != nil {
+		if err := os.Chmod(pubKeyPath, shared.ConfigFilePerm); err != nil {
 			step.Status = "failed"
 			step.Error = err.Error()
 			step.Duration = time.Since(stepStart)
@@ -342,7 +342,7 @@ func (skm *SSHKeyManager) Rollback(backup *ConfigurationBackup) error {
 
 	// Restore backed up files
 	for filePath, content := range backup.Files {
-		if err := WriteFile(filePath, content, 0600); err != nil {
+		if err := WriteFile(filePath, content, shared.SecretFilePerm); err != nil {
 			logger.Warn("Failed to restore file", zap.String("file", filePath), zap.Error(err))
 		}
 	}

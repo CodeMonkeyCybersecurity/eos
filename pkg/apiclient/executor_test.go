@@ -423,10 +423,10 @@ func TestExecutor_Update(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:     "update user with invalid field value",
-			resource: "users",
-			params:   map[string]interface{}{"pk": validUUID},
-			fields:   map[string]interface{}{"type": "invalid_type"},
+			name:        "update user with invalid field value",
+			resource:    "users",
+			params:      map[string]interface{}{"pk": validUUID},
+			fields:      map[string]interface{}{"type": "invalid_type"},
 			expectError: true,
 		},
 	}

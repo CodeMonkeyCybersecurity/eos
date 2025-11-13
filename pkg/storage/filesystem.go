@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -153,7 +154,7 @@ func BackupFstab(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(ctx)
 
 	backupDir := "/etc/fabric/fstab"
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 		logger.Error("Failed to create backup directory", zap.Error(err))
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
@@ -201,7 +202,7 @@ func AddFstabEntry(rc *eos_io.RuntimeContext, entry FstabEntry) error {
 	}
 
 	// Create mount point directory if it doesn't exist
-	if err := os.MkdirAll(entry.Mountpoint, 0755); err != nil {
+	if err := os.MkdirAll(entry.Mountpoint, shared.ServiceDirPerm); err != nil {
 		logger.Error("Failed to create mount point", zap.Error(err))
 		return fmt.Errorf("failed to create mount point %s: %w", entry.Mountpoint, err)
 	}

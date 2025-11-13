@@ -110,10 +110,10 @@ const (
 	// Certificate paths
 	// RATIONALE: TLS certificates for OpenSearch Security admin operations
 	// SECURITY: Used for mTLS authentication when applying security config
-	OpenSearchCertsDir        = "/etc/wazuh-indexer/certs/"
-	OpenSearchRootCA          = OpenSearchCertsDir + "root-ca.pem"
-	OpenSearchAdminCert       = OpenSearchCertsDir + "admin.pem"
-	OpenSearchAdminKey        = OpenSearchCertsDir + "admin-key.pem"
+	OpenSearchCertsDir  = "/etc/wazuh-indexer/certs/"
+	OpenSearchRootCA    = OpenSearchCertsDir + "root-ca.pem"
+	OpenSearchAdminCert = OpenSearchCertsDir + "admin.pem"
+	OpenSearchAdminKey  = OpenSearchCertsDir + "admin-key.pem"
 
 	// Backup directory
 	// RATIONALE: Centralized location for Eos-managed Wazuh backups

@@ -1,6 +1,7 @@
 package local
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -34,11 +35,11 @@ type DiskInfo struct {
 
 // VolumeSpec defines volume creation parameters
 type VolumeSpec struct {
-	Name       string `json:"name"`
-	Device     string `json:"device"`
-	Size       string `json:"size"`
-	Filesystem string `json:"filesystem"`
-	MountPoint string `json:"mount_point"`
+	Name       string   `json:"name"`
+	Device     string   `json:"device"`
+	Size       string   `json:"size"`
+	Filesystem string   `json:"filesystem"`
+	MountPoint string   `json:"mount_point"`
 	Options    []string `json:"options"`
 }
 
@@ -70,7 +71,7 @@ func (lsm *LocalStorageManager) CreateVolume(ctx context.Context, spec *VolumeSp
 	}
 
 	// 3. Create mount point
-	if err := os.MkdirAll(spec.MountPoint, 0755); err != nil {
+	if err := os.MkdirAll(spec.MountPoint, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create mount point: %w", err)
 	}
 
@@ -136,7 +137,7 @@ func (lsm *LocalStorageManager) createFilesystem(ctx context.Context, device, fs
 		return fmt.Errorf("unsupported filesystem type: %s", fsType)
 	}
 
-	lsm.logger.Info("Creating filesystem", 
+	lsm.logger.Info("Creating filesystem",
 		zap.String("device", device),
 		zap.String("type", fsType))
 
@@ -161,7 +162,7 @@ func (lsm *LocalStorageManager) getDeviceUUID(device string) (string, error) {
 
 // updateFstab adds entry to /etc/fstab
 func (lsm *LocalStorageManager) updateFstab(uuid, mountPoint, fsType string, options []string) error {
-	fstabEntry := fmt.Sprintf("UUID=%s %s %s %s 0 2\n", 
+	fstabEntry := fmt.Sprintf("UUID=%s %s %s %s 0 2\n",
 		uuid, mountPoint, fsType, strings.Join(append(lsm.mountOpts, options...), ","))
 
 	// Check if entry already exists
@@ -258,7 +259,7 @@ func (lsm *LocalStorageManager) ResizeVolume(ctx context.Context, device string)
 		return fmt.Errorf("resize not supported for filesystem type: %s", fsType)
 	}
 
-	lsm.logger.Info("Resizing volume", 
+	lsm.logger.Info("Resizing volume",
 		zap.String("device", device),
 		zap.String("filesystem", fsType))
 
@@ -336,5 +337,5 @@ func (lsm *LocalStorageManager) removeFromFstab(mountPoint string) error {
 		}
 	}
 
-	return os.WriteFile("/etc/fstab", []byte(strings.Join(newLines, "\n")), 0644)
+	return os.WriteFile("/etc/fstab", []byte(strings.Join(newLines, "\n")), shared.ConfigFilePerm)
 }

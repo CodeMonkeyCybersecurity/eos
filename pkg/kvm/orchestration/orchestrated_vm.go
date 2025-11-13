@@ -3,6 +3,7 @@
 package orchestration
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -86,9 +87,9 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 		Port:      22, // SSH port
 		Tags:      []string{"kvm", "ubuntu", "orchestrated"},
 		Meta: map[string]string{
-			"created_at":  time.Now().Format(time.RFC3339),
-			"ssh_key":     privateKeyPath,
-			"consul_ip":   ip,
+			"created_at": time.Now().Format(time.RFC3339),
+			"ssh_key":    privateKeyPath,
+			"consul_ip":  ip,
 		},
 		HealthCheck: &HealthCheck{
 			TCP:                            fmt.Sprintf("%s:22", ip),
@@ -114,9 +115,9 @@ func (om *OrchestratedVMManager) CreateOrchestratedVM(vmName string, enableNomad
 			Priority:    50,
 			Datacenters: []string{"dc1"},
 			Meta: map[string]string{
-				"vm_name":  vmName,
-				"vm_ip":    ip,
-				"created":  time.Now().Format(time.RFC3339),
+				"vm_name": vmName,
+				"vm_ip":   ip,
+				"created": time.Now().Format(time.RFC3339),
 			},
 		}
 
@@ -246,13 +247,13 @@ func (om *OrchestratedVMManager) createVMWithVirsh(vmName, _ /* ip */, cloudInit
 	metaDataPath := filepath.Join(workDir, "meta-data")
 
 	// SECURITY P0 #1: Use os.WriteFile instead of shell to prevent command injection
-	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	// Write meta-data
 	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vmName, vmName)
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 

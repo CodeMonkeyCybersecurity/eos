@@ -28,16 +28,16 @@ func (k *KernelLogRetriever) RetrieveKernelLogs(since time.Duration) (*KernelLog
 		RetrievedAt: time.Now(),
 		Messages:    []KernelMessage{},
 	}
-	
+
 	// Try different retrieval methods
-	
+
 	// Method 1: Try dmesg first (most recent, might need privileges)
 	dmesgLogs, err := k.retrieveDmesg()
 	if err == nil && len(dmesgLogs) > 0 {
 		logs.Messages = append(logs.Messages, dmesgLogs...)
 		logs.Source = "dmesg"
 	}
-	
+
 	// Method 2: Try journalctl (most comprehensive if systemd is used)
 	journalLogs, err := k.retrieveJournalKernelLogs(since)
 	if err == nil && len(journalLogs) > 0 {
@@ -48,7 +48,7 @@ func (k *KernelLogRetriever) RetrieveKernelLogs(since time.Duration) (*KernelLog
 			logs.Source = "journalctl"
 		}
 	}
-	
+
 	// Method 3: Traditional log files (fallback for older systems)
 	fileLogs, err := k.retrieveTraditionalKernelLogs(since)
 	if err == nil && len(fileLogs) > 0 {
@@ -59,14 +59,14 @@ func (k *KernelLogRetriever) RetrieveKernelLogs(since time.Duration) (*KernelLog
 			logs.Source = "files"
 		}
 	}
-	
+
 	// Method 4: Emergency retrieval if we got nothing
 	if len(logs.Messages) == 0 {
 		emergencyLogs, _ := k.emergencyKernelLogRetrieval()
 		logs.Messages = emergencyLogs
 		logs.Source = "emergency"
 	}
-	
+
 	return logs, nil
 }
 
@@ -76,7 +76,7 @@ func (k *KernelLogRetriever) retrieveDmesg() ([]KernelMessage, error) {
 	capsCmd := "dmesg --help 2>&1 | grep -E '(-T|--time)' | wc -l"
 	capsOutput, _ := k.client.ExecuteCommand(capsCmd, false)
 	hasTimeSupport := strings.TrimSpace(capsOutput) != "0"
-	
+
 	var dmesgCmd string
 	if hasTimeSupport {
 		// Modern dmesg with timestamp decoding
@@ -85,7 +85,7 @@ func (k *KernelLogRetriever) retrieveDmesg() ([]KernelMessage, error) {
 		// Fallback for older systems
 		dmesgCmd = "dmesg"
 	}
-	
+
 	output, err := k.client.ExecuteCommand(dmesgCmd, true)
 	if err != nil {
 		// Try without sudo
@@ -94,7 +94,7 @@ func (k *KernelLogRetriever) retrieveDmesg() ([]KernelMessage, error) {
 			return nil, fmt.Errorf("failed to retrieve dmesg: %w", err)
 		}
 	}
-	
+
 	return k.parseDmesgOutput(output, hasTimeSupport), nil
 }
 
@@ -102,23 +102,23 @@ func (k *KernelLogRetriever) retrieveDmesg() ([]KernelMessage, error) {
 func (k *KernelLogRetriever) parseDmesgOutput(output string, hasTimestamps bool) []KernelMessage {
 	var messages []KernelMessage
 	lines := strings.Split(output, "\n")
-	
+
 	// Get boot time for relative timestamp calculation
 	bootTime := k.getSystemBootTime()
-	
+
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		
+
 		msg := KernelMessage{Raw: line}
-		
+
 		if hasTimestamps {
 			// Parse modern dmesg format: [Timestamp] message
 			if idx := strings.Index(line, "]"); idx > 0 && strings.HasPrefix(line, "[") {
 				timeStr := strings.TrimPrefix(line[:idx], "[")
 				msg.Message = strings.TrimSpace(line[idx+1:])
-				
+
 				// Try to parse various timestamp formats
 				for _, format := range []string{
 					"Mon Jan 2 15:04:05 2006",
@@ -145,16 +145,16 @@ func (k *KernelLogRetriever) parseDmesgOutput(output string, hasTimestamps bool)
 				msg.Message = line
 			}
 		}
-		
+
 		// Extract severity level
 		msg.Level = k.extractLogLevel(msg.Message)
-		
+
 		// Categorize the message
 		msg.Category = k.categorizeKernelMessage(msg.Message)
-		
+
 		messages = append(messages, msg)
 	}
-	
+
 	return messages
 }
 
@@ -162,39 +162,39 @@ func (k *KernelLogRetriever) parseDmesgOutput(output string, hasTimestamps bool)
 func (k *KernelLogRetriever) retrieveJournalKernelLogs(since time.Duration) ([]KernelMessage, error) {
 	sinceStr := fmt.Sprintf("%.0f seconds ago", since.Seconds())
 	cmd := fmt.Sprintf(`journalctl -k --since="%s" --no-pager`, sinceStr)
-	
+
 	output, err := k.client.ExecuteCommand(cmd, true)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return k.parseJournalOutput(output), nil
 }
 
 // parseJournalOutput parses journalctl output
 func (k *KernelLogRetriever) parseJournalOutput(output string) []KernelMessage {
 	var messages []KernelMessage
-	
+
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if line == "" || strings.HasPrefix(line, "-- ") {
 			continue
 		}
-		
+
 		msg := KernelMessage{Raw: line}
-		
+
 		// Journal format: MMM DD HH:MM:SS hostname kernel: message
 		parts := strings.SplitN(line, " kernel: ", 2)
 		if len(parts) == 2 {
 			msg.Message = parts[1]
-			
+
 			// Try to parse timestamp from the beginning
 			timePart := strings.TrimSpace(parts[0])
 			// Remove hostname
 			if idx := strings.LastIndex(timePart, " "); idx > 0 {
 				timePart = timePart[:idx]
 			}
-			
+
 			// Parse time (journal uses current year)
 			now := time.Now()
 			timeStr := fmt.Sprintf("%d %s", now.Year(), timePart)
@@ -204,13 +204,13 @@ func (k *KernelLogRetriever) parseJournalOutput(output string) []KernelMessage {
 		} else {
 			msg.Message = line
 		}
-		
+
 		msg.Level = k.extractLogLevel(msg.Message)
 		msg.Category = k.categorizeKernelMessage(msg.Message)
-		
+
 		messages = append(messages, msg)
 	}
-	
+
 	return messages
 }
 
@@ -222,15 +222,15 @@ func (k *KernelLogRetriever) retrieveTraditionalKernelLogs(since time.Duration) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var messages []KernelMessage
 	files := strings.Split(filesOutput, "\n")
-	
+
 	for _, file := range files {
 		if file == "" {
 			continue
 		}
-		
+
 		// Get recent entries from the file
 		cmd := fmt.Sprintf(`tail -1000 %s | grep -i kernel`, file)
 		output, err := k.client.ExecuteCommand(cmd, true)
@@ -239,36 +239,36 @@ func (k *KernelLogRetriever) retrieveTraditionalKernelLogs(since time.Duration) 
 			messages = append(messages, fileMessages...)
 		}
 	}
-	
+
 	return messages, nil
 }
 
 // parseTraditionalLogOutput parses traditional syslog format
 func (k *KernelLogRetriever) parseTraditionalLogOutput(output string) []KernelMessage {
 	var messages []KernelMessage
-	
+
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
-		
+
 		msg := KernelMessage{
 			Raw:     line,
 			Message: line,
 		}
-		
+
 		// Try to extract timestamp and message
 		// Format: MMM DD HH:MM:SS hostname kernel: message
 		if idx := strings.Index(line, " kernel: "); idx > 0 {
 			msg.Message = line[idx+9:]
-			
+
 			// Parse timestamp
 			timePart := line[:idx]
 			if idx2 := strings.Index(timePart, " "); idx2 > 0 {
 				timePart = timePart[idx2+1:]
 			}
-			
+
 			// Traditional syslog doesn't include year
 			now := time.Now()
 			timeStr := fmt.Sprintf("%d %s", now.Year(), timePart)
@@ -276,20 +276,20 @@ func (k *KernelLogRetriever) parseTraditionalLogOutput(output string) []KernelMe
 				msg.Timestamp = t
 			}
 		}
-		
+
 		msg.Level = k.extractLogLevel(msg.Message)
 		msg.Category = k.categorizeKernelMessage(msg.Message)
-		
+
 		messages = append(messages, msg)
 	}
-	
+
 	return messages
 }
 
 // emergencyKernelLogRetrieval tries to get any kernel logs when standard methods fail
 func (k *KernelLogRetriever) emergencyKernelLogRetrieval() ([]KernelMessage, error) {
 	var messages []KernelMessage
-	
+
 	// Try to find any kernel panic or error messages
 	strategies := []struct {
 		name string
@@ -308,7 +308,7 @@ func (k *KernelLogRetriever) emergencyKernelLogRetrieval() ([]KernelMessage, err
 			`grep -i kernel /var/log/boot.log 2>/dev/null | tail -50`,
 		},
 	}
-	
+
 	for _, strategy := range strategies {
 		output, err := k.client.ExecuteCommand(strategy.cmd, true)
 		if err == nil && output != "" {
@@ -327,7 +327,7 @@ func (k *KernelLogRetriever) emergencyKernelLogRetrieval() ([]KernelMessage, err
 			}
 		}
 	}
-	
+
 	return messages, nil
 }
 
@@ -342,7 +342,7 @@ func (k *KernelLogRetriever) getSystemBootTime() time.Time {
 			return t
 		}
 	}
-	
+
 	// Fallback: calculate from uptime
 	uptimeCmd := "cat /proc/uptime"
 	uptimeOutput, err := k.client.ExecuteCommand(uptimeCmd, false)
@@ -354,7 +354,7 @@ func (k *KernelLogRetriever) getSystemBootTime() time.Time {
 			}
 		}
 	}
-	
+
 	// Default to 1 hour ago
 	return time.Now().Add(-time.Hour)
 }
@@ -362,7 +362,7 @@ func (k *KernelLogRetriever) getSystemBootTime() time.Time {
 // extractLogLevel extracts the log level from a kernel message
 func (k *KernelLogRetriever) extractLogLevel(message string) string {
 	lowerMsg := strings.ToLower(message)
-	
+
 	if strings.Contains(lowerMsg, "panic") || strings.Contains(lowerMsg, "bug:") || strings.Contains(lowerMsg, "oops:") {
 		return "panic"
 	}
@@ -375,14 +375,14 @@ func (k *KernelLogRetriever) extractLogLevel(message string) string {
 	if strings.Contains(lowerMsg, "debug") {
 		return "debug"
 	}
-	
+
 	return "info"
 }
 
 // categorizeKernelMessage categorizes a kernel message
 func (k *KernelLogRetriever) categorizeKernelMessage(message string) string {
 	lowerMsg := strings.ToLower(message)
-	
+
 	categories := map[string][]string{
 		"memory":  {"memory", "oom", "swap", "page", "allocation"},
 		"disk":    {"ata", "sata", "scsi", "i/o error", "block", "filesystem", "ext4", "xfs"},
@@ -393,7 +393,7 @@ func (k *KernelLogRetriever) categorizeKernelMessage(message string) string {
 		"driver":  {"driver", "module", "firmware"},
 		"power":   {"acpi", "power", "suspend", "resume", "battery"},
 	}
-	
+
 	for category, keywords := range categories {
 		for _, keyword := range keywords {
 			if strings.Contains(lowerMsg, keyword) {
@@ -401,7 +401,7 @@ func (k *KernelLogRetriever) categorizeKernelMessage(message string) string {
 			}
 		}
 	}
-	
+
 	return "general"
 }
 
@@ -409,13 +409,13 @@ func (k *KernelLogRetriever) categorizeKernelMessage(message string) string {
 func mergeKernelMessages(existing, new []KernelMessage) []KernelMessage {
 	// Create a map to track unique messages
 	messageMap := make(map[string]KernelMessage)
-	
+
 	// Add existing messages
 	for _, msg := range existing {
 		key := fmt.Sprintf("%d_%s", msg.Timestamp.Unix(), msg.Message)
 		messageMap[key] = msg
 	}
-	
+
 	// Add new messages
 	for _, msg := range new {
 		key := fmt.Sprintf("%d_%s", msg.Timestamp.Unix(), msg.Message)
@@ -423,12 +423,12 @@ func mergeKernelMessages(existing, new []KernelMessage) []KernelMessage {
 			messageMap[key] = msg
 		}
 	}
-	
+
 	// Convert back to slice
 	var result []KernelMessage
 	for _, msg := range messageMap {
 		result = append(result, msg)
 	}
-	
+
 	return result
 }

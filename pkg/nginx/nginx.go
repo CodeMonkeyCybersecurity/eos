@@ -97,7 +97,7 @@ func RestartNginx(rc *eos_io.RuntimeContext) error {
 
 	// Use shared service manager for consistent service operations
 	serviceManager := serviceutil.NewServiceManager(rc)
-	
+
 	// Reload nginx service (systemctl reload nginx)
 	if err := serviceManager.Reload("nginx"); err != nil {
 		logger.Error("Failed to restart Nginx", zap.Error(err))

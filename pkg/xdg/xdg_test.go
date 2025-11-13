@@ -554,13 +554,13 @@ func BenchmarkXDGPaths(b *testing.B) {
 	}()
 
 	b.Run("ConfigPath", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = XDGConfigPath("benchapp", "config.json")
 		}
 	})
 
 	b.Run("DataPath", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = XDGDataPath("benchapp", "data.db")
 		}
 	})
@@ -569,7 +569,7 @@ func BenchmarkXDGPaths(b *testing.B) {
 		_ = os.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
 		defer func() { _ = os.Unsetenv("XDG_RUNTIME_DIR") }()
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = XDGRuntimePath("benchapp", "socket")
 		}
 	})

@@ -19,31 +19,31 @@ import (
 // LOADED FROM: pkg/[service]/api_definition.yaml
 // EXAMPLE: pkg/authentik/api_definition.yaml
 type APIDefinition struct {
-	Service  string             `yaml:"service"`  // Service name (e.g., "authentik", "wazuh")
-	Version  string             `yaml:"version"`  // API version (e.g., "2025.10")
-	BaseURL  string             `yaml:"base_url"` // Optional direct URL (overrides discovery)
-	Auth     AuthConfig         `yaml:"auth"`     // Authentication configuration
+	Service   string              `yaml:"service"`   // Service name (e.g., "authentik", "wazuh")
+	Version   string              `yaml:"version"`   // API version (e.g., "2025.10")
+	BaseURL   string              `yaml:"base_url"`  // Optional direct URL (overrides discovery)
+	Auth      AuthConfig          `yaml:"auth"`      // Authentication configuration
 	Resources map[string]Resource `yaml:"resources"` // Resource definitions (users, groups, etc.)
 }
 
 // AuthConfig defines how to authenticate with the API
 type AuthConfig struct {
-	Type             AuthType `yaml:"type"`               // Authentication type (bearer_token, basic, none)
+	Type AuthType `yaml:"type"` // Authentication type (bearer_token, basic, none)
 
 	// Token discovery (priority: env_file → consul → vault → env_var → prompt)
-	TokenEnvFile     string   `yaml:"token_env_file"`     // .env file path for token (PRIMARY - next 6 months)
-	TokenEnvVar      string   `yaml:"token_env_var"`      // Environment variable name for token
-	TokenConsulKey   string   `yaml:"token_consul_key"`   // Consul KV path for token (preferred long-term)
-	TokenVaultPath   string   `yaml:"token_vault_path"`   // Vault secret path for token
+	TokenEnvFile   string `yaml:"token_env_file"`   // .env file path for token (PRIMARY - next 6 months)
+	TokenEnvVar    string `yaml:"token_env_var"`    // Environment variable name for token
+	TokenConsulKey string `yaml:"token_consul_key"` // Consul KV path for token (preferred long-term)
+	TokenVaultPath string `yaml:"token_vault_path"` // Vault secret path for token
 
 	// Base URL discovery (priority: env_file → consul → direct → env_var → prompt)
-	BaseURLEnvFile   string   `yaml:"base_url_env_file"`   // .env file path for base URL (PRIMARY - next 6 months)
-	BaseURLEnvVar    string   `yaml:"base_url_env_var"`    // Environment variable name for base URL
-	BaseURLConsulKey string   `yaml:"base_url_consul_key"` // Consul KV path for base URL
+	BaseURLEnvFile   string `yaml:"base_url_env_file"`   // .env file path for base URL (PRIMARY - next 6 months)
+	BaseURLEnvVar    string `yaml:"base_url_env_var"`    // Environment variable name for base URL
+	BaseURLConsulKey string `yaml:"base_url_consul_key"` // Consul KV path for base URL
 
 	// Basic auth (if type == basic)
-	UsernameEnvVar   string   `yaml:"username_env_var"`   // Basic auth username env var
-	PasswordEnvVar   string   `yaml:"password_env_var"`   // Basic auth password env var
+	UsernameEnvVar string `yaml:"username_env_var"` // Basic auth username env var
+	PasswordEnvVar string `yaml:"password_env_var"` // Basic auth password env var
 }
 
 // AuthType represents supported authentication types
@@ -58,24 +58,24 @@ const (
 
 // Resource defines a top-level API resource (e.g., users, groups, flows)
 type Resource struct {
-	Path         string                `yaml:"path"`         // Base path (e.g., /api/v3/core/users)
-	Description  string                `yaml:"description"`  // Human-readable description
-	Operations   map[string]Operation  `yaml:"operations"`   // CRUD operations (list, get, create, update, delete)
-	Subresources map[string]Resource   `yaml:"subresources"` // Nested resources (e.g., user permissions)
+	Path         string               `yaml:"path"`         // Base path (e.g., /api/v3/core/users)
+	Description  string               `yaml:"description"`  // Human-readable description
+	Operations   map[string]Operation `yaml:"operations"`   // CRUD operations (list, get, create, update, delete)
+	Subresources map[string]Resource  `yaml:"subresources"` // Nested resources (e.g., user permissions)
 }
 
 // Operation defines a single API operation (list, get, create, update, delete)
 type Operation struct {
-	Method         HTTPMethod     `yaml:"method"`          // HTTP method (GET, POST, PATCH, PUT, DELETE)
-	Path           string         `yaml:"path"`            // Optional path override (e.g., /api/v3/core/users/{pk})
-	Description    string         `yaml:"description"`     // Human-readable description
-	Params         []Parameter    `yaml:"params"`          // Path/query parameters (e.g., {pk}, ?is_superuser=true)
-	Fields         []Field        `yaml:"fields"`          // Request body fields (for POST/PATCH/PUT)
-	Filters        []Filter       `yaml:"filters"`         // Query filters (for GET list operations)
-	OutputFields   []string       `yaml:"output_fields"`   // Fields to display in output (optional)
-	Confirm        bool           `yaml:"confirm"`         // Require --force flag for destructive ops
-	ConfirmMessage string         `yaml:"confirm_message"` // Custom confirmation prompt
-	Returns        string         `yaml:"returns"`         // Description of return value
+	Method         HTTPMethod  `yaml:"method"`          // HTTP method (GET, POST, PATCH, PUT, DELETE)
+	Path           string      `yaml:"path"`            // Optional path override (e.g., /api/v3/core/users/{pk})
+	Description    string      `yaml:"description"`     // Human-readable description
+	Params         []Parameter `yaml:"params"`          // Path/query parameters (e.g., {pk}, ?is_superuser=true)
+	Fields         []Field     `yaml:"fields"`          // Request body fields (for POST/PATCH/PUT)
+	Filters        []Filter    `yaml:"filters"`         // Query filters (for GET list operations)
+	OutputFields   []string    `yaml:"output_fields"`   // Fields to display in output (optional)
+	Confirm        bool        `yaml:"confirm"`         // Require --force flag for destructive ops
+	ConfirmMessage string      `yaml:"confirm_message"` // Custom confirmation prompt
+	Returns        string      `yaml:"returns"`         // Description of return value
 }
 
 // HTTPMethod represents supported HTTP methods

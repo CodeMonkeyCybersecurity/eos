@@ -45,6 +45,7 @@ func init() {
 	CreateCmd.AddCommand(storageUnifiedCmd)
 
 }
+
 // TODO: refactor
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Global flags
@@ -88,4 +89,3 @@ func init() {
 	SetupCmd.PersistentFlags().BoolVar(&backup, "backup", true, "Create backup before making changes")
 	SetupCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 }
-

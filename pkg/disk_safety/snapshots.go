@@ -68,7 +68,7 @@ func (sm *SnapshotManager) CreateSnapshot(ctx context.Context, vg, lv, journalID
 
 	// Calculate snapshot size
 	snapSize := sm.calculateSnapSize(lvSize)
-	
+
 	// Check if VG has enough free space
 	if err := sm.checkVGFreeSpace(ctx, vg, snapSize); err != nil {
 		return nil, fmt.Errorf("insufficient space for snapshot: %w", err)
@@ -107,7 +107,7 @@ func (sm *SnapshotManager) CreateSnapshot(ctx context.Context, vg, lv, journalID
 		JournalID:  journalID,
 		AutoRemove: sm.autoCleanup,
 	}
-	
+
 	// Set removal time if auto-cleanup is enabled
 	if sm.autoCleanup {
 		removeAt := time.Now().Add(sm.keepTime)
@@ -193,11 +193,11 @@ func (sm *SnapshotManager) GetSnapshot(id string) (*Snapshot, bool) {
 // CleanupExpired removes expired snapshots
 func (sm *SnapshotManager) CleanupExpired(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	sm.mu.RLock()
 	var expiredSnapshots []*Snapshot
 	cutoff := time.Now().Add(-sm.keepTime)
-	
+
 	for _, snap := range sm.snapshots {
 		if snap.AutoRemove && snap.Created.Before(cutoff) {
 			expiredSnapshots = append(expiredSnapshots, snap)
@@ -256,7 +256,7 @@ func (sm *SnapshotManager) GetSnapshotUsage(ctx context.Context, snap *Snapshot)
 	// Use lvs to get snapshot usage information
 	cmd := exec.CommandContext(ctx, "lvs", "--noheadings", "--units", "b", "--separator", ":",
 		"-o", "lv_name,data_percent,metadata_percent,lv_size", snapPath)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("get snapshot usage: %w", err)
@@ -274,7 +274,7 @@ func (sm *SnapshotManager) GetSnapshotUsage(ctx context.Context, snap *Snapshot)
 
 	dataPercent, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
 	metadataPercent, _ := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
-	
+
 	sizeStr := strings.TrimSpace(parts[3])
 	sizeStr = strings.TrimSuffix(sizeStr, "B")
 	size, _ := strconv.ParseUint(sizeStr, 10, 64)
@@ -313,7 +313,7 @@ func (sm *SnapshotManager) calculateSnapSize(lvSize uint64) uint64 {
 func (sm *SnapshotManager) getLVSize(ctx context.Context, vg, lv string) (uint64, error) {
 	cmd := exec.CommandContext(ctx, "lvs", "--noheadings", "--units", "b", "--separator", ":",
 		"-o", "lv_size", fmt.Sprintf("%s/%s", vg, lv))
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("get LV size: %w", err)
@@ -321,7 +321,7 @@ func (sm *SnapshotManager) getLVSize(ctx context.Context, vg, lv string) (uint64
 
 	sizeStr := strings.TrimSpace(string(output))
 	sizeStr = strings.TrimSuffix(sizeStr, "B") // Remove 'B' suffix
-	
+
 	size, err := strconv.ParseUint(sizeStr, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("parse LV size: %w", err)
@@ -334,7 +334,7 @@ func (sm *SnapshotManager) getLVSize(ctx context.Context, vg, lv string) (uint64
 func (sm *SnapshotManager) checkVGFreeSpace(ctx context.Context, vg string, requiredSize uint64) error {
 	cmd := exec.CommandContext(ctx, "vgs", "--noheadings", "--units", "b", "--separator", ":",
 		"-o", "vg_free", vg)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("get VG free space: %w", err)
@@ -342,7 +342,7 @@ func (sm *SnapshotManager) checkVGFreeSpace(ctx context.Context, vg string, requ
 
 	freeStr := strings.TrimSpace(string(output))
 	freeStr = strings.TrimSuffix(freeStr, "B")
-	
+
 	freeSpace, err := strconv.ParseUint(freeStr, 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse VG free space: %w", err)

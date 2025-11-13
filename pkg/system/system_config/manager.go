@@ -220,7 +220,7 @@ func BackupFile(filePath string) (string, error) {
 		return "", fmt.Errorf("failed to read file for backup: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -229,7 +229,7 @@ func BackupFile(filePath string) (string, error) {
 
 // EnsureDirectory creates a directory if it doesn't exist
 func EnsureDirectory(dirPath string) error {
-	return os.MkdirAll(dirPath, 0755)
+	return os.MkdirAll(dirPath, shared.ServiceDirPerm)
 }
 
 // WriteFile writes content to a file with proper permissions
@@ -267,16 +267,16 @@ func CheckFileExists(filePath string) bool {
 // DEPRECATED: Use shared.ServiceManager instead
 func CheckServiceStatus(serviceName string) (ServiceState, error) {
 	var state ServiceState
-	
+
 	// Use simple service manager for compatibility
 	// This is a bridge function until full migration is complete
 	sm := shared.NewSimpleServiceManager()
-	
+
 	// Use shared service manager
 	if active, err := sm.IsActive(serviceName); err == nil {
 		state.Active = active
 	}
-	
+
 	if enabled, err := sm.IsEnabled(serviceName); err == nil {
 		state.Enabled = enabled
 	}
@@ -324,7 +324,6 @@ func GenerateSecureToken(length int) (string, error) {
 
 	return string(token), nil
 }
-
 
 // CheckRoot verifies if the current user has root privileges
 func CheckRoot() error {

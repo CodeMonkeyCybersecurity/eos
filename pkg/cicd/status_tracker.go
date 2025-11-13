@@ -24,16 +24,16 @@ type StatusTracker struct {
 
 // ExecutionTracker tracks status for a single execution
 type ExecutionTracker struct {
-	ExecutionID string                    `json:"execution_id"`
-	PipelineID  string                    `json:"pipeline_id"`
-	Status      ExecutionStatus           `json:"status"`
-	StartTime   time.Time                 `json:"start_time"`
-	EndTime     *time.Time                `json:"end_time,omitempty"`
-	Duration    time.Duration             `json:"duration"`
-	Stages      map[string]*StageTracker  `json:"stages"`
-	Progress    *ProgressInfo             `json:"progress"`
-	Metrics     *ExecutionMetrics         `json:"metrics"`
-	History     []StatusUpdate            `json:"history"`
+	ExecutionID string                   `json:"execution_id"`
+	PipelineID  string                   `json:"pipeline_id"`
+	Status      ExecutionStatus          `json:"status"`
+	StartTime   time.Time                `json:"start_time"`
+	EndTime     *time.Time               `json:"end_time,omitempty"`
+	Duration    time.Duration            `json:"duration"`
+	Stages      map[string]*StageTracker `json:"stages"`
+	Progress    *ProgressInfo            `json:"progress"`
+	Metrics     *ExecutionMetrics        `json:"metrics"`
+	History     []StatusUpdate           `json:"history"`
 }
 
 // StageTracker tracks status for a single stage
@@ -49,10 +49,10 @@ type StageTracker struct {
 
 // ProgressInfo provides detailed progress information
 type ProgressInfo struct {
-	Current     int     `json:"current"`
-	Total       int     `json:"total"`
-	Percentage  float64 `json:"percentage"`
-	Description string  `json:"description"`
+	Current     int        `json:"current"`
+	Total       int        `json:"total"`
+	Percentage  float64    `json:"percentage"`
+	Description string     `json:"description"`
 	ETA         *time.Time `json:"eta,omitempty"`
 }
 
@@ -67,29 +67,29 @@ type ExecutionMetrics struct {
 
 // StatusReport provides comprehensive status information
 type StatusReport struct {
-	ExecutionID    string                      `json:"execution_id"`
-	PipelineID     string                      `json:"pipeline_id"`
-	Status         ExecutionStatus             `json:"status"`
-	StartTime      time.Time                   `json:"start_time"`
-	Duration       time.Duration               `json:"duration"`
-	Progress       *ProgressInfo               `json:"progress"`
-	Stages         []StageStatusReport         `json:"stages"`
-	Metrics        *ExecutionMetrics           `json:"metrics"`
-	RecentEvents   []StatusUpdate              `json:"recent_events"`
-	EstimatedTime  *time.Duration              `json:"estimated_time,omitempty"`
-	GeneratedAt    time.Time                   `json:"generated_at"`
+	ExecutionID   string              `json:"execution_id"`
+	PipelineID    string              `json:"pipeline_id"`
+	Status        ExecutionStatus     `json:"status"`
+	StartTime     time.Time           `json:"start_time"`
+	Duration      time.Duration       `json:"duration"`
+	Progress      *ProgressInfo       `json:"progress"`
+	Stages        []StageStatusReport `json:"stages"`
+	Metrics       *ExecutionMetrics   `json:"metrics"`
+	RecentEvents  []StatusUpdate      `json:"recent_events"`
+	EstimatedTime *time.Duration      `json:"estimated_time,omitempty"`
+	GeneratedAt   time.Time           `json:"generated_at"`
 }
 
 // StageStatusReport provides stage-specific status information
 type StageStatusReport struct {
-	Name        string          `json:"name"`
-	Status      ExecutionStatus `json:"status"`
-	StartTime   time.Time       `json:"start_time"`
-	Duration    time.Duration   `json:"duration"`
-	Progress    *ProgressInfo   `json:"progress"`
-	Error       string          `json:"error,omitempty"`
-	Logs        []LogEntry      `json:"logs,omitempty"`
-	Artifacts   []ArtifactInfo  `json:"artifacts,omitempty"`
+	Name      string          `json:"name"`
+	Status    ExecutionStatus `json:"status"`
+	StartTime time.Time       `json:"start_time"`
+	Duration  time.Duration   `json:"duration"`
+	Progress  *ProgressInfo   `json:"progress"`
+	Error     string          `json:"error,omitempty"`
+	Logs      []LogEntry      `json:"logs,omitempty"`
+	Artifacts []ArtifactInfo  `json:"artifacts,omitempty"`
 }
 
 // NewStatusTracker creates a new status tracker
@@ -203,7 +203,7 @@ func (st *StatusTracker) Subscribe(executionID string) (string, <-chan StatusUpd
 
 	st.subscriptionID++
 	id := fmt.Sprintf("sub-%d", st.subscriptionID)
-	
+
 	ch := make(chan StatusUpdate, 100)
 	key := fmt.Sprintf("%s:%s", executionID, id)
 	st.listeners[key] = ch
@@ -224,7 +224,7 @@ func (st *StatusTracker) Unsubscribe(executionID, subscriptionID string) {
 	if ch, exists := st.listeners[key]; exists {
 		close(ch)
 		delete(st.listeners, key)
-		
+
 		st.logger.Debug("Removed subscription",
 			zap.String("subscription_id", subscriptionID),
 			zap.String("execution_id", executionID))
@@ -427,7 +427,7 @@ func (st *StatusTracker) updateProgress(tracker *ExecutionTracker) {
 
 	completed := 0
 	total := len(tracker.Stages)
-	
+
 	for _, stage := range tracker.Stages {
 		if isTerminalStatus(stage.Status) {
 			completed++
@@ -506,6 +506,6 @@ func (st *StatusTracker) generateSummary(report *StatusReport) []byte {
 				event.Message)
 		}
 	}
-	
+
 	return []byte(summary)
 }

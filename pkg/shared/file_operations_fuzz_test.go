@@ -15,48 +15,48 @@ func FuzzFilePathValidation(f *testing.F) {
 		"../../../etc/passwd",
 		"..\\..\\..\\windows\\system32\\config\\sam",
 		"....//....//....//etc//passwd",
-		
+
 		// URL encoded traversal
 		"..%2f..%2f..%2fetc%2fpasswd",
 		"..%252f..%252f..%252fetc%252fpasswd",
 		"..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
-		
+
 		// Unicode traversal
 		"..∕..∕..∕etc∕passwd",
 		"..⁄..⁄..⁄etc⁄passwd",
 		"..\u2215..\u2215..\u2215etc\u2215passwd",
-		
+
 		// Null byte injection
 		"../../../etc/passwd\x00.txt",
 		"safe.txt\x00../../../etc/passwd",
-		
+
 		// Long path attacks
 		strings.Repeat("../", 1000) + "etc/passwd",
 		strings.Repeat("A", 4096) + "/file.txt",
-		
+
 		// UNC path attacks (Windows)
 		"\\\\server\\share\\file.txt",
 		"\\\\?\\C:\\Windows\\System32\\file.txt",
 		"\\\\?\\UNC\\server\\share\\file.txt",
-		
+
 		// Device file attacks (Unix)
 		"/dev/null",
 		"/dev/zero",
 		"/dev/random",
 		"/proc/self/environ",
 		"/proc/version",
-		
+
 		// Symbolic link attacks
 		"/tmp/symlink",
 		"../symlink",
 		"symlink/../../../etc/passwd",
-		
+
 		// Hidden files
 		".htaccess",
 		".env",
 		".git/config",
 		".ssh/id_rsa",
-		
+
 		// Valid paths (should pass)
 		"file.txt",
 		"subdir/file.txt",
@@ -64,40 +64,40 @@ func FuzzFilePathValidation(f *testing.F) {
 		"./relative/file.txt",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, path string) {
 		// Test path validation
 		isValid := validateFilePath(path)
 		_ = isValid
-		
+
 		// Test path sanitization
 		sanitized := sanitizeFilePath(path)
-		
+
 		// Verify sanitization removes dangerous elements
 		if strings.Contains(sanitized, "..") && isValid {
 			t.Error("Sanitized path contains directory traversal but was marked valid")
 		}
-		
+
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized path contains null bytes")
 		}
-		
+
 		// Test path normalization
 		normalized := normalizeFilePath(path)
 		if !utf8.ValidString(normalized) {
 			t.Error("Normalized path is not valid UTF-8")
 		}
-		
+
 		// Test secure path joining
 		securePath := secureJoinPath("/base", path)
 		if !strings.HasPrefix(securePath, "/base") && len(path) > 0 {
 			t.Error("Secure path join allowed escape from base directory")
 		}
-		
+
 		// Test file extension validation
 		ext := filepath.Ext(path)
 		isAllowedExt := validateFileExtension(ext)
@@ -114,18 +114,18 @@ func FuzzFileNameValidation(f *testing.F) {
 		"file.txt && malicious",
 		"$(whoami).txt",
 		"`id`.txt",
-		
+
 		// Script injection
 		"<script>alert(1)</script>.txt",
 		"file.php.txt",
 		"file.jsp.txt",
 		"file.asp.txt",
-		
+
 		// Reserved Windows names
 		"CON", "PRN", "AUX", "NUL",
 		"COM1", "COM2", "LPT1", "LPT2",
 		"con.txt", "prn.log",
-		
+
 		// Special characters
 		"file:name.txt",
 		"file*name.txt",
@@ -134,22 +134,22 @@ func FuzzFileNameValidation(f *testing.F) {
 		"file<name.txt",
 		"file>name.txt",
 		"file|name.txt",
-		
+
 		// Unicode filename attacks
-		"файл.txt", // Cyrillic
-		"文件.txt", // Chinese
+		"файл.txt",       // Cyrillic
+		"文件.txt",         // Chinese
 		"file\u202e.txt", // Right-to-left override
 		"file\ufeff.txt", // BOM
-		
+
 		// Long filenames
 		strings.Repeat("A", 255) + ".txt",
 		strings.Repeat("A", 1000) + ".txt",
-		
+
 		// Hidden files
 		".htaccess",
 		"..hidden",
 		"...hidden",
-		
+
 		// Valid filenames
 		"file.txt",
 		"document.pdf",
@@ -157,19 +157,19 @@ func FuzzFileNameValidation(f *testing.F) {
 		"data.json",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, filename string) {
 		// Test filename validation
 		isValid := validateFileName(filename)
 		_ = isValid
-		
+
 		// Test filename sanitization
 		sanitized := sanitizeFileName(filename)
-		
+
 		// Verify sanitization removes dangerous characters
 		dangerousChars := []string{"<", ">", ":", "\"", "|", "?", "*", "\x00"}
 		for _, char := range dangerousChars {
@@ -177,16 +177,16 @@ func FuzzFileNameValidation(f *testing.F) {
 				t.Errorf("Sanitized filename contains dangerous character: %s", char)
 			}
 		}
-		
+
 		// Test filename length validation
 		if len(sanitized) > 255 {
 			t.Error("Sanitized filename exceeds maximum length")
 		}
-		
+
 		// Test reserved name detection
 		isReserved := isReservedFileName(filename)
 		_ = isReserved
-		
+
 		// Test safe filename generation
 		safeFilename := generateSafeFileName(filename)
 		if !isValidSafeFileName(safeFilename) {
@@ -203,76 +203,76 @@ func FuzzFileContentValidation(f *testing.F) {
 		"<?php system($_GET['cmd']); ?>",
 		"<script>alert('xss')</script>",
 		"javascript:alert(1)",
-		
+
 		// Binary content
 		"\x7fELF", // ELF header
-		"MZ", // PE header
+		"MZ",      // PE header
 		"\x89PNG", // PNG header
-		"PK", // ZIP header
-		
+		"PK",      // ZIP header
+
 		// Command injection in content
 		"data; $(malicious)",
 		"data | cat /etc/passwd",
 		"data && rm -rf /",
-		
+
 		// SQL injection patterns
 		"'; DROP TABLE users; --",
 		"' OR '1'='1",
 		"UNION SELECT password FROM users",
-		
+
 		// XSS patterns
 		"<img src=x onerror=alert(1)>",
 		"javascript:alert(document.cookie)",
 		"data:text/html,<script>alert(1)</script>",
-		
+
 		// Path injection in content
 		"../../../etc/passwd",
 		"..\\..\\..\\windows\\system32\\config\\sam",
-		
+
 		// Large content (DoS)
 		strings.Repeat("A", 10000),
 		strings.Repeat("💀", 1000), // Unicode bomb
-		
+
 		// Null bytes
 		"data\x00malicious",
 		"\x00\x00\x00\x00",
-		
+
 		// Valid content
 		"Hello, world!",
 		"This is normal text content.",
 		"JSON: {\"key\": \"value\"}",
 		"",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, content string) {
 		// Test content validation
 		isValid := validateFileContent(content)
 		_ = isValid
-		
+
 		// Test content sanitization
 		sanitized := sanitizeFileContent(content)
-		
+
 		// Verify sanitization removes dangerous patterns
 		if strings.Contains(sanitized, "\x00") {
 			t.Error("Sanitized content contains null bytes")
 		}
-		
+
 		// Test content type detection
 		contentType := detectContentType(content)
 		if !isAllowedContentType(contentType) && isValid {
 			t.Error("Content marked as valid but has disallowed content type")
 		}
-		
+
 		// Test size validation
 		if len(content) > 0 {
 			isValidSize := validateContentSize(len(content))
 			_ = isValidSize
 		}
-		
+
 		// Test encoding validation
 		if !utf8.ValidString(content) {
 			// Binary content should be handled differently
@@ -291,52 +291,52 @@ func FuzzFileUpload(f *testing.F) {
 		"payload.sh",
 		"virus.scr",
 		"trojan.pif",
-		
+
 		// Double extensions
 		"image.jpg.exe",
 		"document.pdf.bat",
 		"archive.zip.sh",
-		
+
 		// Null byte attacks
 		"image.jpg\x00.exe",
 		"safe.txt\x00malicious.sh",
-		
+
 		// MIME type spoofing
 		"script.exe", // Would need MIME validation
 		"image.php",
 		"document.jsp",
-		
+
 		// Archive attacks
 		"../../exploit.zip",
 		"zipbomb.zip",
-		
+
 		// Valid uploads
 		"image.jpg",
 		"document.pdf",
 		"archive.zip",
 		"text.txt",
 	}
-	
+
 	for _, seed := range seeds {
 		f.Add(seed)
 	}
-	
+
 	f.Fuzz(func(t *testing.T, filename string) {
 		// Test upload validation
 		isValidUpload := validateFileUpload(filename)
 		_ = isValidUpload
-		
+
 		// Test extension whitelist
 		ext := strings.ToLower(filepath.Ext(filename))
 		isAllowedExt := isAllowedUploadExtension(ext)
 		_ = isAllowedExt
-		
+
 		// Test filename in upload context
 		uploadPath := generateUploadPath(filename)
 		if !isSecureUploadPath(uploadPath) {
 			t.Error("Generated upload path is not secure")
 		}
-		
+
 		// Test quarantine filename generation
 		quarantineName := generateQuarantineName(filename)
 		if !isValidQuarantineName(quarantineName) {
@@ -389,7 +389,7 @@ func validateFileName(filename string) bool {
 	if len(filename) == 0 || len(filename) > 255 {
 		return false
 	}
-	
+
 	// Check for dangerous characters
 	dangerousChars := []string{"<", ">", ":", "\"", "|", "?", "*", "\x00"}
 	for _, char := range dangerousChars {
@@ -397,7 +397,7 @@ func validateFileName(filename string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -407,16 +407,16 @@ func sanitizeFileName(filename string) string {
 		"<": "", ">": "", ":": "", "\"": "", "|": "",
 		"?": "", "*": "", "\x00": "", "/": "_", "\\": "_",
 	}
-	
+
 	for old, new := range dangerousChars {
 		filename = strings.ReplaceAll(filename, old, new)
 	}
-	
+
 	// Limit length
 	if len(filename) > 255 {
 		filename = filename[:255]
 	}
-	
+
 	return filename
 }
 

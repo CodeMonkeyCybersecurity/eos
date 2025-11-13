@@ -36,24 +36,24 @@ type IPAllocation struct {
 
 // VMPool represents a pool of VMs for orchestration
 type VMPool struct {
-	Name         string   `json:"name"`
-	MinSize      int      `json:"min_size"`
-	MaxSize      int      `json:"max_size"`
-	CurrentSize  int      `json:"current_size"`
-	VMTemplate   string   `json:"vm_template"`
-	Tags         []string `json:"tags"`
+	Name         string        `json:"name"`
+	MinSize      int           `json:"min_size"`
+	MaxSize      int           `json:"max_size"`
+	CurrentSize  int           `json:"current_size"`
+	VMTemplate   string        `json:"vm_template"`
+	Tags         []string      `json:"tags"`
 	ScalingRules *ScalingRules `json:"scaling_rules,omitempty"`
 }
 
 // ScalingRules for VM pool management
 type ScalingRules struct {
-	CPUThresholdUp    float64 `json:"cpu_threshold_up"`
-	CPUThresholdDown  float64 `json:"cpu_threshold_down"`
-	MemThresholdUp    float64 `json:"mem_threshold_up"`
-	MemThresholdDown  float64 `json:"mem_threshold_down"`
-	ScaleUpIncrement  int     `json:"scale_up_increment"`
-	ScaleDownDecrement int    `json:"scale_down_decrement"`
-	CooldownPeriod    time.Duration `json:"cooldown_period"`
+	CPUThresholdUp     float64       `json:"cpu_threshold_up"`
+	CPUThresholdDown   float64       `json:"cpu_threshold_down"`
+	MemThresholdUp     float64       `json:"mem_threshold_up"`
+	MemThresholdDown   float64       `json:"mem_threshold_down"`
+	ScaleUpIncrement   int           `json:"scale_up_increment"`
+	ScaleDownDecrement int           `json:"scale_down_decrement"`
+	CooldownPeriod     time.Duration `json:"cooldown_period"`
 }
 
 // NomadVMJob represents a Nomad job for VM workloads
@@ -77,21 +77,21 @@ type Constraint struct {
 
 // OrchestratedVM represents a VM managed by Consul and Nomad
 type OrchestratedVM struct {
-	Name           string            `json:"name"`
-	IPAddress      string            `json:"ip_address"`
-	ConsulServiceID string           `json:"consul_service_id"`
-	NomadJobID     string            `json:"nomad_job_id,omitempty"`
-	State          string            `json:"state"`
-	Health         string            `json:"health"`
-	CreatedAt      time.Time         `json:"created_at"`
-	LastHealthCheck time.Time        `json:"last_health_check"`
-	Meta           map[string]string `json:"meta"`
+	Name            string            `json:"name"`
+	IPAddress       string            `json:"ip_address"`
+	ConsulServiceID string            `json:"consul_service_id"`
+	NomadJobID      string            `json:"nomad_job_id,omitempty"`
+	State           string            `json:"state"`
+	Health          string            `json:"health"`
+	CreatedAt       time.Time         `json:"created_at"`
+	LastHealthCheck time.Time         `json:"last_health_check"`
+	Meta            map[string]string `json:"meta"`
 }
 
 // IPRange represents a range of IPs for allocation
 type IPRange struct {
-	Network string   `json:"network"` // e.g., "192.168.122.0/24"
-	Start   string   `json:"start"`   // e.g., "192.168.122.100"
-	End     string   `json:"end"`     // e.g., "192.168.122.200"
+	Network  string   `json:"network"`  // e.g., "192.168.122.0/24"
+	Start    string   `json:"start"`    // e.g., "192.168.122.100"
+	End      string   `json:"end"`      // e.g., "192.168.122.200"
 	Reserved []string `json:"reserved"` // IPs to never allocate
 }

@@ -34,12 +34,12 @@ func GetDatabaseStatus(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Data
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// EVALUATE
 		logger.Info("Database status retrieved successfully",
 			zap.String("status", status.Status),
 			zap.String("version", status.Version))
-		
+
 		return status, nil
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", config.Type)
@@ -49,7 +49,7 @@ func GetDatabaseStatus(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Data
 // ExecuteQuery executes a database query following Assess → Intervene → Evaluate pattern
 func ExecuteQuery(rc *eos_io.RuntimeContext, config *DatabaseConfig, operation *DatabaseOperation) (*DatabaseOperationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	start := time.Now()
 	logger.Info("Assessing query execution request",
@@ -70,7 +70,7 @@ func ExecuteQuery(rc *eos_io.RuntimeContext, config *DatabaseConfig, operation *
 	}
 
 	// INTERVENE
-	logger.Info("Executing database query", 
+	logger.Info("Executing database query",
 		zap.String("database", config.Database),
 		zap.String("type", operation.Type))
 
@@ -109,7 +109,7 @@ func ExecuteQuery(rc *eos_io.RuntimeContext, config *DatabaseConfig, operation *
 // GetSchemaInfo retrieves database schema information following Assess → Intervene → Evaluate pattern
 func GetSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*SchemaInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing schema info request", zap.String("database", config.Database))
 
@@ -122,12 +122,12 @@ func GetSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*SchemaIn
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// EVALUATE
 		logger.Info("Schema information retrieved successfully",
 			zap.Int("table_count", len(schemaInfo.Tables)),
 			zap.Int("view_count", len(schemaInfo.Views)))
-		
+
 		return schemaInfo, nil
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", config.Type)
@@ -137,7 +137,7 @@ func GetSchemaInfo(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*SchemaIn
 // PerformHealthCheck performs a database health check following Assess → Intervene → Evaluate pattern
 func PerformHealthCheck(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*DatabaseHealthCheck, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing health check request", zap.String("database", config.Database))
 
@@ -193,7 +193,7 @@ func PerformHealthCheck(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Dat
 			healthCheck.Healthy = false
 		}
 	}
-	
+
 	logger.Info("Health check completed",
 		zap.Bool("healthy", healthCheck.Healthy),
 		zap.Duration("response_time", healthCheck.ResponseTime))
@@ -204,7 +204,7 @@ func PerformHealthCheck(rc *eos_io.RuntimeContext, config *DatabaseConfig) (*Dat
 // SetupVaultPostgreSQL sets up Vault dynamic PostgreSQL credentials following Assess → Intervene → Evaluate pattern
 func SetupVaultPostgreSQL(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing Vault PostgreSQL setup",
 		zap.String("connection_name", options.ConnectionName),
@@ -243,7 +243,7 @@ func SetupVaultPostgreSQL(rc *eos_io.RuntimeContext, options *VaultSetupOptions)
 // GenerateCredentials generates dynamic database credentials following Assess → Intervene → Evaluate pattern
 func GenerateCredentials(rc *eos_io.RuntimeContext, options *VaultOperationOptions) (*DatabaseCredential, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing credential generation request",
 		zap.String("role", options.RoleName),
@@ -268,7 +268,7 @@ func GenerateCredentials(rc *eos_io.RuntimeContext, options *VaultOperationOptio
 // RevokeCredentials revokes dynamic database credentials following Assess → Intervene → Evaluate pattern
 func RevokeCredentials(rc *eos_io.RuntimeContext, leaseID string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing credential revocation request", zap.String("lease_id", leaseID))
 
@@ -304,7 +304,7 @@ func connect(config *DatabaseConfig) (*sql.DB, error) {
 func connectPostgreSQL(config *DatabaseConfig) (*sql.DB, error) {
 	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		config.Host, config.Port, config.Username, config.Password, config.Database, config.SSLMode)
-	
+
 	return sql.Open("postgres", connStr)
 }
 
@@ -580,4 +580,3 @@ func executeVaultCommand(rc *eos_io.RuntimeContext, cmd []string) error {
 	// Implementation would execute vault CLI commands
 	return nil
 }
-

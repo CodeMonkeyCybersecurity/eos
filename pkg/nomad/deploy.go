@@ -449,7 +449,7 @@ telemetry {
 	}
 
 	// Write configuration file
-	if err := os.WriteFile(config.ConfigPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(config.ConfigPath, []byte(configContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Nomad configuration: %w", err)
 	}
 

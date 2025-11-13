@@ -6,8 +6,8 @@ import (
 
 // Builder handles various types of build operations
 type Builder struct {
-	workDir   string
-	hugoPath  string
+	workDir    string
+	hugoPath   string
 	dockerPath string
 }
 
@@ -51,20 +51,20 @@ type HugoBuildOptions struct {
 
 // DockerBuildOptions contains Docker-specific build options
 type DockerBuildOptions struct {
-	Dockerfile    string            `json:"dockerfile"`
-	Context       string            `json:"context"`
-	Registry      string            `json:"registry"`
-	Repository    string            `json:"repository"`
-	Tags          []string          `json:"tags"`
-	BuildArgs     map[string]string `json:"build_args"`
-	Labels        map[string]string `json:"labels"`
-	Target        string            `json:"target"`
-	NoCache       bool              `json:"no_cache"`
-	Pull          bool              `json:"pull"`
-	Squash        bool              `json:"squash"`
-	Platform      string            `json:"platform"`
-	SecurityOpt   []string          `json:"security_opt"`
-	ExtraArgs     []string          `json:"extra_args"`
+	Dockerfile  string            `json:"dockerfile"`
+	Context     string            `json:"context"`
+	Registry    string            `json:"registry"`
+	Repository  string            `json:"repository"`
+	Tags        []string          `json:"tags"`
+	BuildArgs   map[string]string `json:"build_args"`
+	Labels      map[string]string `json:"labels"`
+	Target      string            `json:"target"`
+	NoCache     bool              `json:"no_cache"`
+	Pull        bool              `json:"pull"`
+	Squash      bool              `json:"squash"`
+	Platform    string            `json:"platform"`
+	SecurityOpt []string          `json:"security_opt"`
+	ExtraArgs   []string          `json:"extra_args"`
 }
 
 // BuildMetrics contains build performance metrics
@@ -93,11 +93,11 @@ type BuildValidation struct {
 
 // SecurityScanResult contains results from security scanning
 type SecurityScanResult struct {
-	Scanner        string              `json:"scanner"`
-	ScanTime       time.Time           `json:"scan_time"`
+	Scanner         string              `json:"scanner"`
+	ScanTime        time.Time           `json:"scan_time"`
 	Vulnerabilities []VulnerabilityInfo `json:"vulnerabilities"`
-	Passed         bool                `json:"passed"`
-	ReportPath     string              `json:"report_path"`
+	Passed          bool                `json:"passed"`
+	ReportPath      string              `json:"report_path"`
 }
 
 // VulnerabilityInfo contains information about a detected vulnerability
@@ -120,13 +120,13 @@ type LintResult struct {
 
 // LintIssue represents a single linting issue
 type LintIssue struct {
-	File        string `json:"file"`
-	Line        int    `json:"line"`
-	Column      int    `json:"column"`
-	Severity    string `json:"severity"`
-	Rule        string `json:"rule"`
-	Message     string `json:"message"`
-	Suggestion  string `json:"suggestion,omitempty"`
+	File       string `json:"file"`
+	Line       int    `json:"line"`
+	Column     int    `json:"column"`
+	Severity   string `json:"severity"`
+	Rule       string `json:"rule"`
+	Message    string `json:"message"`
+	Suggestion string `json:"suggestion,omitempty"`
 }
 
 // BuildError represents an error during the build process
@@ -183,11 +183,11 @@ type BuildCache struct {
 
 // BuildNotification contains notification settings for build events
 type BuildNotification struct {
-	Enabled       bool                   `json:"enabled"`
-	Channels      []NotificationChannel  `json:"channels"`
-	Events        []BuildEvent           `json:"events"`
-	Templates     map[string]string      `json:"templates"`
-	Recipients    []string               `json:"recipients"`
+	Enabled    bool                  `json:"enabled"`
+	Channels   []NotificationChannel `json:"channels"`
+	Events     []BuildEvent          `json:"events"`
+	Templates  map[string]string     `json:"templates"`
+	Recipients []string              `json:"recipients"`
 }
 
 // NotificationChannel represents a notification delivery channel
@@ -218,7 +218,7 @@ func DefaultHugoBuildOptions() *HugoBuildOptions {
 		Draft:          false,
 		Future:         false,
 		Expired:        false,
-		EnvVars:        map[string]string{
+		EnvVars: map[string]string{
 			"HUGO_ENV": "production",
 		},
 	}

@@ -40,8 +40,9 @@ type BootstrapPassword struct {
 // - Post-write validation (structure correctness)
 //
 // Example:
-//   kv := NewEosKVv2Store(client, "secret", log)
-//   err := WriteBootstrapPassword(ctx, kv, password, log)
+//
+//	kv := NewEosKVv2Store(client, "secret", log)
+//	err := WriteBootstrapPassword(ctx, kv, password, log)
 func WriteBootstrapPassword(ctx context.Context, kv *EosKVv2Store, password string, log *zap.Logger) error {
 	log.Info(" [INTERVENE] Writing bootstrap password to Vault KV",
 		zap.String("path", "secret/eos/bootstrap"))
@@ -57,10 +58,10 @@ func WriteBootstrapPassword(ctx context.Context, kv *EosKVv2Store, password stri
 
 	bootstrapData := map[string]interface{}{
 		vaultpaths.UserpassBootstrapPasswordKVField: password,
-		"created_at":  time.Now().UTC().Format(time.RFC3339),
-		"purpose":     "initial-setup-verification",
-		"lifecycle":   "ephemeral - deleted after first use",
-		"created_by":  "eos-phase-10a",
+		"created_at": time.Now().UTC().Format(time.RFC3339),
+		"purpose":    "initial-setup-verification",
+		"lifecycle":  "ephemeral - deleted after first use",
+		"created_by": "eos-phase-10a",
 	}
 
 	// INTERVENE: Put() includes automatic write-then-verify
@@ -89,13 +90,14 @@ func WriteBootstrapPassword(ctx context.Context, kv *EosKVv2Store, password stri
 // Returns ErrBootstrapPasswordInvalidStructure if the secret exists but is malformed
 //
 // Example:
-//   kv := NewEosKVv2Store(client, "secret", log)
-//   bootstrapPass, err := GetBootstrapPassword(ctx, kv, log)
-//   if err != nil {
-//       // Error includes decision tree with recovery commands
-//       return nil, err
-//   }
-//   password := bootstrapPass.Password
+//
+//	kv := NewEosKVv2Store(client, "secret", log)
+//	bootstrapPass, err := GetBootstrapPassword(ctx, kv, log)
+//	if err != nil {
+//	    // Error includes decision tree with recovery commands
+//	    return nil, err
+//	}
+//	password := bootstrapPass.Password
 func GetBootstrapPassword(ctx context.Context, kv *EosKVv2Store, log *zap.Logger) (*BootstrapPassword, error) {
 	log.Info(" [ASSESS] Reading bootstrap password from Vault KV",
 		zap.String("path", "secret/eos/bootstrap"))

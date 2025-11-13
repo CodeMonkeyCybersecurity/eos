@@ -11,7 +11,7 @@ import (
 
 // BuildOrchestrator manages building multiple components with dependency resolution
 type BuildOrchestrator struct {
-	config         *OrchestratorConfig
+	config          *OrchestratorConfig
 	dependencyGraph *DependencyGraph
 }
 
@@ -114,7 +114,7 @@ func (bo *BuildOrchestrator) BuildAll(rc *eos_io.RuntimeContext, components []*C
 	if bo.config.Parallel {
 		// Build in parallel batches respecting dependencies
 		batches := bo.createBuildBatches(components)
-		
+
 		for i, batch := range batches {
 			logger.Info("Building batch",
 				zap.Int("batch_index", i+1),
@@ -132,9 +132,9 @@ func (bo *BuildOrchestrator) BuildAll(rc *eos_io.RuntimeContext, components []*C
 		for _, component := range components {
 			result, err := bo.buildComponent(rc, component)
 			results = append(results, result)
-			
+
 			if err != nil && !bo.config.ContinueOnError {
-				logger.Error("Component build failed, stopping", 
+				logger.Error("Component build failed, stopping",
 					zap.String("component", component.Name),
 					zap.Error(err))
 				return results, err
@@ -171,7 +171,7 @@ func (bo *BuildOrchestrator) buildBatch(rc *eos_io.RuntimeContext, batch *BuildB
 				zap.Int("batch", batch.BatchIndex))
 
 			result, err := bo.buildComponent(rc, comp)
-			
+
 			resultsChan <- result
 			if err != nil {
 				errorsChan <- err
@@ -334,7 +334,7 @@ func (bo *BuildOrchestrator) topologicalSort(components []*Component) ([]*Compon
 		}
 
 		inProgress[name] = true
-		
+
 		// Visit dependencies first
 		for _, dep := range bo.dependencyGraph.edges[name] {
 			if err := visit(dep); err != nil {
@@ -344,7 +344,7 @@ func (bo *BuildOrchestrator) topologicalSort(components []*Component) ([]*Compon
 
 		inProgress[name] = false
 		visited[name] = true
-		
+
 		// Add to sorted list
 		if component := bo.dependencyGraph.nodes[name]; component != nil {
 			sorted = append(sorted, component)
@@ -367,17 +367,17 @@ func (bo *BuildOrchestrator) topologicalSort(components []*Component) ([]*Compon
 func (bo *BuildOrchestrator) createBuildBatches(components []*Component) []*BuildBatch {
 	var batches []*BuildBatch
 	processed := make(map[string]bool)
-	
+
 	batchIndex := 0
 	for len(processed) < len(components) {
 		var batchComponents []*Component
-		
+
 		// Find components whose dependencies are all processed
 		for _, component := range components {
 			if processed[component.Name] {
 				continue
 			}
-			
+
 			canBuild := true
 			for _, dep := range component.Dependencies {
 				if !processed[dep] {
@@ -385,13 +385,13 @@ func (bo *BuildOrchestrator) createBuildBatches(components []*Component) []*Buil
 					break
 				}
 			}
-			
+
 			if canBuild {
 				batchComponents = append(batchComponents, component)
 				processed[component.Name] = true
 			}
 		}
-		
+
 		if len(batchComponents) > 0 {
 			batches = append(batches, &BuildBatch{
 				Components: batchComponents,
@@ -403,7 +403,7 @@ func (bo *BuildOrchestrator) createBuildBatches(components []*Component) []*Buil
 			break
 		}
 	}
-	
+
 	return batches
 }
 

@@ -113,7 +113,7 @@ func (bi *BinaryInstaller) Install(version string) error {
 
 	// Create temporary directory
 	tmpDir := "/tmp/consul-install"
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := os.MkdirAll(tmpDir, consul.ConsulTempDirPerm); err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
@@ -303,7 +303,7 @@ func (ci *ConsulInstaller) installViaBinary() error {
 	}
 
 	// Set permissions
-	if err := os.Chmod(consul.ConsulBinaryPath, 0755); err != nil {
+	if err := os.Chmod(consul.ConsulBinaryPath, consul.ConsulBinaryPerm); err != nil {
 		return fmt.Errorf("failed to set permissions: %w", err)
 	}
 
@@ -431,4 +431,3 @@ func getUbuntuCodename() (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
-

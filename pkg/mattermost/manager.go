@@ -25,7 +25,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 	if config.NomadAddr != "" {
 		nomadConfig.Address = config.NomadAddr
 	}
-	
+
 	nomadClient, err := api.NewClient(nomadConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
@@ -36,7 +36,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 	if config.VaultAddr != "" {
 		vaultConfig := vault.DefaultConfig()
 		vaultConfig.Address = config.VaultAddr
-		
+
 		vaultClient, err = vault.NewClient(vaultConfig)
 		if err != nil {
 			logger.Warn("Failed to create Vault client, continuing without Vault", zap.Error(err))
@@ -56,7 +56,7 @@ func NewManager(rc *eos_io.RuntimeContext, config *Config) (*Manager, error) {
 // Deploy executes the complete Mattermost deployment process
 func (m *Manager) Deploy(ctx context.Context) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Starting Mattermost deployment",
 		zap.String("environment", m.config.Environment),
 		zap.String("datacenter", m.config.Datacenter),
@@ -66,46 +66,46 @@ func (m *Manager) Deploy(ctx context.Context) error {
 	// Define deployment steps following Assess → Intervene → Evaluate pattern
 	steps := []DeploymentStep{
 		{
-			Name:        "prerequisites",
-			Description: "Check system prerequisites and dependencies",
-			AssessFunc:  m.assessPrerequisites,
+			Name:          "prerequisites",
+			Description:   "Check system prerequisites and dependencies",
+			AssessFunc:    m.assessPrerequisites,
 			InterventFunc: m.ensurePrerequisites,
-			EvaluateFunc: m.evaluatePrerequisites,
+			EvaluateFunc:  m.evaluatePrerequisites,
 		},
 		{
-			Name:        "secrets",
-			Description: "Generate and store secrets",
-			AssessFunc:  m.assessSecrets,
+			Name:          "secrets",
+			Description:   "Generate and store secrets",
+			AssessFunc:    m.assessSecrets,
 			InterventFunc: m.generateSecrets,
-			EvaluateFunc: m.evaluateSecrets,
+			EvaluateFunc:  m.evaluateSecrets,
 		},
 		{
-			Name:        "infrastructure",
-			Description: "Deploy supporting infrastructure (PostgreSQL)",
-			AssessFunc:  m.assessInfrastructure,
+			Name:          "infrastructure",
+			Description:   "Deploy supporting infrastructure (PostgreSQL)",
+			AssessFunc:    m.assessInfrastructure,
 			InterventFunc: m.deployInfrastructure,
-			EvaluateFunc: m.evaluateInfrastructure,
+			EvaluateFunc:  m.evaluateInfrastructure,
 		},
 		{
-			Name:        "mattermost_service",
-			Description: "Deploy Mattermost application service",
-			AssessFunc:  m.assessMattermostService,
+			Name:          "mattermost_service",
+			Description:   "Deploy Mattermost application service",
+			AssessFunc:    m.assessMattermostService,
 			InterventFunc: m.deployMattermostService,
-			EvaluateFunc: m.evaluateMattermostService,
+			EvaluateFunc:  m.evaluateMattermostService,
 		},
 		{
-			Name:        "nginx_proxy",
-			Description: "Configure nginx reverse proxy",
-			AssessFunc:  m.assessNginxProxy,
+			Name:          "nginx_proxy",
+			Description:   "Configure nginx reverse proxy",
+			AssessFunc:    m.assessNginxProxy,
 			InterventFunc: m.deployNginxProxy,
-			EvaluateFunc: m.evaluateNginxProxy,
+			EvaluateFunc:  m.evaluateNginxProxy,
 		},
 	}
 
 	// Execute each step
 	for _, step := range steps {
 		logger.Info("Executing deployment step", zap.String("step", step.Name))
-		
+
 		// Assess
 		if err := step.AssessFunc(ctx, m); err != nil {
 			return fmt.Errorf("assessment failed for step %s: %w", step.Name, err)
@@ -136,75 +136,75 @@ func (m *Manager) Deploy(ctx context.Context) error {
 func (m *Manager) assessPrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing prerequisites")
-	
+
 	// Check Nomad connectivity
 	_, err := m.nomadClient.Status().Leader()
 	if err != nil {
 		return fmt.Errorf("cannot connect to Nomad: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing secrets")
-	
+
 	// Check if required secrets exist
 	if m.config.PostgresPassword == "" || m.config.FilePublicKey == "" {
 		return fmt.Errorf("required secrets not configured")
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing infrastructure")
-	
+
 	// Check if PostgreSQL job exists
 	jobs, _, err := m.nomadClient.Jobs().List(&api.QueryOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list jobs: %w", err)
 	}
-	
+
 	hasPostgres := false
-	
+
 	for _, job := range jobs {
 		if job.Name == "mattermost-postgres" {
 			hasPostgres = true
 		}
 	}
-	
+
 	if !hasPostgres {
 		logger.Info("PostgreSQL service needs deployment", zap.Bool("postgres_exists", hasPostgres))
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessMattermostService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing Mattermost service")
-	
+
 	// Check if Mattermost job exists and is running
 	job, _, err := m.nomadClient.Jobs().Info("mattermost", &api.QueryOptions{})
 	if err != nil {
 		// Job doesn't exist, needs deployment
 		return nil
 	}
-	
+
 	if job.Status == nil || *job.Status != "running" {
 		logger.Info("Mattermost service exists but not running", zap.String("status", *job.Status))
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) assessNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Assessing nginx proxy")
-	
+
 	// Check if nginx proxy configuration exists
 	return nil
 }
@@ -213,7 +213,7 @@ func (m *Manager) assessNginxProxy(ctx context.Context, mgr *Manager) error {
 func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Ensuring prerequisites")
-	
+
 	// Prerequisites are already checked in assess phase
 	return nil
 }
@@ -221,7 +221,7 @@ func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 func (m *Manager) generateSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Generating secrets")
-	
+
 	// Secrets are already provided in config
 	// In a real implementation, this would generate missing secrets
 	return nil
@@ -230,14 +230,14 @@ func (m *Manager) generateSecrets(ctx context.Context, mgr *Manager) error {
 func (m *Manager) deployInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying infrastructure services")
-	
+
 	// Deploy PostgreSQL job
 	postgresJob := m.createPostgresJob()
 	_, _, err := m.nomadClient.Jobs().Register(postgresJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy PostgreSQL: %w", err)
 	}
-	
+
 	// Register services with Consul
 	if err := m.registerConsulServices(ctx); err != nil {
 		return fmt.Errorf("failed to register consul services: %w", err)
@@ -247,40 +247,40 @@ func (m *Manager) deployInfrastructure(ctx context.Context, mgr *Manager) error 
 	if err := m.configureReverseProxy(ctx); err != nil {
 		return fmt.Errorf("failed to configure reverse proxy: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) deployMattermostService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying Mattermost service")
-	
+
 	// Deploy Mattermost job
 	mattermostJob := m.createMattermostJob()
 	_, _, err := m.nomadClient.Jobs().Register(mattermostJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy Mattermost: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) deployNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Info("Deploying local nginx proxy (Layer 2 - Backend)")
-	
+
 	// Deploy local nginx proxy job
 	nginxJob := m.createNginxJob()
 	_, _, err := m.nomadClient.Jobs().Register(nginxJob, &api.WriteOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to deploy local nginx proxy: %w", err)
 	}
-	
+
 	// Register route with Hecate frontend (Layer 1 - Cloud)
 	if err := m.registerHecateRoute(ctx); err != nil {
 		return fmt.Errorf("failed to register Hecate route: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -288,7 +288,7 @@ func (m *Manager) deployNginxProxy(ctx context.Context, mgr *Manager) error {
 func (m *Manager) evaluatePrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating prerequisites")
-	
+
 	// Re-check Nomad connectivity
 	return m.assessPrerequisites(ctx, mgr)
 }
@@ -296,7 +296,7 @@ func (m *Manager) evaluatePrerequisites(ctx context.Context, mgr *Manager) error
 func (m *Manager) evaluateSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating secrets")
-	
+
 	// Verify all required secrets are available
 	return m.assessSecrets(ctx, mgr)
 }
@@ -304,50 +304,50 @@ func (m *Manager) evaluateSecrets(ctx context.Context, mgr *Manager) error {
 func (m *Manager) evaluateInfrastructure(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating infrastructure")
-	
+
 	// Check that infrastructure services are running
 	jobs := []string{"mattermost-postgres"}
-	
+
 	for _, jobName := range jobs {
 		job, _, err := m.nomadClient.Jobs().Info(jobName, &api.QueryOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get job info for %s: %w", jobName, err)
 		}
-		
+
 		if job.Status == nil || *job.Status != "running" {
 			return fmt.Errorf("job %s is not running: %s", jobName, *job.Status)
 		}
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) evaluateMattermostService(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating Mattermost service")
-	
+
 	// Check that Mattermost service is running
 	job, _, err := m.nomadClient.Jobs().Info("mattermost", &api.QueryOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get Mattermost job info: %w", err)
 	}
-	
+
 	if job.Status == nil || *job.Status != "running" {
 		return fmt.Errorf("Mattermost job is not running: %s", *job.Status)
 	}
-	
+
 	return nil
 }
 
 func (m *Manager) evaluateNginxProxy(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("Evaluating Hecate route registration")
-	
+
 	// Check that route was registered successfully
 	logger.Info("Hecate route registration completed",
 		zap.String("domain", m.config.Domain),
 		zap.Int("backend_port", m.config.Port))
-	
+
 	return nil
 }
 
@@ -367,7 +367,7 @@ func (m *Manager) registerHecateRoute(ctx context.Context) error {
 	logger.Info("Registering Mattermost route with Hecate frontend (Layer 1 - Cloud)",
 		zap.String("domain", m.config.Domain),
 		zap.String("local_nginx", "mattermost-nginx.service.consul:80"))
-	
+
 	// Two-layer architecture:
 	// Layer 1 (Cloud): Hetzner Caddy + Authentik → Layer 2 (Local): nginx → Mattermost service
 	//
@@ -376,12 +376,12 @@ func (m *Manager) registerHecateRoute(ctx context.Context) error {
 	// 2. Create a Route struct pointing to LOCAL nginx container (not directly to Mattermost)
 	// 3. Call hecate.CreateRoute() to register with Caddy/Authentik in Hetzner Cloud
 	// 4. Configure DNS via Hetzner provider
-	
+
 	logger.Info("Mattermost route registered with Hecate frontend successfully",
 		zap.String("domain", m.config.Domain),
 		zap.String("architecture", "two-layer"),
 		zap.String("frontend", "hetzner-caddy-authentik"),
 		zap.String("backend", "local-nginx-mattermost"))
-	
+
 	return nil
 }

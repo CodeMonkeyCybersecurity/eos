@@ -23,7 +23,7 @@ func FuzzLoadServicesFromFile(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, jsonContent string) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		// Create temporary file with fuzz content
 		tmpFile, err := os.CreateTemp("", "services_fuzz_*.json")
 		if err != nil {
@@ -65,7 +65,7 @@ func FuzzLoadSystemStateFromFile(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, jsonContent string) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		// Create temporary file with fuzz content
 		tmpFile, err := os.CreateTemp("", "state_fuzz_*.json")
 		if err != nil {
@@ -154,7 +154,7 @@ func FuzzJSONStructures(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, jsonContent string) {
 		var state SystemState
-		
+
 		// Test JSON unmarshaling with fuzzed content
 		defer func() {
 			if r := recover(); r != nil {

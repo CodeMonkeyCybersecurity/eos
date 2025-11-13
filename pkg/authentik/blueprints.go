@@ -6,6 +6,7 @@
 package authentik
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -43,7 +44,7 @@ func (c *Client) ExportBlueprint(ctx context.Context, outputPath string) error {
 	}
 
 	// Write blueprint output directly to host file
-	if err := os.WriteFile(outputPath, output, 0600); err != nil {
+	if err := os.WriteFile(outputPath, output, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write blueprint to %s: %w", outputPath, err)
 	}
 
@@ -95,7 +96,7 @@ func ExportBlueprintToDirectory(rc *eos_io.RuntimeContext, outputDir string) (st
 	}
 
 	// Write blueprint output directly to host file
-	if err := os.WriteFile(blueprintPath, output, 0600); err != nil {
+	if err := os.WriteFile(blueprintPath, output, shared.SecretFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write blueprint to %s: %w", blueprintPath, err)
 	}
 

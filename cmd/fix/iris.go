@@ -2,6 +2,7 @@
 package fix
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -371,7 +372,7 @@ func fixTemporalPath(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write to destination with correct permissions
-	if err := os.WriteFile(targetPath, sourceData, 0755); err != nil {
+	if err := os.WriteFile(targetPath, sourceData, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write binary to %s: %w", targetPath, err)
 	}
 
@@ -416,7 +417,7 @@ WantedBy=multi-user.target
 `
 
 		temporalServicePath := "/etc/systemd/system/temporal.service"
-		if err := os.WriteFile(temporalServicePath, []byte(temporalService), 0644); err != nil {
+		if err := os.WriteFile(temporalServicePath, []byte(temporalService), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to write temporal service: %w", err)
 		}
 
@@ -478,7 +479,7 @@ func fixIrisStructure(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create %s: %w", dir, err)
 		}
 		logger.Info("Created directory", zap.String("path", dir))

@@ -498,7 +498,7 @@ AZURE_OPENAI_API_KEY=
 
 	// Create .env file with secure permissions (0640)
 	envFilePath := fallbackDir + "/.env.azure_openai"
-	if err := os.WriteFile(envFilePath, []byte(envContent), 0640); err != nil {
+	if err := os.WriteFile(envFilePath, []byte(envContent), shared.SecureConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to create fallback .env file: %w", err)
 	}
 

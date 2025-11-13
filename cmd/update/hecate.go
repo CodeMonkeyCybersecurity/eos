@@ -78,6 +78,12 @@ Examples:
     --dns chat.codemonkey.ai \
     --upstream 100.64.0.50
 
+  # Add Moni with OIDC authentication and custom admin group
+  eos update hecate --add moni \
+    --dns chat.codemonkey.net.au \
+    --upstream http://localhost:8080 \
+    --admin-group moni-admin
+
   # Add service with custom port
   eos update hecate --add bionicgpt \
     --dns chat.codemonkey.ai \
@@ -228,6 +234,7 @@ func init() {
 	// Optional flags for --add
 	updateHecateCmd.Flags().Bool("sso", false, "Enable SSO for this route (NOTE: BionicGPT always uses Authentik forward auth regardless of this flag)")
 	updateHecateCmd.Flags().String("sso-provider", "authentik", "SSO provider to use (default: authentik)")
+	updateHecateCmd.Flags().String("admin-group", "", "Admin group name for authorization (used with --add moni, default: moni-admin)")
 	updateHecateCmd.Flags().StringSlice("custom-directive", []string{}, "Custom Caddy directives (can specify multiple times)")
 	updateHecateCmd.Flags().Bool("dry-run", false, "Show what would be changed without applying")
 	updateHecateCmd.Flags().Bool("skip-dns-check", false, "Skip DNS resolution validation")
@@ -253,6 +260,7 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 	upstream, _ := cmd.Flags().GetString("upstream")
 	sso, _ := cmd.Flags().GetBool("sso")
 	ssoProvider, _ := cmd.Flags().GetString("sso-provider")
+	adminGroup, _ := cmd.Flags().GetString("admin-group")
 	customDirectives, _ := cmd.Flags().GetStringSlice("custom-directive")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	skipDNSCheck, _ := cmd.Flags().GetBool("skip-dns-check")
@@ -287,6 +295,7 @@ func runAddServiceFromFlag(rc *eos_io.RuntimeContext, cmd *cobra.Command, servic
 		Backend:             backendWithPort,
 		SSO:                 ssoEnabled, // Auto-enabled for services that require it
 		SSOProvider:         ssoProvider,
+		AdminGroup:          adminGroup, // Admin group for authorization (Moni)
 		CustomDirectives:    customDirectives,
 		DryRun:              dryRun,
 		SkipDNSCheck:        skipDNSCheck,

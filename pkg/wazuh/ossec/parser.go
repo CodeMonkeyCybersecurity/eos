@@ -3,6 +3,7 @@
 package ossec
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"regexp"
@@ -23,7 +24,7 @@ func ReadConfigFile(path string) ([]byte, error) {
 func WriteConfigFile(rc *eos_io.RuntimeContext, path string, content []byte) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	if err := os.WriteFile(path, content, 0640); err != nil {
+	if err := os.WriteFile(path, content, shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ossec.conf: %w", err)
 	}
 

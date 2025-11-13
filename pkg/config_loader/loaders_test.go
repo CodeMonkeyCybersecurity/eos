@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -275,24 +275,24 @@ func TestLoadSystemStateFromFile(t *testing.T) {
 
 func TestFileNotFound(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	nonExistentFile := "/tmp/non_existent_file_12345.json"
-	
+
 	t.Run("LoadServicesFromFile", func(t *testing.T) {
 		_, err := LoadServicesFromFile(rc, nonExistentFile)
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("LoadCronJobsFromFile", func(t *testing.T) {
 		_, err := LoadCronJobsFromFile(rc, nonExistentFile)
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("LoadUsersFromFile", func(t *testing.T) {
 		_, err := LoadUsersFromFile(rc, nonExistentFile)
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("LoadSystemStateFromFile", func(t *testing.T) {
 		_, err := LoadSystemStateFromFile(rc, nonExistentFile)
 		assert.Error(t, err)
@@ -343,12 +343,12 @@ func TestStateApplicationResult(t *testing.T) {
 func createTempFile(t *testing.T, content string) string {
 	tmpFile, err := os.CreateTemp("", "config_test_*.json")
 	require.NoError(t, err)
-	
+
 	_, err = tmpFile.WriteString(content)
 	require.NoError(t, err)
-	
+
 	_ = tmpFile.Close()
 	require.NoError(t, err)
-	
+
 	return tmpFile.Name()
 }

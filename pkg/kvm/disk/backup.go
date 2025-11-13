@@ -1,6 +1,7 @@
 package disk
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ func (bm *BackupManager) Create(ctx context.Context, vmName, diskPath string) (s
 
 	// Ensure backup directory exists
 	backupDir := "/var/lib/eos/backups/kvm"
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 

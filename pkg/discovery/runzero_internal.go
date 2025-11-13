@@ -40,10 +40,10 @@ type ExplorerLocation struct {
 
 // InternalExplorer handles discovery for a specific location
 type InternalExplorer struct {
-	location   ExplorerLocation
-	lastScan   time.Time
-	baseline   map[string]*Asset
-	logger     *zap.Logger
+	location ExplorerLocation
+	lastScan time.Time
+	baseline map[string]*Asset
+	logger   *zap.Logger
 }
 
 // Asset represents a discovered network asset
@@ -363,11 +363,11 @@ func (m *InternalDiscoveryManager) scanHost(rc *eos_io.RuntimeContext, ip string
 	}
 
 	asset := &Asset{
-		Address:   ip,
-		LastSeen:  time.Now(),
-		Services:  []Service{},
-		Tags:      []string{},
-		Metadata:  make(map[string]string),
+		Address:  ip,
+		LastSeen: time.Now(),
+		Services: []Service{},
+		Tags:     []string{},
+		Metadata: make(map[string]string),
 	}
 
 	// Try to get hostname
@@ -522,20 +522,20 @@ func (m *InternalDiscoveryManager) getMACAddress(ip string) (string, error) {
 func (m *InternalDiscoveryManager) grabBanner(conn net.Conn) string {
 	// Set read timeout
 	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-	
+
 	buffer := make([]byte, 1024)
 	n, err := conn.Read(buffer)
 	if err != nil {
 		return ""
 	}
-	
+
 	banner := string(buffer[:n])
 	// Clean up banner
 	banner = strings.TrimSpace(banner)
 	if len(banner) > 200 {
 		banner = banner[:200] + "..."
 	}
-	
+
 	return banner
 }
 
@@ -594,7 +594,7 @@ func (m *InternalDiscoveryManager) fingerprinthOS(services []Service) OSInfo {
 
 	for _, service := range services {
 		banner := strings.ToLower(service.Banner)
-		
+
 		if strings.Contains(banner, "windows") || service.Port == 3389 || service.Port == 445 {
 			os.Type = "windows"
 			break
@@ -650,11 +650,11 @@ func (m *InternalDiscoveryManager) calculateRiskScore(asset *Asset) int {
 
 	// High-risk services
 	highRiskServices := map[string]int{
-		"telnet":  50,
-		"ftp":     30,
-		"http":    20,
-		"snmp":    40,
-		"rdp":     30,
+		"telnet": 50,
+		"ftp":    30,
+		"http":   20,
+		"snmp":   40,
+		"rdp":    30,
 	}
 
 	for _, service := range asset.Services {
@@ -687,7 +687,7 @@ func (m *InternalDiscoveryManager) calculateRiskScore(asset *Asset) int {
 func (m *InternalDiscoveryManager) isAuthorizedAsset(asset *Asset) bool {
 	// Simplified authorization check
 	// In real implementation, this would check against CMDB, AD, etc.
-	
+
 	// Consider it authorized if it has a hostname or is in known ranges
 	if asset.Hostname != "" {
 		return true
@@ -893,14 +893,14 @@ func (m *InternalDiscoveryManager) postProcessResults(rc *eos_io.RuntimeContext,
 
 func generateIPsFromCIDR(ipNet *net.IPNet) []string {
 	var ips []string
-	
+
 	// For large networks, this could be optimized
 	ip := ipNet.IP.Mask(ipNet.Mask)
 	for ipNet.Contains(ip) {
 		ips = append(ips, ip.String())
 		inc(ip)
 	}
-	
+
 	return ips
 }
 
@@ -917,7 +917,7 @@ func sampleIPs(ips []string, maxCount int) []string {
 	if len(ips) <= maxCount {
 		return ips
 	}
-	
+
 	// Simple sampling - take every nth IP
 	step := len(ips) / maxCount
 	var sampled []string
@@ -927,6 +927,6 @@ func sampleIPs(ips []string, maxCount int) []string {
 			break
 		}
 	}
-	
+
 	return sampled
 }

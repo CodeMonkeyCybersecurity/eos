@@ -20,13 +20,13 @@ type GeneratorConfig struct {
 }
 
 type TLSConfig struct {
-	Enabled               bool
-	CAFile                string
-	CertFile              string
-	KeyFile               string
-	VerifyIncoming        bool
-	VerifyOutgoing        bool
-	VerifyServerHostname  bool
+	Enabled              bool
+	CAFile               string
+	CertFile             string
+	KeyFile              string
+	VerifyIncoming       bool
+	VerifyOutgoing       bool
+	VerifyServerHostname bool
 }
 
 // DEPRECATED: ConsulConfig is renamed to GeneratorConfig for clarity

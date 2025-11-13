@@ -48,20 +48,20 @@ func (c *CLI) WithTimeout(timeout time.Duration) *CLI {
 // ExecString executes a command and returns its output as a string
 func (c *CLI) ExecString(command string, args ...string) (string, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	logger.Debug("Executing command",
 		zap.String("command", command),
 		zap.Strings("args", args))
-	
+
 	ctx, cancel := context.WithTimeout(c.rc.Ctx, c.timeout)
 	defer cancel()
-	
+
 	output, err := execute.Run(ctx, execute.Options{
 		Command: command,
 		Args:    args,
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Error("Command execution failed",
 			zap.String("command", command),
@@ -70,34 +70,34 @@ func (c *CLI) ExecString(command string, args ...string) (string, error) {
 			zap.String("output", output))
 		return "", fmt.Errorf("command %s failed: %w", command, err)
 	}
-	
+
 	// Trim whitespace from output
 	output = strings.TrimSpace(output)
-	
+
 	logger.Debug("Command executed successfully",
 		zap.String("command", command),
 		zap.String("output", output))
-	
+
 	return output, nil
 }
 
 // ExecToSuccess executes a command and returns an error if it fails
 func (c *CLI) ExecToSuccess(command string, args ...string) error {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	logger.Debug("Executing command to success",
 		zap.String("command", command),
 		zap.Strings("args", args))
-	
+
 	ctx, cancel := context.WithTimeout(c.rc.Ctx, c.timeout)
 	defer cancel()
-	
+
 	output, err := execute.Run(ctx, execute.Options{
 		Command: command,
 		Args:    args,
 		Capture: true,
 	})
-	
+
 	if err != nil {
 		logger.Error("Command execution failed",
 			zap.String("command", command),
@@ -106,20 +106,20 @@ func (c *CLI) ExecToSuccess(command string, args ...string) error {
 			zap.String("output", output))
 		return fmt.Errorf("command %s failed: %w", command, err)
 	}
-	
+
 	logger.Debug("Command executed successfully",
 		zap.String("command", command))
-	
+
 	return nil
 }
 
 // Which checks if a command exists in the system PATH
 func (c *CLI) Which(command string) (string, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
-	
+
 	logger.Debug("Checking for command existence",
 		zap.String("command", command))
-	
+
 	path, err := exec.LookPath(command)
 	if err != nil {
 		logger.Debug("Command not found",
@@ -127,10 +127,10 @@ func (c *CLI) Which(command string) (string, error) {
 			zap.Error(err))
 		return "", fmt.Errorf("command %s not found in PATH: %w", command, err)
 	}
-	
+
 	logger.Debug("Command found",
 		zap.String("command", command),
 		zap.String("path", path))
-	
+
 	return path, nil
 }

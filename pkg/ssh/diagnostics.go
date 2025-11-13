@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -139,7 +140,7 @@ func CheckSSHKeyPermissions(rc *eos_io.RuntimeContext, keyPath string) error {
 		zap.String("expected_perms", "600"))
 
 	// Check if permissions are correct (600)
-	expectedPerms := os.FileMode(0600)
+	expectedPerms := shared.SecretFilePerm
 	if perms != expectedPerms {
 		logger.Warn("SSH key permissions are incorrect, fixing",
 			zap.String("current", fmt.Sprintf("%o", perms)),

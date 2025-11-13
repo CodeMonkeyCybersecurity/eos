@@ -80,7 +80,7 @@ func DetectEnvironment(rc *eos_io.RuntimeContext) (*ragequit.EnvironmentInfo, er
 	}
 
 	// EVALUATE - Write results
-	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
+	if err := os.WriteFile(outputFile, []byte(output.String()), shared.ConfigFilePerm); err != nil {
 		return nil, fmt.Errorf("failed to write environment detection results: %w", err)
 	}
 

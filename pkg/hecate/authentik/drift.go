@@ -38,13 +38,13 @@ type CaddyDrift struct {
 
 // DockerDrift represents differences between docker-compose.yml and runtime
 type DockerDrift struct {
-	DiskContainers    []string                   // Containers defined in compose file
-	RuntimeContainers []string                   // Running containers
-	AddedContainers   []string                   // Containers running but not in compose
-	RemovedContainers []string                   // Containers in compose but not running
-	EnvDiff           map[string][]EnvVarChange  // Per-container env var changes
-	VolumeDiff        map[string][]VolumeChange  // Per-container volume changes
-	PortDiff          map[string][]PortChange    // Per-container port changes
+	DiskContainers    []string                  // Containers defined in compose file
+	RuntimeContainers []string                  // Running containers
+	AddedContainers   []string                  // Containers running but not in compose
+	RemovedContainers []string                  // Containers in compose but not running
+	EnvDiff           map[string][]EnvVarChange // Per-container env var changes
+	VolumeDiff        map[string][]VolumeChange // Per-container volume changes
+	PortDiff          map[string][]PortChange   // Per-container port changes
 }
 
 // EnvVarChange represents a change in environment variable
@@ -72,12 +72,12 @@ type PortChange struct {
 
 // DriftSummary provides high-level drift statistics
 type DriftSummary struct {
-	TotalDriftIssues    int
-	CaddyDriftCount     int
-	DockerDriftCount    int
-	CriticalIssues      []string
-	RecommendedActions  []string
-	DriftPercentage     float64 // 0-100, how much configuration has drifted
+	TotalDriftIssues   int
+	CaddyDriftCount    int
+	DockerDriftCount   int
+	CriticalIssues     []string
+	RecommendedActions []string
+	DriftPercentage    float64 // 0-100, how much configuration has drifted
 }
 
 // DetectDrift analyzes exported configuration and generates drift report

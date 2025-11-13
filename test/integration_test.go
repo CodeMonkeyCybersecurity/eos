@@ -40,15 +40,16 @@ func TestEosIntegration_VaultAuthenticationWorkflow(t *testing.T) {
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("vault-auth")
 					logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-					_, err := vault.NewClient("http://localhost:8200", logger)
+					vaultWrapper, err := vault.NewClient("http://localhost:8200", logger)
 					if err != nil {
 						return err
 					}
 
-					// This should fail gracefully with mocked responses
-					// TODO: Fix this - SecureAuthenticationOrchestrator expects *api.Client, not *vault.Client
-					// err = vault.SecureAuthenticationOrchestrator(rc, client)
-					err = fmt.Errorf("mock authentication error")
+					// Get underlying API client for functions expecting *api.Client
+					apiClient := vaultWrapper.APIClient()
+
+					// This should fail gracefully with mocked responses in test environment
+					err = vault.SecureAuthenticationOrchestrator(rc, apiClient)
 					if err == nil {
 						return errors.New("expected authentication to fail in test environment")
 					}
@@ -62,14 +63,16 @@ func TestEosIntegration_VaultAuthenticationWorkflow(t *testing.T) {
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("vault-error-check")
 					logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-					_, err := vault.NewClient("http://localhost:8200", logger)
+					vaultWrapper, err := vault.NewClient("http://localhost:8200", logger)
 					if err != nil {
 						return err
 					}
 
-					// TODO: Fix this - SecureAuthenticationOrchestrator expects *api.Client, not *vault.Client
-					// err = vault.SecureAuthenticationOrchestrator(rc, client)
-					err = fmt.Errorf("mock authentication error")
+					// Get underlying API client for functions expecting *api.Client
+					apiClient := vaultWrapper.APIClient()
+
+					// Test secure error handling - should fail in test environment
+					err = vault.SecureAuthenticationOrchestrator(rc, apiClient)
 					if err != nil {
 						// Check that error doesn't contain sensitive paths
 						errMsg := err.Error()
@@ -335,16 +338,21 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 
 					// Test authentication status checking
 					logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-					_, err := vault.NewClient("http://localhost:8200", logger)
+					vaultWrapper, err := vault.NewClient("http://localhost:8200", logger)
 					if err != nil {
 						return err
 					}
 
-					// TODO: Fix this - GetAuthenticationStatus expects *api.Client, not *vault.Client
-					// status := vault.GetAuthenticationStatus(rc, vaultClient)
-					status := map[string]interface{}{"authenticated": false}
+					// Get underlying API client for functions expecting *api.Client
+					apiClient := vaultWrapper.APIClient()
 
-					// Verify status structure (status is never nil since we just created it)
+					// Check authentication status
+					status := vault.GetAuthenticationStatus(rc, apiClient)
+
+					// Verify status structure
+					if status == nil {
+						return errors.New("authentication status was nil")
+					}
 					if _, ok := status["authenticated"]; !ok {
 						return errors.New("authentication status missing 'authenticated' field")
 					}
@@ -361,25 +369,31 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 
 					// Test that system handles failures gracefully
 					logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-					_, err := vault.NewClient("http://localhost:8200", logger)
+					vaultWrapper, err := vault.NewClient("http://localhost:8200", logger)
 					if err != nil {
 						return err
 					}
 
-					// Try authentication (should fail gracefully)
-					// TODO: Fix this - SecureAuthenticationOrchestrator expects *api.Client, not *vault.Client
-					// err = vault.SecureAuthenticationOrchestrator(rc, vaultClient)
-					err = fmt.Errorf("mock authentication error")
+					// Get underlying API client for functions expecting *api.Client
+					apiClient := vaultWrapper.APIClient()
+
+					// Try authentication (should fail gracefully in test environment)
+					err = vault.SecureAuthenticationOrchestrator(rc, apiClient)
 					if err == nil {
 						return errors.New("expected authentication to fail in test environment")
 					}
 
 					// System should still be functional after auth failure
-					// TODO: Fix this - GetAuthenticationStatus expects *api.Client, not *vault.Client
-					// status := vault.GetAuthenticationStatus(rc, vaultClient)
-					status := map[string]interface{}{"authenticated": false}
-					// Note: status is never nil since we just created it above
-					_ = status
+					// Verify we can still query authentication status
+					status := vault.GetAuthenticationStatus(rc, apiClient)
+					if status == nil {
+						return errors.New("authentication status was nil after auth failure")
+					}
+
+					// Verify unauthenticated state is properly reported
+					if authenticated, ok := status["authenticated"].(bool); ok && authenticated {
+						return errors.New("expected authentication status to be false after auth failure")
+					}
 
 					return nil
 				},

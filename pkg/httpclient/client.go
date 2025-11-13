@@ -34,16 +34,16 @@ func NewClient(config *Config) (*Client, error) {
 	if config == nil {
 		config = DefaultConfig()
 	}
-	
+
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	
+
 	tlsConfig, err := buildTLSConfig(config.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build TLS config: %w", err)
 	}
-	
+
 	transport := &http.Transport{
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConns:        config.PoolConfig.MaxIdleConns,
@@ -55,12 +55,12 @@ func NewClient(config *Config) (*Client, error) {
 			KeepAlive: config.PoolConfig.KeepAlive,
 		}).DialContext,
 	}
-	
+
 	httpClient := &http.Client{
 		Timeout:   config.Timeout,
 		Transport: transport,
 	}
-	
+
 	var rateLimiter *rate.Limiter
 	if config.RateLimitConfig != nil {
 		rateLimiter = rate.NewLimiter(
@@ -68,9 +68,9 @@ func NewClient(config *Config) (*Client, error) {
 			config.RateLimitConfig.BurstSize,
 		)
 	}
-	
+
 	logger := zap.L().Named("httpclient")
-	
+
 	return &Client{
 		httpClient:  httpClient,
 		config:      config,
@@ -85,7 +85,7 @@ func NewClientWithContext(ctx context.Context, config *Config) (*Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Use the base logger from otelzap for now
 	client.logger = zap.L().Named("httpclient")
 	return client, nil
@@ -104,18 +104,18 @@ func (c *Client) DoWithContext(ctx context.Context, req *http.Request) (*http.Re
 			return nil, fmt.Errorf("rate limit wait failed: %w", err)
 		}
 	}
-	
+
 	// Set request context
 	req = req.WithContext(ctx)
-	
+
 	// Apply authentication
 	if err := c.applyAuthentication(ctx, req); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
-	
+
 	// Apply default headers
 	c.applyHeaders(req)
-	
+
 	// Execute request with retry logic
 	return c.executeWithRetry(ctx, req)
 }
@@ -166,7 +166,7 @@ func (c *Client) Delete(ctx context.Context, url string) (*http.Response, error)
 func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http.Response, error) {
 	var lastErr error
 	var body []byte
-	
+
 	// Read body once if present (for retries)
 	if req.Body != nil {
 		var err error
@@ -178,31 +178,31 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 			// Log error but don't fail the request
 		}
 	}
-	
+
 	retryConfig := c.config.RetryConfig
 	maxAttempts := retryConfig.MaxRetries + 1
-	
+
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		// Recreate body for retry attempts
 		if body != nil {
 			req.Body = io.NopCloser(bytes.NewReader(body))
 		}
-		
+
 		// Log request if configured
 		if c.config.LogConfig.LogRequests {
 			c.logRequest(req, attempt)
 		}
-		
+
 		// Execute the request
 		start := time.Now()
 		resp, err := c.httpClient.Do(req)
 		duration := time.Since(start)
-		
+
 		// Log response if configured
 		if c.config.LogConfig.LogResponses {
 			c.logResponse(resp, err, duration, attempt)
 		}
-		
+
 		if err != nil {
 			lastErr = err
 			if attempt < maxAttempts-1 {
@@ -212,7 +212,7 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 					zap.Int("attempt", attempt+1),
 					zap.Int("max_attempts", maxAttempts),
 					zap.Duration("retry_delay", delay))
-				
+
 				select {
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -222,7 +222,7 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 			}
 			continue
 		}
-		
+
 		// Check if response status is retryable
 		if c.isRetryableStatus(resp.StatusCode, retryConfig) && attempt < maxAttempts-1 {
 			if err := resp.Body.Close(); err != nil {
@@ -234,7 +234,7 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 				zap.Int("attempt", attempt+1),
 				zap.Int("max_attempts", maxAttempts),
 				zap.Duration("retry_delay", delay))
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -242,10 +242,10 @@ func (c *Client) executeWithRetry(ctx context.Context, req *http.Request) (*http
 				continue
 			}
 		}
-		
+
 		return resp, nil
 	}
-	
+
 	return nil, fmt.Errorf("request failed after %d attempts: %w", maxAttempts, lastErr)
 }
 
@@ -255,7 +255,7 @@ func (c *Client) applyAuthentication(ctx context.Context, req *http.Request) err
 	if auth == nil || auth.Type == AuthTypeNone {
 		return nil
 	}
-	
+
 	switch auth.Type {
 	case AuthTypeBearer:
 		token := auth.Token
@@ -266,26 +266,26 @@ func (c *Client) applyAuthentication(ctx context.Context, req *http.Request) err
 			}
 			token = refreshedToken
 		}
-		
+
 		header := auth.TokenHeader
 		if header == "" {
 			header = "Authorization"
 		}
-		
+
 		prefix := auth.TokenPrefix
 		if prefix == "" {
 			prefix = "Bearer"
 		}
-		
+
 		req.Header.Set(header, fmt.Sprintf("%s %s", prefix, token))
-		
+
 	case AuthTypeBasic:
 		if auth.Username == "" || auth.Password == "" {
 			return fmt.Errorf("username and password required for basic auth")
 		}
 		credentials := base64.StdEncoding.EncodeToString([]byte(auth.Username + ":" + auth.Password))
 		req.Header.Set("Authorization", "Basic "+credentials)
-		
+
 	case AuthTypeAPIKey:
 		if auth.Token == "" {
 			return fmt.Errorf("token required for API key auth")
@@ -295,13 +295,13 @@ func (c *Client) applyAuthentication(ctx context.Context, req *http.Request) err
 			header = "X-API-Key"
 		}
 		req.Header.Set(header, auth.Token)
-		
+
 	case AuthTypeCustom:
 		for key, value := range auth.CustomHeaders {
 			req.Header.Set(key, value)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -311,7 +311,7 @@ func (c *Client) applyHeaders(req *http.Request) {
 	if req.Header.Get("User-Agent") == "" && c.config.UserAgent != "" {
 		req.Header.Set("User-Agent", c.config.UserAgent)
 	}
-	
+
 	// Apply custom headers
 	for key, value := range c.config.Headers {
 		if req.Header.Get(key) == "" {
@@ -323,11 +323,11 @@ func (c *Client) applyHeaders(req *http.Request) {
 // calculateRetryDelay calculates the delay for retry attempts with exponential backoff
 func (c *Client) calculateRetryDelay(attempt int, config *RetryConfig) time.Duration {
 	delay := time.Duration(float64(config.InitialDelay) * math.Pow(config.Multiplier, float64(attempt)))
-	
+
 	if delay > config.MaxDelay {
 		delay = config.MaxDelay
 	}
-	
+
 	// Add jitter if enabled
 	// SECURITY: Use crypto/rand instead of math/rand for unpredictability
 	if config.Jitter {
@@ -341,7 +341,7 @@ func (c *Client) calculateRetryDelay(attempt int, config *RetryConfig) time.Dura
 		}
 		// If crypto/rand fails, continue without jitter (fail-safe)
 	}
-	
+
 	return delay
 }
 
@@ -362,7 +362,7 @@ func (c *Client) logRequest(req *http.Request, attempt int) {
 		zap.String("url", req.URL.String()),
 		zap.Int("attempt", attempt+1),
 	}
-	
+
 	if c.config.LogConfig.LogHeaders {
 		headers := make(map[string]string)
 		for k, v := range req.Header {
@@ -375,12 +375,12 @@ func (c *Client) logRequest(req *http.Request, attempt int) {
 		}
 		fields = append(fields, zap.Any("headers", headers))
 	}
-	
+
 	if c.config.LogConfig.LogBody && req.Body != nil {
 		// Note: This would consume the body, so it should be used carefully
 		fields = append(fields, zap.String("body", "[BODY_LOGGING_ENABLED]"))
 	}
-	
+
 	c.logger.Debug("HTTP request", fields...)
 }
 
@@ -390,18 +390,18 @@ func (c *Client) logResponse(resp *http.Response, err error, duration time.Durat
 		zap.Duration("duration", duration),
 		zap.Int("attempt", attempt+1),
 	}
-	
+
 	if err != nil {
 		fields = append(fields, zap.Error(err))
 		c.logger.Debug("HTTP request failed", fields...)
 		return
 	}
-	
+
 	fields = append(fields,
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("status", resp.Status),
 	)
-	
+
 	if c.config.LogConfig.LogHeaders {
 		headers := make(map[string]string)
 		for k, v := range resp.Header {
@@ -409,7 +409,7 @@ func (c *Client) logResponse(resp *http.Response, err error, duration time.Durat
 		}
 		fields = append(fields, zap.Any("response_headers", headers))
 	}
-	
+
 	c.logger.Debug("HTTP response", fields...)
 }
 
@@ -422,7 +422,7 @@ func isSensitiveHeader(header string) bool {
 		"cookie",
 		"x-forwarded-authorization",
 	}
-	
+
 	headerLower := strings.ToLower(header)
 	for _, sensitive := range sensitiveHeaders {
 		if headerLower == sensitive || strings.Contains(headerLower, "token") || strings.Contains(headerLower, "key") {
@@ -447,28 +447,28 @@ func buildTLSConfig(config *TLSConfig) (*tls.Config, error) {
 			PreferServerCipherSuites: true,
 		}, nil
 	}
-	
+
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: config.InsecureSkipVerify,
 		MinVersion:         config.MinVersion,
 		MaxVersion:         config.MaxVersion,
 		CipherSuites:       config.CipherSuites,
 	}
-	
+
 	// Load root CA if specified
 	if config.RootCAFile != "" {
 		caCert, err := os.ReadFile(config.RootCAFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read root CA file: %w", err)
 		}
-		
+
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
 			return nil, fmt.Errorf("failed to parse root CA certificate")
 		}
 		tlsConfig.RootCAs = caCertPool
 	}
-	
+
 	// Load client certificate if specified
 	if config.ClientCertFile != "" && config.ClientKeyFile != "" {
 		cert, err := tls.LoadX509KeyPair(config.ClientCertFile, config.ClientKeyFile)
@@ -477,7 +477,7 @@ func buildTLSConfig(config *TLSConfig) (*tls.Config, error) {
 		}
 		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	
+
 	return tlsConfig, nil
 }
 

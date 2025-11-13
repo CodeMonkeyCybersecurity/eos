@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
     "bufio"
     "errors"
     "fmt"
@@ -310,7 +311,7 @@ func (c *Creator) ensureSSHAuthSetup() error {
 
 func generateSSHKey(privatePath string) error {
     // Ensure directory exists
-    if err := os.MkdirAll(filepath.Dir(privatePath), 0700); err != nil {
+    if err := os.MkdirAll(filepath.Dir(privatePath), shared.SecretDirPerm); err != nil {
         return fmt.Errorf("create .ssh dir: %w", err)
     }
     // Use ssh-keygen to create key without passphrase (interactive passphrases are out-of-scope here)

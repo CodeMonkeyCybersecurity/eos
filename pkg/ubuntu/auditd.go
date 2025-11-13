@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -65,7 +66,7 @@ func configureAuditd(rc *eos_io.RuntimeContext) error {
 
 	// Write audit rules
 	rulesPath := "/etc/audit/rules.d/hardening.rules"
-	if err := os.WriteFile(rulesPath, []byte(auditRules), 0644); err != nil {
+	if err := os.WriteFile(rulesPath, []byte(auditRules), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write audit rules: %w", err)
 	}
 	logger.Info("Audit rules written", zap.String("path", rulesPath))

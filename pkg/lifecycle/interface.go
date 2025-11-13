@@ -12,10 +12,10 @@ type Manager interface {
 	Install(rc *eos_io.RuntimeContext, config interface{}) error
 	Configure(rc *eos_io.RuntimeContext, config interface{}) error
 	Verify(rc *eos_io.RuntimeContext) error
-	
+
 	// Removal and cleanup
 	Remove(rc *eos_io.RuntimeContext, keepData bool) error
-	
+
 	// Discovery methods
 	IsInstalled(rc *eos_io.RuntimeContext) bool
 	GetName() string
@@ -78,85 +78,85 @@ func (r *Registry) GetAll() map[string]Manager {
 // GetAllServices aggregates services from all registered managers
 func (r *Registry) GetAllServices(excluded map[string]bool) []ServiceInfo {
 	var services []ServiceInfo
-	
+
 	for name, manager := range r.managers {
 		if excluded[name] {
 			continue
 		}
-		
+
 		for _, svc := range manager.GetServices() {
 			if !excluded[svc.Name] {
 				services = append(services, svc)
 			}
 		}
 	}
-	
+
 	return services
 }
 
 // GetAllDirectories aggregates directories from all registered managers
 func (r *Registry) GetAllDirectories(excluded map[string]bool, keepData bool) []DirectoryInfo {
 	var directories []DirectoryInfo
-	
+
 	for name, manager := range r.managers {
 		if excluded[name] {
 			continue
 		}
-		
+
 		for _, dir := range manager.GetDirectories() {
 			// Skip data directories if keepData is true
 			if dir.IsData && keepData {
 				continue
 			}
-			
+
 			directories = append(directories, dir)
 		}
 	}
-	
+
 	return directories
 }
 
 // GetAllBinaries aggregates binaries from all registered managers
 func (r *Registry) GetAllBinaries(excluded map[string]bool) []string {
 	var binaries []string
-	
+
 	for name, manager := range r.managers {
 		if excluded[name] {
 			continue
 		}
-		
+
 		binaries = append(binaries, manager.GetBinaries()...)
 	}
-	
+
 	return binaries
 }
 
 // GetAllAPTSources aggregates APT sources from all registered managers
 func (r *Registry) GetAllAPTSources(excluded map[string]bool) []string {
 	var sources []string
-	
+
 	for name, manager := range r.managers {
 		if excluded[name] {
 			continue
 		}
-		
+
 		sources = append(sources, manager.GetAPTSources()...)
 	}
-	
+
 	return sources
 }
 
 // GetAllSystemdFiles aggregates systemd files from all registered managers
 func (r *Registry) GetAllSystemdFiles(excluded map[string]bool) []string {
 	var files []string
-	
+
 	for name, manager := range r.managers {
 		if excluded[name] {
 			continue
 		}
-		
+
 		files = append(files, manager.GetSystemdFiles()...)
 	}
-	
+
 	return files
 }

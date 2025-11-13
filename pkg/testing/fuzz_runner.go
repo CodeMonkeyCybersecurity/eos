@@ -2,6 +2,7 @@
 package testing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -375,7 +376,7 @@ func (r *FuzzReport) SaveReport(path string) error {
 		}
 	}
 
-	return os.WriteFile(path, []byte(buf.String()), 0644)
+	return os.WriteFile(path, []byte(buf.String()), shared.ConfigFilePerm)
 }
 
 // SetParallelism sets the number of parallel fuzz tests

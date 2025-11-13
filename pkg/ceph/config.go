@@ -2,6 +2,7 @@
 package ceph
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -43,14 +44,14 @@ type CephMonConfig struct {
 
 // CephOSDConfig represents the [osd] section
 type CephOSDConfig struct {
-	OSDMkfsType           string
-	OSDMkfsOptionsXFS     string
-	OSDMountOptionsXFS    string
+	OSDMkfsType        string
+	OSDMkfsOptionsXFS  string
+	OSDMountOptionsXFS string
 }
 
 // CephClientConfig represents the [client] section
 type CephClientConfig struct {
-	RBDCache                      string
+	RBDCache                       string
 	RBDCacheWritethroughUntilFlush string
 }
 
@@ -272,7 +273,7 @@ func WriteCephConf(logger otelzap.LoggerWithCtx, config *CephConfig, path string
 		}
 	}
 
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ceph.conf: %w", err)
 	}
 

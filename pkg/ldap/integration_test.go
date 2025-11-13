@@ -520,19 +520,19 @@ func BenchmarkLDAPOperations(b *testing.B) {
 	}
 
 	b.Run("connection_benchmark", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = CheckConnection(rc, cfg)
 		}
 	})
 
 	b.Run("config_load_benchmark", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _, _ = ReadConfig(rc)
 		}
 	})
 
 	b.Run("port_check_benchmark", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = IsPortOpen(389)
 		}
 	})

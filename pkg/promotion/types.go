@@ -76,15 +76,15 @@ const (
 
 // PromotionResult represents the result of a promotion operation
 type PromotionResult struct {
-	Request         *PromotionRequest     `json:"request"`
-	Success         bool                  `json:"success"`
-	DeploymentID    string                `json:"deployment_id"`
-	Duration        time.Duration         `json:"duration"`
-	StepsExecuted   []PromotionStep       `json:"steps_executed"`
-	ArtifactsPromoted []PromotedArtifact  `json:"artifacts_promoted"`
-	ValidationResults []ValidationResult  `json:"validation_results"`
-	RollbackPlan    *RollbackPlan         `json:"rollback_plan,omitempty"`
-	Error           string                `json:"error,omitempty"`
+	Request           *PromotionRequest  `json:"request"`
+	Success           bool               `json:"success"`
+	DeploymentID      string             `json:"deployment_id"`
+	Duration          time.Duration      `json:"duration"`
+	StepsExecuted     []PromotionStep    `json:"steps_executed"`
+	ArtifactsPromoted []PromotedArtifact `json:"artifacts_promoted"`
+	ValidationResults []ValidationResult `json:"validation_results"`
+	RollbackPlan      *RollbackPlan      `json:"rollback_plan,omitempty"`
+	Error             string             `json:"error,omitempty"`
 }
 
 // PromotionStep represents a step in the promotion process
@@ -112,14 +112,14 @@ const (
 
 // PromotedArtifact represents an artifact that was promoted
 type PromotedArtifact struct {
-	Name            string            `json:"name"`
-	Type            string            `json:"type"`
-	SourceLocation  string            `json:"source_location"`
-	TargetLocation  string            `json:"target_location"`
-	Version         string            `json:"version"`
-	Checksum        string            `json:"checksum"`
-	Size            int64             `json:"size"`
-	Metadata        map[string]string `json:"metadata"`
+	Name           string            `json:"name"`
+	Type           string            `json:"type"`
+	SourceLocation string            `json:"source_location"`
+	TargetLocation string            `json:"target_location"`
+	Version        string            `json:"version"`
+	Checksum       string            `json:"checksum"`
+	Size           int64             `json:"size"`
+	Metadata       map[string]string `json:"metadata"`
 }
 
 // ValidationResult represents the result of promotion validation
@@ -151,12 +151,12 @@ type RollbackStep struct {
 
 // ApprovalConfig holds approval-related configuration
 type ApprovalConfig struct {
-	Required      bool          `json:"required"`
-	MinApprovers  int           `json:"min_approvers"`
-	Approvers     []string      `json:"approvers"`
-	Timeout       time.Duration `json:"timeout"`
-	AutoApprove   bool          `json:"auto_approve"`
-	BypassUsers   []string      `json:"bypass_users"`
+	Required     bool          `json:"required"`
+	MinApprovers int           `json:"min_approvers"`
+	Approvers    []string      `json:"approvers"`
+	Timeout      time.Duration `json:"timeout"`
+	AutoApprove  bool          `json:"auto_approve"`
+	BypassUsers  []string      `json:"bypass_users"`
 }
 
 // ApprovalPolicy defines the approval policy for a promotion
@@ -180,25 +180,25 @@ type Approval struct {
 
 // PromotionConfig holds configuration for promotions
 type PromotionConfig struct {
-	DryRun              bool                              `json:"dry_run"`
-	Force               bool                              `json:"force"`
-	SkipValidation      bool                              `json:"skip_validation"`
-	SkipApproval        bool                              `json:"skip_approval"`
-	Timeout             time.Duration                     `json:"timeout"`
-	ValidationRules     []string                          `json:"validation_rules"`
-	EnvironmentPolicies map[string]EnvironmentPolicy      `json:"environment_policies"`
-	ComponentPolicies   map[string]ComponentPolicy        `json:"component_policies"`
+	DryRun              bool                         `json:"dry_run"`
+	Force               bool                         `json:"force"`
+	SkipValidation      bool                         `json:"skip_validation"`
+	SkipApproval        bool                         `json:"skip_approval"`
+	Timeout             time.Duration                `json:"timeout"`
+	ValidationRules     []string                     `json:"validation_rules"`
+	EnvironmentPolicies map[string]EnvironmentPolicy `json:"environment_policies"`
+	ComponentPolicies   map[string]ComponentPolicy   `json:"component_policies"`
 }
 
 // EnvironmentPolicy defines promotion policies for specific environments
 type EnvironmentPolicy struct {
-	AllowedSources    []string      `json:"allowed_sources"`
-	RequireApproval   bool          `json:"require_approval"`
-	MinApprovals      int           `json:"min_approvals"`
-	ValidationLevel   string        `json:"validation_level"` // basic, standard, strict
-	DeploymentWindow  TimeWindow    `json:"deployment_window"`
-	RollbackWindow    time.Duration `json:"rollback_window"`
-	FreezeWindows     []TimeWindow  `json:"freeze_windows"`
+	AllowedSources   []string      `json:"allowed_sources"`
+	RequireApproval  bool          `json:"require_approval"`
+	MinApprovals     int           `json:"min_approvals"`
+	ValidationLevel  string        `json:"validation_level"` // basic, standard, strict
+	DeploymentWindow TimeWindow    `json:"deployment_window"`
+	RollbackWindow   time.Duration `json:"rollback_window"`
+	FreezeWindows    []TimeWindow  `json:"freeze_windows"`
 }
 
 // ComponentPolicy defines promotion policies for specific components
@@ -219,25 +219,25 @@ type TimeWindow struct {
 
 // HealthCheck defines health check configuration
 type HealthCheck struct {
-	Enabled         bool          `json:"enabled"`
-	Endpoint        string        `json:"endpoint"`
-	ExpectedStatus  int           `json:"expected_status"`
-	Timeout         time.Duration `json:"timeout"`
-	Retries         int           `json:"retries"`
-	RetryDelay      time.Duration `json:"retry_delay"`
-	SuccessThreshold int          `json:"success_threshold"`
+	Enabled          bool          `json:"enabled"`
+	Endpoint         string        `json:"endpoint"`
+	ExpectedStatus   int           `json:"expected_status"`
+	Timeout          time.Duration `json:"timeout"`
+	Retries          int           `json:"retries"`
+	RetryDelay       time.Duration `json:"retry_delay"`
+	SuccessThreshold int           `json:"success_threshold"`
 }
 
 // PromotionError represents an error during promotion operations
 type PromotionError struct {
-	Type        string                 `json:"type"`
-	Component   string                 `json:"component"`
-	Operation   string                 `json:"operation"`
-	Message     string                 `json:"message"`
-	Cause       error                  `json:"cause,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Retryable   bool                   `json:"retryable"`
+	Type      string                 `json:"type"`
+	Component string                 `json:"component"`
+	Operation string                 `json:"operation"`
+	Message   string                 `json:"message"`
+	Cause     error                  `json:"cause,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata"`
+	Timestamp time.Time              `json:"timestamp"`
+	Retryable bool                   `json:"retryable"`
 }
 
 func (e *PromotionError) Error() string {
@@ -270,42 +270,42 @@ type StackPromotionStrategy string
 
 const (
 	StackPromotionStrategySequential StackPromotionStrategy = "sequential"
-	StackPromotionStrategyParallel    StackPromotionStrategy = "parallel"
-	StackPromotionStrategyDependency  StackPromotionStrategy = "dependency-order"
+	StackPromotionStrategyParallel   StackPromotionStrategy = "parallel"
+	StackPromotionStrategyDependency StackPromotionStrategy = "dependency-order"
 )
 
 // PromotionHistory represents the promotion history for tracking
 type PromotionHistory struct {
-	Component     string              `json:"component"`
-	Environment   string              `json:"environment"`
-	Promotions    []PromotionRecord   `json:"promotions"`
-	LastPromoted  *time.Time          `json:"last_promoted,omitempty"`
-	CurrentVersion string             `json:"current_version"`
+	Component      string            `json:"component"`
+	Environment    string            `json:"environment"`
+	Promotions     []PromotionRecord `json:"promotions"`
+	LastPromoted   *time.Time        `json:"last_promoted,omitempty"`
+	CurrentVersion string            `json:"current_version"`
 }
 
 // PromotionRecord represents a single promotion record
 type PromotionRecord struct {
-	ID            string    `json:"id"`
-	Version       string    `json:"version"`
-	FromEnv       string    `json:"from_env"`
-	ToEnv         string    `json:"to_env"`
-	PromotedBy    string    `json:"promoted_by"`
-	PromotedAt    time.Time `json:"promoted_at"`
-	Duration      time.Duration `json:"duration"`
-	Success       bool      `json:"success"`
-	RolledBack    bool      `json:"rolled_back"`
-	RollbackAt    *time.Time `json:"rollback_at,omitempty"`
+	ID         string        `json:"id"`
+	Version    string        `json:"version"`
+	FromEnv    string        `json:"from_env"`
+	ToEnv      string        `json:"to_env"`
+	PromotedBy string        `json:"promoted_by"`
+	PromotedAt time.Time     `json:"promoted_at"`
+	Duration   time.Duration `json:"duration"`
+	Success    bool          `json:"success"`
+	RolledBack bool          `json:"rolled_back"`
+	RollbackAt *time.Time    `json:"rollback_at,omitempty"`
 }
 
 // StackPromotionResult represents the result of a stack promotion
 type StackPromotionResult struct {
-	Request           *StackPromotionRequest `json:"request"`
-	Success           bool                   `json:"success"`
-	ComponentsPromoted int                   `json:"components_promoted"`
-	ComponentsFailed  int                    `json:"components_failed"`
-	Results           []PromotionResult      `json:"results"`
-	StartTime         time.Time              `json:"start_time"`
-	EndTime           time.Time              `json:"end_time"`
-	Duration          time.Duration          `json:"duration"`
-	Error             string                 `json:"error,omitempty"`
+	Request            *StackPromotionRequest `json:"request"`
+	Success            bool                   `json:"success"`
+	ComponentsPromoted int                    `json:"components_promoted"`
+	ComponentsFailed   int                    `json:"components_failed"`
+	Results            []PromotionResult      `json:"results"`
+	StartTime          time.Time              `json:"start_time"`
+	EndTime            time.Time              `json:"end_time"`
+	Duration           time.Duration          `json:"duration"`
+	Error              string                 `json:"error,omitempty"`
 }

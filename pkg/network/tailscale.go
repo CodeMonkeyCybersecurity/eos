@@ -3,6 +3,7 @@
 package network
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -350,7 +351,7 @@ func generateTailscaleTerraformConfig(rc *eos_io.RuntimeContext, config *Tailsca
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating Tailscale Terraform configuration")
 
-	if err := os.MkdirAll(config.TerraformDir, 0755); err != nil {
+	if err := os.MkdirAll(config.TerraformDir, shared.ServiceDirPerm); err != nil {
 		return err
 	}
 

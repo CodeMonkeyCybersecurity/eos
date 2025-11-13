@@ -77,7 +77,7 @@ func (sim *ServiceInstallationManager) installQemuGuest(rc *eos_io.RuntimeContex
 
 	// Use shared service manager for consistent service operations
 	serviceManager := serviceutil.NewServiceManager(rc)
-	
+
 	// Enable the service
 	if err := serviceManager.Enable("qemu-guest-agent"); err != nil {
 		logger.Warn("Failed to enable QEMU Guest Agent service", zap.Error(err))

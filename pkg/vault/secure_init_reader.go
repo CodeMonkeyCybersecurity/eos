@@ -429,7 +429,7 @@ func auditVaultInitAccess(rc *eos_io.RuntimeContext, audit *AccessAuditInfo) {
 	auditDir := "/var/log/eos"
 	auditFile := filepath.Join(auditDir, "vault-access.log")
 
-	if err := os.MkdirAll(auditDir, 0750); err == nil {
+	if err := os.MkdirAll(auditDir, VaultDirPerm); err == nil {
 		auditEntry := fmt.Sprintf("[%s] User '%s' accessed vault init data. Reason: '%s', Redaction: %s\n",
 			audit.AccessTime.Format(time.RFC3339),
 			audit.AccessedBy,

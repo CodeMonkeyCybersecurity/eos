@@ -310,7 +310,7 @@ func BenchmarkScheduleCron(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = scheduleCron(rc, "eos update packages", "linux")
 	}
 }
@@ -321,7 +321,7 @@ func BenchmarkScheduleCronRandomGeneration(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Focus on the random number generation part
 		_ = scheduleCron(rc, "test", "unsupported") // Will fail fast after random generation
 	}

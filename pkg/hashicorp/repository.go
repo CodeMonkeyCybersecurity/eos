@@ -3,6 +3,7 @@
 package hashicorp
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -145,7 +146,7 @@ func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 	repoConfig := fmt.Sprintf("deb [signed-by=%s] https://apt.releases.hashicorp.com %s main",
 		hashicorpKeyPath, codename)
 
-	if err := os.WriteFile(debianRepoPath, []byte(repoConfig+"\n"), 0644); err != nil {
+	if err := os.WriteFile(debianRepoPath, []byte(repoConfig+"\n"), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write repository configuration",
 			zap.String("path", debianRepoPath),
 			zap.String("config", repoConfig),
@@ -189,7 +190,7 @@ gpgcheck=1
 gpgkey=https://rpm.releases.hashicorp.com/gpg
 `
 
-	if err := os.WriteFile(rhelRepoPath, []byte(repoConfig), 0644); err != nil {
+	if err := os.WriteFile(rhelRepoPath, []byte(repoConfig), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write repository configuration",
 			zap.String("path", rhelRepoPath),
 			zap.Error(err))

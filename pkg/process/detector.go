@@ -27,7 +27,7 @@ func FindProcesses(ctx context.Context, pattern string) ([]ProcessInfo, error) {
 		Capture: true,
 		Timeout: 5 * time.Second,
 	})
-	
+
 	if err != nil {
 		// ps command failed - this is an actual error
 		return nil, err
@@ -35,14 +35,14 @@ func FindProcesses(ctx context.Context, pattern string) ([]ProcessInfo, error) {
 
 	processes := []ProcessInfo{}
 	lines := strings.Split(output, "\n")
-	
+
 	// Skip header line
 	for i := 1; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		
+
 		// Check if line contains our pattern
 		if strings.Contains(line, pattern) {
 			// Parse the line
@@ -67,7 +67,7 @@ func FindProcesses(ctx context.Context, pattern string) ([]ProcessInfo, error) {
 			}
 		}
 	}
-	
+
 	return processes, nil
 }
 
@@ -88,24 +88,24 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	if len(processes) == 0 {
 		return 0, nil // No processes to kill
 	}
-	
+
 	// Collect PIDs
 	pids := []string{}
 	for _, proc := range processes {
 		pids = append(pids, strconv.Itoa(proc.PID))
 	}
-	
+
 	// First try SIGTERM
 	_, _ = execute.Run(ctx, execute.Options{
 		Command: "kill",
 		Args:    append([]string{"-TERM"}, pids...),
 		Timeout: 5 * time.Second,
 	})
-	
+
 	// Wait for graceful shutdown
 	// SECURITY P0 #1: Use context-aware sleep to respect cancellation
 	select {
@@ -114,7 +114,7 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 	case <-ctx.Done():
 		return 0, fmt.Errorf("process termination cancelled during graceful wait: %w", ctx.Err())
 	}
-	
+
 	// Check if any still running
 	stillRunning, _ := FindProcesses(ctx, pattern)
 	if len(stillRunning) > 0 {
@@ -123,14 +123,14 @@ func KillProcesses(ctx context.Context, pattern string) (int, error) {
 		for _, proc := range stillRunning {
 			remainingPids = append(remainingPids, strconv.Itoa(proc.PID))
 		}
-		
+
 		_, _ = execute.Run(ctx, execute.Options{
 			Command: "kill",
 			Args:    append([]string{"-KILL"}, remainingPids...),
 			Timeout: 5 * time.Second,
 		})
 	}
-	
+
 	return len(processes), nil
 }
 
@@ -153,15 +153,15 @@ func GetServiceStatus(ctx context.Context, serviceName string) (*ServiceStatus, 
 		Capture: true,
 		Timeout: 5 * time.Second,
 	})
-	
+
 	if err != nil || listOutput == "" || !strings.Contains(listOutput, serviceName) {
 		return nil, nil // Service doesn't exist
 	}
-	
+
 	status := &ServiceStatus{
 		Name: serviceName,
 	}
-	
+
 	// Check if active
 	activeOutput, _ := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
@@ -171,7 +171,7 @@ func GetServiceStatus(ctx context.Context, serviceName string) (*ServiceStatus, 
 	})
 	status.State = strings.TrimSpace(activeOutput)
 	status.IsActive = status.State == "active"
-	
+
 	// Check if enabled
 	enabledOutput, _ := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
@@ -181,7 +181,7 @@ func GetServiceStatus(ctx context.Context, serviceName string) (*ServiceStatus, 
 	})
 	enabledState := strings.TrimSpace(enabledOutput)
 	status.IsEnabled = enabledState == "enabled"
-	
+
 	// Get detailed status
 	if showOutput, err := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
@@ -193,7 +193,7 @@ func GetServiceStatus(ctx context.Context, serviceName string) (*ServiceStatus, 
 			status.SubState = strings.TrimSpace(parts[1])
 		}
 	}
-	
+
 	return status, nil
 }
 
@@ -203,12 +203,12 @@ func IsAPIAccessible(ctx context.Context, checkCommand string, checkArgs []strin
 	// Short timeout for API checks
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	
+
 	_, err := execute.Run(ctx, execute.Options{
 		Command: checkCommand,
 		Args:    checkArgs,
 		Capture: true,
 	})
-	
+
 	return err == nil
 }

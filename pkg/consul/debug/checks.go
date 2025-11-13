@@ -1200,6 +1200,7 @@ func checkVaultConsulConnectivity(rc *eos_io.RuntimeContext) DiagnosticResult {
 //   - Consul is actually running with ACLs enabled
 //   - ACL tokens are working
 //   - ACL bootstrap has been performed
+//
 // To verify actual ACL status, Consul API must be accessible (requires running service)
 func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -1333,6 +1334,7 @@ func checkACLEnabled(rc *eos_io.RuntimeContext) DiagnosticResult {
 //   - SUCCESS: Config matches actual, no orphaned files
 //   - WARNING: Multiple sources disagree, but no active mismatch
 //   - CRITICAL: Config doesn't match actual (ACL operations will fail)
+//
 // checkDataDirectoryConfiguration verifies data directory config matches actual usage
 // Accepts optional authenticated Consul client for API queries (pass nil if client creation failed)
 func checkDataDirectoryConfiguration(rc *eos_io.RuntimeContext, consulClient *consulapi.Client, clientErr error) DiagnosticResult {

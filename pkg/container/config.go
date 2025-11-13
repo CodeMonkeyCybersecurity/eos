@@ -55,7 +55,7 @@ func ValidateVolumeMapping(volumeMapping string) error {
 	}
 
 	hostPath := parts[0]
-	
+
 	// Validate host path
 	if err := validateHostPath(hostPath); err != nil {
 		return fmt.Errorf("invalid host path: %w", err)

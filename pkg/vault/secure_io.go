@@ -19,10 +19,10 @@ import (
 // SecureReadCredential reads a credential file using file descriptors to prevent TOCTOU
 //
 // SECURITY GUARANTEE:
-//   1. Opens file and acquires shared lock (LOCK_SH) - prevents modification during read
-//   2. Uses fstat(fd) to get size - NO RACE, we're reading the locked FD
-//   3. Reads from locked FD - NO RACE, same FD we just fstat'd
-//   4. No path-based operations after open - eliminates TOCTOU window
+//  1. Opens file and acquires shared lock (LOCK_SH) - prevents modification during read
+//  2. Uses fstat(fd) to get size - NO RACE, we're reading the locked FD
+//  3. Reads from locked FD - NO RACE, same FD we just fstat'd
+//  4. No path-based operations after open - eliminates TOCTOU window
 //
 // WHY THIS MATTERS:
 //   - AppRole credentials (role_id, secret_id) are authentication secrets
@@ -30,7 +30,8 @@ import (
 //   - Result: Eos uses attacker's role_id/secret_id, attacker gains Vault access
 //
 // USAGE:
-//   roleID, err := vault.SecureReadCredential(rc, "/var/lib/eos/secret/vault/role_id", "role_id")
+//
+//	roleID, err := vault.SecureReadCredential(rc, "/var/lib/eos/secret/vault/role_id", "role_id")
 func SecureReadCredential(rc *eos_io.RuntimeContext, path, credName string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -97,12 +98,12 @@ func SecureReadCredential(rc *eos_io.RuntimeContext, path, credName string) (str
 // SecureWriteCredential writes a credential file using file descriptors and verifies integrity
 //
 // SECURITY GUARANTEE:
-//   1. Creates file with O_WRONLY|O_CREATE|O_EXCL - fails if file exists (no overwrite races)
-//   2. Acquires exclusive lock (LOCK_EX) immediately after creation
-//   3. Writes data to locked FD
-//   4. Syncs to disk (fsync) before verification
-//   5. Re-reads from same FD to verify integrity
-//   6. No path-based operations after create - eliminates TOCTOU window
+//  1. Creates file with O_WRONLY|O_CREATE|O_EXCL - fails if file exists (no overwrite races)
+//  2. Acquires exclusive lock (LOCK_EX) immediately after creation
+//  3. Writes data to locked FD
+//  4. Syncs to disk (fsync) before verification
+//  5. Re-reads from same FD to verify integrity
+//  6. No path-based operations after create - eliminates TOCTOU window
 //
 // WHY THIS MATTERS:
 //   - Writing root tokens, unseal keys, AppRole credentials
@@ -110,7 +111,8 @@ func SecureReadCredential(rc *eos_io.RuntimeContext, path, credName string) (str
 //   - O_EXCL prevents overwrite races, flock prevents concurrent access
 //
 // USAGE:
-//   err := vault.SecureWriteCredential(rc, "/var/lib/eos/secret/vault/role_id", roleID, 0600, "role_id")
+//
+//	err := vault.SecureWriteCredential(rc, "/var/lib/eos/secret/vault/role_id", roleID, 0600, "role_id")
 func SecureWriteCredential(rc *eos_io.RuntimeContext, path, data string, perm os.FileMode, credName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

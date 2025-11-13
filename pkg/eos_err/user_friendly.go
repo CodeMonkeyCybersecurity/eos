@@ -15,15 +15,15 @@ type UserFriendlyError struct {
 // Error implements the error interface
 func (e *UserFriendlyError) Error() string {
 	var sb strings.Builder
-	
+
 	// Main error message
 	sb.WriteString(fmt.Sprintf("Failed to %s", e.Operation))
-	
+
 	// Add cause if present
 	if e.Cause != nil {
 		sb.WriteString(fmt.Sprintf(": %v", e.Cause))
 	}
-	
+
 	// Add suggestions
 	if len(e.Suggestions) > 0 {
 		sb.WriteString("\n\nTry the following:")
@@ -31,7 +31,7 @@ func (e *UserFriendlyError) Error() string {
 			sb.WriteString(fmt.Sprintf("\n  %d. %s", i+1, suggestion))
 		}
 	}
-	
+
 	return sb.String()
 }
 

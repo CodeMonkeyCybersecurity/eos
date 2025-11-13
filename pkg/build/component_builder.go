@@ -11,9 +11,9 @@ import (
 
 // ComponentBuilder handles building individual components
 type ComponentBuilder struct {
-	config     *ComponentBuildConfig
+	config       *ComponentBuildConfig
 	dockerClient DockerClient
-	gitClient   GitClient
+	gitClient    GitClient
 }
 
 // ComponentBuildConfig holds configuration for component builds
@@ -146,7 +146,7 @@ func (cb *ComponentBuilder) Build(rc *eos_io.RuntimeContext) (*ComponentBuildRes
 func (cb *ComponentBuilder) assessBuildPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Assessing build prerequisites", 
+	logger.Info("Assessing build prerequisites",
 		zap.String("component", cb.config.Name))
 
 	// Check if Docker is available

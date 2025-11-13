@@ -54,24 +54,24 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 		priority  int  // lower number = higher priority
 	}{
 		{
-			name:      "vault-agent-token",
-			fn:        func(client *api.Client) (string, error) {
+			name: "vault-agent-token",
+			fn: func(client *api.Client) (string, error) {
 				return tryAgentTokenInteractive(rc, client, VaultAgentTokenPath, AuthContextRuntime)
 			},
 			sensitive: true,
 			priority:  1,
 		},
 		{
-			name:      "approle-auth",
-			fn:        func(client *api.Client) (string, error) {
+			name: "approle-auth",
+			fn: func(client *api.Client) (string, error) {
 				return tryAppRoleInteractive(rc, client, AuthContextRuntime)
 			},
 			sensitive: true,
 			priority:  2,
 		},
 		{
-			name:      "interactive-userpass",
-			fn:        func(client *api.Client) (string, error) {
+			name: "interactive-userpass",
+			fn: func(client *api.Client) (string, error) {
 				return tryUserpassInteractive(rc, client, AuthContextRuntime)
 			},
 			sensitive: false,

@@ -1,6 +1,7 @@
 package consul
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ func GenerateClusterVariables(rc *eos_io.RuntimeContext, outputDir string, data 
 		zap.String("output_dir", outputDir),
 		zap.String("cluster_name", data.ClusterName))
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -84,7 +85,7 @@ variable "ssh_key_name" {
 `, data.VaultAddr, data.ConsulDatacenter, data.ClusterName, data.ServerCount, data.ClientCount, data.ServerType, data.Location, data.SSHKeyName)
 
 	variablesPath := filepath.Join(outputDir, "variables.tf")
-	if err := os.WriteFile(variablesPath, []byte(variables), 0644); err != nil {
+	if err := os.WriteFile(variablesPath, []byte(variables), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write variables file: %w", err)
 	}
 

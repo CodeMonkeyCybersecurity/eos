@@ -16,7 +16,7 @@ func WriteAgentPassword(rc *eos_io.RuntimeContext, password string) error {
 	otelzap.Ctx(rc.Ctx).Debug(" Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
 
 	data := []byte(password + "\n")
-	if err := os.WriteFile(shared.VaultAgentPassPath, data, 0600); err != nil {
+	if err := os.WriteFile(shared.VaultAgentPassPath, data, VaultSecretFilePerm); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to write password file", zap.String("path", shared.VaultAgentPassPath), zap.Error(err))
 		return fmt.Errorf("failed to write Vault Agent password to %s: %w", shared.VaultAgentPassPath, err)
 	}

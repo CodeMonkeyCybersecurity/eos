@@ -12,6 +12,7 @@ import (
 
 // TestPasswordGenerationSecurity tests the security properties of password generation
 func TestPasswordGenerationSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("entropy_validation", func(t *testing.T) {
 		// Generate large number of passwords to test entropy
 		passwords := make(map[string]bool)
@@ -36,6 +37,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("character_distribution", func(t *testing.T) {
+		t.Parallel()
 		// Test character class distribution in generated passwords
 		const numTests = 100
 		const passwordLength = 24
@@ -83,6 +85,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("length_boundaries", func(t *testing.T) {
+		t.Parallel()
 		// Test minimum length enforcement
 		_, err := GeneratePassword(MinPasswordLen - 1)
 		testutil.AssertError(t, err)
@@ -103,6 +106,7 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 	})
 
 	t.Run("no_predictable_patterns", func(t *testing.T) {
+		t.Parallel()
 		// Generate multiple passwords and check for predictable patterns
 		passwords := make([]string, 50)
 		for i := range passwords {
@@ -142,9 +146,11 @@ func TestPasswordGenerationSecurity(t *testing.T) {
 
 // TestPasswordValidationSecurityExtended tests password validation for security properties
 func TestPasswordValidationSecurityExtended(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	t.Run("common_password_rejection", func(t *testing.T) {
+		t.Parallel()
 		// Test that common/weak passwords are rejected
 		commonPasswords := []string{
 			"password",
@@ -172,6 +178,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("injection_attempt_rejection", func(t *testing.T) {
+		t.Parallel()
 		// Test that passwords containing injection attempts are rejected
 		injectionPasswords := []string{
 			"password'; DROP TABLE users; --",
@@ -192,6 +199,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("unicode_attack_rejection", func(t *testing.T) {
+		t.Parallel()
 		// Test that Unicode-based attacks are handled properly
 		unicodePasswords := []string{
 			"password\u200B123", // Zero-width space
@@ -209,6 +217,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("length_boundary_validation", func(t *testing.T) {
+		t.Parallel()
 		// Test length boundaries
 		shortPasswords := []string{
 			"",
@@ -237,6 +246,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("complexity_requirements", func(t *testing.T) {
+		t.Parallel()
 		// Test passwords missing complexity requirements
 		insufficientPasswords := []struct {
 			password string
@@ -264,6 +274,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 	})
 
 	t.Run("valid_strong_passwords", func(t *testing.T) {
+		t.Parallel()
 		// Test that legitimately strong passwords are accepted
 		strongPasswords := []string{
 			"MyVerySecure!Password123",
@@ -284,6 +295,7 @@ func TestPasswordValidationSecurityExtended(t *testing.T) {
 
 // TestPasswordMemorySecurity tests secure handling of passwords in memory
 func TestPasswordMemorySecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("secure_zero_functionality", func(t *testing.T) {
 		// Test that SecureZero actually zeroes memory
 		sensitiveData := []byte("very secret password data")
@@ -310,6 +322,7 @@ func TestPasswordMemorySecurity(t *testing.T) {
 	})
 
 	t.Run("secure_zero_edge_cases", func(t *testing.T) {
+		t.Parallel()
 		// Test edge cases
 		testCases := [][]byte{
 			{},                 // Empty slice
@@ -330,6 +343,7 @@ func TestPasswordMemorySecurity(t *testing.T) {
 	})
 
 	t.Run("password_generation_cleanup", func(t *testing.T) {
+		t.Parallel()
 		// This is more of a documentation test - ensure password generation
 		// doesn't leave sensitive data in memory longer than necessary
 		pwd, err := GeneratePassword(32)
@@ -351,6 +365,7 @@ func TestPasswordMemorySecurity(t *testing.T) {
 
 // TestPasswordRedactionSecurity tests that passwords are properly redacted in logs
 func TestPasswordRedactionSecurity(t *testing.T) {
+	t.Parallel()
 	t.Run("redaction_effectiveness", func(t *testing.T) {
 		// Test various password-like strings
 		sensitiveStrings := []string{
@@ -380,6 +395,7 @@ func TestPasswordRedactionSecurity(t *testing.T) {
 	})
 
 	t.Run("non_sensitive_passthrough", func(t *testing.T) {
+		t.Parallel()
 		// Test that non-sensitive strings are passed through
 		nonSensitiveStrings := []string{
 			"hello",
@@ -446,7 +462,7 @@ func BenchmarkPasswordGeneration(b *testing.B) {
 
 	for _, length := range lengths {
 		b.Run(fmt.Sprintf("length_%d", length), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, err := GeneratePassword(length)
 				if err != nil {
 					b.Fatal(err)
@@ -468,7 +484,7 @@ func BenchmarkPasswordValidation(b *testing.B) {
 
 	for _, pwd := range passwords {
 		b.Run(fmt.Sprintf("validate_%s", strings.ReplaceAll(pwd, "!", "_")), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_ = ValidateStrongPassword(ctx, pwd)
 			}
 		})
@@ -477,6 +493,7 @@ func BenchmarkPasswordValidation(b *testing.B) {
 
 // TestPasswordSecurityConstants tests that security constants are appropriately set
 func TestPasswordSecurityConstants(t *testing.T) {
+	t.Parallel()
 	t.Run("minimum_length_security", func(t *testing.T) {
 		// Modern security standards recommend at least 12-14 characters
 		if MinPasswordLen < 12 {

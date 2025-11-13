@@ -3,7 +3,7 @@ package nomad_orchestrator
 
 import (
 	"time"
-	
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
@@ -12,19 +12,19 @@ type JobConfig struct {
 	// Service identification
 	ServiceName string
 	JobTemplate string
-	
+
 	// Common configuration
 	Datacenter string
 	Port       int
 	DataPath   string
-	
+
 	// Service-specific variables
 	Variables map[string]interface{}
-	
+
 	// Resource allocation
 	CPU    int
 	Memory int
-	
+
 	// Deployment options
 	Timeout time.Duration
 }

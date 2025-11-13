@@ -74,7 +74,7 @@ func TestVaultSaveCredential(t *testing.T) {
 	t.Run("fail_closed_no_store", func(t *testing.T) {
 		// Test fail-closed behavior when no store is configured
 		globalCredentialStore = nil
-		
+
 		_, err := SaveCredential("testapp", "testuser", "testpass123")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "credential store not initialized")
@@ -183,7 +183,7 @@ func TestVaultReadCredential(t *testing.T) {
 
 	t.Run("no_store_configured", func(t *testing.T) {
 		globalCredentialStore = nil
-		
+
 		_, err := ReadCredential("testapp", "testuser")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "credential store not initialized")
@@ -256,7 +256,7 @@ func TestVaultDeleteCredential(t *testing.T) {
 
 	t.Run("no_store_configured", func(t *testing.T) {
 		globalCredentialStore = nil
-		
+
 		err := DeleteCredential("testapp", "testuser")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "credential store not initialized")
@@ -330,7 +330,7 @@ func TestVaultListCredentials(t *testing.T) {
 
 	t.Run("no_store_configured", func(t *testing.T) {
 		globalCredentialStore = nil
-		
+
 		_, err := ListCredentials("testapp")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "credential store not initialized")
@@ -482,8 +482,8 @@ func TestVaultCredentialSecurity(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				_, err := SaveCredential("app", 
-					fmt.Sprintf("user%d", idx), 
+				_, err := SaveCredential("app",
+					fmt.Sprintf("user%d", idx),
 					fmt.Sprintf("pass%d", idx))
 				errors[idx] = err
 			}(i)
@@ -624,7 +624,7 @@ func BenchmarkVaultOperations(b *testing.B) {
 	SetCredentialStore(mock)
 
 	b.Run("save_credential", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), "pass")
 		}
 	})
@@ -632,9 +632,9 @@ func BenchmarkVaultOperations(b *testing.B) {
 	b.Run("read_credential", func(b *testing.B) {
 		// Pre-save a credential
 		_, _ = SaveCredential("benchapp", "benchuser", "benchpass")
-		
+
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = ReadCredential("benchapp", "benchuser")
 		}
 	})

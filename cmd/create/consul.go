@@ -5,8 +5,8 @@ package create
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/lifecycle"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consul/lifecycle"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"

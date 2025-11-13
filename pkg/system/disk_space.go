@@ -19,10 +19,10 @@ import (
 // DiskSpaceRequirements defines minimum space requirements for an operation
 type DiskSpaceRequirements struct {
 	// Paths to check
-	TempDir    string // Temporary build directory
-	BinaryDir  string // Binary installation directory
-	SourceDir  string // Source code directory
-	BackupDir  string // Backup directory (optional, for filesystem detection)
+	TempDir   string // Temporary build directory
+	BinaryDir string // Binary installation directory
+	SourceDir string // Source code directory
+	BackupDir string // Backup directory (optional, for filesystem detection)
 
 	// Minimum space required (in bytes)
 	MinTempSpace   uint64 // Minimum space for /tmp (build artifacts)
@@ -46,10 +46,10 @@ type DiskSpaceRequirements struct {
 //   - Symlink cycles could cause incorrect results
 //
 // NEW APPROACH:
-//   1. Open each path (or first existing parent) to get a file descriptor
-//   2. fstat(fd) to get device ID - NO RACE, we're statting the open FD
-//   3. Compare device IDs
-//   4. TRUE worst case: if can't determine, assume SAME FS (requires MORE space)
+//  1. Open each path (or first existing parent) to get a file descriptor
+//  2. fstat(fd) to get device ID - NO RACE, we're statting the open FD
+//  3. Compare device IDs
+//  4. TRUE worst case: if can't determine, assume SAME FS (requires MORE space)
 //
 // RATIONALE FOR WORST CASE:
 //   - If we assume "different FS" and they're actually the SAME FS:
@@ -99,9 +99,9 @@ func areOnSameFilesystem(path1, path2 string) (bool, error) {
 // ARCHITECTURAL FIX (Adversarial Analysis Round 4): Returns open FD to eliminate TOCTOU
 //
 // This prevents the race condition where:
-//   1. findExistingParent() confirms /opt/backup exists
-//   2. Attacker deletes /opt/backup
-//   3. syscall.Stat() fails on deleted path
+//  1. findExistingParent() confirms /opt/backup exists
+//  2. Attacker deletes /opt/backup
+//  3. syscall.Stat() fails on deleted path
 //
 // By returning an OPEN file descriptor, we guarantee the path stays valid for fstat.
 func openPathOrParent(path string) (*os.File, error) {
@@ -183,10 +183,10 @@ func DefaultUpdateRequirements(tempDir, binaryDir, sourceDir string) *DiskSpaceR
 // P0 FIX (Adversarial NEW #13): Detects filesystem boundaries for accurate calculation
 //
 // RATIONALE: During update, we need space for:
-//   1. Temp binary in /tmp (actual binary size)
-//   2. Backup in backup dir (actual binary size, if different filesystem)
-//   3. New binary replacing old (actual binary size)
-//   4. Safety margin (2x for filesystem overhead, fragmentation)
+//  1. Temp binary in /tmp (actual binary size)
+//  2. Backup in backup dir (actual binary size, if different filesystem)
+//  3. New binary replacing old (actual binary size)
+//  4. Safety margin (2x for filesystem overhead, fragmentation)
 //
 // FILESYSTEM DETECTION:
 //   - If backup dir is on SAME filesystem as binary dir: need 2× size (backup + new)
@@ -236,8 +236,8 @@ func UpdateRequirementsWithBinarySize(tempDir, binaryDir, sourceDir, backupDir s
 		//     1. Backup created (134MB) - separate filesystem
 		//     2. Peak: backup (134MB) = 1× binary size
 		// Need: 2× on binary FS + 1× on backup FS
-		minBinarySpace = binarySizeUint * safetyFactor  // 2× for binary FS
-		minBackupSpace = binarySizeUint * safetyFactor  // 1× with safety margin for backup FS
+		minBinarySpace = binarySizeUint * safetyFactor // 2× for binary FS
+		minBackupSpace = binarySizeUint * safetyFactor // 1× with safety margin for backup FS
 	}
 
 	// Ensure minimum of 200MB even for small binaries

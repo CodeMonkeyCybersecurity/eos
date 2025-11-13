@@ -19,10 +19,10 @@ import (
 
 // Provider manages Terraform operations
 type Provider struct {
-	rc       *eos_io.RuntimeContext
-	workDir  string
-	vars     map[string]interface{}
-	config   Config
+	rc      *eos_io.RuntimeContext
+	workDir string
+	vars    map[string]interface{}
+	config  Config
 }
 
 // Config holds Terraform provider configuration
@@ -190,10 +190,10 @@ func (p *Provider) renderTemplate(tmplStr string, data interface{}) (string, err
 // Apply applies Terraform configuration
 func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) error {
 	logger := otelzap.Ctx(p.rc.Ctx)
-	
+
 	// Create component directory
 	componentDir := filepath.Join(p.workDir, component.Name)
-	if err := os.MkdirAll(componentDir, 0755); err != nil {
+	if err := os.MkdirAll(componentDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create component directory: %w", err)
 	}
 
@@ -204,7 +204,7 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	}
 
 	mainTfPath := filepath.Join(componentDir, "main.tf")
-	if err := os.WriteFile(mainTfPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(mainTfPath, []byte(config), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write main.tf: %w", err)
 	}
 
@@ -215,22 +215,22 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	}
 
 	jobsDir := filepath.Join(componentDir, "jobs")
-	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+	if err := os.MkdirAll(jobsDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create jobs directory: %w", err)
 	}
 
 	jobPath := filepath.Join(jobsDir, fmt.Sprintf("%s.nomad.hcl", component.Name))
-	if err := os.WriteFile(jobPath, []byte(jobSpec), 0644); err != nil {
+	if err := os.WriteFile(jobPath, []byte(jobSpec), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write nomad job file: %w", err)
 	}
 
 	// Initialize Terraform
 	logger.Info("Initializing Terraform")
 	initCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"init", "-upgrade"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"init", "-upgrade"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, initCmd)
@@ -244,10 +244,10 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	// Plan
 	logger.Info("Planning Terraform changes")
 	planCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"plan", "-out=tfplan"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"plan", "-out=tfplan"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err = execute.Run(p.rc.Ctx, planCmd)
@@ -267,10 +267,10 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	applyArgs = append(applyArgs, "tfplan")
 
 	applyCmd := execute.Options{
-		Command:    "terraform",
-		Args:       applyArgs,
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    applyArgs,
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	_, err = execute.Run(p.rc.Ctx, applyCmd)
@@ -429,14 +429,14 @@ EOH
 // Destroy destroys Terraform-managed resources
 func (p *Provider) Destroy(ctx context.Context, component orchestrator.Component) error {
 	logger := otelzap.Ctx(p.rc.Ctx)
-	
+
 	componentDir := filepath.Join(p.workDir, component.Name)
-	
+
 	destroyCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"destroy", "-auto-approve"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"destroy", "-auto-approve"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, destroyCmd)
@@ -456,12 +456,12 @@ func (p *Provider) Destroy(ctx context.Context, component orchestrator.Component
 // GetOutputs retrieves Terraform outputs
 func (p *Provider) GetOutputs(ctx context.Context, component orchestrator.Component) (map[string]string, error) {
 	componentDir := filepath.Join(p.workDir, component.Name)
-	
+
 	outputCmd := execute.Options{
-		Command:    "terraform",
-		Args:       []string{"output", "-json"},
-		Dir: componentDir,
-		Capture:    true,
+		Command: "terraform",
+		Args:    []string{"output", "-json"},
+		Dir:     componentDir,
+		Capture: true,
 	}
 
 	output, err := execute.Run(p.rc.Ctx, outputCmd)
@@ -473,7 +473,7 @@ func (p *Provider) GetOutputs(ctx context.Context, component orchestrator.Compon
 	outputs := make(map[string]string)
 	// TODO: Implement JSON parsing of Terraform outputs
 	_ = output // Suppress unused variable warning
-	
+
 	return outputs, nil
 }
 

@@ -3,6 +3,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,7 @@ type ExecManager struct {
 // NewExecManager creates a new terraform-exec based manager - SIMPLIFIED
 func NewExecManager(ctx context.Context, workingDir string, logger otelzap.LoggerWithCtx) (*ExecManager, error) {
 	// Ensure working directory exists
-	if err := os.MkdirAll(workingDir, 0755); err != nil {
+	if err := os.MkdirAll(workingDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create working directory: %w", err)
 	}
 
@@ -62,7 +63,7 @@ func (em *ExecManager) CreateVMDirect(config *VMConfig) error {
 
 	// Step 2: Write configuration file
 	configPath := filepath.Join(em.workingDir, "main.tf.json")
-	if err := os.WriteFile(configPath, tfConfig, 0644); err != nil {
+	if err := os.WriteFile(configPath, tfConfig, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write configuration: %w", err)
 	}
 
@@ -334,7 +335,6 @@ func (em *ExecManager) CreateWorkspace(name string) error {
 	return em.tf.WorkspaceNew(em.ctx, name)
 }
 
-
 // ListVMs lists all VMs managed by Terraform
 func (em *ExecManager) ListVMs() ([]*VMInfo, error) {
 	em.logger.Debug("Listing all VMs from Terraform state")
@@ -407,7 +407,7 @@ func (em *ExecManager) UpdateVM(config *VMConfig) error {
 
 	// Write configuration
 	configPath := filepath.Join(em.workingDir, "main.tf.json")
-	if err := os.WriteFile(configPath, tfConfig, 0644); err != nil {
+	if err := os.WriteFile(configPath, tfConfig, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write configuration: %w", err)
 	}
 

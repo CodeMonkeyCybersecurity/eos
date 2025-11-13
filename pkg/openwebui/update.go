@@ -1,6 +1,7 @@
 package openwebui
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -167,7 +168,7 @@ func acquireUpdateLock(ctx context.Context) (*os.File, error) {
 	logger.Debug("Acquiring update lock", zap.String("lock_file", updateLockFile))
 
 	// Ensure /var/lock exists
-	if err := os.MkdirAll("/var/lock", 0755); err != nil {
+	if err := os.MkdirAll("/var/lock", shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
@@ -449,7 +450,7 @@ func (owu *OpenWebUIUpdater) performUpdate(ctx context.Context, state *UpdateSta
 	// Step 2: Ensure backup directory exists before checking disk space
 	if !owu.config.SkipBackup {
 		logger.Debug("Ensuring backup directory exists", zap.String("backup_dir", owu.config.BackupDir))
-		if err := os.MkdirAll(owu.config.BackupDir, 0755); err != nil {
+		if err := os.MkdirAll(owu.config.BackupDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create backup directory: %w", err)
 		}
 
@@ -565,11 +566,11 @@ func (owu *OpenWebUIUpdater) backupData(ctx context.Context) (string, error) {
 	dockerArgs := []string{
 		"run", "--rm",
 		"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
-		"--cap-drop", "ALL",                        // Drop all capabilities
-		"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed for tar
-		"--read-only",                              // Read-only root filesystem
-		"--network", "none",                        // No network access needed
-		"-v", "open-webui-data:/data:ro",           // Mount data volume read-only during backup
+		"--cap-drop", "ALL", // Drop all capabilities
+		"--cap-add", "DAC_OVERRIDE", // Only add minimal capability needed for tar
+		"--read-only",       // Read-only root filesystem
+		"--network", "none", // No network access needed
+		"-v", "open-webui-data:/data:ro", // Mount data volume read-only during backup
 		"-v", fmt.Sprintf("%s:/backup", owu.config.BackupDir),
 		"alpine",
 		"tar", "czf", fmt.Sprintf("/backup/%s", backupName),
@@ -663,7 +664,7 @@ func (owu *OpenWebUIUpdater) updateComposeFile(ctx context.Context, newVersion s
 	}
 
 	// Write backup
-	if err := os.WriteFile(backupComposePath, content, 0644); err != nil {
+	if err := os.WriteFile(backupComposePath, content, shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to create compose file backup", zap.Error(err))
 	} else {
 		logger.Debug("Created compose file backup", zap.String("path", backupComposePath))
@@ -699,7 +700,7 @@ func (owu *OpenWebUIUpdater) updateComposeFile(ctx context.Context, newVersion s
 	tempFile := owu.config.ComposeFile + ".tmp"
 
 	// Write to temp file
-	if err := os.WriteFile(tempFile, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(tempFile, []byte(newContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write temp compose file: %w", err)
 	}
 
@@ -934,11 +935,11 @@ func (owu *OpenWebUIUpdater) RestoreBackup(ctx context.Context, backupPath strin
 		Args: []string{
 			"run", "--rm",
 			"--security-opt", "no-new-privileges:true", // Prevent privilege escalation
-			"--cap-drop", "ALL",                        // Drop all capabilities
-			"--cap-add", "DAC_OVERRIDE",                // Only add minimal capability needed
-			"--cap-add", "CHOWN",                       // Need chown for tar extract
-			"--cap-add", "FOWNER",                      // Need fowner for tar extract
-			"--network", "none",                        // No network access needed
+			"--cap-drop", "ALL", // Drop all capabilities
+			"--cap-add", "DAC_OVERRIDE", // Only add minimal capability needed
+			"--cap-add", "CHOWN", // Need chown for tar extract
+			"--cap-add", "FOWNER", // Need fowner for tar extract
+			"--network", "none", // No network access needed
 			"-v", "open-webui-data:/data",
 			"-v", fmt.Sprintf("%s:/backup:ro", backupDir), // Mount backup directory read-only
 			"alpine",

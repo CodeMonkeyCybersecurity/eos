@@ -61,7 +61,7 @@ For detailed documentation: /etc/ssh/FIDO2_RECOVERY.md`,
 
 		// Run the hardening with FIDO2 SSH authentication
 		logger.Info("Running Ubuntu hardening with FIDO2 SSH authentication")
-		
+
 		if skipFIDO2 {
 			logger.Info("Skipping FIDO2 configuration as requested")
 			// Run enhanced hardening without MFA or FIDO2

@@ -14,6 +14,7 @@ import (
 )
 
 func TestHashPassword(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		password    string
@@ -58,6 +59,7 @@ func TestHashPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			hash, err := HashPassword(tt.password)
 
 			if tt.expectError {
@@ -77,6 +79,7 @@ func TestHashPassword(t *testing.T) {
 }
 
 func TestHashPasswordWithCost(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		password    string
@@ -129,6 +132,7 @@ func TestHashPasswordWithCost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			hash, err := HashPasswordWithCost(tt.password, tt.cost)
 
 			if tt.expectError {
@@ -153,6 +157,7 @@ func TestHashPasswordWithCost(t *testing.T) {
 }
 
 func TestComparePassword(t *testing.T) {
+	t.Parallel()
 	// Create a known hash first
 	password := "test123!"
 	hash, err := HashPassword(password)
@@ -204,6 +209,7 @@ func TestComparePassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ComparePassword(tt.hash, tt.password)
 
 			if tt.expectError {
@@ -216,6 +222,7 @@ func TestComparePassword(t *testing.T) {
 }
 
 func TestComparePasswordBool(t *testing.T) {
+	t.Parallel()
 	// Create a known hash first
 	password := "test123!"
 	hash, err := HashPassword(password)
@@ -261,6 +268,7 @@ func TestComparePasswordBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ComparePasswordBool(tt.hash, tt.password)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -268,6 +276,7 @@ func TestComparePasswordBool(t *testing.T) {
 }
 
 func TestIsHashCostWeak(t *testing.T) {
+	t.Parallel()
 	// Create hashes with different costs
 	password := "test123"
 	lowCostHash, err := HashPasswordWithCost(password, bcrypt.MinCost)
@@ -325,6 +334,7 @@ func TestIsHashCostWeak(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := IsHashCostWeak(tt.hash, tt.minCost)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -332,6 +342,7 @@ func TestIsHashCostWeak(t *testing.T) {
 }
 
 func TestComparePasswordLogging(t *testing.T) {
+	t.Parallel()
 	// Create a known hash first
 	password := "test123!"
 	hash, err := HashPassword(password)
@@ -381,6 +392,7 @@ func TestComparePasswordLogging(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := ComparePasswordLogging(tt.hash, tt.password, tt.logger)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -388,6 +400,7 @@ func TestComparePasswordLogging(t *testing.T) {
 }
 
 func TestBcryptIntegration(t *testing.T) {
+	t.Parallel()
 	// Test a complete workflow
 	originalPassword := "MySecurePassword123!"
 
@@ -417,6 +430,7 @@ func TestBcryptIntegration(t *testing.T) {
 }
 
 func TestBcryptSecurityProperties(t *testing.T) {
+	t.Parallel()
 	password := "testpassword"
 
 	// Test that same password produces different hashes ()
@@ -434,6 +448,7 @@ func TestBcryptSecurityProperties(t *testing.T) {
 }
 
 func TestBcryptErrorHandling(t *testing.T) {
+	t.Parallel()
 	// Test ComparePassword error cases
 	err := ComparePassword("", "password")
 	assert.Error(t, err)

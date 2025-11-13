@@ -157,7 +157,7 @@ func TestGenerateSecureToken(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkGenerateSecureToken(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := GenerateSecureToken(32)
 		if err != nil {
 			b.Fatalf("Failed to generate token: %v", err)
@@ -167,7 +167,7 @@ func BenchmarkGenerateSecureToken(b *testing.B) {
 
 func BenchmarkValidateEmail(b *testing.B) {
 	email := "test@example.com"
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = shared.ValidateEmail(email)
 	}
 }

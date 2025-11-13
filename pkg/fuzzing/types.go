@@ -6,35 +6,35 @@ import (
 )
 
 // TODO: Add JSON report generation - currently returns placeholder in generateJSONReport
-// TODO: Consider adding XML report format for CI integration  
+// TODO: Consider adding XML report format for CI integration
 // TODO: Add fuzz corpus management for persistent test cases
 
 // Comprehensive fuzzing coverage has been added for input sanitization:
 // - pkg/eos_io/secure_input_fuzz_test.go: Terminal injection, password validation
-// - pkg/ldap/ldap_fuzz_test.go: LDAP injection attacks, filter validation  
+// - pkg/ldap/ldap_fuzz_test.go: LDAP injection attacks, filter validation
 // - pkg/shared/file_operations_fuzz_test.go: Path traversal, filename injection
 // - pkg/shared/network_input_fuzz_test.go: SSRF, header injection, URL validation
 
 // Config represents the configuration for fuzzing operations
 type Config struct {
 	// Test execution settings
-	Duration      time.Duration `json:"duration"`
-	ParallelJobs  int           `json:"parallel_jobs"`
-	Verbose       bool          `json:"verbose"`
-	
+	Duration     time.Duration `json:"duration"`
+	ParallelJobs int           `json:"parallel_jobs"`
+	Verbose      bool          `json:"verbose"`
+
 	// Test category settings
 	SecurityFocus       bool `json:"security_focus"`
 	ArchitectureTesting bool `json:"architecture_testing"`
-	
+
 	// Output settings
-	LogDir        string `json:"log_dir"`
-	ReportFormat  string `json:"report_format"`
-	
+	LogDir       string `json:"log_dir"`
+	ReportFormat string `json:"report_format"`
+
 	// CI/CD specific settings
-	CIMode          bool   `json:"ci_mode"`
-	CIProfile       string `json:"ci_profile"`
-	FailFast        bool   `json:"fail_fast"`
-	
+	CIMode    bool   `json:"ci_mode"`
+	CIProfile string `json:"ci_profile"`
+	FailFast  bool   `json:"fail_fast"`
+
 	// Overnight testing settings
 	LongDuration   time.Duration `json:"long_duration"`
 	MediumDuration time.Duration `json:"medium_duration"`
@@ -64,22 +64,22 @@ type CrashData struct {
 
 // TestCategory represents different categories of fuzz tests
 type TestCategory struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Packages    []string `json:"packages"`
-	Priority    int      `json:"priority"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	Packages    []string      `json:"packages"`
+	Priority    int           `json:"priority"`
 	Duration    time.Duration `json:"duration"`
 }
 
 // FuzzSession represents a complete fuzzing session
 type FuzzSession struct {
-	ID            string         `json:"id"`
-	StartTime     time.Time      `json:"start_time"`
-	EndTime       time.Time      `json:"end_time"`
-	Config        Config         `json:"config"`
-	Results       []TestResult   `json:"results"`
-	Summary       SessionSummary `json:"summary"`
-	LogDir        string         `json:"log_dir"`
+	ID        string         `json:"id"`
+	StartTime time.Time      `json:"start_time"`
+	EndTime   time.Time      `json:"end_time"`
+	Config    Config         `json:"config"`
+	Results   []TestResult   `json:"results"`
+	Summary   SessionSummary `json:"summary"`
+	LogDir    string         `json:"log_dir"`
 }
 
 // SessionSummary provides summary statistics for a fuzzing session
@@ -131,43 +131,43 @@ type ProfileConfig struct {
 func DefaultProfiles() ProfileConfig {
 	return ProfileConfig{
 		Quick: Config{
-			Duration:     30 * time.Second,
-			ParallelJobs: 4,
-			SecurityFocus: true,
+			Duration:            30 * time.Second,
+			ParallelJobs:        4,
+			SecurityFocus:       true,
 			ArchitectureTesting: false,
-			Verbose: false,
-			CIMode: false,
-			FailFast: true,
+			Verbose:             false,
+			CIMode:              false,
+			FailFast:            true,
 		},
 		Security: Config{
-			Duration:     5 * time.Minute,
-			ParallelJobs: 4,
-			SecurityFocus: true,
+			Duration:            5 * time.Minute,
+			ParallelJobs:        4,
+			SecurityFocus:       true,
 			ArchitectureTesting: false,
-			Verbose: true,
-			CIMode: false,
-			FailFast: false,
+			Verbose:             true,
+			CIMode:              false,
+			FailFast:            false,
 		},
 		Overnight: Config{
-			Duration:       30 * time.Minute,
-			LongDuration:   8 * time.Hour,
-			MediumDuration: 2 * time.Hour,
-			ShortDuration:  30 * time.Minute,
-			ParallelJobs:   4,
-			SecurityFocus: true,
+			Duration:            30 * time.Minute,
+			LongDuration:        8 * time.Hour,
+			MediumDuration:      2 * time.Hour,
+			ShortDuration:       30 * time.Minute,
+			ParallelJobs:        4,
+			SecurityFocus:       true,
 			ArchitectureTesting: true,
-			Verbose: true,
-			CIMode: false,
-			FailFast: false,
+			Verbose:             true,
+			CIMode:              false,
+			FailFast:            false,
 		},
 		CI: Config{
-			Duration:     60 * time.Second,
-			ParallelJobs: 4,
-			SecurityFocus: true,
+			Duration:            60 * time.Second,
+			ParallelJobs:        4,
+			SecurityFocus:       true,
 			ArchitectureTesting: false,
-			Verbose: false,
-			CIMode: true,
-			FailFast: true,
+			Verbose:             false,
+			CIMode:              true,
+			FailFast:            true,
 		},
 	}
 }
@@ -181,9 +181,9 @@ const (
 
 // Constants for CI profiles
 const (
-	CIProfilePRValidation   = "pr-validation"
-	CIProfileSecurityFocus  = "security-focused"
-	CIProfileArchitecture   = "architecture"
+	CIProfilePRValidation  = "pr-validation"
+	CIProfileSecurityFocus = "security-focused"
+	CIProfileArchitecture  = "architecture"
 	CIProfileFull          = "full"
 )
 

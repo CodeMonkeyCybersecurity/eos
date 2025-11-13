@@ -71,20 +71,20 @@ func TestSaveCredential(t *testing.T) {
 			checkFile:   true,
 		},
 		{
-			name:          "empty_app_name",
-			app:           "",
-			username:      "user",
-			password:      "pass",
-			expectError:   false, // Currently allows empty app
-			checkFile:     true,
+			name:        "empty_app_name",
+			app:         "",
+			username:    "user",
+			password:    "pass",
+			expectError: false, // Currently allows empty app
+			checkFile:   true,
 		},
 		{
-			name:          "empty_username",
-			app:           "testapp",
-			username:      "",
-			password:      "pass",
-			expectError:   false, // Currently allows empty username
-			checkFile:     true,
+			name:        "empty_username",
+			app:         "testapp",
+			username:    "",
+			password:    "pass",
+			expectError: false, // Currently allows empty username
+			checkFile:   true,
 		},
 		{
 			name:        "path_traversal_in_username",
@@ -124,7 +124,7 @@ func TestSaveCredential(t *testing.T) {
 
 					// Check permissions
 					perms := info.Mode().Perm()
-					assert.Equal(t, fs.FileMode(0600), perms, 
+					assert.Equal(t, fs.FileMode(0600), perms,
 						"Credential file should have 0600 permissions")
 
 					// Check directory permissions
@@ -182,7 +182,7 @@ func TestCredentialSecurity(t *testing.T) {
 		info, err := os.Stat(path)
 		require.NoError(t, err)
 		assert.Equal(t, fs.FileMode(0644), info.Mode().Perm())
-		
+
 		t.Log("WARNING: No protection against permission changes after creation")
 	})
 
@@ -190,7 +190,7 @@ func TestCredentialSecurity(t *testing.T) {
 		// Test path traversal in username
 		maliciousUsername := "../../outside/config"
 		path, err := SaveCredential("app", maliciousUsername, "gotcha")
-		
+
 		// Currently this succeeds - SECURITY ISSUE!
 		assert.NoError(t, err)
 		assert.Contains(t, path, "..")
@@ -207,13 +207,13 @@ func TestCredentialSecurity(t *testing.T) {
 		configBase := filepath.Join(tempDir, "app", "credentials")
 		err = os.MkdirAll(filepath.Dir(configBase), 0700)
 		require.NoError(t, err)
-		
+
 		err = os.Symlink(targetDir, configBase)
 		if err == nil {
 			// If symlink creation succeeded, test the vulnerability
 			_, err := SaveCredential("app", "user", "leaked")
 			assert.NoError(t, err)
-			
+
 			// Check if file was created in symlink target
 			targetFile := filepath.Join(targetDir, "user.secret")
 			if _, err := os.Stat(targetFile); err == nil {
@@ -252,12 +252,12 @@ func TestCredentialSecurity(t *testing.T) {
 
 		// All should succeed (but last write wins)
 		assert.Equal(t, goroutines, successCount)
-		
+
 		// Read final content
 		finalPath := paths[0] // All should have same path
 		content, err := os.ReadFile(finalPath)
 		require.NoError(t, err)
-		
+
 		t.Logf("Final password in file: %s", string(content))
 		t.Log("WARNING: No protection against concurrent writes - last write wins")
 	})
@@ -268,7 +268,7 @@ func TestCredentialSecurity(t *testing.T) {
 		sensitivePassword := "this-stays-in-memory"
 		_, err := SaveCredential("memapp", "user", sensitivePassword)
 		assert.NoError(t, err)
-		
+
 		// In languages like Go, we can't easily clear string memory
 		t.Log("WARNING: Passwords remain in memory as immutable strings")
 	})
@@ -327,7 +327,7 @@ func TestCredentialFileNaming(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path, err := SaveCredential("naming-test", tt.username, "password")
-			
+
 			if tt.shouldSanitize {
 				// These SHOULD be sanitized but currently aren't
 				assert.NoError(t, err) // Currently succeeds
@@ -421,14 +421,14 @@ func BenchmarkSaveCredential(b *testing.B) {
 	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
 
 	b.Run("small_password", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), "smallpass")
 		}
 	})
 
 	b.Run("large_password", func(b *testing.B) {
 		largePassword := strings.Repeat("x", 1024)
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), largePassword)
 		}
 	})

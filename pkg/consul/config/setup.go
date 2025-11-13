@@ -17,6 +17,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// NOTE: Duplicates consul.ConsulConfigDirPerm/ConsulDataDirPerm/ConsulLogDirPerm/ConsulOptDirPerm
+// to avoid circular import (config → consul → acl → validation → consul)
+// consulConfigPerm is defined in generator.go in this package
+const (
+	consulConfigDirPerm = 0750 // /etc/consul.d
+	consulDataDirPerm   = 0750 // /var/lib/consul
+	consulLogDirPerm    = 0755 // /var/log/consul
+	consulOptDirPerm    = 0755 // /opt/consul
+)
+
 // DirectoryConfig represents a directory to be created with specific permissions
 type DirectoryConfig struct {
 	Path  string
@@ -54,10 +64,10 @@ func (sm *SetupManager) SetupDirectories() error {
 
 	// Define required directories
 	directories := []DirectoryConfig{
-		{Path: "/etc/consul.d", Mode: 0755, Owner: "consul"},
-		{Path: "/var/lib/consul", Mode: 0755, Owner: "consul"},
-		{Path: "/var/log/consul", Mode: 0755, Owner: "consul"},
-		{Path: "/opt/consul", Mode: 0755, Owner: "consul"},
+		{Path: "/etc/consul.d", Mode: consulConfigDirPerm, Owner: "consul"},
+		{Path: "/var/lib/consul", Mode: consulDataDirPerm, Owner: "consul"},
+		{Path: "/var/log/consul", Mode: consulLogDirPerm, Owner: "consul"},
+		{Path: "/opt/consul", Mode: consulOptDirPerm, Owner: "consul"},
 	}
 
 	// Critical directories that must have correct ownership
@@ -133,7 +143,7 @@ func (sm *SetupManager) CreateLogrotateConfig() error {
 `
 
 	logrotateFile := "/etc/logrotate.d/consul"
-	if err := os.WriteFile(logrotateFile, []byte(logrotateConfig), 0644); err != nil {
+	if err := os.WriteFile(logrotateFile, []byte(logrotateConfig), consulConfigPerm); err != nil {
 		return fmt.Errorf("failed to write logrotate config: %w", err)
 	}
 

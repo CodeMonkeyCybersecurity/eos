@@ -66,7 +66,7 @@ func generateSystemFacts(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 
 	// Create facts directory
 	factsDir := "/var/lib/eos/facts"
-	if err := os.MkdirAll(factsDir, 0755); err != nil {
+	if err := os.MkdirAll(factsDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create facts directory: %w", err)
 	}
 
@@ -110,7 +110,7 @@ func generateSystemFacts(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	}
 
 	factsPath := filepath.Join(factsDir, "system.json")
-	if err := os.WriteFile(factsPath, factsJSON, 0644); err != nil {
+	if err := os.WriteFile(factsPath, factsJSON, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write facts file: %w", err)
 	}
 
@@ -433,7 +433,7 @@ func generateTerraformData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 
 	// Create Terraform directory
 	terraformDir := "/var/lib/eos/terraform"
-	if err := os.MkdirAll(terraformDir, 0755); err != nil {
+	if err := os.MkdirAll(terraformDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create terraform directory: %w", err)
 	}
 
@@ -444,7 +444,7 @@ func generateTerraformData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 	hostname := strings.ToLower(strings.Split(info.Hostname, ".")[0])
 	terraformPath := filepath.Join(terraformDir, fmt.Sprintf("%s.tf", hostname))
 
-	if err := os.WriteFile(terraformPath, []byte(terraformResource), 0644); err != nil {
+	if err := os.WriteFile(terraformPath, []byte(terraformResource), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write terraform file: %w", err)
 	}
 
@@ -544,7 +544,7 @@ func CreateInventoryBackup(rc *eos_io.RuntimeContext) error {
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("inventory-backup-%s", timestamp))
 
-	if err := os.MkdirAll(backupPath, 0755); err != nil {
+	if err := os.MkdirAll(backupPath, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -644,7 +644,7 @@ func generateHashiCorpData(rc *eos_io.RuntimeContext, info *SystemInfo) error {
 
 	// Create HashiCorp configuration directory
 	configDir := "/opt/eos/hashicorp"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create HashiCorp config directory: %w", err)
 	}
 
@@ -676,7 +676,7 @@ func writeJSONConfig(path string, config interface{}) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, shared.ConfigFilePerm)
 }
 
 // ValidateHashiCorpExport validates the exported HashiCorp configuration data

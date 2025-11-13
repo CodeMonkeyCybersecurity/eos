@@ -72,14 +72,14 @@ func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.Asse
 	// CRITICAL: Validate hook command to prevent RCE
 	// WHITELIST only specific allowed commands
 	allowedCommands := map[string]bool{
-		"/usr/bin/restic":      true,
-		"/usr/bin/rsync":       true,
-		"/usr/bin/tar":         true,
-		"/usr/bin/gzip":        true,
-		"/bin/sh":              false, // BLOCKED - shell injection risk
-		"/bin/bash":            false, // BLOCKED - shell injection risk
-		"/usr/bin/curl":        false, // BLOCKED - exfiltration risk
-		"/usr/bin/wget":        false, // BLOCKED - exfiltration risk
+		"/usr/bin/restic": true,
+		"/usr/bin/rsync":  true,
+		"/usr/bin/tar":    true,
+		"/usr/bin/gzip":   true,
+		"/bin/sh":         false, // BLOCKED - shell injection risk
+		"/bin/bash":       false, // BLOCKED - shell injection risk
+		"/usr/bin/curl":   false, // BLOCKED - exfiltration risk
+		"/usr/bin/wget":   false, // BLOCKED - exfiltration risk
 	}
 
 	cmd := parts[0]

@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
@@ -32,6 +33,11 @@ Example:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// CRITICAL: Detect flag-like args (P0-1 fix)
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 
 		workingDir := "."
 		if len(args) > 0 {

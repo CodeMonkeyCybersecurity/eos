@@ -1,6 +1,7 @@
 package read
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/discovery"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -18,8 +20,8 @@ import (
 
 // discoveryCmd represents the internal asset discovery command
 var discoveryCmd = &cobra.Command{
-	Use:     "discovery [location]",
-	Short:   "Discover internal network assets using runZero-style techniques",
+	Use:   "discovery [location]",
+	Short: "Discover internal network assets using runZero-style techniques",
 	Long: `Discover internal network assets using HD Moore's runZero-style discovery techniques.
 This command performs comprehensive internal network scanning to identify:
 
@@ -56,6 +58,11 @@ Examples:
 // runDiscovery executes the internal asset discovery
 func runDiscovery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
 
 	// Parse flags
 	aggressive, _ := cmd.Flags().GetBool("aggressive")
@@ -94,7 +101,7 @@ func runDiscovery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	if len(args) > 0 {
 		specificLocation = args[0]
 		logger.Info("Discovering specific location", zap.String("location", specificLocation))
-		
+
 		result, err := manager.DiscoverLocation(rc, specificLocation)
 		if err != nil {
 			return fmt.Errorf("discovery failed for location %s: %w", specificLocation, err)
@@ -102,7 +109,7 @@ func runDiscovery(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		results = []*discovery.DiscoveryResult{result}
 	} else {
 		logger.Info("Discovering all configured locations")
-		
+
 		allResults, err := manager.DiscoverAll(rc)
 		if err != nil {
 			return fmt.Errorf("discovery failed: %w", err)
@@ -173,7 +180,7 @@ func loadDiscoveryConfig(configFile string) (*discovery.InternalDiscoveryConfig,
 // saveDiscoveryConfig saves discovery configuration
 func saveDiscoveryConfig(_ *discovery.InternalDiscoveryConfig, filename string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -192,13 +199,13 @@ func saveDiscoveryConfig(_ *discovery.InternalDiscoveryConfig, filename string) 
 // filterComplianceResults filters results to show only compliance violations
 func filterComplianceResults(results []*discovery.DiscoveryResult) []*discovery.DiscoveryResult {
 	filtered := make([]*discovery.DiscoveryResult, 0, len(results))
-	
+
 	for _, result := range results {
 		if len(result.Violations) > 0 {
 			// Create a copy with only assets that have violations
 			filteredResult := *result
 			filteredResult.AssetsFound = []discovery.Asset{}
-			
+
 			// Include only assets with violations
 			for _, violation := range result.Violations {
 				found := false
@@ -212,18 +219,18 @@ func filterComplianceResults(results []*discovery.DiscoveryResult) []*discovery.
 					filteredResult.AssetsFound = append(filteredResult.AssetsFound, violation.Asset)
 				}
 			}
-			
+
 			filtered = append(filtered, &filteredResult)
 		}
 	}
-	
+
 	return filtered
 }
 
 // filterShadowITResults filters results to show only shadow IT
 func filterShadowITResults(results []*discovery.DiscoveryResult) []*discovery.DiscoveryResult {
 	filtered := make([]*discovery.DiscoveryResult, 0, len(results))
-	
+
 	for _, result := range results {
 		if len(result.ShadowIT) > 0 {
 			// Create a copy with only shadow IT assets
@@ -232,7 +239,7 @@ func filterShadowITResults(results []*discovery.DiscoveryResult) []*discovery.Di
 			filtered = append(filtered, &filteredResult)
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -377,7 +384,7 @@ func displayResultsSummary(logger *otelzap.LoggerWithCtx, results []*discovery.D
 // saveDiscoveryResults saves results to a file
 func saveDiscoveryResults(results []*discovery.DiscoveryResult, filename, format string) error {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -402,16 +409,16 @@ func saveDiscoveryResults(results []*discovery.DiscoveryResult, filename, format
 
 // DiscoverySummary provides aggregated discovery statistics
 type DiscoverySummary struct {
-	LocationsScanned     int                `json:"locations_scanned"`
-	TotalAssets          int                `json:"total_assets"`
-	NewAssets            int                `json:"new_assets"`
-	UnauthorizedAssets   int                `json:"unauthorized_assets"`
-	TotalViolations      int                `json:"total_violations"`
-	TotalAlerts          int                `json:"total_alerts"`
-	AvgComplianceScore   int                `json:"avg_compliance_score"`
-	AvgRiskScore         int                `json:"avg_risk_score"`
-	TopRisks             []discovery.Asset  `json:"top_risks"`
-	ScanDuration         time.Duration      `json:"scan_duration"`
+	LocationsScanned   int               `json:"locations_scanned"`
+	TotalAssets        int               `json:"total_assets"`
+	NewAssets          int               `json:"new_assets"`
+	UnauthorizedAssets int               `json:"unauthorized_assets"`
+	TotalViolations    int               `json:"total_violations"`
+	TotalAlerts        int               `json:"total_alerts"`
+	AvgComplianceScore int               `json:"avg_compliance_score"`
+	AvgRiskScore       int               `json:"avg_risk_score"`
+	TopRisks           []discovery.Asset `json:"top_risks"`
+	ScanDuration       time.Duration     `json:"scan_duration"`
 }
 
 // generateDiscoverySummary creates a summary of all discovery results

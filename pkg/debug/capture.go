@@ -4,6 +4,7 @@
 package debug
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"io"
@@ -39,7 +40,7 @@ func CaptureDebugOutput(rc *eos_io.RuntimeContext, config *CaptureConfig) (strin
 
 	// Create .eos/debug directory in user's home
 	debugDir := filepath.Join(homeDir, ".eos", "debug")
-	if err := os.MkdirAll(debugDir, 0755); err != nil {
+	if err := os.MkdirAll(debugDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create debug directory %s: %w", debugDir, err)
 	}
 
@@ -52,7 +53,7 @@ func CaptureDebugOutput(rc *eos_io.RuntimeContext, config *CaptureConfig) (strin
 	filepath := filepath.Join(debugDir, filename)
 
 	// INTERVENE - Write debug output to file
-	if err := os.WriteFile(filepath, []byte(config.Output), 0644); err != nil {
+	if err := os.WriteFile(filepath, []byte(config.Output), shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write debug output to %s: %w", filepath, err)
 	}
 

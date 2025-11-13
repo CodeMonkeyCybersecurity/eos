@@ -19,11 +19,11 @@ import (
 
 // DependencyCheckResult contains results of build dependency verification
 type DependencyCheckResult struct {
-	GoPath         string   // Path to Go compiler
-	GoVersion      string   // Go version string
-	PkgConfigPath  string   // Path to pkg-config
-	LibvirtOK      bool     // Libvirt dev libraries found
-	CephLibsOK     bool     // All Ceph dev libraries found
+	GoPath          string   // Path to Go compiler
+	GoVersion       string   // Go version string
+	PkgConfigPath   string   // Path to pkg-config
+	LibvirtOK       bool     // Libvirt dev libraries found
+	CephLibsOK      bool     // All Ceph dev libraries found
 	MissingCephLibs []string // List of missing Ceph libraries
 }
 
@@ -161,10 +161,10 @@ func VerifyLibvirtDev(rc *eos_io.RuntimeContext, pkgConfigPath string) error {
 		logger.Debug("libvirt pkg-config check failed",
 			zap.Error(err),
 			zap.String("output", strings.TrimSpace(string(libvirtOutput))))
-		return fmt.Errorf("libvirt development libraries not found\n"+
-			"Fix: Install libvirt development libraries:\n"+
-			"  Ubuntu/Debian: sudo apt install libvirt-dev\n"+
-			"  RHEL/CentOS:   sudo yum install libvirt-devel\n"+
+		return fmt.Errorf("libvirt development libraries not found\n" +
+			"Fix: Install libvirt development libraries:\n" +
+			"  Ubuntu/Debian: sudo apt install libvirt-dev\n" +
+			"  RHEL/CentOS:   sudo yum install libvirt-devel\n" +
 			"  Fedora:        sudo dnf install libvirt-devel")
 	}
 

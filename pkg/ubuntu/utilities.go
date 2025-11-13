@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -34,7 +35,7 @@ func installLynis(rc *eos_io.RuntimeContext) error {
 	// Add Lynis repository
 	repoLine := "deb [signed-by=/usr/share/keyrings/cisofy-archive-keyring.gpg] https://packages.cisofy.com/community/lynis/deb/ stable main"
 	repoPath := "/etc/apt/sources.list.d/cisofy-lynis.list"
-	if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+	if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write Lynis repo file: %w", err)
 	}
 
@@ -70,11 +71,11 @@ $nrconf{restart} = 'a';
 `
 	// Create config directory if it doesn't exist
 	configDir := "/etc/needrestart/conf.d"
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("create needrestart config dir: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(configContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write needrestart config: %w", err)
 	}
 

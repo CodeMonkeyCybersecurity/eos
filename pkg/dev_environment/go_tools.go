@@ -1,6 +1,7 @@
 package dev_environment
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,7 @@ func InstallGoTools(rc *eos_io.RuntimeContext) error {
 
 	// Ensure GOPATH/bin is in PATH
 	goBin := filepath.Join(gopath, "bin")
-	if err := os.MkdirAll(goBin, 0755); err != nil {
+	if err := os.MkdirAll(goBin, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create go bin directory: %w", err)
 	}
 
@@ -161,7 +162,7 @@ func installGolangciLint(rc *eos_io.RuntimeContext) error {
 	defer func() { _ = os.Remove(tmpScript) }()
 
 	// Make it executable
-	if err := os.Chmod(tmpScript, 0755); err != nil {
+	if err := os.Chmod(tmpScript, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to make installer executable: %w", err)
 	}
 

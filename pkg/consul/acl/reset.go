@@ -36,6 +36,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// NOTE: Duplicates consul.ConsulConfigPerm to avoid circular import
+const consulConfigPerm = 0640
+
 // NOTE: Vault path functions are defined below to avoid circular import.
 // These duplicate the logic from pkg/consul/constants.go but use environment-aware paths.
 
@@ -428,7 +431,7 @@ func ResetACLBootstrap(rc *eos_io.RuntimeContext, config *ResetConfig) (*Bootstr
 			zap.String("content", resetIndexStr),
 			zap.String("permissions", "0644"))
 
-		if err := os.WriteFile(resetFilePath, []byte(resetIndexStr), 0644); err != nil {
+		if err := os.WriteFile(resetFilePath, []byte(resetIndexStr), consulConfigPerm); err != nil {
 			return nil, fmt.Errorf("failed to write reset index file on attempt %d: %w\n"+
 				"File: %s\n"+
 				"Remediation:\n"+

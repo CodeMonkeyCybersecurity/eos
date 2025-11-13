@@ -344,7 +344,7 @@ func TestFirewallSecurityPortValidation(t *testing.T) {
 
 // Benchmark Tests
 func BenchmarkHasBinary(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		hasBinary("go")
 	}
 }
@@ -356,7 +356,7 @@ func BenchmarkAllowPorts(b *testing.B) {
 	ports := []string{"8080", "8443"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = AllowPorts(rc, ports)
 	}
 }

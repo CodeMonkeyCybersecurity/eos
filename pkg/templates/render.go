@@ -11,6 +11,7 @@
 package templates
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"embed"
@@ -189,7 +190,7 @@ func (r *Renderer) RenderToFile(ctx context.Context, templatePath, outputPath st
 	}
 
 	// Write to output file
-	if err := os.WriteFile(outputPath, []byte(result), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(result), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write output file %s: %w", outputPath, err)
 	}
 

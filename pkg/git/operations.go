@@ -19,11 +19,11 @@ import (
 
 // RepositoryState represents the state of a git repository
 type RepositoryState struct {
-	IsRepository bool
-	HasChanges   bool
+	IsRepository  bool
+	HasChanges    bool
 	CurrentCommit string
-	RemoteURL    string
-	Branch       string
+	RemoteURL     string
+	Branch        string
 }
 
 // VerifyRepository checks if a directory is a valid git repository
@@ -128,7 +128,7 @@ func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 
 	// SECURITY CHECK: Verify remote is trusted BEFORE pulling
 	if err := VerifyTrustedRemote(rc, repoDir); err != nil {
-		return err  // Error already includes detailed message
+		return err // Error already includes detailed message
 	}
 
 	// Use --autostash to handle uncommitted changes automatically

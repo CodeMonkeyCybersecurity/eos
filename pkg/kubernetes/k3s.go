@@ -285,7 +285,7 @@ k3s_server_url = "%s"
 k3s_token = "%s"`, serverURL, token)
 	}
 
-	if err := os.WriteFile(outputDir+"/terraform.tfvars", []byte(tfvarsContent), 0644); err != nil {
+	if err := os.WriteFile(outputDir+"/terraform.tfvars", []byte(tfvarsContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 	}
 

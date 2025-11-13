@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ai"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -57,6 +58,11 @@ Examples:
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// CRITICAL: Detect flag-like args (P0-1 fix)
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 		question := strings.Join(args, " ")
 
 		// Get flags
@@ -117,7 +123,7 @@ Examples:
 		}
 
 		// Display response
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 		logger.Info("terminal prompt:  AI Assistant Response")
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 		logger.Info("")
@@ -211,7 +217,7 @@ Examples:
 			if err != nil {
 				logger.Warn("AI analysis failed", zap.Error(err))
 			} else if len(response.Choices) > 0 {
-				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 				logger.Info("terminal prompt:  AI Analysis & Recommendations")
 				logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 				logger.Info("")
@@ -294,7 +300,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		}
 
 		// Display response
-		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n" + strings.Repeat("=", 80))))
+		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", "\n"+strings.Repeat("=", 80))))
 		logger.Info("terminal prompt:  Diagnostic Results & Fix Recommendations")
 		logger.Info("terminal prompt:", zap.String("output", fmt.Sprintf("%v", strings.Repeat("=", 80))))
 		logger.Info("")

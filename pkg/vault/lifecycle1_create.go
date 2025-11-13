@@ -79,7 +79,7 @@ func orchestrateVaultCreateViaNomad(rc *eos_io.RuntimeContext) error {
 func generateVaultNomadJob(rc *eos_io.RuntimeContext) (*api.Job, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Generating Vault Nomad job specification")
-	
+
 	// Create basic Vault job
 	job := &api.Job{
 		ID:          stringPtr("vault"),
@@ -115,7 +115,7 @@ func generateVaultNomadJob(rc *eos_io.RuntimeContext) (*api.Job, error) {
 			},
 		},
 	}
-	
+
 	return job, nil
 }
 
@@ -123,7 +123,7 @@ func generateVaultNomadJob(rc *eos_io.RuntimeContext) (*api.Job, error) {
 func waitForVaultDeployment(rc *eos_io.RuntimeContext, _ *api.Client) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Waiting for Vault deployment to complete")
-	
+
 	// TODO: Implement proper deployment waiting and health checks
 	// For now, just return success
 	return nil
@@ -131,4 +131,4 @@ func waitForVaultDeployment(rc *eos_io.RuntimeContext, _ *api.Client) error {
 
 // Helper functions for Nomad API
 func stringPtr(s string) *string { return &s }
-func intPtr(i int) *int { return &i }
+func intPtr(i int) *int          { return &i }

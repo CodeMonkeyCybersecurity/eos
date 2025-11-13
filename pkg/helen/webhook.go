@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"os/exec"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"os/exec"
 )
 
 // WebhookPayload represents the incoming webhook data
@@ -31,9 +31,9 @@ type WebhookPayload struct {
 	Ref        string `json:"ref"`
 	After      string `json:"after"`
 	HeadCommit struct {
-		ID        string   `json:"id"`
-		Message   string   `json:"message"`
-		Timestamp string   `json:"timestamp"`
+		ID        string `json:"id"`
+		Message   string `json:"message"`
+		Timestamp string `json:"timestamp"`
 		Author    struct {
 			Name  string `json:"name"`
 			Email string `json:"email"`
@@ -62,7 +62,7 @@ type WebhookConfigExtended struct {
 func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		// Extract environment from URL path
 		pathParts := strings.Split(r.URL.Path, "/")
 		if len(pathParts) < 4 {
@@ -71,18 +71,18 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 			return
 		}
 		environment := pathParts[3]
-		
+
 		logger.Info("Webhook received",
 			zap.String("environment", environment),
 			zap.String("method", r.Method),
 			zap.String("remote_addr", r.RemoteAddr))
-		
+
 		// Only accept POST requests
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		// Read webhook configuration from Vault
 		webhookConfig, err := getWebhookConfig(rc, environment)
 		if err != nil {
@@ -90,20 +90,20 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 			http.Error(w, "Webhook not configured", http.StatusNotFound)
 			return
 		}
-		
+
 		// Verify webhook signature
 		signature := r.Header.Get("X-Hub-Signature-256")
 		if signature == "" {
 			signature = r.Header.Get("X-Signature")
 		}
-		
+
 		body, err := readAndVerifyWebhook(r, webhookConfig.Secret, signature)
 		if err != nil {
 			logger.Error("Webhook verification failed", zap.Error(err))
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		
+
 		// Parse webhook payload
 		var payload WebhookPayload
 		if err := json.Unmarshal(body, &payload); err != nil {
@@ -111,7 +111,7 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 			http.Error(w, "Invalid payload", http.StatusBadRequest)
 			return
 		}
-		
+
 		// Check if this is the correct branch
 		expectedRef := fmt.Sprintf("refs/heads/%s", webhookConfig.GitBranch)
 		if payload.Ref != expectedRef {
@@ -122,25 +122,25 @@ func WebhookHandler(rc *eos_io.RuntimeContext) http.HandlerFunc {
 			_, _ = fmt.Fprintf(w, "Ignoring push to %s (expecting %s)", payload.Ref, expectedRef)
 			return
 		}
-		
+
 		// Log deployment trigger
 		logger.Info("Triggering Helen deployment",
 			zap.String("environment", environment),
 			zap.String("commit", payload.After),
 			zap.String("author", payload.HeadCommit.Author.Name),
 			zap.String("message", payload.HeadCommit.Message))
-		
+
 		// Trigger deployment asynchronously
 		go func() {
 			if err := triggerDeployment(rc, environment, &payload); err != nil {
 				logger.Error("Deployment failed", zap.Error(err))
 			}
 		}()
-		
+
 		// Update last trigger time
 		webhookConfig.LastTrigger = time.Now()
 		_ = updateWebhookConfig(rc, environment, webhookConfig)
-		
+
 		// Return success
 		w.WriteHeader(http.StatusOK)
 		_, _ = fmt.Fprintf(w, "Deployment triggered for environment: %s", environment)
@@ -155,14 +155,14 @@ func readAndVerifyWebhook(r *http.Request, secret, signature string) ([]byte, er
 		return nil, fmt.Errorf("failed to read body: %w", err)
 	}
 	defer func() { _ = r.Body.Close() }()
-	
+
 	// Verify signature if provided
 	if signature != "" && secret != "" {
 		if !verifySignature(body, secret, signature) {
 			return nil, fmt.Errorf("invalid signature")
 		}
 	}
-	
+
 	return body, nil
 }
 
@@ -170,12 +170,12 @@ func readAndVerifyWebhook(r *http.Request, secret, signature string) ([]byte, er
 func verifySignature(payload []byte, secret, signature string) bool {
 	// Remove "sha256=" prefix if present
 	signature = strings.TrimPrefix(signature, "sha256=")
-	
+
 	// Calculate expected signature
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(payload)
 	expectedSig := hex.EncodeToString(mac.Sum(nil))
-	
+
 	// Constant time comparison
 	return hmac.Equal([]byte(signature), []byte(expectedSig))
 }
@@ -183,12 +183,12 @@ func verifySignature(payload []byte, secret, signature string) bool {
 // getWebhookConfig retrieves webhook configuration from Vault
 func getWebhookConfig(rc *eos_io.RuntimeContext, environment string) (*WebhookConfigExtended, error) {
 	vaultPath := fmt.Sprintf("kv/data/helen/%s/webhook", environment)
-	
+
 	data, err := vaultReadSecret(rc, vaultPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read webhook config: %w", err)
 	}
-	
+
 	config := &WebhookConfigExtended{
 		WebhookConfig: WebhookConfig{
 			Secret: data["secret"].(string),
@@ -197,7 +197,7 @@ func getWebhookConfig(rc *eos_io.RuntimeContext, environment string) (*WebhookCo
 		GitRepo:     data["git_repo"].(string),
 		GitBranch:   data["git_branch"].(string),
 	}
-	
+
 	// Parse timestamps if present
 	if createdAt, ok := data["created_at"].(string); ok {
 		config.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
@@ -205,14 +205,14 @@ func getWebhookConfig(rc *eos_io.RuntimeContext, environment string) (*WebhookCo
 	if lastTrigger, ok := data["last_trigger"].(string); ok {
 		config.LastTrigger, _ = time.Parse(time.RFC3339, lastTrigger)
 	}
-	
+
 	return config, nil
 }
 
 // updateWebhookConfig updates webhook configuration in Vault
 func updateWebhookConfig(rc *eos_io.RuntimeContext, environment string, config *WebhookConfigExtended) error {
 	vaultPath := fmt.Sprintf("kv/data/helen/%s/webhook", environment)
-	
+
 	data := map[string]interface{}{
 		"secret":       config.Secret,
 		"environment":  config.Environment,
@@ -221,18 +221,18 @@ func updateWebhookConfig(rc *eos_io.RuntimeContext, environment string, config *
 		"created_at":   config.CreatedAt.Format(time.RFC3339),
 		"last_trigger": config.LastTrigger.Format(time.RFC3339),
 	}
-	
+
 	return vaultWriteSecret(rc, vaultPath, data)
 }
 
 // triggerDeployment triggers a new deployment for Helen
 func triggerDeployment(rc *eos_io.RuntimeContext, environment string, payload *WebhookPayload) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting deployment",
 		zap.String("environment", environment),
 		zap.String("commit", payload.After))
-	
+
 	// Create deployment context
 	deployCtx := &DeploymentContext{
 		Environment: environment,
@@ -241,25 +241,25 @@ func triggerDeployment(rc *eos_io.RuntimeContext, environment string, payload *W
 		Author:      payload.HeadCommit.Author.Name,
 		Timestamp:   time.Now(),
 	}
-	
+
 	// Read current configuration
 	ghostConfig, err := readGhostConfig(rc, environment)
 	if err != nil {
 		return fmt.Errorf("failed to read Ghost config: %w", err)
 	}
-	
+
 	// Update git repository
 	logger.Info("Updating git repository")
 	if err := updateGitRepository(rc, ghostConfig); err != nil {
 		return fmt.Errorf("failed to update repository: %w", err)
 	}
-	
+
 	// Create blue-green deployment
 	logger.Info("Creating blue-green deployment")
 	if err := createBlueGreenDeployment(rc, ghostConfig, deployCtx); err != nil {
 		return fmt.Errorf("blue-green deployment failed: %w", err)
 	}
-	
+
 	// Wait for health checks
 	logger.Info("Waiting for deployment to be healthy")
 	if err := WaitForGhostHealthy(rc, ghostConfig); err != nil {
@@ -267,19 +267,19 @@ func triggerDeployment(rc *eos_io.RuntimeContext, environment string, payload *W
 		_ = rollbackDeployment(rc, ghostConfig, deployCtx)
 		return fmt.Errorf("deployment health check failed: %w", err)
 	}
-	
+
 	// Promote deployment
 	logger.Info("Promoting deployment")
 	if err := promoteDeployment(rc, ghostConfig, deployCtx); err != nil {
 		return fmt.Errorf("failed to promote deployment: %w", err)
 	}
-	
+
 	// Log successful deployment
 	logger.Info("Deployment completed successfully",
 		zap.String("environment", environment),
 		zap.String("commit", payload.After),
 		zap.Duration("duration", time.Since(deployCtx.Timestamp)))
-	
+
 	// Store deployment record
 	_ = storeDeploymentRecord(rc, deployCtx)
 
@@ -304,7 +304,7 @@ func readGhostConfig(rc *eos_io.RuntimeContext, environment string) (*GhostConfi
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config from Vault: %w", err)
 	}
-	
+
 	// Reconstruct GhostConfig
 	config := &GhostConfig{
 		Config: &Config{
@@ -323,16 +323,16 @@ func readGhostConfig(rc *eos_io.RuntimeContext, environment string) (*GhostConfi
 		DockerImage:   data["docker_image"].(string),
 		InstanceCount: int(data["instance_count"].(float64)),
 	}
-	
+
 	return config, nil
 }
 
 // updateGitRepository pulls latest changes from git
 func updateGitRepository(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	repoPath := filepath.Join("/var/lib/helen", config.Environment, "repo")
-	
+
 	// Check if repo exists
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); os.IsNotExist(err) {
 		// Clone repository
@@ -349,67 +349,67 @@ func updateGitRepository(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 			return fmt.Errorf("failed to pull changes: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
 // createBlueGreenDeployment creates a new deployment alongside the existing one
 func createBlueGreenDeployment(rc *eos_io.RuntimeContext, config *GhostConfig, ctx *DeploymentContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Modify job name for blue-green
 	config.Namespace = fmt.Sprintf("%s-blue", config.Namespace)
-	
+
 	logger.Info("Creating blue deployment", zap.String("namespace", config.Namespace))
-	
+
 	// Deploy using existing DeployGhost function
 	if err := DeployGhost(rc, config); err != nil {
 		return fmt.Errorf("failed to create blue deployment: %w", err)
 	}
-	
+
 	return nil
 }
 
 // promoteDeployment promotes the blue deployment to green
 func promoteDeployment(rc *eos_io.RuntimeContext, config *GhostConfig, ctx *DeploymentContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Update Hecate route to point to new deployment
 	logger.Info("Updating Hecate route")
 	if err := ConfigureHecateGhostRoute(rc, config); err != nil {
 		return fmt.Errorf("failed to update route: %w", err)
 	}
-	
+
 	// Stop old deployment
 	oldNamespace := strings.TrimSuffix(config.Namespace, "-blue")
 	logger.Info("Stopping old deployment", zap.String("namespace", oldNamespace))
-	
+
 	cmd := exec.CommandContext(rc.Ctx, "nomad", "job", "stop", fmt.Sprintf("helen-ghost-%s", oldNamespace))
 	if err := cmd.Run(); err != nil {
 		logger.Warn("Failed to stop old deployment", zap.Error(err))
 	}
-	
+
 	// Rename blue to green
 	config.Namespace = oldNamespace
-	
+
 	return nil
 }
 
 // rollbackDeployment rolls back a failed deployment
 func rollbackDeployment(rc *eos_io.RuntimeContext, config *GhostConfig, ctx *DeploymentContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Warn("Rolling back deployment",
 		zap.String("environment", config.Environment),
 		zap.String("commit", ctx.CommitID))
-	
+
 	// Stop blue deployment
 	blueNamespace := fmt.Sprintf("%s-blue", config.Environment)
 	cmd := exec.CommandContext(rc.Ctx, "nomad", "job", "stop", fmt.Sprintf("helen-ghost-%s", blueNamespace))
 	if err := cmd.Run(); err != nil {
 		logger.Error("Failed to stop blue deployment", zap.Error(err))
 	}
-	
+
 	ctx.Status = "rolled_back"
 	_ = storeDeploymentRecord(rc, ctx)
 
@@ -419,29 +419,29 @@ func rollbackDeployment(rc *eos_io.RuntimeContext, config *GhostConfig, ctx *Dep
 // storeDeploymentRecord stores a deployment record in Consul
 func storeDeploymentRecord(rc *eos_io.RuntimeContext, ctx *DeploymentContext) error {
 	key := fmt.Sprintf("helen/deployments/%s/%d", ctx.Environment, ctx.Timestamp.Unix())
-	
+
 	data, err := json.Marshal(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal deployment record: %w", err)
 	}
-	
+
 	return consulWriteKV(rc, key, string(data))
 }
 
 // CreateWebhookEndpoint creates the webhook endpoint in Hecate
 func CreateWebhookEndpoint(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	webhookPath := fmt.Sprintf("/webhooks/helen/%s", config.Environment)
-	
+
 	logger.Info("Creating webhook endpoint",
 		zap.String("path", webhookPath),
 		zap.String("environment", config.Environment))
-	
+
 	// This would integrate with Hecate to create the route
 	// For now, we'll document what needs to be done
 	logger.Info("Webhook endpoint ready",
 		zap.String("url", fmt.Sprintf("https://%s%s", config.Domain, webhookPath)))
-	
+
 	return nil
 }

@@ -72,7 +72,7 @@ func SetupAuthentikWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Servi
 		"authentik",
 		DockerAuthentikService,
 		caddyProxy,
-		nil,                                             // No NGINX config needed for Authentik
+		nil, // No NGINX config needed for Authentik
 		[]string{"authentik-postgres", "authentik-redis"}, // depends_on
 		[]string{
 			"authentik-postgres-data:/var/lib/postgresql/data",

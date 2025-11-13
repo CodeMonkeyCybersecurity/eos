@@ -316,7 +316,7 @@ func (bgi *BionicGPTInstaller) performInstallation(ctx context.Context) error {
 		zap.String("compose_file", bgi.config.ComposeFile),
 		zap.String("env_file", bgi.config.EnvFile))
 
-	if err := os.MkdirAll(bgi.config.InstallDir, 0755); err != nil {
+	if err := os.MkdirAll(bgi.config.InstallDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
@@ -774,7 +774,7 @@ AUTH_HEADER_GROUPS=X-Auth-Request-Groups
 
 	// Create .env file with appropriate permissions
 	// 0640 = owner read/write, group read, others none
-	if err := os.WriteFile(bgi.config.EnvFile, []byte(content), 0640); err != nil {
+	if err := os.WriteFile(bgi.config.EnvFile, []byte(content), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 
@@ -798,7 +798,7 @@ func (bgi *BionicGPTInstaller) createComposeFile(ctx context.Context) error {
 	// Generate docker-compose.yml for Azure OpenAI (no local LLM)
 	content := bgi.generateComposeContent()
 
-	if err := os.WriteFile(bgi.config.ComposeFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(bgi.config.ComposeFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 

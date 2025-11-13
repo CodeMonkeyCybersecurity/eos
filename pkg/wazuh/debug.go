@@ -1,6 +1,7 @@
 package wazuh
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"context"
 	"encoding/json"
@@ -589,7 +590,7 @@ func SendTestWebhook(rc *eos_io.RuntimeContext) []wazuhCheckResult {
 
 	// Write to temp file
 	tmpFile := filepath.Join(os.TempDir(), "test_alert.json")
-	if err := os.WriteFile(tmpFile, alertJSON, 0640); err != nil {
+	if err := os.WriteFile(tmpFile, alertJSON, shared.SecureConfigFilePerm); err != nil {
 		results = append(results, wazuhCheckResult{
 			name:     "Test Alert Creation",
 			category: "Test Webhook",

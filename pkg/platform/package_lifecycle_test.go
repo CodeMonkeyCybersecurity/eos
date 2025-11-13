@@ -342,7 +342,7 @@ func BenchmarkPackageUpdate(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = PackageUpdate(rc, true) // Use cron mode to avoid actual package updates
 	}
 }
@@ -353,7 +353,7 @@ func BenchmarkRunAndLog(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = runAndLog(rc, "echo 'benchmark'", "bash", "-c")
 	}
 }

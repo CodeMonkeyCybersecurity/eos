@@ -893,7 +893,7 @@ func (vi *VaultInstaller) setupUserAndDirectories() error {
 		// ATOMIC APPROACH: Create directory with restrictive permissions, then chown, then chmod
 		// NOTE: We don't use umask because it's process-global and racy in multi-threaded programs.
 		// Instead we use: create restrictive (0700) → chown → chmod to desired mode
-		restrictiveMode := os.FileMode(0700)
+		restrictiveMode := os.FileMode(VaultDataDirPerm)
 
 		vi.logger.Debug("Creating directory with restrictive→chown→chmod pattern",
 			zap.String("path", dir.path),

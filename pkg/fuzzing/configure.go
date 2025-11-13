@@ -1,6 +1,7 @@
 package fuzzing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -19,43 +20,43 @@ import (
 // Configure sets up the fuzzing environment and validates configuration
 func Configure(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check prerequisites and validate configuration
 	logger.Info("Assessing fuzzing configuration prerequisites")
-	
+
 	if err := validateConfig(config); err != nil {
 		return fmt.Errorf("configuration validation failed: %w", err)
 	}
-	
+
 	if err := checkEnvironmentPrerequisites(rc.Ctx, logger); err != nil {
 		return fmt.Errorf("environment prerequisites not met: %w", err)
 	}
-	
+
 	// INTERVENE - Apply configuration and setup environment
 	logger.Info("Configuring fuzzing environment",
 		zap.Duration("duration", config.Duration),
 		zap.Int("parallel_jobs", config.ParallelJobs),
 		zap.Bool("security_focus", config.SecurityFocus))
-	
+
 	if err := setupLogDirectory(config, logger); err != nil {
 		return fmt.Errorf("failed to setup log directory: %w", err)
 	}
-	
+
 	if err := applyEnvironmentConfiguration(config, logger); err != nil {
 		return fmt.Errorf("failed to apply environment configuration: %w", err)
 	}
-	
+
 	// EVALUATE - Verify configuration was applied successfully
 	logger.Info("Verifying fuzzing configuration")
-	
+
 	if err := verifyConfiguration(config, logger); err != nil {
 		return fmt.Errorf("configuration verification failed: %w", err)
 	}
-	
+
 	logger.Info("Fuzzing configuration completed successfully",
 		zap.String("log_dir", config.LogDir),
 		zap.String("report_format", config.ReportFormat))
-	
+
 	return nil
 }
 
@@ -64,19 +65,19 @@ func validateConfig(config *Config) error {
 	if config.Duration <= 0 {
 		return fmt.Errorf("duration must be positive, got %v", config.Duration)
 	}
-	
+
 	if config.Duration > 24*time.Hour {
 		return fmt.Errorf("duration too long (max 24h), got %v", config.Duration)
 	}
-	
+
 	if config.ParallelJobs <= 0 {
 		return fmt.Errorf("parallel_jobs must be positive, got %d", config.ParallelJobs)
 	}
-	
+
 	if config.ParallelJobs > 32 {
 		return fmt.Errorf("parallel_jobs too high (max 32), got %d", config.ParallelJobs)
 	}
-	
+
 	// Validate CI profile if in CI mode
 	if config.CIMode && config.CIProfile != "" {
 		validProfiles := []string{CIProfilePRValidation, CIProfileSecurityFocus, CIProfileArchitecture, CIProfileFull}
@@ -91,7 +92,7 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("invalid CI profile: %s, valid options: %v", config.CIProfile, validProfiles)
 		}
 	}
-	
+
 	// Validate report format
 	if config.ReportFormat == "" {
 		config.ReportFormat = ReportFormatMarkdown
@@ -107,34 +108,34 @@ func validateConfig(config *Config) error {
 	if !valid {
 		return fmt.Errorf("invalid report format: %s, valid options: %v", config.ReportFormat, validFormats)
 	}
-	
+
 	return nil
 }
 
 // checkEnvironmentPrerequisites verifies the environment is ready for fuzzing
 func checkEnvironmentPrerequisites(_ context.Context, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("Checking environment prerequisites")
-	
+
 	// Check Go installation
 	if err := checkGoInstallation(logger); err != nil {
 		return fmt.Errorf("go installation check failed: %w", err)
 	}
-	
+
 	// Check if we're in a Go module
 	if err := checkGoModule(logger); err != nil {
 		return fmt.Errorf("go module check failed: %w", err)
 	}
-	
+
 	// Check for test files
 	if err := checkFuzzTests(logger); err != nil {
 		return fmt.Errorf("fuzz test check failed: %w", err)
 	}
-	
+
 	// Check system resources
 	if err := checkSystemResources(logger); err != nil {
 		return fmt.Errorf("system resource check failed: %w", err)
 	}
-	
+
 	logger.Debug("Environment prerequisites satisfied")
 	return nil
 }
@@ -148,22 +149,22 @@ func setupLogDirectory(config *Config, logger otelzap.LoggerWithCtx) error {
 		}
 		config.LogDir = filepath.Join(homeDir, ".cache", "eos-fuzz")
 	}
-	
+
 	// Create log directory with proper permissions
-	if err := os.MkdirAll(config.LogDir, 0755); err != nil {
+	if err := os.MkdirAll(config.LogDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create log directory %s: %w", config.LogDir, err)
 	}
-	
+
 	// Check write permissions
 	testFile := filepath.Join(config.LogDir, ".write_test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("log directory is not writable: %w", err)
 	}
 	_ = os.Remove(testFile)
-	
+
 	logger.Debug("Log directory configured",
 		zap.String("path", config.LogDir))
-	
+
 	return nil
 }
 
@@ -173,33 +174,33 @@ func applyEnvironmentConfiguration(config *Config, logger otelzap.LoggerWithCtx)
 	if err := os.Setenv("GOMAXPROCS", fmt.Sprintf("%d", config.ParallelJobs)); err != nil {
 		logger.Warn("Failed to set GOMAXPROCS", zap.Error(err))
 	}
-	
+
 	// Set fuzzing-specific environment variables
 	envVars := map[string]string{
 		"FUZZTIME":      config.Duration.String(),
 		"PARALLEL_JOBS": fmt.Sprintf("%d", config.ParallelJobs),
 		"LOG_DIR":       config.LogDir,
 	}
-	
+
 	if config.SecurityFocus {
 		envVars["SECURITY_FOCUS"] = "true"
 	}
-	
+
 	if config.ArchitectureTesting {
 		envVars["ARCHITECTURE_TESTING"] = "true"
 	}
-	
+
 	if config.Verbose {
 		envVars["VERBOSE"] = "true"
 	}
-	
+
 	if config.CIMode {
 		envVars["CI_MODE"] = "true"
 		if config.CIProfile != "" {
 			envVars["CI_PROFILE"] = config.CIProfile
 		}
 	}
-	
+
 	for key, value := range envVars {
 		if err := os.Setenv(key, value); err != nil {
 			logger.Warn("Failed to set environment variable",
@@ -208,10 +209,10 @@ func applyEnvironmentConfiguration(config *Config, logger otelzap.LoggerWithCtx)
 				zap.Error(err))
 		}
 	}
-	
+
 	logger.Debug("Environment configuration applied",
 		zap.Any("variables", envVars))
-	
+
 	return nil
 }
 
@@ -221,7 +222,7 @@ func verifyConfiguration(config *Config, logger otelzap.LoggerWithCtx) error {
 	if _, err := os.Stat(config.LogDir); os.IsNotExist(err) {
 		return fmt.Errorf("log directory does not exist: %s", config.LogDir)
 	}
-	
+
 	// Verify environment variables
 	expectedDuration := os.Getenv("FUZZTIME")
 	if expectedDuration != config.Duration.String() {
@@ -229,7 +230,7 @@ func verifyConfiguration(config *Config, logger otelzap.LoggerWithCtx) error {
 			zap.String("expected", config.Duration.String()),
 			zap.String("actual", expectedDuration))
 	}
-	
+
 	logger.Debug("Configuration verification completed successfully")
 	return nil
 }
@@ -240,12 +241,12 @@ func checkGoInstallation(_ otelzap.LoggerWithCtx) error {
 	if _, err := os.Stat("/usr/local/go/bin/go"); err == nil {
 		return nil
 	}
-	
+
 	// Check if go is in PATH
 	if _, err := exec.LookPath("go"); err != nil {
 		return fmt.Errorf("go not found in PATH or /usr/local/go/bin/go")
 	}
-	
+
 	return nil
 }
 
@@ -260,7 +261,7 @@ func checkFuzzTests(logger otelzap.LoggerWithCtx) error {
 	// Check for common fuzz test locations
 	testDirs := []string{"pkg", "cmd"}
 	foundTests := false
-	
+
 	for _, dir := range testDirs {
 		if _, err := os.Stat(dir); err == nil {
 			// Look for *fuzz*test.go files
@@ -272,11 +273,11 @@ func checkFuzzTests(logger otelzap.LoggerWithCtx) error {
 			}
 		}
 	}
-	
+
 	if !foundTests {
 		logger.Warn("No fuzz tests found in common locations (pkg/, cmd/)")
 	}
-	
+
 	return nil
 }
 
@@ -286,7 +287,7 @@ func checkSystemResources(logger otelzap.LoggerWithCtx) error {
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-	
+
 	// Basic disk space check (implementation would depend on system)
 	logger.Debug("System resource check completed", zap.String("cwd", cwd))
 	return nil

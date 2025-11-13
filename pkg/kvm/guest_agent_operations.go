@@ -6,6 +6,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -20,13 +21,13 @@ import (
 
 // GuestAgentAddConfig contains configuration for adding guest agent channels
 type GuestAgentAddConfig struct {
-	VMNames      []string
-	DryRun       bool
-	Force        bool
-	BatchSize    int
-	WaitBetween  int
-	NoBackup     bool
-	NoRestart    bool
+	VMNames     []string
+	DryRun      bool
+	Force       bool
+	BatchSize   int
+	WaitBetween int
+	NoBackup    bool
+	NoRestart   bool
 }
 
 // GuestAgentAddResult contains results of guest agent addition
@@ -364,14 +365,14 @@ func backupVMXML(rc *eos_io.RuntimeContext, vmName, xmlContent string) (string, 
 	logger := otelzap.Ctx(rc.Ctx)
 
 	backupDir := "/var/lib/eos/backups/kvm"
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := fmt.Sprintf("%s/%s-guest-agent-%s.xml", backupDir, vmName, timestamp)
 
-	if err := os.WriteFile(backupPath, []byte(xmlContent), 0600); err != nil {
+	if err := os.WriteFile(backupPath, []byte(xmlContent), shared.SecretFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write backup: %w", err)
 	}
 

@@ -117,7 +117,7 @@ func (ni *NomadInstaller) Install() error {
 		ni.config.Version, ni.config.Version, arch)
 
 	tmpDir := "/tmp/nomad-install"
-	_ = os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, shared.ServiceDirPerm)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	if err := ni.runner.Run("wget", "-O", tmpDir+"/nomad.zip", downloadURL); err != nil {
@@ -144,9 +144,9 @@ func (ni *NomadInstaller) Install() error {
 	if err := userMgr.CreateSystemUser("nomad", "/var/lib/nomad"); err != nil {
 		return fmt.Errorf("failed to create nomad user: %w", err)
 	}
-	_ = os.MkdirAll("/etc/nomad.d", 0755)
-	_ = os.MkdirAll("/opt/nomad/data", 0755)
-	_ = os.MkdirAll("/var/log/nomad", 0755)
+	_ = os.MkdirAll("/etc/nomad.d", shared.ServiceDirPerm)
+	_ = os.MkdirAll("/opt/nomad/data", shared.ServiceDirPerm)
+	_ = os.MkdirAll("/var/log/nomad", shared.ServiceDirPerm)
 	_ = ni.runner.Run("chown", "-R", "nomad:nomad", "/opt/nomad")
 	_ = ni.runner.Run("chown", "-R", "nomad:nomad", "/var/log/nomad")
 
@@ -204,7 +204,7 @@ ports {
 		ni.config.BindAddr, shared.PortNomad, serverConfig, clientConfig)
 
 	// SECURITY P0 #2: Check critical file write errors
-	if err := os.WriteFile("/etc/nomad.d/nomad.hcl", []byte(config), 0640); err != nil {
+	if err := os.WriteFile("/etc/nomad.d/nomad.hcl", []byte(config), shared.SecureConfigFilePerm); err != nil {
 		panic(fmt.Sprintf("FATAL: Failed to write Nomad config: %v", err))
 	}
 	_ = ni.runner.Run("chown", "nomad:nomad", "/etc/nomad.d/nomad.hcl")
@@ -232,7 +232,7 @@ WantedBy=multi-user.target`
 
 	// SECURITY P0 #2: Check critical file write errors
 	// SECURITY P2 #6: Use 0640 instead of 0644 for service file (contains paths)
-	if err := os.WriteFile("/etc/systemd/system/nomad.service", []byte(serviceContent), 0640); err != nil {
+	if err := os.WriteFile("/etc/systemd/system/nomad.service", []byte(serviceContent), shared.SecureConfigFilePerm); err != nil {
 		panic(fmt.Sprintf("FATAL: Failed to write Nomad service file: %v", err))
 	}
 	_ = ni.runner.Run("systemctl", "daemon-reload")

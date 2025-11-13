@@ -148,7 +148,7 @@ func assessDockerState(rc *eos_io.RuntimeContext) *DockerState {
 	}); err == nil && output != "" {
 		state.Networks = strings.Split(strings.TrimSpace(output), "\n")
 		state.NetworkCount = len(state.Networks)
-		
+
 		// Count default networks (bridge, host, none)
 		for _, net := range state.Networks {
 			if net == "bridge" || net == "host" || net == "none" {
@@ -185,7 +185,7 @@ func cleanupContainers(rc *eos_io.RuntimeContext, state *DockerState) error {
 	// First, stop all running containers gracefully
 	if len(state.RunningContainers) > 0 {
 		logger.Info("Stopping running containers", zap.Int("count", len(state.RunningContainers)))
-		
+
 		// Stop with timeout
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "docker",
@@ -197,7 +197,7 @@ func cleanupContainers(rc *eos_io.RuntimeContext, state *DockerState) error {
 			logger.Warn("Some containers failed to stop gracefully",
 				zap.Error(err),
 				zap.String("output", output))
-			
+
 			// Force kill if graceful stop failed
 			logger.Info("Force killing remaining containers")
 			_, _ = execute.Run(rc.Ctx, execute.Options{
@@ -217,7 +217,7 @@ func cleanupContainers(rc *eos_io.RuntimeContext, state *DockerState) error {
 		Capture: true,
 		Timeout: 30 * time.Second,
 	})
-	
+
 	// Alternative: remove containers one by one if batch removal fails
 	if err != nil && len(state.AllContainers) > 0 {
 		logger.Warn("Batch container removal failed, removing individually")
@@ -251,12 +251,12 @@ func cleanupVolumes(rc *eos_io.RuntimeContext, state *DockerState) error {
 		Capture: true,
 		Timeout: 60 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Warn("Volume prune failed, trying individual removal",
 			zap.Error(err),
 			zap.String("output", output))
-		
+
 		// Remove volumes individually
 		for _, volume := range state.Volumes {
 			_, _ = execute.Run(rc.Ctx, execute.Options{

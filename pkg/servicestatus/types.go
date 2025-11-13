@@ -135,8 +135,8 @@ type HealthCheck struct {
 
 // NetworkInfo contains network and endpoint information
 type NetworkInfo struct {
-	Endpoints []Endpoint
-	ListenAddr string
+	Endpoints     []Endpoint
+	ListenAddr    string
 	AdvertiseAddr string
 }
 
@@ -163,7 +163,7 @@ type IntegrationInfo struct {
 type IntegrationType string
 
 const (
-	IntegrationTypeStorageBackend IntegrationType = "storage_backend"
+	IntegrationTypeStorageBackend   IntegrationType = "storage_backend"
 	IntegrationTypeServiceDiscovery IntegrationType = "service_discovery"
 	IntegrationTypeSecretStore      IntegrationType = "secret_store"
 	IntegrationTypeConfigStore      IntegrationType = "config_store"
@@ -173,14 +173,14 @@ const (
 
 // ClusterInfo contains cluster-specific information
 type ClusterInfo struct {
-	Mode         string   // server, client, standalone
-	NodeName     string
-	Datacenter   string
-	Leader       string
-	Peers        []string
-	Members      []ClusterMember
-	Healthy      bool
-	QuorumSize   int
+	Mode          string // server, client, standalone
+	NodeName      string
+	Datacenter    string
+	Leader        string
+	Peers         []string
+	Members       []ClusterMember
+	Healthy       bool
+	QuorumSize    int
 	VotingMembers int
 }
 
@@ -197,9 +197,9 @@ type ClusterMember struct {
 type OutputFormat string
 
 const (
-	FormatText OutputFormat = "text"
-	FormatJSON OutputFormat = "json"
-	FormatYAML OutputFormat = "yaml"
+	FormatText  OutputFormat = "text"
+	FormatJSON  OutputFormat = "json"
+	FormatYAML  OutputFormat = "yaml"
 	FormatShort OutputFormat = "short" // One-line summary
 )
 

@@ -353,7 +353,7 @@ func BenchmarkWrapExtended(b *testing.B) {
 	wrapped := WrapExtended(1*time.Minute, fn)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = wrapped(cmd, []string{"arg1", "arg2"})
 	}
 }
@@ -364,7 +364,7 @@ func BenchmarkSanitizeCommandInputs(b *testing.B) {
 	args := []string{"normal", "args", "without", "issues"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = sanitizeCommandInputs(ctx, cmd, args)
 	}
 }

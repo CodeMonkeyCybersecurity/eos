@@ -36,16 +36,16 @@ Examples:
 }
 
 var (
-	udisks2Device      string
-	udisks2Size        string
-	udisks2Filesystem  string
-	udisks2Label       string
-	udisks2MountPoint  string
+	udisks2Device       string
+	udisks2Size         string
+	udisks2Filesystem   string
+	udisks2Label        string
+	udisks2MountPoint   string
 	udisks2MountOptions []string
-	udisks2Encrypted   bool
-	udisks2Passphrase  string
-	udisks2Force       bool
-	udisks2DryRun      bool
+	udisks2Encrypted    bool
+	udisks2Passphrase   string
+	udisks2Force        bool
+	udisks2DryRun       bool
 )
 
 func init() {
@@ -92,14 +92,14 @@ func createStorageUdisks2(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 	// Create volume request
 	request := &udisks2.VolumeRequest{
-		Device:       udisks2Device,
-		Size:         sizeBytes,
-		Filesystem:   udisks2Filesystem,
-		Label:        udisks2Label,
-		MountPoint:   udisks2MountPoint,
-		Options: udisks2MountOptions,
-		Encrypted:    udisks2Encrypted,
-		Passphrase:   udisks2Passphrase,
+		Device:     udisks2Device,
+		Size:       sizeBytes,
+		Filesystem: udisks2Filesystem,
+		Label:      udisks2Label,
+		MountPoint: udisks2MountPoint,
+		Options:    udisks2MountOptions,
+		Encrypted:  udisks2Encrypted,
+		Passphrase: udisks2Passphrase,
 		Metadata: map[string]string{
 			"created_by": "eos",
 			"created_at": time.Now().Format(time.RFC3339),
@@ -145,7 +145,7 @@ func createStorageUdisks2(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 
 func parseSize(sizeStr string) (uint64, error) {
 	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
-	
+
 	var multiplier uint64 = 1
 	var numStr string
 
@@ -205,7 +205,7 @@ func showDryRun(_ *eos_io.RuntimeContext, request *udisks2.VolumeRequest) error 
 	fmt.Printf("Label:        %s\n", request.Label)
 	fmt.Printf("Mount Point:  %s\n", request.MountPoint)
 	fmt.Printf("Encrypted:    %t\n", request.Encrypted)
-	
+
 	if len(request.Options) > 0 {
 		fmt.Printf("Mount Options: %s\n", strings.Join(request.Options, ","))
 	}
@@ -213,20 +213,20 @@ func showDryRun(_ *eos_io.RuntimeContext, request *udisks2.VolumeRequest) error 
 	fmt.Printf("\nOperations that would be performed:\n")
 	fmt.Printf("1. Validate device %s\n", request.Device)
 	fmt.Printf("2. Create partition table (GPT)\n")
-	
+
 	if request.Size > 0 {
 		fmt.Printf("3. Create partition of size %s\n", utils.FormatBytes(request.Size))
 	} else {
 		fmt.Printf("3. Create partition using full device\n")
 	}
-	
+
 	if request.Encrypted {
 		fmt.Printf("4. Setup LUKS encryption\n")
 		fmt.Printf("5. Create %s filesystem on encrypted device\n", request.Filesystem)
 	} else {
 		fmt.Printf("4. Create %s filesystem\n", request.Filesystem)
 	}
-	
+
 	if request.MountPoint != "" {
 		fmt.Printf("5. Mount at %s\n", request.MountPoint)
 	}
@@ -244,13 +244,13 @@ func displayVolumeInfo(_ *eos_io.RuntimeContext, volume *udisks2.VolumeInfo) {
 	fmt.Printf("Size:         %s\n", utils.FormatBytes(volume.Size))
 	fmt.Printf("Encrypted:    %t\n", volume.Encrypted)
 	fmt.Printf("Status:       %s\n", volume.Status)
-	
+
 	if volume.MountPoint != "" {
 		fmt.Printf("Mount Point:  %s\n", volume.MountPoint)
 	} else {
 		fmt.Printf("Mount Point:  (not mounted)\n")
 	}
-	
+
 	fmt.Printf("Created:      %s\n", volume.CreatedAt.Format(time.RFC3339))
 
 	if volume.MountPoint != "" {
@@ -260,4 +260,3 @@ func displayVolumeInfo(_ *eos_io.RuntimeContext, volume *udisks2.VolumeInfo) {
 		fmt.Printf("  eos mount %s /your/mount/point\n", volume.Device)
 	}
 }
-

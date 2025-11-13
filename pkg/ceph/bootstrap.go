@@ -2,6 +2,7 @@
 package ceph
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -19,35 +20,35 @@ import (
 
 // BootstrapConfig contains configuration for bootstrapping a Ceph monitor
 type BootstrapConfig struct {
-	Hostname      string // Monitor hostname (e.g., "vhost5")
-	MonitorIP     string // Monitor IP address (e.g., "192.168.6.77")
-	PublicNetwork string // Public network CIDR (e.g., "192.168.6.0/24")
+	Hostname       string // Monitor hostname (e.g., "vhost5")
+	MonitorIP      string // Monitor IP address (e.g., "192.168.6.77")
+	PublicNetwork  string // Public network CIDR (e.g., "192.168.6.0/24")
 	ClusterNetwork string // Cluster network CIDR (optional, defaults to PublicNetwork)
-	ClusterName   string // Cluster name (default: "ceph")
-	FSID          string // Cluster UUID (generated if empty)
+	ClusterName    string // Cluster name (default: "ceph")
+	FSID           string // Cluster UUID (generated if empty)
 }
 
 // BootstrapState tracks bootstrap progress for resumability
 type BootstrapState string
 
 const (
-	StateUninitialized       BootstrapState = "uninitialized"
-	StateFSIDGenerated       BootstrapState = "fsid_generated"
-	StateConfigWritten       BootstrapState = "config_written"
-	StateKeyringsCreated     BootstrapState = "keyrings_created"
-	StateMonmapGenerated     BootstrapState = "monmap_generated"
-	StateMonitorInitialized  BootstrapState = "monitor_initialized"
-	StateOwnershipFixed      BootstrapState = "ownership_fixed"
-	StateMonitorStarted      BootstrapState = "monitor_started"
-	StateBootstrapComplete   BootstrapState = "complete"
+	StateUninitialized      BootstrapState = "uninitialized"
+	StateFSIDGenerated      BootstrapState = "fsid_generated"
+	StateConfigWritten      BootstrapState = "config_written"
+	StateKeyringsCreated    BootstrapState = "keyrings_created"
+	StateMonmapGenerated    BootstrapState = "monmap_generated"
+	StateMonitorInitialized BootstrapState = "monitor_initialized"
+	StateOwnershipFixed     BootstrapState = "ownership_fixed"
+	StateMonitorStarted     BootstrapState = "monitor_started"
+	StateBootstrapComplete  BootstrapState = "complete"
 )
 
 // BootstrapStateData contains state data for resumption
 type BootstrapStateData struct {
-	State          BootstrapState     `json:"state"`
-	Config         *BootstrapConfig   `json:"config"`
-	Timestamp      time.Time          `json:"timestamp"`
-	CompletedSteps []string           `json:"completed_steps"`
+	State          BootstrapState   `json:"state"`
+	Config         *BootstrapConfig `json:"config"`
+	Timestamp      time.Time        `json:"timestamp"`
+	CompletedSteps []string         `json:"completed_steps"`
 }
 
 // BootstrapFirstMonitor creates a new Ceph cluster with the first monitor
@@ -220,7 +221,7 @@ func validateBootstrapPreconditions(logger otelzap.LoggerWithCtx, config *Bootst
 	}
 
 	for _, dir := range requiredDirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 
@@ -288,7 +289,7 @@ rbd cache writethrough until flush = true
 		}
 	}
 
-	if err := os.WriteFile(confPath, []byte(confContent), 0644); err != nil {
+	if err := os.WriteFile(confPath, []byte(confContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ceph.conf: %w", err)
 	}
 
@@ -384,7 +385,7 @@ func createSecureKeyring(name string) (string, error) {
 	tmpFile.Close()
 
 	// Set restrictive permissions (owner read/write only)
-	if err := os.Chmod(keyringPath, 0600); err != nil {
+	if err := os.Chmod(keyringPath, shared.SecretFilePerm); err != nil {
 		os.Remove(keyringPath)
 		return "", fmt.Errorf("failed to set permissions: %w", err)
 	}
@@ -431,7 +432,7 @@ func mkfsMonitor(logger otelzap.LoggerWithCtx, config *BootstrapConfig, monKeyri
 
 	// Create monitor data directory
 	logger.Debug("Creating monitor data directory", zap.String("path", monDataDir))
-	if err := os.MkdirAll(monDataDir, 0755); err != nil {
+	if err := os.MkdirAll(monDataDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create monitor data directory: %w", err)
 	}
 
@@ -489,7 +490,7 @@ func fixMonitorOwnership(logger otelzap.LoggerWithCtx, config *BootstrapConfig) 
 	if err := os.Chown(adminKeyring, uid, gid); err != nil {
 		logger.Warn("Failed to chown admin keyring", zap.Error(err))
 	}
-	if err := os.Chmod(adminKeyring, 0600); err != nil {
+	if err := os.Chmod(adminKeyring, shared.SecretFilePerm); err != nil {
 		logger.Warn("Failed to chmod admin keyring", zap.Error(err))
 	}
 
@@ -501,7 +502,7 @@ func fixMonitorOwnership(logger otelzap.LoggerWithCtx, config *BootstrapConfig) 
 			if err := os.Chown(keyringPath, uid, gid); err != nil {
 				logger.Warn("Failed to chown "+dir+" keyring", zap.Error(err))
 			}
-			if err := os.Chmod(keyringPath, 0600); err != nil {
+			if err := os.Chmod(keyringPath, shared.SecretFilePerm); err != nil {
 				logger.Warn("Failed to chmod "+dir+" keyring", zap.Error(err))
 			}
 		}

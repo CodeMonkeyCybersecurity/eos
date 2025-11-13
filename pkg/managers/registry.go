@@ -20,10 +20,10 @@ type ManagerRegistry struct {
 
 // RegistryConfig provides configuration for the manager registry
 type RegistryConfig struct {
-	EnableHealthChecks bool          `json:"enable_health_checks"`
+	EnableHealthChecks  bool          `json:"enable_health_checks"`
 	HealthCheckInterval time.Duration `json:"health_check_interval"`
-	MaxConcurrentOps   int           `json:"max_concurrent_ops"`
-	LogLevel           string        `json:"log_level"`
+	MaxConcurrentOps    int           `json:"max_concurrent_ops"`
+	LogLevel            string        `json:"log_level"`
 }
 
 // DefaultRegistryConfig returns default configuration for the registry
@@ -32,13 +32,13 @@ func DefaultRegistryConfig() *RegistryConfig {
 		EnableHealthChecks:  true,
 		HealthCheckInterval: time.Minute * 5,
 		MaxConcurrentOps:    10,
-		LogLevel:           "info",
+		LogLevel:            "info",
 	}
 }
 
 var (
 	globalRegistry *ManagerRegistry
-	once          sync.Once
+	once           sync.Once
 )
 
 // GetGlobalRegistry returns the singleton manager registry
@@ -91,7 +91,7 @@ func (mr *ManagerRegistry) GetManager(name string) (interface{}, error) {
 func GetManagerTyped[T any](name string) (T, error) {
 	var zero T
 	registry := GetGlobalRegistry()
-	
+
 	manager, err := registry.GetManager(name)
 	if err != nil {
 		return zero, err
@@ -189,11 +189,11 @@ func (mr *ManagerRegistry) HealthCheckAll(ctx context.Context) *RegistryHealthRe
 
 // RegistryHealthResult represents the health status of all managers
 type RegistryHealthResult struct {
-	Overall   HealthState                     `json:"overall"`
-	Managers  map[string]*HealthCheckResult   `json:"managers"`
-	Duration  time.Duration                   `json:"duration"`
-	Timestamp time.Time                       `json:"timestamp"`
-	Errors    []string                        `json:"errors,omitempty"`
+	Overall   HealthState                   `json:"overall"`
+	Managers  map[string]*HealthCheckResult `json:"managers"`
+	Duration  time.Duration                 `json:"duration"`
+	Timestamp time.Time                     `json:"timestamp"`
+	Errors    []string                      `json:"errors,omitempty"`
 }
 
 // Start begins background health checking if enabled
@@ -243,7 +243,7 @@ func RegisterServiceManager(name string, manager interface{}) error {
 	return GetGlobalRegistry().RegisterManager("service."+name, manager)
 }
 
-// RegisterDatabaseManager registers a database manager  
+// RegisterDatabaseManager registers a database manager
 func RegisterDatabaseManager(name string, manager interface{}) error {
 	return GetGlobalRegistry().RegisterManager("database."+name, manager)
 }

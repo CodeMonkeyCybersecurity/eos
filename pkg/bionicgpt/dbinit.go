@@ -13,6 +13,7 @@
 package bionicgpt
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -50,7 +51,7 @@ func (bgi *BionicGPTInstaller) createDatabaseInitScript(ctx context.Context) err
 	// Write script file
 	// 0755 = owner read/write/execute, group read/execute, others read/execute
 	// Needs execute permission to run in docker-entrypoint-initdb.d
-	if err := os.WriteFile(scriptPath, []byte(content), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(content), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write database init script: %w", err)
 	}
 
@@ -140,8 +141,7 @@ echo "  Privileges: ALL (tables, sequences, schema)"
 echo "════════════════════════════════════════════════════════════════"
 `,
 		bgi.config.PostgresPassword, // Password for bionic_application user
-		bgi.config.PostgresDB,        // Database name in CREATE USER notice
-		bgi.config.PostgresDB,        // Database name in final echo
+		bgi.config.PostgresDB,       // Database name in CREATE USER notice
+		bgi.config.PostgresDB,       // Database name in final echo
 	)
 }
-

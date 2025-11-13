@@ -160,8 +160,8 @@ func FuzzYAMLInjectionSecurity(f *testing.F) {
 			"!!python",
 			"!!ruby",
 			"!!perl",
-			"&",  // YAML anchors
-			"*",  // YAML aliases
+			"&",   // YAML anchors
+			"*",   // YAML aliases
 			"---", // Document separator
 			"...", // Document end
 		}

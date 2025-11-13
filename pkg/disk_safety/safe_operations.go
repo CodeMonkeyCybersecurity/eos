@@ -13,27 +13,26 @@ import (
 
 // SafeStorageOperations provides safe disk operations with comprehensive safety checks
 type SafeStorageOperations struct {
-	journal       *JournalStorage
-	preflight     *PreflightRunner
-	snapshots     *SnapshotManager
-	rollback      *RollbackManager
-	config        *SafetyConfig
+	journal   *JournalStorage
+	preflight *PreflightRunner
+	snapshots *SnapshotManager
+	rollback  *RollbackManager
+	config    *SafetyConfig
 }
-
 
 // DefaultSafetyConfig returns a conservative safety configuration
 func DefaultSafetyConfig() *SafetyConfig {
 	return &SafetyConfig{
-		RequireSnapshot:      false, // Allow operations without snapshots if VG space is limited
-		SnapshotMinSize:      1 << 30,  // 1GB
-		SnapshotMaxSize:      50 << 30, // 50GB
-		SnapshotRetention:    24 * time.Hour,
-		RequireBackup:        false,
-		BackupMaxAge:         24 * time.Hour,
-		AllowOnlineResize:    true,
-		MaxResizePercent:     90,
-		RequireHealthCheck:   true,
-		JournalRetention:     90 * 24 * time.Hour,
+		RequireSnapshot:    false,    // Allow operations without snapshots if VG space is limited
+		SnapshotMinSize:    1 << 30,  // 1GB
+		SnapshotMaxSize:    50 << 30, // 50GB
+		SnapshotRetention:  24 * time.Hour,
+		RequireBackup:      false,
+		BackupMaxAge:       24 * time.Hour,
+		AllowOnlineResize:  true,
+		MaxResizePercent:   90,
+		RequireHealthCheck: true,
+		JournalRetention:   90 * 24 * time.Hour,
 	}
 }
 
@@ -93,9 +92,9 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 
 	// Set operation parameters
 	entry.Parameters = map[string]interface{}{
-		"size":              req.Size,
-		"dry_run":           req.DryRun,
-		"require_snapshot":  sso.config.RequireSnapshot,
+		"size":             req.Size,
+		"dry_run":          req.DryRun,
+		"require_snapshot": sso.config.RequireSnapshot,
 	}
 
 	// Update journal status
@@ -103,11 +102,11 @@ func (sso *SafeStorageOperations) SafeExtendLV(rc *eos_io.RuntimeContext, req *E
 
 	// Track the operation result
 	result := &OperationResult{
-		JournalID:   entry.ID,
-		Operation:   "safe_extend_lv",
-		Target:      target,
-		StartTime:   time.Now(),
-		Success:     false,
+		JournalID: entry.ID,
+		Operation: "safe_extend_lv",
+		Target:    target,
+		StartTime: time.Now(),
+		Success:   false,
 	}
 
 	// Defer cleanup and final status updates
@@ -283,19 +282,19 @@ type ExtendLVRequest struct {
 
 // OperationResult contains the result of a safe operation
 type OperationResult struct {
-	JournalID         string            `json:"journal_id"`
-	Operation         string            `json:"operation"`
-	Target            DiskTarget        `json:"target"`
-	Success           bool              `json:"success"`
-	Message           string            `json:"message"`
-	Error             error             `json:"error,omitempty"`
-	StartTime         time.Time         `json:"start_time"`
-	EndTime           time.Time         `json:"end_time"`
-	Duration          time.Duration     `json:"duration"`
-	PreflightReport   *PreflightReport  `json:"preflight_report,omitempty"`
-	SnapshotCreated   bool              `json:"snapshot_created"`
-	SnapshotID        string            `json:"snapshot_id,omitempty"`
-	RollbackAvailable bool              `json:"rollback_available"`
+	JournalID         string           `json:"journal_id"`
+	Operation         string           `json:"operation"`
+	Target            DiskTarget       `json:"target"`
+	Success           bool             `json:"success"`
+	Message           string           `json:"message"`
+	Error             error            `json:"error,omitempty"`
+	StartTime         time.Time        `json:"start_time"`
+	EndTime           time.Time        `json:"end_time"`
+	Duration          time.Duration    `json:"duration"`
+	PreflightReport   *PreflightReport `json:"preflight_report,omitempty"`
+	SnapshotCreated   bool             `json:"snapshot_created"`
+	SnapshotID        string           `json:"snapshot_id,omitempty"`
+	RollbackAvailable bool             `json:"rollback_available"`
 }
 
 // captureDiskState captures the current state of the disk system

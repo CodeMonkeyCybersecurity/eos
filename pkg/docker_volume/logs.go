@@ -62,7 +62,7 @@ func ConfigureLogRotation(rc *eos_io.RuntimeContext, config *ContainerLogConfig)
 
 		// Create a configuration file for reference
 		configPath := fmt.Sprintf("/etc/docker/containers/%s/log-rotation.conf", config.ContainerID)
-		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(configPath), shared.ServiceDirPerm); err != nil {
 			logger.Warn("Failed to create config directory",
 				zap.Error(err))
 		}
@@ -73,7 +73,7 @@ func ConfigureLogRotation(rc *eos_io.RuntimeContext, config *ContainerLogConfig)
 		}
 
 		configData, _ := json.MarshalIndent(logConfig, "", "  ")
-		if err := os.WriteFile(configPath, configData, 0644); err != nil {
+		if err := os.WriteFile(configPath, configData, shared.ConfigFilePerm); err != nil {
 			logger.Warn("Failed to write config file",
 				zap.Error(err))
 		}
@@ -286,7 +286,7 @@ func SetDefaultLogLimits(rc *eos_io.RuntimeContext, maxSize string, maxFiles int
 		}
 	}
 
-	if err := os.WriteFile(daemonConfigPath, configData, 0644); err != nil {
+	if err := os.WriteFile(daemonConfigPath, configData, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write daemon config: %w", err)
 	}
 

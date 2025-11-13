@@ -30,7 +30,7 @@ type ExportValidationReport struct {
 type ExpectedExportFile struct {
 	Filename    string
 	Description string
-	Critical    bool // If true, export is incomplete without this
+	Critical    bool  // If true, export is incomplete without this
 	MinSize     int64 // Minimum expected file size in bytes
 }
 

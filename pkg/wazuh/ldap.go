@@ -97,7 +97,7 @@ func DownloadAndPlaceCert(fqdn string) error {
 	cert := outputStr[startIdx : endIdx+len("-----END CERTIFICATE-----")]
 
 	// Write directly to file (no shell redirection)
-	return os.WriteFile("/etc/wazuh-indexer/opensearch-security/ldapcacert.pem", []byte(cert), 0600)
+	return os.WriteFile("/etc/wazuh-indexer/opensearch-security/ldapcacert.pem", []byte(cert), shared.SecretFilePerm)
 }
 
 func PatchConfigYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
@@ -198,13 +198,13 @@ func PatchConfigYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
 	}
 
 	// Backup
-	if err := os.WriteFile(backupPath, raw, 0644); err != nil {
+	if err := os.WriteFile(backupPath, raw, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup of config.yml: %w", err)
 	}
 	logger.Info("Backup created", zap.String("path", backupPath))
 
 	// Write patched config
-	if err := os.WriteFile(configPath, out, 0644); err != nil {
+	if err := os.WriteFile(configPath, out, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write config.yml: %w", err)
 	}
 
@@ -257,12 +257,12 @@ func PatchRolesMappingYML(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
 	}
 
 	// Backup
-	if err := os.WriteFile(backupPath, raw, 0644); err != nil {
+	if err := os.WriteFile(backupPath, raw, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup of roles_mapping.yml: %w", err)
 	}
 	logger.Info("Backup created", zap.String("path", backupPath))
 
-	if err := os.WriteFile(path, out, 0644); err != nil {
+	if err := os.WriteFile(path, out, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write roles_mapping.yml: %w", err)
 	}
 

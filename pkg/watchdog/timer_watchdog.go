@@ -13,10 +13,10 @@ import (
 
 // TimerWatchdog implements a timeout mechanism for command execution
 type TimerWatchdog struct {
-	timeout  time.Duration
-	logger   *zap.Logger
-	timer    *time.Timer
-	done     chan bool
+	timeout   time.Duration
+	logger    *zap.Logger
+	timer     *time.Timer
+	done      chan bool
 	onTimeout func()
 }
 
@@ -109,11 +109,11 @@ func ExecuteWithTimeout(ctx context.Context, logger *zap.Logger, timeout time.Du
 				zap.Duration("timeout", timeout))
 		},
 	}
-	
+
 	watchdog := NewTimerWatchdog(logger, config)
 	watchdog.Start()
 	defer watchdog.Stop()
-	
+
 	// Execute the function
 	return fn()
 }
@@ -146,11 +146,11 @@ func (cw *CommandWatchdog) Execute(commandName string, args []string, fn func() 
 		}()),
 		zap.Int("uid", os.Getuid()),
 		zap.Int("gid", os.Getgid()))
-	
+
 	// Use a timer with done channel for clean shutdown
 	timer := time.NewTimer(cw.timeout)
 	defer timer.Stop()
-	
+
 	done := make(chan error, 1)
 
 	// Execute function in goroutine with panic recovery
@@ -170,7 +170,7 @@ func (cw *CommandWatchdog) Execute(commandName string, args []string, fn func() 
 		}()
 		done <- fn()
 	}()
-	
+
 	// Wait for completion or timeout
 	select {
 	case err := <-done:
@@ -184,7 +184,7 @@ func (cw *CommandWatchdog) Execute(commandName string, args []string, fn func() 
 				zap.String("command", commandName))
 		}
 		return err
-		
+
 	case <-timer.C:
 		// Timeout occurred
 		cw.logger.Fatal("Command execution timeout exceeded",

@@ -66,6 +66,24 @@ test-cgo: ## Run tests for CGO-enabled packages (cephfs, kvm)
 	CGO_ENABLED=1 go test -v -race -tags=integration ./pkg/cephfs/...
 	CGO_ENABLED=1 go test -v -race -tags=integration ./pkg/kvm/...
 
+test-e2e-smoke: ## Run E2E smoke tests (fast, non-destructive)
+	@echo "[INFO] Running E2E smoke tests..."
+	@echo "[INFO] These tests verify command structure without modifying the system"
+	go test -v -tags=e2e_smoke -timeout=5m ./test/e2e/smoke/...
+
+test-e2e-full: ## Run full E2E tests (slow, DESTRUCTIVE - requires isolated test environment)
+	@echo "[WARN] ==================================================================="
+	@echo "[WARN] Running FULL E2E tests - these MODIFY the system!"
+	@echo "[WARN] Only run in isolated test environment (VM or container)"
+	@echo "[WARN] ==================================================================="
+	@if [ "$$EOS_E2E_FULL_APPROVED" != "true" ]; then \
+		echo "[ERROR] Full E2E tests not approved"; \
+		echo "[ERROR] Set EOS_E2E_FULL_APPROVED=true to run destructive tests"; \
+		exit 1; \
+	fi
+	@echo "[INFO] Running full E2E tests..."
+	sudo -E go test -v -tags=e2e_full -timeout=60m ./test/e2e/full/...
+
 ##@ Linting
 
 lint-install: ## Install golangci-lint

@@ -2,6 +2,7 @@
 package cloudinit
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -343,7 +344,7 @@ func (g *Generator) WriteConfig(config *CloudInitConfig, outputPath string) erro
 
 	// Ensure directory exists
 	dir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -357,7 +358,7 @@ func (g *Generator) WriteConfig(config *CloudInitConfig, outputPath string) erro
 	content := "#cloud-config\n" + string(yamlData)
 
 	// Write file with appropriate permissions
-	if err := os.WriteFile(outputPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -465,11 +466,11 @@ final_message: |
 
 	// Ensure directory exists
 	dir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	if err := os.WriteFile(outputPath, []byte(template), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(template), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write template: %w", err)
 	}
 
@@ -504,7 +505,7 @@ func validateOutputPath(path string) error {
 
 	// Clean the path and check it hasn't changed
 	cleanPath := filepath.Clean(path)
-	if cleanPath != path && path != "./" + cleanPath {
+	if cleanPath != path && path != "./"+cleanPath {
 		// Allow relative paths that get cleaned (e.g., "./file" -> "file")
 		if !strings.HasPrefix(path, "./") || cleanPath != strings.TrimPrefix(path, "./") {
 			return fmt.Errorf("output path contains unsafe elements")

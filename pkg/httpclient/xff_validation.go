@@ -41,9 +41,10 @@ func NewTrustedProxyValidator(trustedCIDRs []string) (*TrustedProxyValidator, er
 // 3. Return rightmost non-trusted IP in X-Forwarded-For chain
 //
 // Example:
-//   X-Forwarded-For: client, proxy1, proxy2
-//   Immediate client: proxy2 (trusted)
-//   → Returns "client" (first non-trusted IP)
+//
+//	X-Forwarded-For: client, proxy1, proxy2
+//	Immediate client: proxy2 (trusted)
+//	→ Returns "client" (first non-trusted IP)
 func (v *TrustedProxyValidator) GetClientIP(r *http.Request) (string, error) {
 	// Get immediate client IP from RemoteAddr
 	immediateIP, _, err := net.SplitHostPort(r.RemoteAddr)
@@ -113,8 +114,9 @@ func (v *TrustedProxyValidator) isTrustedProxy(ip net.IP) bool {
 // when the immediate client is in the trusted proxy list.
 //
 // Usage:
-//   validator, _ := NewTrustedProxyValidator([]string{"10.0.0.0/8"})
-//   clientIP, err := validator.ValidateXForwardedFor(r)
+//
+//	validator, _ := NewTrustedProxyValidator([]string{"10.0.0.0/8"})
+//	clientIP, err := validator.ValidateXForwardedFor(r)
 func (v *TrustedProxyValidator) ValidateXForwardedFor(r *http.Request) (string, error) {
 	return v.GetClientIP(r)
 }

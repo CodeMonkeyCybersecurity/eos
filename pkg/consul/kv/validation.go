@@ -190,7 +190,7 @@ func isSafeValue(value string) bool {
 		"enabled", "disabled", // Feature flags
 		"http://", "https://", // URLs (endpoints are OK in Consul KV)
 		"info", "debug", "warn", "error", // Log levels
-		"/", // Paths
+		"/",                      // Paths
 		"localhost", "127.0.0.1", // Local addresses
 	}
 
@@ -217,21 +217,21 @@ func isSafeValue(value string) bool {
 // hasSecretPrefix checks for common secret prefixes
 func hasSecretPrefix(value string) bool {
 	secretPrefixes := []string{
-		"sk_",       // Stripe secret keys
-		"pk_",       // Stripe publishable keys (still sensitive)
-		"ghp_",      // GitHub personal access tokens
-		"gho_",      // GitHub OAuth tokens
-		"ghs_",      // GitHub server-to-server tokens
+		"sk_",         // Stripe secret keys
+		"pk_",         // Stripe publishable keys (still sensitive)
+		"ghp_",        // GitHub personal access tokens
+		"gho_",        // GitHub OAuth tokens
+		"ghs_",        // GitHub server-to-server tokens
 		"github_pat_", // GitHub fine-grained PATs
-		"glpat-",    // GitLab personal access tokens
-		"xoxb-",     // Slack bot tokens
-		"xoxp-",     // Slack user tokens
-		"SG.",       // SendGrid API keys
-		"key-",      // Generic API key prefix
-		"Bearer ",   // Bearer tokens
-		"Basic ",    // Basic auth
-		"AKIA",      // AWS access key ID
-		"ASIA",      // AWS temporary access key ID
+		"glpat-",      // GitLab personal access tokens
+		"xoxb-",       // Slack bot tokens
+		"xoxp-",       // Slack user tokens
+		"SG.",         // SendGrid API keys
+		"key-",        // Generic API key prefix
+		"Bearer ",     // Bearer tokens
+		"Basic ",      // Basic auth
+		"AKIA",        // AWS access key ID
+		"ASIA",        // AWS temporary access key ID
 	}
 
 	for _, prefix := range secretPrefixes {

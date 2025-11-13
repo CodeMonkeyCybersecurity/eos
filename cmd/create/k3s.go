@@ -58,7 +58,6 @@ For Terraform-based deployment, use:
 	}),
 }
 
-
 var CreateKubeadmCmd = &cobra.Command{
 	Use:   "kubeadm",
 	Short: "Install Kubernetes using kubeadm",

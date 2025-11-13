@@ -285,7 +285,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 
 	minSpaceGB := 1
 	for _, dir := range dataDirs {
-		if err := os.MkdirAll(filepath.Dir(dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dir), consul.ConsulOptDirPerm); err != nil {
 			continue
 		}
 
@@ -295,7 +295,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 		}
 
 		if spaceGB < float64(minSpaceGB) {
-			return fmt.Errorf("insufficient disk space in %s: %.1fGB available, %dGB required", 
+			return fmt.Errorf("insufficient disk space in %s: %.1fGB available, %dGB required",
 				dir, spaceGB, minSpaceGB)
 		}
 
@@ -357,14 +357,14 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 
 	for _, dir := range testDirs {
 		// Try to create directory
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, consul.ConsulOptDirPerm); err != nil {
 			inaccessible = append(inaccessible, dir)
 			continue
 		}
 
 		// Try to write a test file
 		testFile := filepath.Join(dir, ".permission_test")
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte("test"), consul.ConsulConfigPerm); err != nil {
 			inaccessible = append(inaccessible, dir)
 			continue
 		}
@@ -372,7 +372,7 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 	}
 
 	if len(inaccessible) > 0 {
-		return fmt.Errorf("insufficient permissions for directories: %s (try running with sudo)", 
+		return fmt.Errorf("insufficient permissions for directories: %s (try running with sudo)",
 			strings.Join(inaccessible, ", "))
 	}
 
@@ -435,7 +435,7 @@ func getMemoryInfo() (*MemoryInfo, error) {
 
 	memInfo := &MemoryInfo{}
 	lines := strings.Split(string(data), "\n")
-	
+
 	for _, line := range lines {
 		if strings.HasPrefix(line, "MemTotal:") {
 			fields := strings.Fields(line)

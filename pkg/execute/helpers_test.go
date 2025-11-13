@@ -409,7 +409,7 @@ func TestHelpersEdgeCases(t *testing.T) {
 
 // Benchmark Tests
 func BenchmarkMax(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		max(i, i+1)
 	}
 }
@@ -418,13 +418,13 @@ func BenchmarkDefaultTimeout(b *testing.B) {
 	timeout := 5 * time.Second
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		defaultTimeout(timeout)
 	}
 }
 
 func BenchmarkDefaultTimeoutZero(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		defaultTimeout(0)
 	}
 }
@@ -433,7 +433,7 @@ func BenchmarkBuildCommandString(b *testing.B) {
 	args := []string{"arg1", "arg2", "arg3"}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		buildCommandString("command", args...)
 	}
 }
@@ -446,7 +446,7 @@ func BenchmarkBuildCommandStringLarge(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		buildCommandString("command", args...)
 	}
 }

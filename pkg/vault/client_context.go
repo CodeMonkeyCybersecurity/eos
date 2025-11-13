@@ -140,15 +140,17 @@ func SetPrivilegedClient(rc *eos_io.RuntimeContext, client *api.Client) {
 // For operational commands (NOT initial setup), use GetAdminClient() instead.
 //
 // When to use GetPrivilegedClient():
-//   ✅ CORRECT: During 'eos create vault' (initial setup, Phases 6-15)
-//   ✅ CORRECT: When explicitly handling root token operations
-//   ❌ AVOID: For maintenance commands (policy updates, MFA repair, drift correction)
+//
+//	✅ CORRECT: During 'eos create vault' (initial setup, Phases 6-15)
+//	✅ CORRECT: When explicitly handling root token operations
+//	❌ AVOID: For maintenance commands (policy updates, MFA repair, drift correction)
 //
 // When to use GetAdminClient():
-//   ✅ CORRECT: eos update vault --fix
-//   ✅ CORRECT: eos update vault --policies
-//   ✅ CORRECT: eos debug vault
-//   ✅ CORRECT: Any operational command after initial setup
+//
+//	✅ CORRECT: eos update vault --fix
+//	✅ CORRECT: eos update vault --policies
+//	✅ CORRECT: eos debug vault
+//	✅ CORRECT: Any operational command after initial setup
 //
 // Why this matters (HashiCorp security model):
 //   - Root token should be deleted after initial setup

@@ -3,6 +3,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -258,7 +259,7 @@ func CollateAndWriteFile[T any](
 		buf.WriteString(footer)
 	}
 
-	err := os.WriteFile(filePath, buf.Bytes(), 0644)
+	err := os.WriteFile(filePath, buf.Bytes(), shared.ConfigFilePerm)
 	if err != nil {
 		log.Error("Failed to write file", zap.Error(err), zap.String("path", filePath))
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)

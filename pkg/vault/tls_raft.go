@@ -137,7 +137,7 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 
 	// Ensure output directories exist
 	certDir := filepath.Dir(config.CertPath)
-	if err := os.MkdirAll(certDir, 0755); err != nil {
+	if err := os.MkdirAll(certDir, VaultBaseDirPerm); err != nil {
 		log.Error("Failed to create certificate directory", zap.String("dir", certDir), zap.Error(err))
 		return fmt.Errorf("create cert directory: %w", err)
 	}
@@ -157,7 +157,7 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 	}
 
 	// Set certificate file permissions (world-readable)
-	if err := os.Chmod(config.CertPath, 0644); err != nil {
+	if err := os.Chmod(config.CertPath, VaultTLSCertPerm); err != nil {
 		log.Warn("Failed to set certificate permissions", zap.Error(err))
 	}
 
@@ -177,7 +177,7 @@ func GenerateRaftTLSCertificate(rc *eos_io.RuntimeContext, config *TLSCertificat
 	}
 
 	// Set private key file permissions (owner read-only for security)
-	if err := os.Chmod(config.KeyPath, 0600); err != nil {
+	if err := os.Chmod(config.KeyPath, VaultTLSKeyPerm); err != nil {
 		log.Error("Failed to set key permissions", zap.Error(err))
 		return fmt.Errorf("set key permissions: %w", err)
 	}

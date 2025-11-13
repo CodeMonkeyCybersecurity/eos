@@ -1,6 +1,7 @@
 package moni
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -52,7 +53,7 @@ func GenerateSSLCerts(rc *eos_io.RuntimeContext) error {
 	logger.Info("Generating SSL certificates...")
 
 	// Create certs directory
-	if err := os.MkdirAll(MoniCertsDir, 0755); err != nil {
+	if err := os.MkdirAll(MoniCertsDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create certs directory: %w", err)
 	}
 
@@ -452,11 +453,11 @@ func createSeparateCertDirs(rc *eos_io.RuntimeContext, images []PostgresImage) e
 	}
 
 	// Create directories
-	if err := os.MkdirAll(MoniCertsAlpineDir, 0755); err != nil {
+	if err := os.MkdirAll(MoniCertsAlpineDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create alpine certs dir: %w", err)
 	}
 
-	if err := os.MkdirAll(MoniCertsStandardDir, 0755); err != nil {
+	if err := os.MkdirAll(MoniCertsStandardDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create standard certs dir: %w", err)
 	}
 

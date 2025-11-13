@@ -599,7 +599,7 @@ func BenchmarkExecutor_SuccessfulExecution(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		mockOp := &MockAIEOperation{}
 		mockOp.On("Assess", ctx).Return(assessment, nil)
 		mockOp.On("Intervene", ctx, assessment).Return(intervention, nil)

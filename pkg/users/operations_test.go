@@ -63,8 +63,6 @@ func (m *MockClient) Get(ctx context.Context, target string, key string) (map[st
 	return nil, errors.New("not implemented in mock")
 }
 
-
-
 func (m *MockClient) IsAPIAvailable(ctx context.Context) bool {
 	return false // Default to local mode for tests
 }
@@ -583,7 +581,7 @@ func TestGetSystemUsers_Error(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkGenerateSecurePassword(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := users.GenerateSecurePassword(16)
 		if err != nil {
 			b.Fatal(err)
@@ -607,7 +605,7 @@ func BenchmarkUserExistenceCheck_Assess(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := operation.Assess(ctx)
 		if err != nil {
 			b.Fatal(err)

@@ -350,7 +350,7 @@ func TestCompressionStats_Structure(t *testing.T) {
 func TestUsageInfo_Structure(t *testing.T) {
 	usage := &UsageInfo{
 		TotalSize:       1099511627776, // 1TB
-		UsedSize:        549755813888,  // 512GB  
+		UsedSize:        549755813888,  // 512GB
 		FreeSize:        549755813888,  // 512GB
 		DataSize:        500000000000,  // ~465GB
 		MetadataSize:    49755813888,   // ~46GB
@@ -433,7 +433,7 @@ func TestHelperFunctions(t *testing.T) {
 
 	t.Run("isDeviceMounted with mock", func(t *testing.T) {
 		rc := testutil.TestRuntimeContext(t)
-		
+
 		// Test with unmounted device
 		mounted, mountPoint := isDeviceMounted(rc, "/dev/sda99")
 		assert.False(t, mounted)
@@ -444,7 +444,7 @@ func TestHelperFunctions(t *testing.T) {
 		// Currently returns 0 for all inputs in stub
 		tests := []string{
 			"10.00GiB",
-			"100MiB", 
+			"100MiB",
 			"1.5TiB",
 			"invalid",
 			"",
@@ -464,7 +464,7 @@ func TestCreateVolume_ErrorPaths(t *testing.T) {
 		config := &Config{
 			Device: "/dev/nonexistent",
 		}
-		
+
 		err := CreateVolume(rc, config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "device not found")
@@ -474,7 +474,7 @@ func TestCreateVolume_ErrorPaths(t *testing.T) {
 		config := &Config{
 			Device: "",
 		}
-		
+
 		err := CreateVolume(rc, config)
 		require.Error(t, err)
 	})
@@ -487,7 +487,7 @@ func TestCreateSubvolume_ErrorPaths(t *testing.T) {
 		config := &Config{
 			SubvolumePath: "/nonexistent/path/subvol",
 		}
-		
+
 		err := CreateSubvolume(rc, config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "parent path does not exist")
@@ -497,7 +497,7 @@ func TestCreateSubvolume_ErrorPaths(t *testing.T) {
 		config := &Config{
 			SubvolumePath: "",
 		}
-		
+
 		err := CreateSubvolume(rc, config)
 		require.Error(t, err)
 	})
@@ -511,7 +511,7 @@ func TestDeviceHasFilesystem_Mock(t *testing.T) {
 		device   string
 		expected bool
 	}{
-		{"/dev/sda1", false},     // Would check real device
+		{"/dev/sda1", false}, // Would check real device
 		{"/dev/mapper/vg-lv", false},
 		{"", false},
 		{"/invalid/device", false},

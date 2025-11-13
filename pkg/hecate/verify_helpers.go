@@ -15,20 +15,20 @@ import (
 func VerifyHecateInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying Hecate installation")
-	
+
 	// Check if reverse proxy is installed
 	backend := DetectInstalledBackend()
 	if backend == "" {
 		return fmt.Errorf("no reverse proxy backend found (nginx or caddy)")
 	}
-	
+
 	logger.Info("Found reverse proxy backend", zap.String("backend", backend))
-	
+
 	// Verify service is running
 	if !IsServiceRunning(backend) {
 		return fmt.Errorf("%s service is not running", backend)
 	}
-	
+
 	// Verify configuration
 	switch backend {
 	case "nginx":
@@ -39,20 +39,20 @@ func VerifyHecateInstallation(rc *eos_io.RuntimeContext) error {
 		// Caddy validates config on startup
 		logger.Debug("Caddy configuration is validated on startup")
 	}
-	
+
 	// Verify directories exist
 	requiredDirs := []string{
 		"/etc/hecate",
 		"/var/lib/hecate",
 		"/var/log/hecate",
 	}
-	
+
 	for _, dir := range requiredDirs {
 		if _, err := os.Stat(dir); err != nil {
 			return fmt.Errorf("required directory %s does not exist: %w", dir, err)
 		}
 	}
-	
+
 	logger.Info("Hecate verification completed successfully")
 	return nil
 }
@@ -71,22 +71,22 @@ func DetectInstalledBackend() string {
 // GetHecateStatus returns the current status of Hecate
 func GetHecateStatus(rc *eos_io.RuntimeContext) (*ServiceStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	status := &ServiceStatus{
 		Running: false,
 		Version: "unknown",
 	}
-	
+
 	// Detect backend
 	backend := DetectInstalledBackend()
 	if backend == "" {
 		status.Errors = append(status.Errors, "No reverse proxy backend installed")
 		return status, nil
 	}
-	
+
 	// Check if service is running
 	status.Running = IsServiceRunning(backend)
-	
+
 	// Get version
 	switch backend {
 	case "nginx":
@@ -94,7 +94,7 @@ func GetHecateStatus(rc *eos_io.RuntimeContext) (*ServiceStatus, error) {
 	case "caddy":
 		status.Version = GetCaddyVersion()
 	}
-	
+
 	// Test configuration
 	var configErr error
 	switch backend {
@@ -104,23 +104,23 @@ func GetHecateStatus(rc *eos_io.RuntimeContext) (*ServiceStatus, error) {
 		// Caddy validates on startup
 		configErr = nil
 	}
-	
+
 	status.ConfigValid = configErr == nil
 	if configErr != nil {
 		status.Errors = append(status.Errors, fmt.Sprintf("Configuration error: %v", configErr))
 	}
-	
+
 	// Count active routes (simplified)
 	routesDir := "/etc/hecate/routes"
 	if entries, err := os.ReadDir(routesDir); err == nil {
 		status.ActiveRoutes = len(entries)
 	}
-	
+
 	logger.Debug("Status retrieved",
 		zap.String("backend", backend),
 		zap.Bool("running", status.Running),
 		zap.String("version", status.Version))
-	
+
 	return status, nil
 }
 
@@ -136,7 +136,7 @@ func CheckListeningPorts() ([]int, error) {
 			return nil, fmt.Errorf("failed to check listening ports: %w", err)
 		}
 	}
-	
+
 	var ports []int
 	lines := strings.Split(string(output), "\n")
 	for _, line := range lines {
@@ -158,6 +158,6 @@ func CheckListeningPorts() ([]int, error) {
 			}
 		}
 	}
-	
+
 	return ports, nil
 }

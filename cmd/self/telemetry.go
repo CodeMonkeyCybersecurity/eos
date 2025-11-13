@@ -3,6 +3,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,11 +37,11 @@ Commands:
 
 		switch action {
 		case "on":
-			if err := os.MkdirAll(filepath.Dir(stateFile), 0700); err != nil {
+			if err := os.MkdirAll(filepath.Dir(stateFile), shared.SecretDirPerm); err != nil {
 				log.Error("Failed to create config directory", zap.Error(err))
 				return fmt.Errorf("mkdir failed: %w", err)
 			}
-			if err := os.WriteFile(stateFile, []byte("on\n"), 0600); err != nil {
+			if err := os.WriteFile(stateFile, []byte("on\n"), shared.SecretFilePerm); err != nil {
 				log.Error("Failed to write telemetry toggle file", zap.Error(err))
 				return fmt.Errorf("enable telemetry: %w", err)
 			}

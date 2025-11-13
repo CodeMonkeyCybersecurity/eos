@@ -5,11 +5,11 @@ package read
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/backend"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/hybrid"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )

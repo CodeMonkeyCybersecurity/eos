@@ -11,6 +11,7 @@ import (
 )
 
 func TestHashString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -55,6 +56,7 @@ func TestHashString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := HashString(tt.input)
 
 			// Basic validation
@@ -79,6 +81,7 @@ func TestHashString(t *testing.T) {
 }
 
 func TestHashStringConsistency(t *testing.T) {
+	t.Parallel()
 	// Test that hashing is deterministic
 	input := "test input for consistency"
 
@@ -92,6 +95,7 @@ func TestHashStringConsistency(t *testing.T) {
 }
 
 func TestHashStrings(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		inputs []string
@@ -124,6 +128,7 @@ func TestHashStrings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := HashStrings(tt.inputs)
 
 			// Length should match input length
@@ -147,6 +152,7 @@ func TestHashStrings(t *testing.T) {
 }
 
 func TestAllUnique(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		items    []string
@@ -206,6 +212,7 @@ func TestAllUnique(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := AllUnique(tt.items)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -213,6 +220,7 @@ func TestAllUnique(t *testing.T) {
 }
 
 func TestAllHashesPresent(t *testing.T) {
+	t.Parallel()
 	// Create some test data
 	known := []string{
 		HashString("first"),
@@ -278,6 +286,7 @@ func TestAllHashesPresent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := AllHashesPresent(tt.hashes, tt.known)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -285,6 +294,7 @@ func TestAllHashesPresent(t *testing.T) {
 }
 
 func TestInjectSecretsFromPlaceholders(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                 string
 		input                string
@@ -337,6 +347,7 @@ func TestInjectSecretsFromPlaceholders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result, replacements, err := InjectSecretsFromPlaceholders([]byte(tt.input))
 
 			if tt.shouldError {
@@ -381,6 +392,7 @@ func TestInjectSecretsFromPlaceholders(t *testing.T) {
 }
 
 func TestSecureZero(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		data []byte
@@ -413,6 +425,7 @@ func TestSecureZero(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Make a copy to verify original data
 			original := make([]byte, len(tt.data))
 			copy(original, tt.data)
@@ -438,6 +451,7 @@ func TestSecureZero(t *testing.T) {
 }
 
 func TestHashIntegration(t *testing.T) {
+	t.Parallel()
 	// Test a complete workflow
 	inputs := []string{"password1", "password2", "password3"}
 

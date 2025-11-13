@@ -3,16 +3,17 @@
 package logger
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"path/filepath"
 )
 
 func EnsureLogPermissions(path string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, shared.SecretDirPerm); err != nil {
 		return err
 	}
-	if err := os.Chmod(dir, 0700); err != nil {
+	if err := os.Chmod(dir, shared.SecretDirPerm); err != nil {
 		return err
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -24,7 +25,7 @@ func EnsureLogPermissions(path string) error {
 			return cerr
 		}
 	}
-	return os.Chmod(path, 0600)
+	return os.Chmod(path, shared.SecretFilePerm)
 }
 
 func IsStrict(strict []bool) bool {

@@ -14,11 +14,11 @@ import (
 
 // Pipeline implements the complete orchestration pipeline
 type pipeline struct {
-	rc            *eos_io.RuntimeContext
-	terraform     TerraformProvider
-	nomad         NomadClient
-	stateStore    StateStore
-	config        PipelineConfig
+	rc         *eos_io.RuntimeContext
+	terraform  TerraformProvider
+	nomad      NomadClient
+	stateStore StateStore
+	config     PipelineConfig
 }
 
 // PipelineConfig holds pipeline configuration
@@ -27,8 +27,6 @@ type PipelineConfig struct {
 	AutoApprove bool
 	Timeout     time.Duration
 }
-
-
 
 // TerraformProvider defines the interface for Terraform operations
 type TerraformProvider interface {
@@ -49,8 +47,6 @@ type NomadClient interface {
 
 // PipelineOption defines options for creating a pipeline
 type PipelineOption func(*pipeline)
-
-
 
 // WithTerraform configures the Terraform provider
 func WithTerraform(terraform TerraformProvider) PipelineOption {
@@ -88,11 +84,11 @@ func NewPipeline(rc *eos_io.RuntimeContext, opts ...PipelineOption) Pipeline {
 			Timeout: 10 * time.Minute,
 		},
 	}
-	
+
 	for _, opt := range opts {
 		opt(p)
 	}
-	
+
 	return p
 }
 
@@ -123,12 +119,10 @@ func (p *pipeline) Deploy(ctx context.Context, component Component) (*Deployment
 	// Create error chain for collecting errors
 	errorChain := &ErrorChain{}
 
-
-
 	// Phase 2: Terraform Infrastructure
 	if p.terraform != nil {
 		logger.Info("Phase 2: Applying Terraform configuration")
-		
+
 		if !p.config.DryRun {
 			if err := p.terraform.Apply(ctx, component); err != nil {
 				orchErr := NewOrchestrationError(
@@ -141,12 +135,10 @@ func (p *pipeline) Deploy(ctx context.Context, component Component) (*Deployment
 				errorChain.Add(orchErr)
 				deployment.Status = StatusFailed
 				deployment.Error = err.Error()
-				
 
-				
 				return deployment, errorChain
 			}
-			
+
 			// Get Terraform outputs
 			outputs, err := p.terraform.GetOutputs(ctx, component)
 			if err != nil {
@@ -162,14 +154,14 @@ func (p *pipeline) Deploy(ctx context.Context, component Component) (*Deployment
 	// Phase 3: Wait for Nomad job health
 	if p.nomad != nil && !p.config.DryRun {
 		logger.Info("Phase 3: Waiting for Nomad job health")
-		
+
 		// Get job ID from Terraform outputs
 		jobID, ok := deployment.Outputs["tf_job_id"]
 		if !ok {
 			// Try to construct job ID
 			jobID = component.Name
 		}
-		
+
 		if err := p.nomad.WaitForJob(ctx, jobID, p.config.Timeout); err != nil {
 			orchErr := NewOrchestrationError(
 				LayerNomad,
@@ -181,7 +173,7 @@ func (p *pipeline) Deploy(ctx context.Context, component Component) (*Deployment
 			errorChain.Add(orchErr)
 			deployment.Status = StatusUnhealthy
 			deployment.Error = err.Error()
-			
+
 			// Don't rollback yet - job might recover
 			logger.Warn("Nomad job is unhealthy but deployment continues",
 				zap.String("job_id", jobID))
@@ -267,7 +259,7 @@ func (p *pipeline) checkComponentHealth(ctx context.Context, deployment *Deploym
 		if jobID == "" {
 			jobID = deployment.Component.Name
 		}
-		
+
 		if err := p.nomad.VerifyHealth(ctx, jobID); err != nil {
 			return false, nil
 		}
@@ -294,7 +286,7 @@ func (p *pipeline) GetLogs(ctx context.Context, deploymentID string, options Log
 		if jobID == "" {
 			jobID = deployment.Component.Name
 		}
-		
+
 		return p.nomad.GetLogs(ctx, jobID, options)
 	}
 
@@ -306,7 +298,7 @@ func (p *pipeline) Preview(component Component) (string, error) {
 	if p.stateStore == nil {
 		return "", fmt.Errorf("orchestrator not configured")
 	}
-	
+
 	// TODO: Implement actual state preview
 	return fmt.Sprintf("Preview for component: %s\nType: %s\n", component.Name, component.Type), nil
 }
@@ -316,7 +308,7 @@ func (p *pipeline) PreviewTerraform(component Component) (string, error) {
 	if p.terraform == nil {
 		return "", fmt.Errorf("terraform provider not configured")
 	}
-	
+
 	return p.terraform.Preview(component)
 }
 
@@ -326,19 +318,19 @@ func (p *pipeline) PreviewNomad(component Component) (string, error) {
 	if p.terraform == nil {
 		return "", fmt.Errorf("terraform provider not configured")
 	}
-	
+
 	// Get the Terraform preview which includes Nomad job specs
 	preview, err := p.terraform.Preview(component)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Extract just the Nomad job portion
 	// This is a simplified extraction - in production you'd parse more carefully
 	startMarker := "=== jobs/"
 	if idx := strings.Index(preview, startMarker); idx != -1 {
 		return preview[idx:], nil
 	}
-	
+
 	return preview, nil
 }

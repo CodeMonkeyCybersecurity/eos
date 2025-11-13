@@ -22,10 +22,10 @@ type RollbackManager struct {
 
 // InstallationState tracks what was installed for rollback purposes
 type InstallationState struct {
-	BinaryInstalled  bool
-	ConfigCreated    bool
-	ServiceCreated   bool
-	UseRepository    bool
+	BinaryInstalled bool
+	ConfigCreated   bool
+	ServiceCreated  bool
+	UseRepository   bool
 }
 
 // NewRollbackManager creates a new rollback manager

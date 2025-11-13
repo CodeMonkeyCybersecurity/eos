@@ -4,6 +4,7 @@
 package remotedebug
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -17,39 +18,39 @@ import (
 type EvidenceType string
 
 const (
-	EvidenceTypeFile      EvidenceType = "file"       // File system evidence
-	EvidenceTypeCommand   EvidenceType = "command"    // Command output
-	EvidenceTypeLogEntry  EvidenceType = "log"        // Log file entry
-	EvidenceTypeMetric    EvidenceType = "metric"     // System metric
-	EvidenceTypeConfig    EvidenceType = "config"     // Configuration file
-	EvidenceTypeProcess   EvidenceType = "process"    // Process information
-	EvidenceTypeNetwork   EvidenceType = "network"    // Network state
-	EvidenceTypeSnapshot  EvidenceType = "snapshot"   // System snapshot
+	EvidenceTypeFile     EvidenceType = "file"     // File system evidence
+	EvidenceTypeCommand  EvidenceType = "command"  // Command output
+	EvidenceTypeLogEntry EvidenceType = "log"      // Log file entry
+	EvidenceTypeMetric   EvidenceType = "metric"   // System metric
+	EvidenceTypeConfig   EvidenceType = "config"   // Configuration file
+	EvidenceTypeProcess  EvidenceType = "process"  // Process information
+	EvidenceTypeNetwork  EvidenceType = "network"  // Network state
+	EvidenceTypeSnapshot EvidenceType = "snapshot" // System snapshot
 )
 
 // StructuredEvidence represents a single piece of evidence with metadata
 type StructuredEvidence struct {
-	Type      EvidenceType      `json:"type"`                // Type of evidence
-	Timestamp time.Time         `json:"timestamp"`           // When collected
-	Source    string            `json:"source"`              // Where from (hostname/IP)
-	Collector string            `json:"collector"`           // Who collected (user@host)
-	Data      json.RawMessage   `json:"data"`                // Actual evidence (structured JSON)
-	Checksum  string            `json:"checksum"`            // SHA256 for integrity verification
-	Metadata  map[string]string `json:"metadata,omitempty"`  // Additional context
+	Type      EvidenceType      `json:"type"`               // Type of evidence
+	Timestamp time.Time         `json:"timestamp"`          // When collected
+	Source    string            `json:"source"`             // Where from (hostname/IP)
+	Collector string            `json:"collector"`          // Who collected (user@host)
+	Data      json.RawMessage   `json:"data"`               // Actual evidence (structured JSON)
+	Checksum  string            `json:"checksum"`           // SHA256 for integrity verification
+	Metadata  map[string]string `json:"metadata,omitempty"` // Additional context
 }
 
 // EvidenceSession represents a complete evidence collection session
 type EvidenceSession struct {
-	SessionID   string               `json:"session_id"`   // Unique session identifier
-	StartTime   time.Time            `json:"start_time"`   // Session start
-	EndTime     time.Time            `json:"end_time"`     // Session end
-	Host        string               `json:"host"`         // Target hostname
-	Collector   string               `json:"collector"`    // Who ran the collection
-	Command     string               `json:"command"`      // Command that triggered collection
-	Evidence    []StructuredEvidence `json:"evidence"`     // All collected evidence
-	Issues      []Issue              `json:"issues"`       // Detected issues
-	Warnings    []Warning            `json:"warnings"`     // Warnings
-	Report      *SystemReport        `json:"report"`       // Complete system report
+	SessionID string               `json:"session_id"` // Unique session identifier
+	StartTime time.Time            `json:"start_time"` // Session start
+	EndTime   time.Time            `json:"end_time"`   // Session end
+	Host      string               `json:"host"`       // Target hostname
+	Collector string               `json:"collector"`  // Who ran the collection
+	Command   string               `json:"command"`    // Command that triggered collection
+	Evidence  []StructuredEvidence `json:"evidence"`   // All collected evidence
+	Issues    []Issue              `json:"issues"`     // Detected issues
+	Warnings  []Warning            `json:"warnings"`   // Warnings
+	Report    *SystemReport        `json:"report"`     // Complete system report
 }
 
 // EvidenceRepository manages evidence storage and retrieval
@@ -66,7 +67,7 @@ func NewEvidenceRepository() (*EvidenceRepository, error) {
 	}
 
 	baseDir := filepath.Join(homeDir, ".eos", "evidence")
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create evidence directory: %w", err)
 	}
 
@@ -83,19 +84,19 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 		session.StartTime.Format("20060102-150405"),
 		sanitizeFilename(session.Host)))
 
-	if err := os.MkdirAll(sessionDir, 0755); err != nil {
+	if err := os.MkdirAll(sessionDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create session directory: %w", err)
 	}
 
 	// Write manifest.json (session metadata)
 	manifestPath := filepath.Join(sessionDir, "manifest.json")
 	manifestData, err := json.MarshalIndent(map[string]interface{}{
-		"session_id":  session.SessionID,
-		"start_time":  session.StartTime,
-		"end_time":    session.EndTime,
-		"host":        session.Host,
-		"collector":   session.Collector,
-		"command":     session.Command,
+		"session_id":     session.SessionID,
+		"start_time":     session.StartTime,
+		"end_time":       session.EndTime,
+		"host":           session.Host,
+		"collector":      session.Collector,
+		"command":        session.Command,
 		"evidence_count": len(session.Evidence),
 		"issue_count":    len(session.Issues),
 		"warning_count":  len(session.Warnings),
@@ -103,7 +104,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal manifest: %w", err)
 	}
-	if err := os.WriteFile(manifestPath, manifestData, 0644); err != nil {
+	if err := os.WriteFile(manifestPath, manifestData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write manifest: %w", err)
 	}
 
@@ -113,7 +114,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal evidence: %w", err)
 	}
-	if err := os.WriteFile(evidencePath, evidenceData, 0644); err != nil {
+	if err := os.WriteFile(evidencePath, evidenceData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write evidence: %w", err)
 	}
 
@@ -123,7 +124,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal issues: %w", err)
 	}
-	if err := os.WriteFile(issuesPath, issuesData, 0644); err != nil {
+	if err := os.WriteFile(issuesPath, issuesData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write issues: %w", err)
 	}
 
@@ -133,7 +134,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal warnings: %w", err)
 	}
-	if err := os.WriteFile(warningsPath, warningsData, 0644); err != nil {
+	if err := os.WriteFile(warningsPath, warningsData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write warnings: %w", err)
 	}
 
@@ -143,7 +144,7 @@ func (r *EvidenceRepository) StoreSession(session *EvidenceSession) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal report: %w", err)
 	}
-	if err := os.WriteFile(reportPath, reportData, 0644); err != nil {
+	if err := os.WriteFile(reportPath, reportData, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write report: %w", err)
 	}
 
@@ -182,7 +183,7 @@ Evidence Location: %s
 		len(session.Warnings),
 		sessionDir,
 	)
-	if err := os.WriteFile(summaryPath, []byte(summary), 0644); err != nil {
+	if err := os.WriteFile(summaryPath, []byte(summary), shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write summary: %w", err)
 	}
 

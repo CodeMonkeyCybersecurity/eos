@@ -2,6 +2,7 @@
 package git_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,42 +17,42 @@ import (
 // IsGitRepository checks if the specified path is a Git repository following Assess → Intervene → Evaluate pattern
 func IsGitRepository(rc *eos_io.RuntimeContext, path string) bool {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if path == "" {
 		path = "."
 	}
-	
+
 	logger.Debug("Checking if directory is a Git repository", zap.String("path", path))
-	
+
 	// INTERVENE
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	cmd.Dir = path
 	err := cmd.Run()
-	
+
 	// EVALUATE
 	isRepo := err == nil
-	logger.Debug("Git repository check completed", 
-		zap.String("path", path), 
+	logger.Debug("Git repository check completed",
+		zap.String("path", path),
 		zap.Bool("is_repository", isRepo))
-	
+
 	return isRepo
 }
 
 // GetRepositoryInfo retrieves comprehensive information about a Git repository following Assess → Intervene → Evaluate pattern
 func GetRepositoryInfo(rc *eos_io.RuntimeContext, path string) (*GitRepository, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing Git repository information request", zap.String("path", path))
-	
+
 	if !IsGitRepository(rc, path) {
 		return nil, fmt.Errorf("not a git repository: %s", path)
 	}
 
 	// INTERVENE
 	logger.Info("Gathering Git repository information", zap.String("path", path))
-	
+
 	repo := &GitRepository{
 		Path:       path,
 		RemoteURLs: make(map[string]string),
@@ -82,7 +83,7 @@ func GetRepositoryInfo(rc *eos_io.RuntimeContext, path string) (*GitRepository, 
 	}
 
 	// EVALUATE
-	logger.Info("Git repository information gathered successfully", 
+	logger.Info("Git repository information gathered successfully",
 		zap.String("path", path),
 		zap.Int("remote_count", len(repo.RemoteURLs)),
 		zap.Int("branch_count", len(repo.Branches)))
@@ -93,17 +94,17 @@ func GetRepositoryInfo(rc *eos_io.RuntimeContext, path string) (*GitRepository, 
 // GetStatus retrieves the current status of a Git repository following Assess → Intervene → Evaluate pattern
 func GetStatus(rc *eos_io.RuntimeContext, path string) (*GitStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing Git status request", zap.String("path", path))
-	
+
 	if path == "" {
 		path = "."
 	}
 
 	// INTERVENE
 	logger.Info("Getting Git repository status", zap.String("path", path))
-	
+
 	status := &GitStatus{}
 
 	// Get current branch
@@ -172,7 +173,7 @@ func GetStatus(rc *eos_io.RuntimeContext, path string) (*GitStatus, error) {
 	}
 
 	// EVALUATE
-	logger.Info("Git status retrieved successfully", 
+	logger.Info("Git status retrieved successfully",
 		zap.String("path", path),
 		zap.String("branch", status.Branch),
 		zap.Bool("is_clean", status.IsClean),
@@ -186,13 +187,13 @@ func GetStatus(rc *eos_io.RuntimeContext, path string) (*GitStatus, error) {
 // ConfigureGit sets up Git configuration following Assess → Intervene → Evaluate pattern
 func ConfigureGit(rc *eos_io.RuntimeContext, config *GitConfig, global bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	scope := "--local"
 	if global {
 		scope = "--global"
 	}
-	
+
 	logger.Info("Assessing Git configuration requirements",
 		zap.String("scope", scope),
 		zap.String("name", config.Name),
@@ -255,19 +256,19 @@ func ConfigureGit(rc *eos_io.RuntimeContext, config *GitConfig, global bool) err
 // InitRepository initializes a new Git repository following Assess → Intervene → Evaluate pattern
 func InitRepository(rc *eos_io.RuntimeContext, options *GitInitOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if options.Path == "" {
 		options.Path = "."
 	}
-	
+
 	logger.Info("Assessing Git repository initialization", zap.String("path", options.Path))
 
 	// INTERVENE
 	logger.Info("Initializing Git repository", zap.String("path", options.Path))
 
 	// Ensure directory exists
-	if err := os.MkdirAll(options.Path, 0755); err != nil {
+	if err := os.MkdirAll(options.Path, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -317,19 +318,19 @@ func InitRepository(rc *eos_io.RuntimeContext, options *GitInitOptions) error {
 // CommitAndPush commits changes and optionally pushes to remote following Assess → Intervene → Evaluate pattern
 func CommitAndPush(rc *eos_io.RuntimeContext, path string, options *GitCommitOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if path == "" {
 		path = "."
 	}
-	
+
 	logger.Info("Assessing commit and push requirements",
 		zap.String("path", path),
 		zap.String("message", options.Message),
 		zap.Bool("push", options.Push))
 
 	// INTERVENE
-	logger.Info("Committing and pushing changes", 
+	logger.Info("Committing and pushing changes",
 		zap.String("path", path),
 		zap.Bool("add_all", options.AddAll))
 
@@ -367,7 +368,7 @@ func CommitAndPush(rc *eos_io.RuntimeContext, path string, options *GitCommitOpt
 	}
 
 	// EVALUATE
-	logger.Info("Commit and push completed successfully", 
+	logger.Info("Commit and push completed successfully",
 		zap.String("path", path),
 		zap.String("message", options.Message))
 	return nil
@@ -376,19 +377,19 @@ func CommitAndPush(rc *eos_io.RuntimeContext, path string, options *GitCommitOpt
 // ManageRemote manages Git remotes following Assess → Intervene → Evaluate pattern
 func ManageRemote(rc *eos_io.RuntimeContext, path string, operation *GitRemoteOperation) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if path == "" {
 		path = "."
 	}
-	
+
 	logger.Info("Assessing Git remote operation",
 		zap.String("operation", operation.Operation),
 		zap.String("name", operation.Name),
 		zap.String("url", operation.URL))
 
 	// INTERVENE
-	logger.Info("Managing Git remote", 
+	logger.Info("Managing Git remote",
 		zap.String("path", path),
 		zap.String("operation", operation.Operation))
 
@@ -410,8 +411,8 @@ func ManageRemote(rc *eos_io.RuntimeContext, path string, operation *GitRemoteOp
 	if err != nil {
 		return fmt.Errorf("remote operation %s failed: %w", operation.Operation, err)
 	}
-	
-	logger.Info("Git remote operation completed successfully", 
+
+	logger.Info("Git remote operation completed successfully",
 		zap.String("operation", operation.Operation),
 		zap.String("name", operation.Name))
 	return nil
@@ -420,7 +421,7 @@ func ManageRemote(rc *eos_io.RuntimeContext, path string, operation *GitRemoteOp
 // DeployWithGit performs Git-based deployment operations following Assess → Intervene → Evaluate pattern
 func DeployWithGit(rc *eos_io.RuntimeContext, options *GitDeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing Git deployment requirements",
 		zap.String("repository", options.RepositoryPath),
@@ -433,11 +434,11 @@ func DeployWithGit(rc *eos_io.RuntimeContext, options *GitDeploymentOptions) err
 
 	// INTERVENE
 	if options.DryRun {
-		logger.Info("Dry run: would perform Git deployment", 
+		logger.Info("Dry run: would perform Git deployment",
 			zap.String("repository", options.RepositoryPath))
 		return nil
 	}
-	
+
 	logger.Info("Starting Git deployment", zap.String("repository", options.RepositoryPath))
 
 	// Pull latest changes
@@ -462,7 +463,7 @@ func DeployWithGit(rc *eos_io.RuntimeContext, options *GitDeploymentOptions) err
 	}
 
 	// EVALUATE
-	logger.Info("Git deployment completed successfully", 
+	logger.Info("Git deployment completed successfully",
 		zap.String("repository", options.RepositoryPath),
 		zap.String("branch", options.Branch))
 	return nil
@@ -471,20 +472,20 @@ func DeployWithGit(rc *eos_io.RuntimeContext, options *GitDeploymentOptions) err
 // GetConfig retrieves current Git configuration following Assess → Intervene → Evaluate pattern
 func GetConfig(rc *eos_io.RuntimeContext, path string, global bool) (*GitConfig, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	scope := "--local"
 	if global {
 		scope = "--global"
 	}
-	
-	logger.Info("Assessing Git configuration retrieval", 
+
+	logger.Info("Assessing Git configuration retrieval",
 		zap.String("path", path),
 		zap.String("scope", scope))
 
 	// INTERVENE
 	logger.Info("Getting Git configuration", zap.String("scope", scope))
-	
+
 	config := &GitConfig{
 		Custom: make(map[string]string),
 	}
@@ -515,7 +516,7 @@ func GetConfig(rc *eos_io.RuntimeContext, path string, global bool) (*GitConfig,
 	}
 
 	// EVALUATE
-	logger.Info("Git configuration retrieved successfully", 
+	logger.Info("Git configuration retrieved successfully",
 		zap.String("scope", scope),
 		zap.String("name", config.Name),
 		zap.String("email", config.Email))

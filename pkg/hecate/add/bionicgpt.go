@@ -1080,7 +1080,7 @@ BIONICGPT_ADMIN_EMAIL=%s
 # To retrieve password: cat %s | grep BIONICGPT_ADMIN_PASSWORD
 `, time.Now().Format(time.RFC3339), adminUsername, password, adminEmail, adminEnvPath)
 
-	if err := os.WriteFile(adminEnvPath, []byte(adminEnvContent), 0600); err != nil {
+	if err := os.WriteFile(adminEnvPath, []byte(adminEnvContent), shared.SecretFilePerm); err != nil {
 		logger.Warn("Failed to write admin credentials to .env.admin", zap.Error(err))
 	} else {
 		logger.Info("Admin credentials stored", zap.String("path", adminEnvPath))

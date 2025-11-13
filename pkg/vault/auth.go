@@ -279,7 +279,7 @@ func LoadOrPromptInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error
 	// Try multiple paths for vault_init.json (new location + legacy fallback)
 	initPaths := []string{
 		"/run/eos/vault_init_output.json", // New location (tmpfs, faster, survives restarts via systemd)
-		shared.VaultInitPath,               // Legacy: /var/lib/eos/secret/vault_init.json
+		shared.VaultInitPath,              // Legacy: /var/lib/eos/secret/vault_init.json
 	}
 
 	var res api.InitResponse

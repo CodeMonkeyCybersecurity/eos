@@ -167,7 +167,7 @@ func SaveConfig(rc *eos_io.RuntimeContext, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(configFile, data, 0644)
+	return os.WriteFile(configFile, data, shared.ConfigFilePerm)
 }
 
 // PromptInput displays a prompt and reads user input.

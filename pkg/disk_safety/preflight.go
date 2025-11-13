@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // PreflightCheck interface for all safety checks
 type PreflightCheck interface {
 	Name() string
@@ -24,7 +23,6 @@ type PreflightCheck interface {
 	Severity() CheckSeverity
 	CanSkip() bool
 }
-
 
 // PreflightRunner executes preflight checks
 type PreflightRunner struct {
@@ -141,10 +139,10 @@ func (pr *PreflightRunner) Run(ctx context.Context, target DiskTarget) (*Preflig
 // FilesystemCleanCheck verifies filesystem integrity
 type FilesystemCleanCheck struct{}
 
-func (f *FilesystemCleanCheck) Name() string        { return "filesystem_clean" }
-func (f *FilesystemCleanCheck) Description() string { return "Verify filesystem integrity" }
+func (f *FilesystemCleanCheck) Name() string            { return "filesystem_clean" }
+func (f *FilesystemCleanCheck) Description() string     { return "Verify filesystem integrity" }
 func (f *FilesystemCleanCheck) Severity() CheckSeverity { return SeverityCritical }
-func (f *FilesystemCleanCheck) CanSkip() bool       { return false }
+func (f *FilesystemCleanCheck) CanSkip() bool           { return false }
 
 func (f *FilesystemCleanCheck) Check(ctx context.Context, target DiskTarget) error {
 	device := target.GetDevice()
@@ -201,10 +199,10 @@ func (f *FilesystemCleanCheck) checkMountedFilesystem(ctx context.Context, devic
 // OpenFilesCheck verifies no files are open on the target
 type OpenFilesCheck struct{}
 
-func (o *OpenFilesCheck) Name() string        { return "open_files" }
-func (o *OpenFilesCheck) Description() string { return "Check for open files on target filesystem" }
+func (o *OpenFilesCheck) Name() string            { return "open_files" }
+func (o *OpenFilesCheck) Description() string     { return "Check for open files on target filesystem" }
 func (o *OpenFilesCheck) Severity() CheckSeverity { return SeverityWarning }
-func (o *OpenFilesCheck) CanSkip() bool       { return true }
+func (o *OpenFilesCheck) CanSkip() bool           { return true }
 
 func (o *OpenFilesCheck) Check(ctx context.Context, target DiskTarget) error {
 	mountpoint := target.GetMountpoint()
@@ -229,10 +227,10 @@ func (o *OpenFilesCheck) Check(ctx context.Context, target DiskTarget) error {
 // MountStatusCheck verifies mount status consistency
 type MountStatusCheck struct{}
 
-func (m *MountStatusCheck) Name() string        { return "mount_status" }
-func (m *MountStatusCheck) Description() string { return "Verify mount status consistency" }
+func (m *MountStatusCheck) Name() string            { return "mount_status" }
+func (m *MountStatusCheck) Description() string     { return "Verify mount status consistency" }
 func (m *MountStatusCheck) Severity() CheckSeverity { return SeverityWarning }
-func (m *MountStatusCheck) CanSkip() bool       { return true }
+func (m *MountStatusCheck) CanSkip() bool           { return true }
 
 func (m *MountStatusCheck) Check(ctx context.Context, target DiskTarget) error {
 	device := target.GetDevice()
@@ -256,10 +254,10 @@ func (m *MountStatusCheck) Check(ctx context.Context, target DiskTarget) error {
 // SmartHealthCheck verifies disk SMART health
 type SmartHealthCheck struct{}
 
-func (s *SmartHealthCheck) Name() string        { return "smart_health" }
-func (s *SmartHealthCheck) Description() string { return "Check disk SMART health status" }
+func (s *SmartHealthCheck) Name() string            { return "smart_health" }
+func (s *SmartHealthCheck) Description() string     { return "Check disk SMART health status" }
 func (s *SmartHealthCheck) Severity() CheckSeverity { return SeverityWarning }
-func (s *SmartHealthCheck) CanSkip() bool       { return true }
+func (s *SmartHealthCheck) CanSkip() bool           { return true }
 
 func (s *SmartHealthCheck) Check(ctx context.Context, target DiskTarget) error {
 	device := target.GetPhysicalDevice()
@@ -289,10 +287,10 @@ func (s *SmartHealthCheck) Check(ctx context.Context, target DiskTarget) error {
 // FreeSpaceCheck verifies sufficient free space exists
 type FreeSpaceCheck struct{}
 
-func (f *FreeSpaceCheck) Name() string        { return "free_space" }
-func (f *FreeSpaceCheck) Description() string { return "Verify sufficient free space for operation" }
+func (f *FreeSpaceCheck) Name() string            { return "free_space" }
+func (f *FreeSpaceCheck) Description() string     { return "Verify sufficient free space for operation" }
 func (f *FreeSpaceCheck) Severity() CheckSeverity { return SeverityCritical }
-func (f *FreeSpaceCheck) CanSkip() bool       { return false }
+func (f *FreeSpaceCheck) CanSkip() bool           { return false }
 
 func (f *FreeSpaceCheck) Check(ctx context.Context, target DiskTarget) error {
 	if target.VolumeGroup == "" {
@@ -300,7 +298,7 @@ func (f *FreeSpaceCheck) Check(ctx context.Context, target DiskTarget) error {
 	}
 
 	// Check free space in volume group
-	cmd := exec.CommandContext(ctx, "vgs", "--noheadings", "--units", "b", 
+	cmd := exec.CommandContext(ctx, "vgs", "--noheadings", "--units", "b",
 		"--separator", ":", "-o", "vg_name,vg_free", target.VolumeGroup)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -327,7 +325,7 @@ func (f *FreeSpaceCheck) Check(ctx context.Context, target DiskTarget) error {
 	// Require at least 1GB free space
 	minFreeSpace := int64(1 << 30) // 1GB
 	if freeBytes < minFreeSpace {
-		return fmt.Errorf("insufficient free space: %d bytes available, need at least %d bytes", 
+		return fmt.Errorf("insufficient free space: %d bytes available, need at least %d bytes",
 			freeBytes, minFreeSpace)
 	}
 
@@ -337,10 +335,10 @@ func (f *FreeSpaceCheck) Check(ctx context.Context, target DiskTarget) error {
 // ActiveIOCheck verifies no high I/O activity
 type ActiveIOCheck struct{}
 
-func (a *ActiveIOCheck) Name() string        { return "active_io" }
-func (a *ActiveIOCheck) Description() string { return "Check for high I/O activity" }
+func (a *ActiveIOCheck) Name() string            { return "active_io" }
+func (a *ActiveIOCheck) Description() string     { return "Check for high I/O activity" }
 func (a *ActiveIOCheck) Severity() CheckSeverity { return SeverityWarning }
-func (a *ActiveIOCheck) CanSkip() bool       { return true }
+func (a *ActiveIOCheck) CanSkip() bool           { return true }
 
 func (a *ActiveIOCheck) Check(ctx context.Context, target DiskTarget) error {
 	// Check if iostat is available
@@ -372,10 +370,10 @@ func (a *ActiveIOCheck) Check(ctx context.Context, target DiskTarget) error {
 // PermissionCheck verifies required permissions
 type PermissionCheck struct{}
 
-func (p *PermissionCheck) Name() string        { return "permissions" }
-func (p *PermissionCheck) Description() string { return "Verify required permissions for operation" }
+func (p *PermissionCheck) Name() string            { return "permissions" }
+func (p *PermissionCheck) Description() string     { return "Verify required permissions for operation" }
 func (p *PermissionCheck) Severity() CheckSeverity { return SeverityCritical }
-func (p *PermissionCheck) CanSkip() bool       { return false }
+func (p *PermissionCheck) CanSkip() bool           { return false }
 
 func (p *PermissionCheck) Check(ctx context.Context, target DiskTarget) error {
 	// Check if running as root
@@ -397,10 +395,10 @@ func (p *PermissionCheck) Check(ctx context.Context, target DiskTarget) error {
 // LockFileCheck verifies no lock files prevent operation
 type LockFileCheck struct{}
 
-func (l *LockFileCheck) Name() string        { return "lock_files" }
-func (l *LockFileCheck) Description() string { return "Check for lock files that prevent operation" }
+func (l *LockFileCheck) Name() string            { return "lock_files" }
+func (l *LockFileCheck) Description() string     { return "Check for lock files that prevent operation" }
 func (l *LockFileCheck) Severity() CheckSeverity { return SeverityCritical }
-func (l *LockFileCheck) CanSkip() bool       { return false }
+func (l *LockFileCheck) CanSkip() bool           { return false }
 
 func (l *LockFileCheck) Check(ctx context.Context, target DiskTarget) error {
 	// Check common lock files that would prevent package manager operations

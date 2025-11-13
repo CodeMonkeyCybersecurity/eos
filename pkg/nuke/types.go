@@ -15,11 +15,11 @@ type Config struct {
 
 // NukeResult contains the results of a nuke operation
 type NukeResult struct {
-	InitialComponents int
-	RemovedComponents int
+	InitialComponents   int
+	RemovedComponents   int
 	RemainingComponents int
-	SuccessRate       float64
-	RemainingItems    []string
+	SuccessRate         float64
+	RemainingItems      []string
 }
 
 // PhaseResult contains the result of a single nuke phase
@@ -33,26 +33,26 @@ type PhaseResult struct {
 
 // ServiceConfig represents a service that can be removed
 type ServiceConfig struct {
-	Name       string
-	Component  string
-	IsData     bool
-	Required   bool
+	Name      string
+	Component string
+	IsData    bool
+	Required  bool
 }
 
 // DirectoryConfig represents a directory that can be removed
 type DirectoryConfig struct {
-	Path       string
-	Component  string
-	IsData     bool
+	Path        string
+	Component   string
+	IsData      bool
 	Description string
 }
 
 // RemovalPlan contains the plan for what will be removed
 type RemovalPlan struct {
-	Components      []state.Component
-	Services        []ServiceConfig
-	Directories     []DirectoryConfig
-	ExcludedItems   []string
-	DevModeActive   bool
-	DataPreserved   bool
+	Components    []state.Component
+	Services      []ServiceConfig
+	Directories   []DirectoryConfig
+	ExcludedItems []string
+	DevModeActive bool
+	DataPreserved bool
 }

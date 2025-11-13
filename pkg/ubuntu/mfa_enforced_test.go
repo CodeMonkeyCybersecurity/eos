@@ -174,7 +174,7 @@ func TestMFAScriptSafety(t *testing.T) {
 
 // Benchmark basic MFA config generation
 func BenchmarkDefaultMFAConfig(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		config := DefaultEnforcedMFAConfig()
 		_ = config // Use the config to avoid optimization
 	}

@@ -5,6 +5,7 @@
 package helen
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"fmt"
@@ -23,28 +24,28 @@ import (
 // GhostConfig extends the base Config for Ghost-specific settings
 type GhostConfig struct {
 	*Config // Embed the existing Config struct
-	
+
 	// Ghost-specific fields
-	Mode          string   `json:"mode"`
-	Domain        string   `json:"domain"`
-	Environment   string   `json:"environment"`
-	Database      string   `json:"database"`
-	GitRepo       string   `json:"git_repo,omitempty"`
-	GitBranch     string   `json:"git_branch"`
-	RepoPath      string   `json:"repo_path,omitempty"`
-	EnableAuth    bool     `json:"enable_auth"`
-	EnableWebhook bool     `json:"enable_webhook"`
-	DockerImage   string   `json:"docker_image"`
-	InstanceCount int      `json:"instance_count"`
+	Mode          string     `json:"mode"`
+	Domain        string     `json:"domain"`
+	Environment   string     `json:"environment"`
+	Database      string     `json:"database"`
+	GitRepo       string     `json:"git_repo,omitempty"`
+	GitBranch     string     `json:"git_branch"`
+	RepoPath      string     `json:"repo_path,omitempty"`
+	EnableAuth    bool       `json:"enable_auth"`
+	EnableWebhook bool       `json:"enable_webhook"`
+	DockerImage   string     `json:"docker_image"`
+	InstanceCount int        `json:"instance_count"`
 	VaultPaths    VaultPaths `json:"vault_paths"`
-	
+
 	// Database configuration
 	DBHost     string `json:"db_host,omitempty"`
 	DBPort     int    `json:"db_port,omitempty"`
 	DBName     string `json:"db_name,omitempty"`
 	DBUser     string `json:"db_user,omitempty"`
 	DBPassword string `json:"db_password,omitempty"`
-	
+
 	// Email configuration
 	MailHost     string `json:"mail_host,omitempty"`
 	MailPort     int    `json:"mail_port,omitempty"`
@@ -84,10 +85,10 @@ func ParseGhostFlags(cmd *cobra.Command) (*GhostConfig, error) {
 	config.EnableAuth, _ = cmd.Flags().GetBool("enable-auth")
 	config.EnableWebhook, _ = cmd.Flags().GetBool("enable-webhook")
 	config.InstanceCount, _ = cmd.Flags().GetInt("ghost-instances")
-	
+
 	// Set default Docker image if not specified
 	config.DockerImage = "ghost:5-alpine"
-	
+
 	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, err
@@ -101,7 +102,7 @@ func (c *GhostConfig) Validate() error {
 	if c.Domain == "" {
 		return fmt.Errorf("domain is required for Ghost deployment")
 	}
-	
+
 	validEnvs := []string{"dev", "staging", "production"}
 	valid := false
 	for _, env := range validEnvs {
@@ -113,34 +114,34 @@ func (c *GhostConfig) Validate() error {
 	if !valid {
 		return fmt.Errorf("invalid environment: %s (must be dev/staging/production)", c.Environment)
 	}
-	
+
 	if c.Database != "mysql" && c.Database != "sqlite" {
 		return fmt.Errorf("invalid database: %s (must be mysql or sqlite)", c.Database)
 	}
-	
+
 	if c.InstanceCount < 1 {
 		c.InstanceCount = 1
 	}
-	
+
 	return nil
 }
 
 // CheckGhostPrerequisites verifies all requirements for Ghost deployment
 func CheckGhostPrerequisites(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check base prerequisites first (Vault, Nomad, Consul)
 	if err := CheckPrerequisites(rc); err != nil {
 		return err
 	}
-	
+
 	// Check if Hecate is deployed
 	logger.Info("Checking Hecate deployment")
 	services, err := consulListServices(rc)
 	if err != nil {
 		return fmt.Errorf("failed to query Consul: %w", err)
 	}
-	
+
 	hecateFound := false
 	for _, service := range services {
 		if strings.Contains(service, "hecate") || strings.Contains(service, "caddy") {
@@ -148,35 +149,35 @@ func CheckGhostPrerequisites(rc *eos_io.RuntimeContext, config *GhostConfig) err
 			break
 		}
 	}
-	
+
 	if !hecateFound {
 		return fmt.Errorf("Hecate reverse proxy not found. Deploy with: eos create hecate")
 	}
-	
+
 	// Check if database is available (for MySQL mode)
 	if config.Database == "mysql" {
 		logger.Info("Checking MySQL availability")
 		// This would check if MySQL is deployed or accessible
 		// For now, we'll assume it needs to be configured
 	}
-	
+
 	return nil
 }
 
 // PrepareGitRepository clones or updates the Helen git repository
 func PrepareGitRepository(rc *eos_io.RuntimeContext, config *GhostConfig) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create work directory
 	repoPath := filepath.Join(config.WorkDir, "helen-repo")
-	
+
 	// Check if repo already exists
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
 		// Repository exists, update it
 		logger.Info("Updating existing Helen repository",
 			zap.String("path", repoPath),
 			zap.String("branch", config.GitBranch))
-		
+
 		if err := gitPull(rc, repoPath, config.GitBranch); err != nil {
 			return "", fmt.Errorf("failed to update repository: %w", err)
 		}
@@ -185,25 +186,25 @@ func PrepareGitRepository(rc *eos_io.RuntimeContext, config *GhostConfig) (strin
 		logger.Info("Cloning Helen repository",
 			zap.String("repo", config.GitRepo),
 			zap.String("branch", config.GitBranch))
-		
+
 		if err := gitClone(rc, config.GitRepo, repoPath, config.GitBranch); err != nil {
 			return "", fmt.Errorf("failed to clone repository: %w", err)
 		}
 	}
-	
+
 	return repoPath, nil
 }
 
 // CreateGhostVaultSecrets creates the necessary Vault secrets for Ghost
 func CreateGhostVaultSecrets(rc *eos_io.RuntimeContext, config *GhostConfig) (VaultPaths, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	paths := VaultPaths{
 		Database: fmt.Sprintf("kv/data/helen/%s/database", config.Environment),
 		Mail:     fmt.Sprintf("kv/data/helen/%s/mail", config.Environment),
 		Admin:    fmt.Sprintf("kv/data/helen/%s/admin", config.Environment),
 	}
-	
+
 	// Create database secrets
 	dbSecrets := map[string]interface{}{
 		"client":   config.Database,
@@ -213,7 +214,7 @@ func CreateGhostVaultSecrets(rc *eos_io.RuntimeContext, config *GhostConfig) (Va
 		"password": generatePassword(),
 		"database": fmt.Sprintf("helen_%s", config.Environment),
 	}
-	
+
 	// Override with MySQL service discovery if available
 	if config.Database == "mysql" {
 		if mysqlService, err := consulGetService(rc, "mysql"); err == nil {
@@ -221,12 +222,12 @@ func CreateGhostVaultSecrets(rc *eos_io.RuntimeContext, config *GhostConfig) (Va
 			dbSecrets["port"] = mysqlService.Port
 		}
 	}
-	
+
 	logger.Info("Creating database secrets in Vault", zap.String("path", paths.Database))
 	if err := vaultWriteSecret(rc, paths.Database, dbSecrets); err != nil {
 		return paths, fmt.Errorf("failed to create database secrets: %w", err)
 	}
-	
+
 	// Create mail secrets with sensible defaults
 	mailSecrets := map[string]interface{}{
 		"host":     "smtp.gmail.com",
@@ -236,69 +237,68 @@ func CreateGhostVaultSecrets(rc *eos_io.RuntimeContext, config *GhostConfig) (Va
 		"password": "", // User should configure
 		"from":     fmt.Sprintf("noreply@%s", config.Domain),
 	}
-	
+
 	logger.Info("Creating mail configuration in Vault", zap.String("path", paths.Mail))
 	if err := vaultWriteSecret(rc, paths.Mail, mailSecrets); err != nil {
 		return paths, fmt.Errorf("failed to create mail secrets: %w", err)
 	}
-	
+
 	// Create admin user secrets
 	adminSecrets := map[string]interface{}{
 		"email":    fmt.Sprintf("admin@%s", config.Domain),
 		"password": generatePassword(),
 		"name":     "Administrator",
 	}
-	
+
 	logger.Info("Creating admin credentials in Vault", zap.String("path", paths.Admin))
 	if err := vaultWriteSecret(rc, paths.Admin, adminSecrets); err != nil {
 		return paths, fmt.Errorf("failed to create admin secrets: %w", err)
 	}
-	
+
 	return paths, nil
 }
 
 // DeployGhost deploys Ghost CMS using Nomad
 func DeployGhost(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Generate Nomad job specification
 	jobSpec, err := generateGhostNomadJob(config)
 	if err != nil {
 		return fmt.Errorf("failed to generate Nomad job: %w", err)
 	}
-	
+
 	// Write job file
 	jobFile := filepath.Join(config.WorkDir, fmt.Sprintf("helen-ghost-%s.nomad", config.Environment))
-	if err := os.WriteFile(jobFile, jobSpec, 0644); err != nil {
+	if err := os.WriteFile(jobFile, jobSpec, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write job file: %w", err)
 	}
-	
+
 	// Deploy using Nomad
 	logger.Info("Deploying Ghost to Nomad",
 		zap.String("job_file", jobFile),
 		zap.String("environment", config.Environment))
-	
+
 	if err := nomadRunJob(rc, jobFile); err != nil {
 		return fmt.Errorf("failed to deploy Nomad job: %w", err)
 	}
-	
+
 	// Register with Consul
 	if err := registerGhostService(rc, config); err != nil {
 		logger.Warn("Failed to register with Consul", zap.Error(err))
 	}
-	
+
 	return nil
 }
-
 
 // SetupGhostWebhook configures CI/CD webhook for automatic deployments
 func SetupGhostWebhook(rc *eos_io.RuntimeContext, config *GhostConfig) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Generate webhook endpoint
 	webhookPath := fmt.Sprintf("/webhooks/helen/%s", config.Environment)
 	webhookURL := fmt.Sprintf("https://%s%s", config.Domain, webhookPath)
-	
+
 	// Create webhook handler configuration
 	webhookConfig := map[string]interface{}{
 		"endpoint":    webhookPath,
@@ -307,39 +307,39 @@ func SetupGhostWebhook(rc *eos_io.RuntimeContext, config *GhostConfig) (string, 
 		"git_branch":  config.GitBranch,
 		"secret":      generatePassword(),
 	}
-	
+
 	// Store webhook configuration in Vault
 	webhookVaultPath := fmt.Sprintf("kv/data/helen/%s/webhook", config.Environment)
 	if err := vaultWriteSecret(rc, webhookVaultPath, webhookConfig); err != nil {
 		return "", fmt.Errorf("failed to store webhook config: %w", err)
 	}
-	
+
 	logger.Info("Webhook configuration created",
 		zap.String("url", webhookURL),
 		zap.String("vault_path", webhookVaultPath))
-	
+
 	// TODO: Deploy actual webhook handler service
 	// This would be a separate Nomad job that listens for webhooks
 	// and triggers redeployments
-	
+
 	return webhookURL, nil
 }
 
 // WaitForGhostHealthy waits for the Ghost deployment to become healthy
 func WaitForGhostHealthy(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	serviceName := fmt.Sprintf("helen-ghost-%s", config.Environment)
 	logger.Info("Waiting for Ghost to become healthy",
 		zap.String("service", serviceName))
-	
+
 	// Wait up to 5 minutes for service to be healthy
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Minute)
 	defer cancel()
-	
+
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -351,12 +351,12 @@ func WaitForGhostHealthy(rc *eos_io.RuntimeContext, config *GhostConfig) error {
 				logger.Debug("Health check failed", zap.Error(err))
 				continue
 			}
-			
+
 			if health.Status == "passing" {
 				logger.Info("Ghost is healthy")
 				return nil
 			}
-			
+
 			logger.Debug("Ghost not yet healthy",
 				zap.String("status", health.Status))
 		}
@@ -419,17 +419,17 @@ EOH
   }
 }
 `
-	
+
 	tmpl, err := template.New("nomad-job").Parse(jobTemplate)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, config); err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -450,7 +450,7 @@ func registerGhostService(rc *eos_io.RuntimeContext, config *GhostConfig) error 
 			Timeout:  "5s",
 		},
 	}
-	
+
 	return consulRegisterService(rc, service)
 }
 

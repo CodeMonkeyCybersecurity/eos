@@ -21,18 +21,18 @@ func validateContainerName(name string) error {
 	if name == "" {
 		return fmt.Errorf("container name cannot be empty")
 	}
-	
+
 	// Check for shell metacharacters that could be used for injection
 	// Allow alphanumeric, hyphens, underscores, dots (valid container name chars)
 	if matched, _ := regexp.MatchString(`[^a-zA-Z0-9._-]`, name); matched {
 		return fmt.Errorf("container name contains forbidden characters")
 	}
-	
+
 	// Check length to prevent DoS
 	if len(name) > 253 {
 		return fmt.Errorf("container name too long (max 253 characters)")
 	}
-	
+
 	return nil
 }
 
@@ -64,7 +64,7 @@ func StopContainer(rc *eos_io.RuntimeContext, containerName string) error {
 	if err := validateContainerName(containerName); err != nil {
 		return fmt.Errorf("invalid container name: %w", err)
 	}
-	
+
 	out, err := exec.Command("docker", "ps", "--filter", "name="+containerName, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)

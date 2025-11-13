@@ -2,6 +2,7 @@
 package cron_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"crypto/sha256"
 	"fmt"
@@ -20,12 +21,12 @@ import (
 // ListCronJobs lists all cron jobs for the current or specified user following Assess → Intervene → Evaluate pattern
 func ListCronJobs(rc *eos_io.RuntimeContext, config *CronConfig) (*CronListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultCronConfig()
 	}
-	
+
 	logger.Info("Assessing cron job listing requirements", zap.String("user", config.User))
 
 	result := &CronListResult{
@@ -68,7 +69,7 @@ func ListCronJobs(rc *eos_io.RuntimeContext, config *CronConfig) (*CronListResul
 	result.Count = len(jobs)
 
 	// EVALUATE
-	logger.Info("Cron job listing completed", 
+	logger.Info("Cron job listing completed",
 		zap.Int("job_count", len(jobs)),
 		zap.String("user", result.User),
 		zap.Bool("has_crontab", result.HasCrontab))
@@ -79,12 +80,12 @@ func ListCronJobs(rc *eos_io.RuntimeContext, config *CronConfig) (*CronListResul
 // AddCronJob adds a new cron job following Assess → Intervene → Evaluate pattern
 func AddCronJob(rc *eos_io.RuntimeContext, config *CronConfig, job *CronJob) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultCronConfig()
 	}
-	
+
 	logger.Info("Assessing cron job addition",
 		zap.String("schedule", job.Schedule),
 		zap.String("command", job.Command),
@@ -149,7 +150,7 @@ func AddCronJob(rc *eos_io.RuntimeContext, config *CronConfig, job *CronJob) (*C
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully added cron job: %s", job.ID)
 
-	logger.Info("Cron job added successfully", 
+	logger.Info("Cron job added successfully",
 		zap.String("job_id", job.ID),
 		zap.String("schedule", job.Schedule))
 
@@ -159,12 +160,12 @@ func AddCronJob(rc *eos_io.RuntimeContext, config *CronConfig, job *CronJob) (*C
 // RemoveCronJob removes a cron job by ID or exact match following Assess → Intervene → Evaluate pattern
 func RemoveCronJob(rc *eos_io.RuntimeContext, config *CronConfig, jobIdentifier string) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultCronConfig()
 	}
-	
+
 	logger.Info("Assessing cron job removal",
 		zap.String("identifier", jobIdentifier),
 		zap.Bool("dry_run", config.DryRun))
@@ -241,12 +242,12 @@ func RemoveCronJob(rc *eos_io.RuntimeContext, config *CronConfig, jobIdentifier 
 // ClearAllCronJobs removes all cron jobs following Assess → Intervene → Evaluate pattern
 func ClearAllCronJobs(rc *eos_io.RuntimeContext, config *CronConfig) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	if config == nil {
 		config = DefaultCronConfig()
 	}
-	
+
 	logger.Info("Assessing clear all cron jobs",
 		zap.Bool("dry_run", config.DryRun),
 		zap.String("user", config.User))
@@ -307,17 +308,17 @@ func ClearAllCronJobs(rc *eos_io.RuntimeContext, config *CronConfig) (*CronOpera
 // ValidateCronExpression validates a cron expression following Assess → Intervene → Evaluate pattern
 func ValidateCronExpression(rc *eos_io.RuntimeContext, expression string) *CronValidationResult {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Debug("Assessing cron expression validation", zap.String("expression", expression))
-	
+
 	result := &CronValidationResult{
 		Expression: expression,
 	}
 
 	// INTERVENE
 	logger.Debug("Validating cron expression", zap.String("expression", expression))
-	
+
 	if err := validateCronExpression(expression); err != nil {
 		result.Valid = false
 		result.Error = err.Error()
@@ -328,8 +329,8 @@ func ValidateCronExpression(rc *eos_io.RuntimeContext, expression string) *CronV
 	// EVALUATE
 	result.Valid = true
 	result.Description = describeCronExpression(expression)
-	
-	logger.Debug("Cron expression validation completed", 
+
+	logger.Debug("Cron expression validation completed",
 		zap.String("expression", expression),
 		zap.Bool("valid", result.Valid))
 
@@ -506,7 +507,7 @@ func createCronBackup(rc *eos_io.RuntimeContext, config *CronConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create backup directory
-	if err := os.MkdirAll(config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -538,7 +539,7 @@ func createCronBackup(rc *eos_io.RuntimeContext, config *CronConfig) error {
 	}
 
 	// Write backup file
-	if err := os.WriteFile(backupPath, output, 0644); err != nil {
+	if err := os.WriteFile(backupPath, output, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 

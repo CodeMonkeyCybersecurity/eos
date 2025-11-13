@@ -44,24 +44,24 @@ func NewLifecycleManager(rc *eos_io.RuntimeContext) *LifecycleManager {
 // DeploymentRequest contains everything needed to deploy a consul-template service
 type DeploymentRequest struct {
 	// Service configuration
-	ServiceName     string
-	Description     string
-	VaultSecrets    []string          // Vault secret paths to use
-	ConsulKeys      []string          // Consul KV keys to use
-	OutputFile      string            // Where to render the config
-	OutputPerms     os.FileMode       // Permissions for rendered file
-	ReloadCommand   string            // Command to run after rendering (optional)
-	EnableService   bool              // Enable systemd service to start on boot
-	StartService    bool              // Start the service immediately
-	ConsulAddr      string            // Consul address (optional, uses default)
-	VaultAddr       string            // Vault address (optional, uses default)
-	VaultTokenPath  string            // Vault token path (optional, uses default)
+	ServiceName    string
+	Description    string
+	VaultSecrets   []string    // Vault secret paths to use
+	ConsulKeys     []string    // Consul KV keys to use
+	OutputFile     string      // Where to render the config
+	OutputPerms    os.FileMode // Permissions for rendered file
+	ReloadCommand  string      // Command to run after rendering (optional)
+	EnableService  bool        // Enable systemd service to start on boot
+	StartService   bool        // Start the service immediately
+	ConsulAddr     string      // Consul address (optional, uses default)
+	VaultAddr      string      // Vault address (optional, uses default)
+	VaultTokenPath string      // Vault token path (optional, uses default)
 
 	// Advanced options
-	CustomTemplate  *TemplateContent  // Custom template (if not using auto-generated .env)
-	WaitMin         time.Duration     // Min wait before rendering
-	WaitMax         time.Duration     // Max wait before rendering
-	BackupExisting  bool              // Backup existing file before overwriting
+	CustomTemplate *TemplateContent // Custom template (if not using auto-generated .env)
+	WaitMin        time.Duration    // Min wait before rendering
+	WaitMax        time.Duration    // Max wait before rendering
+	BackupExisting bool             // Backup existing file before overwriting
 }
 
 // Deploy deploys a complete consul-template service for an application
@@ -75,24 +75,25 @@ type DeploymentRequest struct {
 // 5. Starting the service
 //
 // Example:
-//   lm := NewLifecycleManager(rc)
-//   err := lm.Deploy(&DeploymentRequest{
-//       ServiceName: "bionicgpt",
-//       Description: "Configuration rendering for BionicGPT",
-//       VaultSecrets: []string{
-//           "secret/bionicgpt/postgres_password",
-//           "secret/bionicgpt/jwt_secret",
-//       },
-//       ConsulKeys: []string{
-//           "config/bionicgpt/log_level",
-//           "config/bionicgpt/feature_flags/enable_rag",
-//       },
-//       OutputFile: "/opt/bionicgpt/.env",
-//       OutputPerms: 0640,
-//       ReloadCommand: "docker compose -f /opt/bionicgpt/docker-compose.yml up -d --force-recreate",
-//       EnableService: true,
-//       StartService: true,
-//   })
+//
+//	lm := NewLifecycleManager(rc)
+//	err := lm.Deploy(&DeploymentRequest{
+//	    ServiceName: "bionicgpt",
+//	    Description: "Configuration rendering for BionicGPT",
+//	    VaultSecrets: []string{
+//	        "secret/bionicgpt/postgres_password",
+//	        "secret/bionicgpt/jwt_secret",
+//	    },
+//	    ConsulKeys: []string{
+//	        "config/bionicgpt/log_level",
+//	        "config/bionicgpt/feature_flags/enable_rag",
+//	    },
+//	    OutputFile: "/opt/bionicgpt/.env",
+//	    OutputPerms: 0640,
+//	    ReloadCommand: "docker compose -f /opt/bionicgpt/docker-compose.yml up -d --force-recreate",
+//	    EnableService: true,
+//	    StartService: true,
+//	})
 func (lm *LifecycleManager) Deploy(req *DeploymentRequest) error {
 	lm.logger.Info("Deploying consul-template service",
 		zap.String("service", req.ServiceName))

@@ -132,9 +132,9 @@ func EnableActivityTracking(rc *eos_io.RuntimeContext, client *api.Client) error
 
 // ActivityTrackingConfig represents the Vault activity tracking configuration
 type ActivityTrackingConfig struct {
-	Enabled         bool   `json:"enabled"`
-	RetentionMonths int    `json:"retention_months"`
-	DefaultReportMonths int `json:"default_report_months"`
+	Enabled             bool `json:"enabled"`
+	RetentionMonths     int  `json:"retention_months"`
+	DefaultReportMonths int  `json:"default_report_months"`
 }
 
 // GetActivityTrackingConfig retrieves the current activity tracking configuration

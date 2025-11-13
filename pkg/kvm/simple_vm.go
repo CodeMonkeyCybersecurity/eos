@@ -6,6 +6,7 @@
 package kvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -40,9 +41,9 @@ var (
 // SimpleVMConfig holds simplified configuration for quick VM creation
 type SimpleVMConfig struct {
 	Name     string
-	Memory   string   // in MB
+	Memory   string // in MB
 	VCPUs    string
-	DiskSize string   // in GB
+	DiskSize string // in GB
 	Network  string
 	SSHKeys  []string // Additional SSH public keys to inject
 }
@@ -86,7 +87,7 @@ func CreateSimpleUbuntuVM(rc *eos_io.RuntimeContext, vmName string) error {
 
 	// Create working directory
 	seedDir := filepath.Join(isoDir, config.Name)
-	if err := os.MkdirAll(seedDir, 0755); err != nil {
+	if err := os.MkdirAll(seedDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create seed directory: %w", err)
 	}
 
@@ -353,7 +354,7 @@ func createVMWithMergedCloudInit(rc *eos_io.RuntimeContext, vmName string, cloud
 
 	// Create working directory
 	seedDir := filepath.Join(isoDir, config.Name)
-	if err := os.MkdirAll(seedDir, 0755); err != nil {
+	if err := os.MkdirAll(seedDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create seed directory: %w", err)
 	}
 
@@ -361,7 +362,7 @@ func createVMWithMergedCloudInit(rc *eos_io.RuntimeContext, vmName string, cloud
 
 	// Write merged cloud-init to user-data
 	userDataPath := filepath.Join(seedDir, "user-data")
-	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write merged user-data: %w", err)
 	}
 
@@ -371,7 +372,7 @@ local-hostname: %s
 `, config.Name, config.Name)
 
 	metaDataPath := filepath.Join(seedDir, "meta-data")
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 
@@ -439,7 +440,7 @@ func checkPrerequisites() error {
 	}
 
 	// Ensure iso directory exists and is writable
-	if err := os.MkdirAll(isoDir, 0755); err != nil {
+	if err := os.MkdirAll(isoDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create iso directory: %w", err)
 	}
 
@@ -553,7 +554,7 @@ func generateSSHKeyED25519(seedDir, vmName string) (string, string, error) {
 
 	// Write public key
 	pubKeyPath := privKeyPath + ".pub"
-	if err := os.WriteFile(pubKeyPath, []byte(pubKeyStr), 0644); err != nil {
+	if err := os.WriteFile(pubKeyPath, []byte(pubKeyStr), shared.ConfigFilePerm); err != nil {
 		return "", "", fmt.Errorf("failed to write public key: %w", err)
 	}
 
@@ -640,7 +641,7 @@ disable_root: true
 `, config.Name, formatSSHKeys(config.SSHKeys))
 
 	userDataPath := filepath.Join(seedDir, "user-data")
-	if err := os.WriteFile(userDataPath, []byte(userData), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(userData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write user-data: %w", err)
 	}
 
@@ -650,7 +651,7 @@ local-hostname: %s
 `, config.Name, config.Name)
 
 	metaDataPath := filepath.Join(seedDir, "meta-data")
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write meta-data: %w", err)
 	}
 
@@ -720,7 +721,7 @@ func createVMDisk(baseImagePath, vmDiskPath, diskSize string, logger *otelzap.Lo
 
 	// Set proper permissions
 	// SECURITY: VM disk images should not be world-readable (may contain sensitive data)
-	if err := os.Chmod(vmDiskPath, 0640); err != nil {
+	if err := os.Chmod(vmDiskPath, shared.SecureConfigFilePerm); err != nil {
 		logger.Warn("Failed to set disk permissions", zap.Error(err))
 	}
 

@@ -103,12 +103,12 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestNewUnifiedClient(t *testing.T) {
 	tests := []struct {
-		name         string
-		baseURL      string
-		token        string
-		expectErr    bool
-		errMsg       string
-		expectedURL  string // Expected after SanitizeURL
+		name        string
+		baseURL     string
+		token       string
+		expectErr   bool
+		errMsg      string
+		expectedURL string // Expected after SanitizeURL
 	}{
 		{
 			name:        "valid_https_url",
@@ -471,10 +471,10 @@ func TestUnifiedClient_DoRequest_NoRetryDeterministicErrors(t *testing.T) {
 
 func TestUnifiedClient_DoRequest_RetryAfterHeader(t *testing.T) {
 	tests := []struct {
-		name              string
-		retryAfterValue   string
-		expectedMinDelay  time.Duration
-		expectedMaxDelay  time.Duration
+		name             string
+		retryAfterValue  string
+		expectedMinDelay time.Duration
+		expectedMaxDelay time.Duration
 	}{
 		{
 			name:             "retry_after_seconds",
@@ -780,7 +780,7 @@ func BenchmarkUnifiedClient_DoRequest(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := client.DoRequest(ctx, "GET", "/api/v3/core/users/", nil)
 		if err != nil {
 			b.Fatalf("DoRequest failed: %v", err)
@@ -798,7 +798,7 @@ func BenchmarkUnifiedClient_DoRequest_WithRetry(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Reset responses for each iteration
 		mockTransport.responses = []mockResponse{
 			{statusCode: 500, body: []byte(`{"error": "internal error"}`)},

@@ -39,10 +39,10 @@ type UninstallState struct {
 	Version             string
 	ExistingPaths       []string
 	PackageInstalled    bool
-	ConsulStorageExists bool   // Vault data exists in Consul storage backend
-	ConsulStorageKeys   int    // Number of keys in Consul storage
-	VaultInitialized    bool   // Vault is initialized (from API check)
-	CredentialsExist    bool   // vault_init.json file exists
+	ConsulStorageExists bool // Vault data exists in Consul storage backend
+	ConsulStorageKeys   int  // Number of keys in Consul storage
+	VaultInitialized    bool // Vault is initialized (from API check)
+	CredentialsExist    bool // vault_init.json file exists
 }
 
 // DeletionStep represents a single step in the deletion process
@@ -89,7 +89,7 @@ func NewVaultUninstaller(rc *eos_io.RuntimeContext, config *UninstallConfig) *Va
 
 	// Initialize transaction tracking with secure log directory
 	logDir := "/var/log/eos"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, VaultBaseDirPerm); err != nil {
 		// If we can't create log directory, fall back to temp
 		logDir = os.TempDir()
 	}
@@ -146,8 +146,8 @@ func (vu *VaultUninstaller) Assess() (*UninstallState, error) {
 
 	// Check for configuration and data directories
 	checkPaths := map[string]*bool{
-		VaultConfigDir: &state.ConfigExists,
-		VaultDataDir:   &state.DataExists,
+		VaultConfigDir:   &state.ConfigExists,
+		VaultDataDir:     &state.DataExists,
 		"/var/lib/vault": nil, // Just track existence
 		VaultLogsDir:     nil,
 	}

@@ -104,7 +104,7 @@ func TestClientGet(t *testing.T) {
 	var requestCount int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&requestCount, 1)
-		
+
 		switch r.URL.Path {
 		case "/success":
 			w.WriteHeader(http.StatusOK)
@@ -186,7 +186,7 @@ func TestClientGet(t *testing.T) {
 
 			ctx := context.Background()
 			resp, err := client.Get(ctx, tt.url)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -206,21 +206,21 @@ func TestClientPost(t *testing.T) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		// Check content type
 		contentType := r.Header.Get("Content-Type")
 		if contentType != "application/json" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		// Read body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(body)
 	}))
@@ -263,13 +263,13 @@ func TestClientPost(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			resp, err := client.Post(ctx, server.URL, tt.contentType, strings.NewReader(tt.body))
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantStatus, resp.StatusCode)
-				
+
 				if resp.StatusCode == http.StatusOK {
 					body, err := io.ReadAll(resp.Body)
 					assert.NoError(t, err)
@@ -285,7 +285,7 @@ func TestClientPost(t *testing.T) {
 func TestAuthentication(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
-		
+
 		switch {
 		case strings.HasPrefix(auth, "Bearer "):
 			token := strings.TrimPrefix(auth, "Bearer ")
@@ -364,10 +364,10 @@ func TestAuthentication(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := DefaultConfig()
 			config.AuthConfig = tt.authConfig
-			
+
 			client, err := NewClient(config)
 			require.NoError(t, err)
-			
+
 			ctx := context.Background()
 			resp, err := client.Get(ctx, server.URL)
 			require.NoError(t, err)
@@ -382,7 +382,7 @@ func TestRetryLogic(t *testing.T) {
 	var attempts int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		current := atomic.AddInt32(&attempts, 1)
-		
+
 		if current < 3 {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		} else {
@@ -405,7 +405,7 @@ func TestRetryLogic(t *testing.T) {
 
 	ctx := context.Background()
 	resp, err := client.Get(ctx, server.URL)
-	
+
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, int32(3), atomic.LoadInt32(&attempts))
@@ -431,13 +431,13 @@ func TestRateLimiting(t *testing.T) {
 	// Measure time for multiple requests
 	start := time.Now()
 	ctx := context.Background()
-	
+
 	for i := 0; i < 5; i++ {
 		resp, err := client.Get(ctx, server.URL)
 		assert.NoError(t, err)
 		resp.Body.Close()
 	}
-	
+
 	elapsed := time.Since(start)
 	// With 5 RPS and burst of 2, 5 requests should take at least ~600ms
 	// (2 immediate, then 3 more at 200ms intervals)
@@ -462,11 +462,11 @@ func TestConcurrentRequests(t *testing.T) {
 	wg.Add(numGoroutines)
 
 	errors := make(chan error, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
 			defer wg.Done()
-			
+
 			ctx := context.Background()
 			resp, err := client.Get(ctx, server.URL)
 			if err != nil {
@@ -476,15 +476,15 @@ func TestConcurrentRequests(t *testing.T) {
 			resp.Body.Close()
 		}()
 	}
-	
+
 	wg.Wait()
 	close(errors)
-	
+
 	// Check for errors
 	for err := range errors {
 		t.Errorf("Concurrent request failed: %v", err)
 	}
-	
+
 	assert.Equal(t, int32(numGoroutines), atomic.LoadInt32(&requestCount))
 }
 
@@ -553,13 +553,13 @@ func TestTLSValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			config := DefaultConfig()
 			config.TLSConfig = tt.config
-			
+
 			client, err := NewClient(config)
 			require.NoError(t, err)
-			
+
 			ctx := context.Background()
 			resp, err := client.Get(ctx, server.URL)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -576,20 +576,20 @@ func TestDefaultClient(t *testing.T) {
 	defaultClient := DefaultClient()
 	assert.NotNil(t, defaultClient)
 	assert.NotNil(t, defaultClient.httpClient)
-	
+
 	// Test getting underlying HTTP client
 	httpClient := DefaultHTTPClient()
 	assert.NotNil(t, httpClient)
-	
+
 	// Test replacing default client
 	newConfig := DefaultConfig()
 	newConfig.Timeout = 5 * time.Second
 	newClient, err := NewClient(newConfig)
 	require.NoError(t, err)
-	
+
 	SetDefaultClient(newClient)
 	assert.Equal(t, newClient, DefaultClient())
-	
+
 	// Test setting standard http.Client
 	stdClient := &http.Client{
 		Timeout: 10 * time.Second,

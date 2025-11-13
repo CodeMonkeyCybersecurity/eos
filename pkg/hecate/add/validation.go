@@ -533,12 +533,12 @@ func ValidateCustomDirectives(directives []string) error {
 
 	// Basic validation - check for obviously dangerous directives
 	dangerousPatterns := []string{
-		"file_server",     // Could expose file system
-		"php_fastcgi",     // Could execute code
-		"exec",            // Could execute arbitrary commands
-		"import",          // Could import malicious config
-		"bind",            // Could bind to different interface
-		"tls internal",    // Could break TLS setup
+		"file_server",  // Could expose file system
+		"php_fastcgi",  // Could execute code
+		"exec",         // Could execute arbitrary commands
+		"import",       // Could import malicious config
+		"bind",         // Could bind to different interface
+		"tls internal", // Could break TLS setup
 	}
 
 	for _, directive := range directives {

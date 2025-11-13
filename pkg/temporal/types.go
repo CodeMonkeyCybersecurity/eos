@@ -28,35 +28,35 @@ const (
 
 // TemporalConfig holds configuration for Temporal installation
 type TemporalConfig struct {
-	Version              string
-	PostgreSQLVersion    string
-	InstallDir           string
-	DataDir              string
-	Host                 string
-	Port                 int
-	UIPort               int
-	MetricsPort          int
-	HistoryShards        int
-	WorkflowRetention    string
-	PostgreSQLPassword   string
-	EnableMetrics        bool
-	EnableArchival       bool
+	Version            string
+	PostgreSQLVersion  string
+	InstallDir         string
+	DataDir            string
+	Host               string
+	Port               int
+	UIPort             int
+	MetricsPort        int
+	HistoryShards      int
+	WorkflowRetention  string
+	PostgreSQLPassword string
+	EnableMetrics      bool
+	EnableArchival     bool
 }
 
 // DefaultConfig returns default Temporal configuration
 func DefaultConfig() *TemporalConfig {
 	return &TemporalConfig{
-		Version:            TemporalVersion,
-		PostgreSQLVersion:  PostgreSQLVersion,
-		InstallDir:         InstallDir,
-		DataDir:            DataDir,
-		Host:               DefaultHost,
-		Port:               DefaultPort,
-		UIPort:             DefaultUIPort,
-		MetricsPort:        DefaultMetricsPort,
-		HistoryShards:      DefaultHistoryShards,
-		WorkflowRetention:  DefaultWorkflowRetention,
-		EnableMetrics:      true,
-		EnableArchival:     false,
+		Version:           TemporalVersion,
+		PostgreSQLVersion: PostgreSQLVersion,
+		InstallDir:        InstallDir,
+		DataDir:           DataDir,
+		Host:              DefaultHost,
+		Port:              DefaultPort,
+		UIPort:            DefaultUIPort,
+		MetricsPort:       DefaultMetricsPort,
+		HistoryShards:     DefaultHistoryShards,
+		WorkflowRetention: DefaultWorkflowRetention,
+		EnableMetrics:     true,
+		EnableArchival:    false,
 	}
 }

@@ -243,7 +243,7 @@ func BenchmarkRunDockerAction(b *testing.B) {
 	rc := eos_io.NewContext(ctx, "benchmark")
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Use a fast command that doesn't require Docker to be installed
 		_ = RunDockerAction(rc, "--help")
 	}
@@ -254,7 +254,7 @@ func BenchmarkUninstallConflictingPackages(b *testing.B) {
 	rc := eos_io.NewContext(ctx, "benchmark")
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		UninstallConflictingPackages(rc)
 	}
 }

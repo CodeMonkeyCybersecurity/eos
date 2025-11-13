@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/environments"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -43,6 +44,11 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// CRITICAL: Detect flag-like args (P0-1 fix)
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 
 		envName := args[0]
 
@@ -99,11 +105,11 @@ Examples:
 			env.DisplayName = displayName
 		} else if env.DisplayName == "" || env.DisplayName == "Development" {
 			// Capitalize first letter only (strings.Title is deprecated)
-		if len(envName) > 0 && envName[0] >= 'a' && envName[0] <= 'z' {
-			env.DisplayName = string(envName[0]-32) + envName[1:]
-		} else {
-			env.DisplayName = envName
-		}
+			if len(envName) > 0 && envName[0] >= 'a' && envName[0] <= 'z' {
+				env.DisplayName = string(envName[0]-32) + envName[1:]
+			} else {
+				env.DisplayName = envName
+			}
 		}
 
 		if description != "" {

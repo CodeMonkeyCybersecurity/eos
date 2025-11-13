@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -31,7 +32,7 @@ func BackupFile(ctx context.Context, path string) error {
 		return fmt.Errorf("failed to read file for backup: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, input, 0644); err != nil {
+	if err := os.WriteFile(backupPath, input, shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write backup file",
 			zap.String("backup_path", backupPath),
 			zap.Error(err))

@@ -16,7 +16,7 @@ import (
 const (
 	// MaxInputLength defines the maximum allowed length for user input
 	MaxInputLength = 4096
-	
+
 	// MaxPasswordLength defines the maximum allowed password length
 	MaxPasswordLength = 256
 )
@@ -24,16 +24,16 @@ const (
 var (
 	// controlCharRegex matches dangerous control characters
 	controlCharRegex = regexp.MustCompile(`[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]`)
-	
+
 	// ansiEscapeRegex matches ANSI escape sequences
 	ansiEscapeRegex = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]|\x9b[0-9;]*[A-Za-z]`)
 )
 
 // InputValidationError represents input validation errors
 type InputValidationError struct {
-	Field   string
-	Reason  string
-	Input   string
+	Field  string
+	Reason string
+	Input  string
 }
 
 func (e *InputValidationError) Error() string {
@@ -50,7 +50,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input,
 		}
 	}
-	
+
 	// Check input length
 	if len(input) > MaxInputLength {
 		return &InputValidationError{
@@ -59,7 +59,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input[:50] + "...", // Truncate for logging
 		}
 	}
-	
+
 	// Check for valid UTF-8
 	if !utf8.ValidString(input) {
 		return &InputValidationError{
@@ -68,7 +68,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input,
 		}
 	}
-	
+
 	// Check for dangerous control characters
 	if controlCharRegex.MatchString(input) {
 		return &InputValidationError{
@@ -77,7 +77,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input,
 		}
 	}
-	
+
 	// Check for ANSI escape sequences (terminal manipulation)
 	if ansiEscapeRegex.MatchString(input) {
 		return &InputValidationError{
@@ -86,7 +86,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input,
 		}
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(input, "\x00") {
 		return &InputValidationError{
@@ -95,7 +95,7 @@ func validateUserInput(input, fieldName string) error {
 			Input:  input,
 		}
 	}
-	
+
 	return nil
 }
 
@@ -103,16 +103,16 @@ func validateUserInput(input, fieldName string) error {
 func sanitizeUserInput(input string) string {
 	// Remove control characters except newlines and tabs
 	sanitized := controlCharRegex.ReplaceAllString(input, "")
-	
+
 	// Remove ANSI escape sequences
 	sanitized = ansiEscapeRegex.ReplaceAllString(sanitized, "")
-	
+
 	// Remove null bytes
 	sanitized = strings.ReplaceAll(sanitized, "\x00", "")
-	
+
 	// Remove CSI characters
 	sanitized = strings.ReplaceAll(sanitized, "\x9b", "")
-	
+
 	// Ensure valid UTF-8
 	if !utf8.ValidString(sanitized) {
 		var result strings.Builder
@@ -123,7 +123,7 @@ func sanitizeUserInput(input string) string {
 		}
 		sanitized = result.String()
 	}
-	
+
 	return strings.TrimSpace(sanitized)
 }
 
@@ -137,7 +137,7 @@ func validatePasswordInput(password, fieldName string) error {
 			Input:  "[PASSWORD]",
 		}
 	}
-	
+
 	// Check password length
 	if len(password) > MaxPasswordLength {
 		return &InputValidationError{
@@ -146,7 +146,7 @@ func validatePasswordInput(password, fieldName string) error {
 			Input:  "[PASSWORD]",
 		}
 	}
-	
+
 	// Check for valid UTF-8
 	if !utf8.ValidString(password) {
 		return &InputValidationError{
@@ -155,7 +155,7 @@ func validatePasswordInput(password, fieldName string) error {
 			Input:  "[PASSWORD]",
 		}
 	}
-	
+
 	// Check for dangerous control characters (be more permissive for passwords)
 	for _, r := range password {
 		if r < 32 && r != '\t' && r != '\n' {
@@ -173,7 +173,7 @@ func validatePasswordInput(password, fieldName string) error {
 			}
 		}
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(password, "\x00") {
 		return &InputValidationError{
@@ -182,7 +182,7 @@ func validatePasswordInput(password, fieldName string) error {
 			Input:  "[PASSWORD]",
 		}
 	}
-	
+
 	return nil
 }
 
@@ -190,16 +190,16 @@ func validatePasswordInput(password, fieldName string) error {
 func sanitizePasswordInput(password string) string {
 	// For passwords, we're more conservative - reject rather than sanitize
 	// if there are dangerous characters, but we can remove some safe ones
-	
+
 	// Remove null bytes
 	sanitized := strings.ReplaceAll(password, "\x00", "")
-	
+
 	// Remove ANSI escape sequences
 	sanitized = ansiEscapeRegex.ReplaceAllString(sanitized, "")
-	
+
 	// Remove CSI characters
 	sanitized = strings.ReplaceAll(sanitized, "\x9b", "")
-	
+
 	return sanitized
 }
 
@@ -209,11 +209,11 @@ func parseYesNoInput(input, fieldName string) (bool, error) {
 	if err := validateUserInput(input, fieldName); err != nil {
 		return false, err
 	}
-	
+
 	// Sanitize and normalize
 	sanitized := sanitizeUserInput(input)
 	normalized := strings.ToLower(strings.TrimSpace(sanitized))
-	
+
 	// Parse yes/no responses
 	switch normalized {
 	case "y", "yes", "true", "1":
@@ -232,17 +232,17 @@ func parseYesNoInput(input, fieldName string) (bool, error) {
 // PromptInput prompts for user input with validation and sanitization
 func PromptInput(rc *RuntimeContext, prompt, fieldName string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if we can read from terminal
 	logger.Debug("Assessing user input capability", zap.String("field", fieldName))
-	
+
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return "", fmt.Errorf("stdin is not a terminal")
 	}
-	
+
 	// INTERVENE - Read input with validation
 	fmt.Print(prompt)
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
 		if err := scanner.Err(); err != nil {
@@ -250,22 +250,22 @@ func PromptInput(rc *RuntimeContext, prompt, fieldName string) (string, error) {
 		}
 		return "", fmt.Errorf("no input received")
 	}
-	
+
 	input := scanner.Text()
-	
+
 	// EVALUATE - Validate and sanitize input
 	if err := validateUserInput(input, fieldName); err != nil {
 		logger.Warn("Invalid user input", zap.String("field", fieldName), zap.Error(err))
 		return "", err
 	}
-	
+
 	sanitized := sanitizeUserInput(input)
-	
-	logger.Debug("Successfully read and validated user input", 
+
+	logger.Debug("Successfully read and validated user input",
 		zap.String("field", fieldName),
 		zap.Int("original_length", len(input)),
 		zap.Int("sanitized_length", len(sanitized)))
-	
+
 	return sanitized, nil
 }
 
@@ -297,7 +297,7 @@ func PromptSecurePassword(rc *RuntimeContext, prompt string) (string, error) {
 		logger.Warn("Invalid password input", zap.Error(err))
 		return "", err
 	}
-	
+
 	// Sanitize password (conservative approach)
 	sanitized := sanitizePasswordInput(passwordStr)
 
@@ -308,7 +308,7 @@ func PromptSecurePassword(rc *RuntimeContext, prompt string) (string, error) {
 // ReadInput safely reads input from stdin with validation (for non-interactive use)
 func ReadInput(rc *RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
 		if err := scanner.Err(); err != nil {
@@ -316,39 +316,39 @@ func ReadInput(rc *RuntimeContext) (string, error) {
 		}
 		return "", fmt.Errorf("no input received")
 	}
-	
+
 	input := scanner.Text()
-	
+
 	// Validate and sanitize
 	if err := validateUserInput(input, "stdin"); err != nil {
 		logger.Warn("Invalid stdin input", zap.Error(err))
 		return "", err
 	}
-	
+
 	sanitized := sanitizeUserInput(input)
-	
-	logger.Debug("Successfully read stdin input", 
+
+	logger.Debug("Successfully read stdin input",
 		zap.Int("original_length", len(input)),
 		zap.Int("sanitized_length", len(sanitized)))
-	
+
 	return sanitized, nil
 }
 
 // PromptInputWithValidation prompts for user input with validation and sanitization
 func PromptInputWithValidation(rc *RuntimeContext, prompt, fieldName string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS - Check if we can read from terminal
 	logger.Debug("Assessing user input capability", zap.String("field", fieldName))
-	
+
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return "", fmt.Errorf("stdin is not a terminal")
 	}
-	
+
 	// INTERVENE - Read input with validation
 	logger.Info("terminal prompt: " + prompt)
 	fmt.Print(prompt)
-	
+
 	scanner := bufio.NewScanner(os.Stdin)
 	if !scanner.Scan() {
 		if err := scanner.Err(); err != nil {
@@ -356,43 +356,43 @@ func PromptInputWithValidation(rc *RuntimeContext, prompt, fieldName string) (st
 		}
 		return "", fmt.Errorf("no input received")
 	}
-	
+
 	input := scanner.Text()
-	
+
 	// EVALUATE - Validate and sanitize input
 	if err := validateUserInput(input, fieldName); err != nil {
 		logger.Warn("Invalid user input", zap.String("field", fieldName), zap.Error(err))
 		return "", err
 	}
-	
+
 	sanitized := sanitizeUserInput(input)
-	
-	logger.Debug("Successfully read and validated user input", 
+
+	logger.Debug("Successfully read and validated user input",
 		zap.String("field", fieldName),
 		zap.Int("original_length", len(input)),
 		zap.Int("sanitized_length", len(sanitized)))
-	
+
 	return sanitized, nil
 }
 
 // PromptYesNoSecure prompts for a yes/no response with validation
 func PromptYesNoSecure(rc *RuntimeContext, prompt, fieldName string) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	input, err := PromptInputWithValidation(rc, prompt, fieldName)
 	if err != nil {
 		return false, err
 	}
-	
+
 	result, err := parseYesNoInput(input, fieldName)
 	if err != nil {
 		logger.Warn("Invalid yes/no input", zap.String("field", fieldName), zap.Error(err))
 		return false, err
 	}
-	
-	logger.Debug("Successfully parsed yes/no input", 
+
+	logger.Debug("Successfully parsed yes/no input",
 		zap.String("field", fieldName),
 		zap.Bool("result", result))
-	
+
 	return result, nil
 }

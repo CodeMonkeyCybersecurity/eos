@@ -151,4 +151,3 @@ func (h *HashOperationsImpl) VerifyPassword(ctx context.Context, password, hash 
 	h.logger.Debug("Password verified successfully")
 	return true, nil
 }
-

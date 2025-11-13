@@ -239,7 +239,6 @@ func getLocalConsulClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	return client, nil
 }
 
-
 func createCrossDCQuery(rc *eos_io.RuntimeContext, backend *Backend) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

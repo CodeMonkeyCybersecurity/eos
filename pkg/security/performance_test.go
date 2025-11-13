@@ -49,7 +49,7 @@ func BenchmarkLargeScaleMaliciousInputs(b *testing.B) {
 			sanitizer := NewInputSanitizer()
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, _ = sanitizer.SanitizeInput(bm.input)
 			}
 		})
@@ -58,7 +58,7 @@ func BenchmarkLargeScaleMaliciousInputs(b *testing.B) {
 			sanitizer := NewStrictSanitizer()
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, _ = sanitizer.SanitizeInput(bm.input)
 			}
 		})
@@ -116,7 +116,7 @@ func BenchmarkSecureOutputPerformance(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				bm.fn()
 			}
 		})
@@ -163,7 +163,7 @@ func BenchmarkArgumentSanitization(b *testing.B) {
 	for _, bm := range benchmarks {
 		b.Run(bm.name, func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, _ = sanitizer.SanitizeArguments(bm.args)
 			}
 		})
@@ -181,7 +181,7 @@ func BenchmarkMemoryEfficiency(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			result, _ := sanitizer.SanitizeInput(largeInput)
 			_ = result // Prevent optimization
 		}
@@ -192,7 +192,7 @@ func BenchmarkMemoryEfficiency(b *testing.B) {
 		b.ResetTimer()
 
 		smallMalicious := "user\x1b[31m\x9btest\xff\xfe"
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			result, _ := sanitizer.SanitizeInput(smallMalicious)
 			_ = result
 		}
@@ -233,7 +233,7 @@ func BenchmarkWorstCaseScenarios(b *testing.B) {
 			sanitizer := NewInputSanitizer()
 			b.ResetTimer()
 
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				result, err := sanitizer.SanitizeInput(bm.input)
 				if err != nil {
 					b.Logf("Expected failure for %s: %v", bm.desc, err)

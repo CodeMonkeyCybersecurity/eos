@@ -6,6 +6,7 @@ import (
 )
 
 func TestSetDebugMode(t *testing.T) {
+	t.Parallel()
 	// Save original debug state
 	originalDebug := os.Getenv("Eos_DEBUG")
 	defer func() {
@@ -17,6 +18,7 @@ func TestSetDebugMode(t *testing.T) {
 	}()
 
 	t.Run("enables_debug_mode", func(t *testing.T) {
+		t.Parallel()
 		// Clear any existing debug setting
 		_ = os.Unsetenv("Eos_DEBUG")
 
@@ -35,6 +37,7 @@ func TestSetDebugMode(t *testing.T) {
 	})
 
 	t.Run("disables_debug_mode", func(t *testing.T) {
+		t.Parallel()
 		// First enable debug
 		SetDebugMode(true)
 		if !DebugEnabled() {
@@ -56,6 +59,7 @@ func TestSetDebugMode(t *testing.T) {
 	})
 
 	t.Run("toggle_debug_mode_multiple_times", func(t *testing.T) {
+		t.Parallel()
 		// Start with debug disabled
 		SetDebugMode(false)
 		if DebugEnabled() {
@@ -81,6 +85,7 @@ func TestSetDebugMode(t *testing.T) {
 }
 
 func TestDebugEnabled(t *testing.T) {
+	t.Parallel()
 	// Save original debug state
 	originalDebug := DebugMode
 	defer func() {
@@ -88,6 +93,7 @@ func TestDebugEnabled(t *testing.T) {
 	}()
 
 	t.Run("returns_false_when_unset", func(t *testing.T) {
+		t.Parallel()
 		DebugMode = false
 
 		if DebugEnabled() {
@@ -96,6 +102,7 @@ func TestDebugEnabled(t *testing.T) {
 	})
 
 	t.Run("returns_true_when_set_to_true", func(t *testing.T) {
+		t.Parallel()
 		DebugMode = true
 
 		if !DebugEnabled() {
@@ -104,6 +111,7 @@ func TestDebugEnabled(t *testing.T) {
 	})
 
 	t.Run("returns_false_when_set_to_false", func(t *testing.T) {
+		t.Parallel()
 		DebugMode = false
 
 		if DebugEnabled() {
@@ -112,6 +120,7 @@ func TestDebugEnabled(t *testing.T) {
 	})
 
 	t.Run("debug_mode_toggle_test", func(t *testing.T) {
+		t.Parallel()
 		// Test true state
 		DebugMode = true
 		if !DebugEnabled() {
@@ -128,6 +137,7 @@ func TestDebugEnabled(t *testing.T) {
 
 // TestDebugModeIntegration tests the integration between SetDebugMode and DebugEnabled
 func TestDebugModeIntegration(t *testing.T) {
+	t.Parallel()
 	// Save original debug state
 	originalDebug := DebugMode
 	defer func() {
@@ -135,6 +145,7 @@ func TestDebugModeIntegration(t *testing.T) {
 	}()
 
 	t.Run("set_and_check_consistency", func(t *testing.T) {
+		t.Parallel()
 		// Test enable
 		SetDebugMode(true)
 		if !DebugEnabled() {
@@ -149,6 +160,7 @@ func TestDebugModeIntegration(t *testing.T) {
 	})
 
 	t.Run("multiple_toggles", func(t *testing.T) {
+		t.Parallel()
 		// Start false
 		SetDebugMode(false)
 		if DebugEnabled() {

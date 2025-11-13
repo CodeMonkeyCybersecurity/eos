@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -96,7 +97,7 @@ func EncryptFileWithPassword(inputPath, outputPath, password string) error {
 	}
 
 	// Write encrypted data to output file
-	if err := os.WriteFile(outputPath, encrypted, 0600); err != nil {
+	if err := os.WriteFile(outputPath, encrypted, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("write encrypted file: %w", err)
 	}
 
@@ -124,7 +125,7 @@ func DecryptFileWithPassword(inputPath, outputPath, password string) error {
 	}
 
 	// Write decrypted data to output file
-	if err := os.WriteFile(outputPath, plaintext, 0600); err != nil {
+	if err := os.WriteFile(outputPath, plaintext, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("write decrypted file: %w", err)
 	}
 

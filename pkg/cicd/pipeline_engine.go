@@ -376,9 +376,9 @@ func (pe *PipelineEngine) performRollback(rc *eos_io.RuntimeContext, orchestrato
 	rollbackConfig.Version = "previous" // This would be determined from deployment history
 
 	rollbackTrigger := TriggerInfo{
-		Type:    "rollback",
-		Source:  "automatic",
-		Message: "Automatic rollback due to deployment failure",
+		Type:      "rollback",
+		Source:    "automatic",
+		Message:   "Automatic rollback due to deployment failure",
 		Timestamp: time.Now(),
 	}
 
@@ -551,7 +551,7 @@ func (pe *PipelineEngine) executeCanaryDeployment(rc *eos_io.RuntimeContext, orc
 	// Deploy canary instances
 	canaryConfig := *orchestrator.config
 	canaryConfig.AppName = fmt.Sprintf("%s-canary", orchestrator.config.AppName)
-	
+
 	// Set canary instance count
 	jobSpec := generateNomadJobSpec(&canaryConfig)
 	jobStatus, err := orchestrator.nomadClient.SubmitJob(rc.Ctx, jobSpec)
@@ -567,13 +567,13 @@ func (pe *PipelineEngine) executeCanaryDeployment(rc *eos_io.RuntimeContext, orc
 	// If auto-promote is enabled, promote canary
 	if orchestrator.config.Deployment.Strategy.AutoPromote {
 		logger.Info("Auto-promoting canary deployment")
-		
+
 		// Scale up canary to full deployment
 		fullJobSpec := generateNomadJobSpec(orchestrator.config)
 		if _, err := orchestrator.nomadClient.SubmitJob(rc.Ctx, fullJobSpec); err != nil {
 			return fmt.Errorf("failed to promote canary: %w", err)
 		}
-		
+
 		// Remove canary designation
 		if err := orchestrator.nomadClient.StopJob(rc.Ctx, jobStatus.ID, true); err != nil {
 			logger.Warn("Failed to remove canary job",
@@ -589,7 +589,7 @@ func (pe *PipelineEngine) executeCanaryDeployment(rc *eos_io.RuntimeContext, orc
 // waitForHealthy waits for deployment to become healthy
 func (pe *PipelineEngine) waitForHealthy(rc *eos_io.RuntimeContext, orchestrator *PipelineOrchestrator, jobID string) error {
 	deadline := time.Now().Add(orchestrator.config.Deployment.Strategy.HealthyDeadline)
-	
+
 	for time.Now().Before(deadline) {
 		status, err := orchestrator.nomadClient.GetJobStatus(rc.Ctx, jobID)
 		if err != nil {

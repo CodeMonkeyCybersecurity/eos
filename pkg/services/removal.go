@@ -14,29 +14,29 @@ import (
 
 // ServiceRemovalConfig defines how to remove a service
 type ServiceRemovalConfig struct {
-	Name            string
-	ServiceNames    []string // systemd service names
-	PackageNames    []string // APT package names
-	Processes       []string // Process names to kill
-	ConfigDirs      []string // Configuration directories
-	DataDirs        []string // Data directories
-	LogDirs         []string // Log directories
-	Users           []string // System users to remove
-	Groups          []string // System groups to remove
-	CustomCleanup   func(rc *eos_io.RuntimeContext) error
+	Name          string
+	ServiceNames  []string // systemd service names
+	PackageNames  []string // APT package names
+	Processes     []string // Process names to kill
+	ConfigDirs    []string // Configuration directories
+	DataDirs      []string // Data directories
+	LogDirs       []string // Log directories
+	Users         []string // System users to remove
+	Groups        []string // System groups to remove
+	CustomCleanup func(rc *eos_io.RuntimeContext) error
 }
 
 // RemoveService removes a service using the provided configuration
 func RemoveService(rc *eos_io.RuntimeContext, config ServiceRemovalConfig, keepData bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Removing service", 
+	logger.Info("Removing service",
 		zap.String("service", config.Name),
 		zap.Bool("keep_data", keepData))
 
 	// Stop and disable services
 	for _, service := range config.ServiceNames {
 		if err := stopAndDisableService(rc, service); err != nil {
-			logger.Debug("Failed to stop service", 
+			logger.Debug("Failed to stop service",
 				zap.String("service", service),
 				zap.Error(err))
 		}
@@ -225,7 +225,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 			},
 		},
 		{
-			Name:         "eos-storage-monitor", 
+			Name:         "eos-storage-monitor",
 			ServiceNames: []string{"eos-storage-monitor"},
 			Processes:    []string{"eos-storage-monitor"},
 			ConfigDirs:   []string{"/etc/eos"},
@@ -260,7 +260,7 @@ func GetAdditionalServicesConfigs() []ServiceRemovalConfig {
 
 func stopAndDisableService(rc *eos_io.RuntimeContext, service string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check if service exists first
 	if output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "systemctl",
@@ -296,9 +296,9 @@ func killProcess(rc *eos_io.RuntimeContext, process string) {
 		Args:    []string{"-TERM", "-f", process},
 		Timeout: 5 * time.Second,
 	})
-	
+
 	time.Sleep(2 * time.Second)
-	
+
 	// Force kill if still running
 	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "pkill",
@@ -309,7 +309,7 @@ func killProcess(rc *eos_io.RuntimeContext, process string) {
 
 func removePackages(rc *eos_io.RuntimeContext, packages []string) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Check which packages are actually installed
 	installedPackages := []string{}
 	for _, pkg := range packages {
@@ -328,7 +328,7 @@ func removePackages(rc *eos_io.RuntimeContext, packages []string) {
 	}
 
 	logger.Info("Removing packages", zap.Strings("packages", installedPackages))
-	
+
 	args := append([]string{"remove", "--purge", "-y"}, installedPackages...)
 	_, _ = execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",

@@ -1,6 +1,7 @@
 package build
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -32,7 +33,7 @@ func NewBuilder(workDir string) (*Builder, error) {
 
 	if err := checkCommandExists("docker"); err != nil {
 		return nil, &BuildError{
-			Type:      "prerequisite", 
+			Type:      "prerequisite",
 			Stage:     "initialization",
 			Message:   "docker command not found in PATH",
 			Cause:     err,
@@ -41,7 +42,7 @@ func NewBuilder(workDir string) (*Builder, error) {
 	}
 
 	// Ensure work directory exists
-	if err := os.MkdirAll(workDir, 0755); err != nil {
+	if err := os.MkdirAll(workDir, shared.ServiceDirPerm); err != nil {
 		return nil, &BuildError{
 			Type:      "initialization",
 			Stage:     "setup",
@@ -229,7 +230,7 @@ func (b *Builder) executeHugoBuild(ctx context.Context, config cicd.HugoConfig, 
 	cmd.Env = append(os.Environ(), fmt.Sprintf("HUGO_ENV=%s", config.Environment))
 
 	output, err := cmd.CombinedOutput()
-	
+
 	result.Logs = append(result.Logs, cicd.LogEntry{
 		Timestamp: time.Now(),
 		Level:     "info",
@@ -544,7 +545,7 @@ func (b *Builder) executeDockerBuild(ctx context.Context, config cicd.BuildConfi
 	})
 
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		result.Logs = append(result.Logs, cicd.LogEntry{
 			Timestamp: time.Now(),

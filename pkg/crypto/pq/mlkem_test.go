@@ -213,8 +213,8 @@ func TestValidateMLKEMPublicKey(t *testing.T) {
 
 	t.Run("invalid_sizes", func(t *testing.T) {
 		testCases := []struct {
-			size     int
-			name     string
+			size int
+			name string
 		}{
 			{0, "empty"},
 			{1183, "one_byte_short"},
@@ -519,7 +519,7 @@ func TestRealWorldScenarios(t *testing.T) {
 		// Simulate key rotation every N operations
 		const rotationInterval = 3
 		var currentKeypair *MLKEMKeypair
-		
+
 		for i := 0; i < 10; i++ {
 			// Rotate keys at interval
 			if i%rotationInterval == 0 {
@@ -544,7 +544,7 @@ func BenchmarkMLKEMOperations(b *testing.B) {
 	}
 
 	b.Run("GenerateKeypair", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = GenerateMLKEMKeypair(rc)
 		}
 	})
@@ -554,26 +554,26 @@ func BenchmarkMLKEMOperations(b *testing.B) {
 	require.NoError(b, err)
 
 	b.Run("Encapsulate", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = EncapsulateSecret(rc, keypair.PublicKey)
 		}
 	})
 
 	b.Run("ValidatePublicKey", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_ = ValidateMLKEMPublicKey(rc, keypair.PublicKey)
 		}
 	})
 
 	b.Run("RawMLKEM768Generate", func(b *testing.B) {
 		// Benchmark raw library performance for comparison
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _ = mlkem768.GenerateKey()
 		}
 	})
 
 	b.Run("RawMLKEM768Encapsulate", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			_, _, _ = mlkem768.Encapsulate(keypair.PublicKey)
 		}
 	})
@@ -626,7 +626,7 @@ func TestAPICompatibility(t *testing.T) {
 
 	t.Run("info_completeness", func(t *testing.T) {
 		info := GetMLKEMInfo()
-		
+
 		// Verify all expected fields are present
 		requiredFields := []string{
 			"algorithm", "standard", "security_level",

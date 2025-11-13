@@ -290,7 +290,7 @@ func (owi *OpenWebUIInstaller) performInstallation(ctx context.Context) error {
 		zap.String("compose_file", owi.config.ComposeFile),
 		zap.String("env_file", owi.config.EnvFile))
 
-	if err := os.MkdirAll(owi.config.InstallDir, 0755); err != nil {
+	if err := os.MkdirAll(owi.config.InstallDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
 
@@ -706,7 +706,7 @@ TZ=%s
 
 	// Create .env file with appropriate permissions for Docker Compose
 	// 0640 = owner read/write, group read, others none
-	if err := os.WriteFile(owi.config.EnvFile, []byte(content), 0640); err != nil {
+	if err := os.WriteFile(owi.config.EnvFile, []byte(content), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 
@@ -753,7 +753,7 @@ model_list:
 		owi.config.AzureDeployment,
 	)
 
-	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write litellm_config.yaml: %w", err)
 	}
 
@@ -918,7 +918,7 @@ networks:
 		)
 	}
 
-	if err := os.WriteFile(owi.config.ComposeFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(owi.config.ComposeFile, []byte(content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 
@@ -1062,8 +1062,8 @@ func (owi *OpenWebUIInstaller) verifyInstallation(ctx context.Context) error {
 	healthURL := fmt.Sprintf("http://localhost:%d/health", owi.config.Port)
 	client := &http.Client{Timeout: 5 * time.Second}
 
-	maxRetries := 12     // 12 attempts
-	retryInterval := 10 * time.Second  // Every 10 seconds = 120 seconds total
+	maxRetries := 12                  // 12 attempts
+	retryInterval := 10 * time.Second // Every 10 seconds = 120 seconds total
 	logger.Info("Waiting for Open WebUI to become healthy",
 		zap.Duration("max_wait", time.Duration(maxRetries)*retryInterval),
 		zap.String("url", healthURL))

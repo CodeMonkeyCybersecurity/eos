@@ -62,7 +62,7 @@ func NewConfigManager() *ConfigManager {
 func (cm *ConfigManager) LoadConfig() error {
 	// Ensure config directory exists
 	configDir := filepath.Dir(cm.configPath)
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -97,7 +97,7 @@ func (cm *ConfigManager) LoadConfig() error {
 func (cm *ConfigManager) SaveConfig() error {
 	// Ensure config directory exists
 	configDir := filepath.Dir(cm.configPath)
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -108,7 +108,7 @@ func (cm *ConfigManager) SaveConfig() error {
 	}
 
 	// Write to file with restricted permissions
-	if err := os.WriteFile(cm.configPath, data, 0600); err != nil {
+	if err := os.WriteFile(cm.configPath, data, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 

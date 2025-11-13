@@ -4,6 +4,7 @@
 package environment
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -18,43 +19,43 @@ import (
 
 // DeploymentEnvironment represents an Eos deployment environment configuration
 type DeploymentEnvironment struct {
-	Name            string           `yaml:"name" json:"name"`
-	Datacenter      string           `yaml:"datacenter" json:"datacenter"`
-	FrontendHost    string           `yaml:"frontend_host" json:"frontend_host"`
-	BackendHost     string           `yaml:"backend_host" json:"backend_host"`
-	WireGuard       WireGuardConfig  `yaml:"wireguard" json:"wireguard"`
-	Consul          ConsulConfig     `yaml:"consul" json:"consul"`
-	Vault           *VaultConfig     `yaml:"vault,omitempty" json:"vault,omitempty"`
-	Nomad           *NomadConfig     `yaml:"nomad,omitempty" json:"nomad,omitempty"`
-	CreatedAt       string           `yaml:"created_at" json:"created_at"`
-	UpdatedAt       string           `yaml:"updated_at" json:"updated_at"`
+	Name         string          `yaml:"name" json:"name"`
+	Datacenter   string          `yaml:"datacenter" json:"datacenter"`
+	FrontendHost string          `yaml:"frontend_host" json:"frontend_host"`
+	BackendHost  string          `yaml:"backend_host" json:"backend_host"`
+	WireGuard    WireGuardConfig `yaml:"wireguard" json:"wireguard"`
+	Consul       ConsulConfig    `yaml:"consul" json:"consul"`
+	Vault        *VaultConfig    `yaml:"vault,omitempty" json:"vault,omitempty"`
+	Nomad        *NomadConfig    `yaml:"nomad,omitempty" json:"nomad,omitempty"`
+	CreatedAt    string          `yaml:"created_at" json:"created_at"`
+	UpdatedAt    string          `yaml:"updated_at" json:"updated_at"`
 }
 
 // WireGuardConfig holds WireGuard network configuration
 type WireGuardConfig struct {
-	Interface      string   `yaml:"interface" json:"interface"`
-	Subnet         string   `yaml:"subnet" json:"subnet"`
-	FrontendIP     string   `yaml:"frontend_ip" json:"frontend_ip"`
-	BackendIP      string   `yaml:"backend_ip" json:"backend_ip"`
-	ListenPort     int      `yaml:"listen_port" json:"listen_port"`
-	AllowedIPs     []string `yaml:"allowed_ips" json:"allowed_ips"`
+	Interface  string   `yaml:"interface" json:"interface"`
+	Subnet     string   `yaml:"subnet" json:"subnet"`
+	FrontendIP string   `yaml:"frontend_ip" json:"frontend_ip"`
+	BackendIP  string   `yaml:"backend_ip" json:"backend_ip"`
+	ListenPort int      `yaml:"listen_port" json:"listen_port"`
+	AllowedIPs []string `yaml:"allowed_ips" json:"allowed_ips"`
 }
 
 // ConsulConfig holds Consul configuration
 type ConsulConfig struct {
-	ServerAddress  string   `yaml:"server_address" json:"server_address"`
-	ClientAddress  string   `yaml:"client_address" json:"client_address"`
-	Datacenter     string   `yaml:"datacenter" json:"datacenter"`
-	RetryJoin      []string `yaml:"retry_join" json:"retry_join"`
-	UIEnabled      bool     `yaml:"ui_enabled" json:"ui_enabled"`
+	ServerAddress string   `yaml:"server_address" json:"server_address"`
+	ClientAddress string   `yaml:"client_address" json:"client_address"`
+	Datacenter    string   `yaml:"datacenter" json:"datacenter"`
+	RetryJoin     []string `yaml:"retry_join" json:"retry_join"`
+	UIEnabled     bool     `yaml:"ui_enabled" json:"ui_enabled"`
 }
 
 // VaultConfig holds Vault configuration
 type VaultConfig struct {
-	Address       string `yaml:"address" json:"address"`
-	TLSEnabled    bool   `yaml:"tls_enabled" json:"tls_enabled"`
-	SealType      string `yaml:"seal_type" json:"seal_type"` // shamir, auto
-	HAEnabled     bool   `yaml:"ha_enabled" json:"ha_enabled"`
+	Address    string `yaml:"address" json:"address"`
+	TLSEnabled bool   `yaml:"tls_enabled" json:"tls_enabled"`
+	SealType   string `yaml:"seal_type" json:"seal_type"` // shamir, auto
+	HAEnabled  bool   `yaml:"ha_enabled" json:"ha_enabled"`
 }
 
 // NomadConfig holds Nomad configuration
@@ -83,7 +84,7 @@ func NewEnvironmentManager(rc *eos_io.RuntimeContext) (*EnvironmentManager, erro
 	}
 
 	configDir := filepath.Join(homeDir, ".eos", "environments")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -116,7 +117,7 @@ func (em *EnvironmentManager) SaveEnvironment(ctx context.Context, env *Deployme
 		return fmt.Errorf("failed to marshal environment config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write environment config: %w", err)
 	}
 
@@ -257,7 +258,7 @@ func (em *EnvironmentManager) SetCurrentEnvironment(ctx context.Context, envName
 
 	// Also write to local marker file
 	markerPath := filepath.Join(em.configDir, ".current")
-	if err := os.WriteFile(markerPath, []byte(envName), 0644); err != nil {
+	if err := os.WriteFile(markerPath, []byte(envName), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to write local environment marker",
 			zap.Error(err))
 	}

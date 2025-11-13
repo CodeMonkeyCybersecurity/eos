@@ -990,7 +990,6 @@ job "%s" {
 		group.RestartPolicy.Attempts, group.RestartPolicy.Delay, group.RestartPolicy.Interval, group.RestartPolicy.Mode)
 }
 
-
 func (o *OrchestrationManager) generateSystemdUnit(config *SystemdServiceConfig) string {
 	// Generate systemd unit file from SystemdServiceConfig
 	return fmt.Sprintf(`
@@ -1115,7 +1114,7 @@ func (d *DeploymentOrchestrator) DeployApplication(rc *eos_io.RuntimeContext, re
 	logger.Info("Preparing infrastructure via Nomad")
 	// Prepare infrastructure via Nomad
 	// In production, would ensure required nodes and resources are available
-	
+
 	// Step 4: Execute deployment based on strategy
 	switch req.Strategy {
 	case "rolling":

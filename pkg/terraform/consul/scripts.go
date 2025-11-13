@@ -1,6 +1,7 @@
 package consul
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func GenerateVaultSecretsSetup(rc *eos_io.RuntimeContext, outputDir string, data
 		zap.String("output_dir", outputDir),
 		zap.String("vault_addr", data.VaultAddr))
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -107,7 +108,7 @@ echo "You can now run: eos create consul-vault . --services --consul-kv"
 `, data.VaultAddr, data.SecretsMount, data.ConsulDatacenter)
 
 	scriptPath := filepath.Join(outputDir, "setup-consul-vault-secrets.sh")
-	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(script), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write setup script: %w", err)
 	}
 

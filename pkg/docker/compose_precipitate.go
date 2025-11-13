@@ -4,6 +4,7 @@
 package docker
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -490,7 +491,7 @@ func PrecipitateAndSave(rc *eos_io.RuntimeContext, opts *PrecipitateComposeOptio
 	composeContent := RenderCompose(precipitated)
 
 	// INTERVENE - Write to file
-	if err := os.WriteFile(outputPath, []byte(composeContent), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(composeContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write compose file: %w", err)
 	}
 

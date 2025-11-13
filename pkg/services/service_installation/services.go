@@ -163,7 +163,7 @@ func GetServiceStatus(rc *eos_io.RuntimeContext, serviceType ServiceType) (*Serv
 			break
 		}
 	}
-	
+
 	status.HealthCheck = healthResult
 
 	// EVALUATE
@@ -506,7 +506,7 @@ func performHTTPHealthCheck(rc *eos_io.RuntimeContext, endpoint string) HealthCh
 func installGrafana(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Grafana service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "grafana_install",
 		Description: "Installing Grafana via Docker",
@@ -517,14 +517,14 @@ func installGrafana(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, r
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }
 
 func installMattermost(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Mattermost service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "mattermost_install",
 		Description: "Installing Mattermost via Docker",
@@ -535,14 +535,14 @@ func installMattermost(rc *eos_io.RuntimeContext, options *ServiceInstallOptions
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }
 
 func installLxd(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing LXD service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "lxd_install",
 		Description: "Installing LXD via snap",
@@ -552,14 +552,14 @@ func installLxd(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, resul
 	result.Steps = append(result.Steps, step)
 	result.Success = true
 	result.Version = options.Version
-	
+
 	return nil
 }
 
 func installCaddy(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Caddy service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "caddy_install",
 		Description: "Installing Caddy web server",
@@ -570,14 +570,14 @@ func installCaddy(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, res
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }
 
 func installLoki(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Loki service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "loki_install",
 		Description: "Installing Loki log aggregation",
@@ -588,14 +588,14 @@ func installLoki(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, resu
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }
 
 func installTailscale(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Tailscale service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "tailscale_install",
 		Description: "Installing Tailscale VPN",
@@ -605,14 +605,14 @@ func installTailscale(rc *eos_io.RuntimeContext, options *ServiceInstallOptions,
 	result.Steps = append(result.Steps, step)
 	result.Success = true
 	result.Version = options.Version
-	
+
 	return nil
 }
 
 func installGuacamole(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Guacamole service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "guacamole_install",
 		Description: "Installing Apache Guacamole",
@@ -623,14 +623,14 @@ func installGuacamole(rc *eos_io.RuntimeContext, options *ServiceInstallOptions,
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }
 
 func installQemuGuest(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing QEMU Guest Agent", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "qemu_guest_install",
 		Description: "Installing QEMU Guest Agent",
@@ -640,14 +640,14 @@ func installQemuGuest(rc *eos_io.RuntimeContext, options *ServiceInstallOptions,
 	result.Steps = append(result.Steps, step)
 	result.Success = true
 	result.Version = options.Version
-	
+
 	return nil
 }
 
 func installHecate(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing Hecate service", zap.String("version", options.Version))
-	
+
 	step := InstallationStep{
 		Name:        "hecate_install",
 		Description: "Installing Hecate reverse proxy",
@@ -658,6 +658,6 @@ func installHecate(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, re
 	result.Success = true
 	result.Version = options.Version
 	result.Port = options.Port
-	
+
 	return nil
 }

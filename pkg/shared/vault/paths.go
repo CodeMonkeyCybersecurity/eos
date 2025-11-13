@@ -1,12 +1,14 @@
 // Package vault provides centralized Vault secret path management for EOS.
 //
 // This package implements the standardized secret path structure:
-//   services/{environment}/{service}
+//
+//	services/{environment}/{service}
 //
 // Example paths:
-//   services/production/consul
-//   services/staging/authentik
-//   services/development/bionicgpt
+//
+//	services/production/consul
+//	services/staging/authentik
+//	services/development/bionicgpt
 //
 // All Vault secret path construction MUST use the helpers in this package.
 // Direct path string construction is forbidden (see CLAUDE.md P0 rule #13).
@@ -90,8 +92,9 @@ func AllEnvironments() []Environment {
 // Format: services/{environment}/{service}
 //
 // Example:
-//   SecretPath(EnvironmentProduction, ServiceConsul)
-//   → "services/production/consul"
+//
+//	SecretPath(EnvironmentProduction, ServiceConsul)
+//	→ "services/production/consul"
 //
 // This is the canonical path format used throughout EOS.
 // All service secrets are stored at this path as a single KV v2 entry
@@ -105,8 +108,9 @@ func SecretPath(env Environment, svc Service) string {
 // Format: {mount}/data/services/{environment}/{service}
 //
 // Example:
-//   SecretDataPath("", EnvironmentProduction, ServiceConsul)
-//   → "secret/data/services/production/consul"
+//
+//	SecretDataPath("", EnvironmentProduction, ServiceConsul)
+//	→ "secret/data/services/production/consul"
 //
 // This path is used with the Vault Logical API client.Logical().Read()
 // for direct KV v2 data access.
@@ -115,9 +119,10 @@ func SecretPath(env Environment, svc Service) string {
 // so use SecretPath() for SDK methods.
 //
 // Parameters:
-//   mount - KV v2 mount point (use "" for default "secret")
-//   env   - Target environment
-//   svc   - Target service
+//
+//	mount - KV v2 mount point (use "" for default "secret")
+//	env   - Target environment
+//	svc   - Target service
 func SecretDataPath(mount string, env Environment, svc Service) string {
 	if mount == "" {
 		mount = DefaultMount
@@ -130,16 +135,18 @@ func SecretDataPath(mount string, env Environment, svc Service) string {
 // Format: {mount}/metadata/services/{environment}/{service}
 //
 // Example:
-//   SecretMetadataPath("", EnvironmentProduction, ServiceConsul)
-//   → "secret/metadata/services/production/consul"
+//
+//	SecretMetadataPath("", EnvironmentProduction, ServiceConsul)
+//	→ "secret/metadata/services/production/consul"
 //
 // This path is used to access KV v2 metadata (version history, timestamps, etc.)
 // via client.Logical().Read() or LIST operations.
 //
 // Parameters:
-//   mount - KV v2 mount point (use "" for default "secret")
-//   env   - Target environment
-//   svc   - Target service
+//
+//	mount - KV v2 mount point (use "" for default "secret")
+//	env   - Target environment
+//	svc   - Target service
 func SecretMetadataPath(mount string, env Environment, svc Service) string {
 	if mount == "" {
 		mount = DefaultMount
@@ -152,15 +159,17 @@ func SecretMetadataPath(mount string, env Environment, svc Service) string {
 // Format: {mount}/metadata/services/{environment}
 //
 // Example:
-//   SecretListPath("", EnvironmentProduction)
-//   → "secret/metadata/services/production"
+//
+//	SecretListPath("", EnvironmentProduction)
+//	→ "secret/metadata/services/production"
 //
 // Use this with Vault LIST operation to discover all services with secrets
 // in a given environment.
 //
 // Parameters:
-//   mount - KV v2 mount point (use "" for default "secret")
-//   env   - Target environment
+//
+//	mount - KV v2 mount point (use "" for default "secret")
+//	env   - Target environment
 func SecretListPath(mount string, env Environment) string {
 	if mount == "" {
 		mount = DefaultMount
@@ -173,8 +182,9 @@ func SecretListPath(mount string, env Environment) string {
 // Format: services/{environment}/{service}
 //
 // Example:
-//   CLIPath(EnvironmentProduction, ServiceConsul)
-//   → "services/production/consul"
+//
+//	CLIPath(EnvironmentProduction, ServiceConsul)
+//	→ "services/production/consul"
 //
 // This is identical to SecretPath() and provided for clarity in CLI contexts.
 func CLIPath(env Environment, svc Service) string {
@@ -186,8 +196,9 @@ func CLIPath(env Environment, svc Service) string {
 // Expected format: services/{environment}/{service}
 //
 // Example:
-//   ParseSecretPath("services/production/consul")
-//   → (EnvironmentProduction, ServiceConsul, nil)
+//
+//	ParseSecretPath("services/production/consul")
+//	→ (EnvironmentProduction, ServiceConsul, nil)
 //
 // Returns error if:
 //   - Path doesn't have exactly 3 components
@@ -232,8 +243,9 @@ func ParseSecretPath(secretPath string) (Environment, Service, error) {
 // Returns error if environment is not recognized.
 //
 // Example:
-//   ValidateEnvironment("production")  → nil
-//   ValidateEnvironment("invalid")     → error
+//
+//	ValidateEnvironment("production")  → nil
+//	ValidateEnvironment("invalid")     → error
 func ValidateEnvironment(env string) error {
 	validEnvs := map[string]bool{
 		string(EnvironmentProduction):  true,
@@ -256,8 +268,9 @@ func ValidateEnvironment(env string) error {
 // Returns error if service is not recognized.
 //
 // Example:
-//   ValidateService("consul")  → nil
-//   ValidateService("invalid") → error
+//
+//	ValidateService("consul")  → nil
+//	ValidateService("invalid") → error
 func ValidateService(svc string) error {
 	validSvcs := map[string]bool{
 		string(ServiceConsul):    true,

@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/consul/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -26,11 +26,11 @@ const (
 
 // HecateConsulConfig holds Hecate configuration that can be stored in Consul
 type HecateConsulConfig struct {
-	Domain           string
-	ServerIP         string
-	HetznerDNSToken  string
-	VaultEnabled     bool
-	ConsulAvailable  bool
+	Domain          string
+	ServerIP        string
+	HetznerDNSToken string
+	VaultEnabled    bool
+	ConsulAvailable bool
 }
 
 // ConsulConfigManager handles reading/writing Hecate config to Consul KV

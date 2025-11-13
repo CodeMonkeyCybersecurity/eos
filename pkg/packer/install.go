@@ -3,6 +3,7 @@
 package packer
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"runtime"
@@ -79,7 +80,7 @@ func (pi *PackerInstaller) Install() error {
 		pi.config.Version, pi.config.Version, arch)
 
 	tmpDir := "/tmp/packer-install"
-	_ = os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, shared.ServiceDirPerm)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
@@ -105,8 +106,8 @@ func (pi *PackerInstaller) Install() error {
 	}
 
 	// Setup directories
-	_ = os.MkdirAll(pi.config.PluginDirectory, 0755)
-	_ = os.MkdirAll(pi.config.CacheDirectory, 0755)
+	_ = os.MkdirAll(pi.config.PluginDirectory, shared.ServiceDirPerm)
+	_ = os.MkdirAll(pi.config.CacheDirectory, shared.ServiceDirPerm)
 
 	// Phase 3: EVALUATE
 	if output, err := pi.runner.RunOutput("packer", "version"); err != nil {

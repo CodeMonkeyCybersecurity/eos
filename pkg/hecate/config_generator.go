@@ -563,7 +563,7 @@ func writeYAMLConfig(config RawYAMLConfig, outputPath string) error {
 
 	fullData := []byte(header + string(data))
 
-	if err := os.WriteFile(outputPath, fullData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, fullData, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 

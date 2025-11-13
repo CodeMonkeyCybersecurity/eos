@@ -3,6 +3,7 @@
 package eos_io
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"fmt"
@@ -31,7 +32,7 @@ func WriteYAML(ctx context.Context, filePath string, in interface{}) error {
 	}
 
 	// SECURITY: Use 0640 instead of 0644 for config files (owner: rw, group: r, others: none)
-	if err := os.WriteFile(filePath, data, 0640); err != nil {
+	if err := os.WriteFile(filePath, data, shared.SecureConfigFilePerm); err != nil {
 		logger.Error(" Failed to write YAML file",
 			zap.String("path", filePath),
 			zap.Error(err))

@@ -93,11 +93,11 @@ func (op *Operation) Done() {
 // PercentageTracker tracks percentage progress and only logs when it changes
 // This prevents log spam when progress callbacks fire multiple times at same percentage
 type PercentageTracker struct {
-	mu            sync.Mutex
-	lastLogged    int64
-	logInterval   int64 // Log every N percent (default: 10)
-	operation     string
-	ctx           context.Context
+	mu          sync.Mutex
+	lastLogged  int64
+	logInterval int64 // Log every N percent (default: 10)
+	operation   string
+	ctx         context.Context
 }
 
 // NewPercentageTracker creates a progress tracker that deduplicates logs

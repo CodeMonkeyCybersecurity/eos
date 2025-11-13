@@ -14,23 +14,23 @@ import (
 // ConfigureSystemTools applies system tools configuration following Assess → Intervene → Evaluate pattern
 func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) (*ConfigurationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing system tools configuration requirements")
-	
+
 	// Use default config if not provided
 	if config == nil {
 		config = DefaultSystemToolsConfig()
 	}
-	
+
 	// Validate configuration
 	if err := ValidateSystemToolsConfig(rc, config); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
-	
+
 	// INTERVENE
 	logger.Info("Applying system tools configuration")
-	
+
 	start := time.Now()
 	result := &ConfigurationResult{
 		Type:      ConfigTypeSystemTools,
@@ -39,7 +39,7 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 		Changes:   make([]ConfigurationChange, 0),
 		Warnings:  make([]string, 0),
 	}
-	
+
 	// Update system if requested
 	if config.UpdateSystem {
 		if err := UpdateSystem(rc, result); err != nil {
@@ -49,7 +49,7 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			return result, err
 		}
 	}
-	
+
 	// Install packages if requested
 	if config.InstallPackages && len(config.Packages) > 0 {
 		if err := InstallSystemPackages(rc, config.Packages, result); err != nil {
@@ -59,7 +59,7 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			return result, err
 		}
 	}
-	
+
 	// Install npm tools if requested
 	if config.InstallNpm {
 		if err := InstallNpmTools(rc, config.InstallZx, result); err != nil {
@@ -67,7 +67,7 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			result.Warnings = append(result.Warnings, fmt.Sprintf("npm tools installation failed: %v", err))
 		}
 	}
-	
+
 	// Configure UFW if requested
 	if config.ConfigureUFW {
 		if err := ConfigureUFW(rc, result); err != nil {
@@ -75,7 +75,7 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			result.Warnings = append(result.Warnings, fmt.Sprintf("UFW configuration failed: %v", err))
 		}
 	}
-	
+
 	// Setup sensors if requested
 	if config.SetupSensors {
 		if err := SetupSensors(rc, result); err != nil {
@@ -83,17 +83,17 @@ func ConfigureSystemTools(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			result.Warnings = append(result.Warnings, fmt.Sprintf("sensors setup failed: %v", err))
 		}
 	}
-	
+
 	// EVALUATE
 	result.Success = true
 	result.Message = "System tools configuration applied successfully"
 	result.Duration = time.Since(start)
-	
-	logger.Info("System tools configuration completed", 
+
+	logger.Info("System tools configuration completed",
 		zap.Duration("duration", result.Duration),
 		zap.Int("changes", len(result.Changes)),
 		zap.Int("warnings", len(result.Warnings)))
-	
+
 	return result, nil
 }
 
@@ -121,46 +121,46 @@ func DefaultSystemToolsConfig() *SystemToolsConfig {
 // ValidateSystemToolsConfig validates the configuration
 func ValidateSystemToolsConfig(rc *eos_io.RuntimeContext, config *SystemToolsConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Validating system tools configuration")
-	
+
 	// Check if running as root for system modifications
 	if config.UpdateSystem || config.InstallPackages {
 		if err := CheckRoot(); err != nil {
 			return fmt.Errorf("system tools configuration requires root privileges: %w", err)
 		}
 	}
-	
+
 	// Check dependencies
 	dependencies := []string{"apt", "systemctl"}
 	if config.InstallNpm {
 		dependencies = append(dependencies, "npm")
 	}
-	
+
 	depStatus := CheckDependencies(dependencies)
 	for _, dep := range depStatus {
 		if dep.Required && !dep.Available {
 			return fmt.Errorf("required dependency not available: %s", dep.Name)
 		}
 	}
-	
+
 	return nil
 }
 
 // UpdateSystem performs system update and cleanup
 func UpdateSystem(rc *eos_io.RuntimeContext, result *ConfigurationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Preparing system update")
-	
+
 	step := ConfigurationStep{
 		Name:        "System Update",
 		Description: "Updating system packages and performing cleanup",
 		Status:      "running",
 	}
 	stepStart := time.Now()
-	
+
 	// INTERVENE
 	commands := []struct {
 		name string
@@ -171,7 +171,7 @@ func UpdateSystem(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 		{"apt autoremove", []string{"apt", "autoremove", "-y"}},
 		{"apt autoclean", []string{"apt", "autoclean", "-y"}},
 	}
-	
+
 	for _, cmd := range commands {
 		logger.Info("Running system update command", zap.String("command", cmd.name))
 		if err := RunCommand(rc, cmd.name, cmd.args[0], cmd.args[1:]...); err != nil {
@@ -182,19 +182,19 @@ func UpdateSystem(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 			return err
 		}
 	}
-	
+
 	// EVALUATE
 	step.Status = "completed"
 	step.Duration = time.Since(stepStart)
 	result.Steps = append(result.Steps, step)
-	
+
 	result.Changes = append(result.Changes, ConfigurationChange{
 		Type:        "system",
 		Target:      "packages",
 		Action:      "updated",
 		Description: "System packages updated and cleaned",
 	})
-	
+
 	logger.Info("System update completed successfully", zap.Duration("duration", step.Duration))
 	return nil
 }
@@ -202,25 +202,25 @@ func UpdateSystem(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 // InstallSystemPackages installs the specified packages
 func InstallSystemPackages(rc *eos_io.RuntimeContext, packages []string, result *ConfigurationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Preparing to install packages", zap.Int("count", len(packages)))
-	
+
 	if len(packages) == 0 {
 		return nil
 	}
-	
+
 	step := ConfigurationStep{
 		Name:        "Install Packages",
 		Description: fmt.Sprintf("Installing %d system packages", len(packages)),
 		Status:      "running",
 	}
 	stepStart := time.Now()
-	
+
 	// INTERVENE
 	args := []string{"install", "-y", "--fix-missing"}
 	args = append(args, packages...)
-	
+
 	logger.Info("Installing packages", zap.Strings("packages", packages))
 	if err := RunCommand(rc, "install packages", "apt", args...); err != nil {
 		step.Status = "failed"
@@ -229,40 +229,40 @@ func InstallSystemPackages(rc *eos_io.RuntimeContext, packages []string, result 
 		result.Steps = append(result.Steps, step)
 		return err
 	}
-	
+
 	// EVALUATE
 	step.Status = "completed"
 	step.Duration = time.Since(stepStart)
 	result.Steps = append(result.Steps, step)
-	
+
 	result.Changes = append(result.Changes, ConfigurationChange{
 		Type:        "packages",
 		Target:      strings.Join(packages, ", "),
 		Action:      "installed",
 		Description: fmt.Sprintf("Installed %d packages", len(packages)),
 	})
-	
-	logger.Info("Package installation completed", 
+
+	logger.Info("Package installation completed",
 		zap.Int("count", len(packages)),
 		zap.Duration("duration", step.Duration))
-	
+
 	return nil
 }
 
 // InstallNpmTools installs npm and optionally zx
 func InstallNpmTools(rc *eos_io.RuntimeContext, installZx bool, result *ConfigurationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Preparing to install npm tools", zap.Bool("install_zx", installZx))
-	
+
 	step := ConfigurationStep{
 		Name:        "Install NPM Tools",
 		Description: "Installing npm and zx for scripting",
 		Status:      "running",
 	}
 	stepStart := time.Now()
-	
+
 	// INTERVENE
 	// Install npm if not present
 	logger.Info("Installing npm")
@@ -273,7 +273,7 @@ func InstallNpmTools(rc *eos_io.RuntimeContext, installZx bool, result *Configur
 		result.Steps = append(result.Steps, step)
 		return err
 	}
-	
+
 	// Install zx if requested
 	if installZx {
 		logger.Info("Installing zx globally")
@@ -285,41 +285,41 @@ func InstallNpmTools(rc *eos_io.RuntimeContext, installZx bool, result *Configur
 			return err
 		}
 	}
-	
+
 	// EVALUATE
 	step.Status = "completed"
 	step.Duration = time.Since(stepStart)
 	result.Steps = append(result.Steps, step)
-	
+
 	tools := "npm"
 	if installZx {
 		tools = "npm, zx"
 	}
-	
+
 	result.Changes = append(result.Changes, ConfigurationChange{
 		Type:        "packages",
 		Target:      tools,
 		Action:      "installed",
 		Description: fmt.Sprintf("%s scripting tools installed", tools),
 	})
-	
+
 	return nil
 }
 
 // ConfigureUFW enables and configures UFW firewall
 func ConfigureUFW(rc *eos_io.RuntimeContext, result *ConfigurationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Preparing to configure UFW firewall")
-	
+
 	step := ConfigurationStep{
 		Name:        "Configure UFW",
 		Description: "Configuring UFW firewall",
 		Status:      "running",
 	}
 	stepStart := time.Now()
-	
+
 	// INTERVENE
 	logger.Info("Enabling UFW firewall")
 	if err := RunCommand(rc, "enable ufw", "ufw", "--force", "enable"); err != nil {
@@ -329,19 +329,19 @@ func ConfigureUFW(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 		result.Steps = append(result.Steps, step)
 		return err
 	}
-	
+
 	// EVALUATE
 	step.Status = "completed"
 	step.Duration = time.Since(stepStart)
 	result.Steps = append(result.Steps, step)
-	
+
 	result.Changes = append(result.Changes, ConfigurationChange{
 		Type:        "service",
 		Target:      "ufw",
 		Action:      "enabled",
 		Description: "UFW firewall enabled",
 	})
-	
+
 	logger.Info("UFW configuration completed")
 	return nil
 }
@@ -349,17 +349,17 @@ func ConfigureUFW(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 // SetupSensors configures lm-sensors for hardware monitoring
 func SetupSensors(rc *eos_io.RuntimeContext, result *ConfigurationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Preparing to setup hardware sensors")
-	
+
 	step := ConfigurationStep{
 		Name:        "Setup Sensors",
 		Description: "Configuring lm-sensors for hardware monitoring",
 		Status:      "running",
 	}
 	stepStart := time.Now()
-	
+
 	// INTERVENE
 	logger.Info("Running sensors-detect")
 	if err := RunCommand(rc, "sensors-detect", "sensors-detect", "--auto"); err != nil {
@@ -369,19 +369,19 @@ func SetupSensors(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 		result.Steps = append(result.Steps, step)
 		return err
 	}
-	
+
 	// EVALUATE
 	step.Status = "completed"
 	step.Duration = time.Since(stepStart)
 	result.Steps = append(result.Steps, step)
-	
+
 	result.Changes = append(result.Changes, ConfigurationChange{
 		Type:        "system",
 		Target:      "sensors",
 		Action:      "configured",
 		Description: "Hardware sensors configured for monitoring",
 	})
-	
+
 	logger.Info("Sensors setup completed")
 	return nil
 }
@@ -389,13 +389,13 @@ func SetupSensors(rc *eos_io.RuntimeContext, result *ConfigurationResult) error 
 // GetSystemToolsStatus returns the current status of system tools
 func GetSystemToolsStatus(rc *eos_io.RuntimeContext, config *SystemToolsConfig) (*ConfigurationStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Getting system tools status")
-	
+
 	if config == nil {
 		config = DefaultSystemToolsConfig()
 	}
-	
+
 	status := &ConfigurationStatus{
 		Type:       ConfigTypeSystemTools,
 		Configured: true,
@@ -407,7 +407,7 @@ func GetSystemToolsStatus(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 		Packages:     make([]PackageStatus, 0),
 		Services:     make([]ServiceStatus, 0),
 	}
-	
+
 	// Check package status
 	for _, pkg := range config.Packages {
 		pkgState, err := CheckPackageInstalled(pkg)
@@ -424,7 +424,7 @@ func GetSystemToolsStatus(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 		}
 		status.Packages = append(status.Packages, pkgStatus)
 	}
-	
+
 	// Check service status for relevant packages
 	servicePackages := []string{"nginx", "ufw", "nfs-kernel-server", "prometheus"}
 	for _, service := range servicePackages {
@@ -444,6 +444,6 @@ func GetSystemToolsStatus(rc *eos_io.RuntimeContext, config *SystemToolsConfig) 
 			status.Services = append(status.Services, serviceStatus)
 		}
 	}
-	
+
 	return status, nil
 }

@@ -19,19 +19,19 @@ import (
 // ListServices lists systemd services following Assess → Intervene → Evaluate pattern
 func ListServices(rc *eos_io.RuntimeContext, config *ServiceConfig, filter *ServiceFilterOptions) (*ServiceListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing service listing requirements",
 		zap.Bool("show_all", config.ShowAll),
 		zap.Any("filter", filter))
-	
+
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	// INTERVENE
 	logger.Info("Listing systemd services")
-	
+
 	// Build systemctl command
 	args := []string{"list-units", "--type=service"}
 	if config.ShowAll {
@@ -67,27 +67,27 @@ func ListServices(rc *eos_io.RuntimeContext, config *ServiceConfig, filter *Serv
 		result.Filter = filter.Pattern
 	}
 
-	logger.Info("Service listing completed", 
+	logger.Info("Service listing completed",
 		zap.Int("total_services", len(services)),
 		zap.String("filter_applied", result.Filter))
-	
+
 	return result, nil
 }
 
 // GetServiceStatus gets detailed status for a specific service following Assess → Intervene → Evaluate pattern
 func GetServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing service status request", zap.String("service", serviceName))
-	
+
 	if serviceName == "" {
 		return nil, fmt.Errorf("service name cannot be empty")
 	}
-	
+
 	// INTERVENE
 	logger.Info("Getting service status", zap.String("service", serviceName))
-	
+
 	cmd := exec.CommandContext(rc.Ctx, "systemctl", "show", serviceName, "--no-pager")
 	output, err := cmd.Output()
 	if err != nil {
@@ -101,7 +101,7 @@ func GetServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceIn
 		return nil, fmt.Errorf("failed to parse service status: %w", err)
 	}
 
-	logger.Info("Service status retrieved successfully", 
+	logger.Info("Service status retrieved successfully",
 		zap.String("service", serviceName),
 		zap.String("state", string(service.State)),
 		zap.Bool("running", service.Running))
@@ -112,17 +112,17 @@ func GetServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceIn
 // StartService starts and optionally enables a service following Assess → Intervene → Evaluate pattern
 func StartService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceName string, enable bool) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing service start requirements",
 		zap.String("service", serviceName),
 		zap.Bool("enable", enable),
 		zap.Bool("dry_run", config.DryRun))
-	
+
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	if serviceName == "" {
 		return nil, fmt.Errorf("service name cannot be empty")
 	}
@@ -201,17 +201,17 @@ func StartService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceName 
 // StopService stops and optionally disables a service following Assess → Intervene → Evaluate pattern
 func StopService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceName string, disable bool) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing service stop requirements",
 		zap.String("service", serviceName),
 		zap.Bool("disable", disable),
 		zap.Bool("dry_run", config.DryRun))
-	
+
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	if serviceName == "" {
 		return nil, fmt.Errorf("service name cannot be empty")
 	}
@@ -290,16 +290,16 @@ func StopService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceName s
 // RestartService restarts a service following Assess → Intervene → Evaluate pattern
 func RestartService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceName string) (*ServiceOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing service restart requirements",
 		zap.String("service", serviceName),
 		zap.Bool("dry_run", config.DryRun))
-	
+
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	if serviceName == "" {
 		return nil, fmt.Errorf("service name cannot be empty")
 	}
@@ -339,25 +339,25 @@ func RestartService(rc *eos_io.RuntimeContext, config *ServiceConfig, serviceNam
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully restarted service: %s", serviceName)
 
-	logger.Info("Service restart completed successfully", 
+	logger.Info("Service restart completed successfully",
 		zap.String("service", serviceName))
-	
+
 	return operation, nil
 }
 
 // ViewLogs displays logs for a service following Assess → Intervene → Evaluate pattern
 func ViewLogs(rc *eos_io.RuntimeContext, serviceName string, options *LogsOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// ASSESS
 	logger.Info("Assessing log viewing requirements",
 		zap.String("service", serviceName),
 		zap.Any("options", options))
-	
+
 	if serviceName == "" {
 		return fmt.Errorf("service name cannot be empty")
 	}
-	
+
 	// INTERVENE
 	logger.Info("Viewing service logs", zap.String("service", serviceName))
 

@@ -51,14 +51,14 @@ type AdminAuthMethod struct {
 //  4. Suggests root token (does NOT auto-try, requires explicit command)
 //
 // Use cases:
-//  - Policy updates: eos update vault --policies
-//  - MFA repair: eos update vault --fix --mfa
-//  - Drift correction: eos update vault --fix
-//  - Debug operations: eos debug vault
+//   - Policy updates: eos update vault --policies
+//   - MFA repair: eos update vault --fix --mfa
+//   - Drift correction: eos update vault --fix
+//   - Debug operations: eos debug vault
 //
 // DO NOT USE for:
-//  - Initial setup: use GetPrivilegedClient() (needs root token)
-//  - Normal operations: use GetVaultClient() (regular auth)
+//   - Initial setup: use GetPrivilegedClient() (needs root token)
+//   - Normal operations: use GetVaultClient() (regular auth)
 func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -221,21 +221,21 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		zap.Error(lastErr))
 
 	return nil, fmt.Errorf(
-		"admin authentication failed: no valid admin-level credentials available\n\n" +
-			"This operation requires elevated privileges (eos-admin-policy).\n\n" +
-			"Options:\n" +
-			"  1. Ensure Vault Agent is running and has admin policy:\n" +
-			"     systemctl status vault-agent-eos\n" +
-			"     (Agent should have been configured during 'eos create vault')\n\n" +
-			"  2. Check if admin AppRole exists:\n" +
-			"     ls -la /var/lib/eos/secret/admin_role_id\n" +
-			"     (Should have been created during 'eos create vault')\n\n" +
-			"  3. Re-run Vault setup to create admin AppRole:\n" +
-			"     sudo eos create vault\n" +
-			"     (This will detect existing Vault and only create missing components)\n\n" +
-			"  4. Emergency root access (use with caution):\n" +
-			"     export VAULT_TOKEN=$(sudo cat /run/eos/vault_init_output.json | jq -r '.root_token')\n" +
-			"     (This should only be used in emergencies - root token has unlimited access)\n\n" +
+		"admin authentication failed: no valid admin-level credentials available\n\n"+
+			"This operation requires elevated privileges (eos-admin-policy).\n\n"+
+			"Options:\n"+
+			"  1. Ensure Vault Agent is running and has admin policy:\n"+
+			"     systemctl status vault-agent-eos\n"+
+			"     (Agent should have been configured during 'eos create vault')\n\n"+
+			"  2. Check if admin AppRole exists:\n"+
+			"     ls -la /var/lib/eos/secret/admin_role_id\n"+
+			"     (Should have been created during 'eos create vault')\n\n"+
+			"  3. Re-run Vault setup to create admin AppRole:\n"+
+			"     sudo eos create vault\n"+
+			"     (This will detect existing Vault and only create missing components)\n\n"+
+			"  4. Emergency root access (use with caution):\n"+
+			"     export VAULT_TOKEN=$(sudo cat /run/eos/vault_init_output.json | jq -r '.root_token')\n"+
+			"     (This should only be used in emergencies - root token has unlimited access)\n\n"+
 			"Last error: %v", lastErr)
 }
 

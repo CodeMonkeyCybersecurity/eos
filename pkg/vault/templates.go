@@ -24,12 +24,12 @@ import (
 // AgentTemplateConfig defines a Vault Agent template configuration
 // NOTE: Renamed from TemplateConfig to avoid conflict with template_bionicgpt.go:TemplateConfig
 type AgentTemplateConfig struct {
-	ServiceName      string // e.g., "bionicgpt"
-	SourceTemplate   string // Path to .ctmpl file
-	DestinationFile  string // Where to write rendered file
-	FilePermissions  string // e.g., "0640"
-	CommandOnChange  string // Command to run when template changes
-	TemplateContent  string // Actual template content (if not reading from file)
+	ServiceName     string // e.g., "bionicgpt"
+	SourceTemplate  string // Path to .ctmpl file
+	DestinationFile string // Where to write rendered file
+	FilePermissions string // e.g., "0640"
+	CommandOnChange string // Command to run when template changes
+	TemplateContent string // Actual template content (if not reading from file)
 }
 
 // EnableTemplatesConfig configures template rendering enablement
@@ -65,7 +65,7 @@ func EnableTemplates(rc *eos_io.RuntimeContext, config *EnableTemplatesConfig) e
 		logger.Info(fmt.Sprintf("Template directory does not exist: %s", TemplateDir))
 		if !config.DryRun {
 			logger.Info("Creating template directory...")
-			if err := os.MkdirAll(TemplateDir, 0755); err != nil {
+			if err := os.MkdirAll(TemplateDir, VaultBaseDirPerm); err != nil {
 				return fmt.Errorf("failed to create template directory: %w", err)
 			}
 			logger.Info("✓ Template directory created")
@@ -200,13 +200,13 @@ func WriteSampleTemplates(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Ensure template directory exists
-	if err := os.MkdirAll(TemplateDir, 0755); err != nil {
+	if err := os.MkdirAll(TemplateDir, VaultBaseDirPerm); err != nil {
 		return fmt.Errorf("failed to create template directory: %w", err)
 	}
 
 	// Write BionicGPT example
 	bionicPath := filepath.Join(TemplateDir, "bionicgpt.env.ctmpl.example")
-	if err := os.WriteFile(bionicPath, []byte(GenerateBionicGPTTemplate()), 0644); err != nil {
+	if err := os.WriteFile(bionicPath, []byte(GenerateBionicGPTTemplate()), VaultTLSCertPerm); err != nil {
 		return fmt.Errorf("failed to write BionicGPT template example: %w", err)
 	}
 

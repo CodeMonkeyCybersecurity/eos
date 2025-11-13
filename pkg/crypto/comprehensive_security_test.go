@@ -387,7 +387,7 @@ func BenchmarkGeneratePassword(b *testing.B) {
 	for _, length := range lengths {
 		b.Run(fmt.Sprintf("length_%d", length), func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, err := GeneratePassword(length)
 				if err != nil {
 					b.Fatal(err)
@@ -409,7 +409,7 @@ func BenchmarkValidateStrongPassword(b *testing.B) {
 	for _, password := range passwords {
 		b.Run(fmt.Sprintf("len_%d", len(password)), func(b *testing.B) {
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				err := ValidateStrongPassword(ctx, password)
 				if err != nil {
 					b.Fatal(err)

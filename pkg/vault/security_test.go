@@ -153,7 +153,7 @@ func TestVaultClientCacheSecurity(t *testing.T) {
 				defer func() { done <- true }()
 
 				logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-		client, err := NewClient(shared.GetVaultAddr(), logger)
+				client, err := NewClient(shared.GetVaultAddr(), logger)
 				if err != nil {
 					t.Errorf("Failed to create vault client: %v", err)
 					return
@@ -209,7 +209,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 			}
 
 			logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-		client, err := NewClient(shared.GetVaultAddr(), logger)
+			client, err := NewClient(shared.GetVaultAddr(), logger)
 			if tt.expectError {
 				testutil.AssertError(t, err)
 			} else {
@@ -293,7 +293,7 @@ func TestTokenValidationSecurity(t *testing.T) {
 			defer cleanup()
 
 			logger := otelzap.Ctx(rc.Ctx).Logger().Logger
-		client, err := NewClient(shared.GetVaultAddr(), logger)
+			client, err := NewClient(shared.GetVaultAddr(), logger)
 			testutil.AssertNoError(t, err)
 
 			isValid := VerifyToken(rc, client.APIClient(), tt.token)

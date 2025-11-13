@@ -131,14 +131,14 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	// Use Consul storage backend (recommended)
 	// Provides HA without Raft complexity
 	params := shared.VaultConfigParams{
-		Port:          shared.VaultDefaultPort,
-		ClusterPort:   shared.VaultClusterPort,
-		TLSCrt:        shared.TLSCrt,
-		TLSKey:        shared.TLSKey,
-		APIAddr:       vaultAddr,
-		ClusterAddr:   shared.GetVaultClusterAddr(),
-		LogLevel:      logLevel,
-		LogFormat:     logFormat,
+		Port:        shared.VaultDefaultPort,
+		ClusterPort: shared.VaultClusterPort,
+		TLSCrt:      shared.TLSCrt,
+		TLSKey:      shared.TLSKey,
+		APIAddr:     vaultAddr,
+		ClusterAddr: shared.GetVaultClusterAddr(),
+		LogLevel:    logLevel,
+		LogFormat:   logFormat,
 		// Consul backend configuration
 		ConsulAddress: shared.GetConsulHostPort(),
 		ConsulPath:    "vault/",
@@ -155,7 +155,7 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 
 	// Guarantee the parent directory exists
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, VaultBaseDirPerm); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("failed to create Vault config directory", zap.String("path", dir), zap.Error(err))
 		return fmt.Errorf("mkdir vault config dir: %w", err)
 	}
@@ -164,7 +164,7 @@ func WriteVaultHCL(rc *eos_io.RuntimeContext) error {
 	// Safely write the Vault config
 	// SECURITY: Use 0640 instead of 0644 to prevent world-readable config
 	// Vault configs may contain sensitive paths, storage backend details, etc.
-	if err := os.WriteFile(configPath, []byte(hcl), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte(hcl), VaultConfigPerm); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("failed to write Vault HCL config", zap.Error(err))
 		return fmt.Errorf("write vault hcl: %w", err)
 	}

@@ -3,6 +3,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -215,7 +216,7 @@ ACTION=="add", SUBSYSTEM=="hidraw", ATTRS{usage}=="00010006", RUN+="/usr/sbin/us
 
 	udevPath := "/etc/udev/rules.d/70-fido2.rules"
 	log.Info(" Writing FIDO2 udev rules", zap.String("path", udevPath))
-	if err := os.WriteFile(udevPath, []byte(udevRules), 0644); err != nil {
+	if err := os.WriteFile(udevPath, []byte(udevRules), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write udev rules", zap.Error(err))
 		return cerr.Wrap(err, "failed to write udev rules")
 	}
@@ -289,7 +290,7 @@ auth    required      pam_unix.so
 `, time.Now().Format(time.RFC3339))
 
 	log.Info(" Writing sudo PAM configuration")
-	if err := os.WriteFile("/etc/pam.d/sudo", []byte(sudoPAMConfig), 0644); err != nil {
+	if err := os.WriteFile("/etc/pam.d/sudo", []byte(sudoPAMConfig), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write sudo PAM config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write sudo PAM config")
 	}
@@ -335,7 +336,7 @@ UsePAM yes
 	}
 
 	log.Info(" Writing SSH configuration")
-	if err := os.WriteFile(sshConfigPath, []byte(sshConfig), 0644); err != nil {
+	if err := os.WriteFile(sshConfigPath, []byte(sshConfig), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write SSH config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write SSH config")
 	}
@@ -406,7 +407,7 @@ fi
 
 	enrollmentPath := "/usr/local/bin/setup-fido2"
 	log.Info(" Creating FIDO2 enrollment script", zap.String("path", enrollmentPath))
-	if err := os.WriteFile(enrollmentPath, []byte(enrollmentScript), 0755); err != nil {
+	if err := os.WriteFile(enrollmentPath, []byte(enrollmentScript), shared.ExecutablePerm); err != nil {
 		log.Error(" Failed to write enrollment script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write enrollment script")
 	}
@@ -457,7 +458,7 @@ esac
 
 	managementPath := "/usr/local/bin/manage-fido2"
 	log.Info(" Creating FIDO2 management script", zap.String("path", managementPath))
-	if err := os.WriteFile(managementPath, []byte(managementScript), 0755); err != nil {
+	if err := os.WriteFile(managementPath, []byte(managementScript), shared.ExecutablePerm); err != nil {
 		log.Error(" Failed to write management script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write management script")
 	}
@@ -477,7 +478,7 @@ func configureFIDO2Monitoring(rc *eos_io.RuntimeContext, config *FIDO2Config) er
 
 	// Create FIDO2 log directory
 	logDir := "/var/log/fido2"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, shared.ServiceDirPerm); err != nil {
 		log.Error(" Failed to create FIDO2 log directory", zap.Error(err))
 		return cerr.Wrap(err, "failed to create FIDO2 log directory")
 	}
@@ -491,7 +492,7 @@ func configureFIDO2Monitoring(rc *eos_io.RuntimeContext, config *FIDO2Config) er
 
 	configPath := "/etc/rsyslog.d/60-fido2.conf"
 	log.Info(" Configuring FIDO2 logging", zap.String("path", configPath))
-	if err := os.WriteFile(configPath, []byte(rsyslogConfig), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(rsyslogConfig), shared.ConfigFilePerm); err != nil {
 		log.Error(" Failed to write rsyslog config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write rsyslog config")
 	}

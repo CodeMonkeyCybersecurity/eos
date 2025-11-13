@@ -1,6 +1,7 @@
 package terraform
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -124,7 +125,7 @@ func (m *GraphManager) ensurePrerequisites(ctx context.Context, mgr *GraphManage
 	// Ensure output directory exists
 	outputDir := filepath.Dir(m.config.OutputFile)
 	if outputDir != "." {
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 			logger.Error("Failed to create output directory", zap.Error(err))
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
@@ -205,7 +206,7 @@ func (m *GraphManager) generateTerraformGraph(ctx context.Context, mgr *GraphMan
 	}
 
 	// Write to file
-	if err := os.WriteFile(m.config.OutputFile, []byte(finalOutput), 0644); err != nil {
+	if err := os.WriteFile(m.config.OutputFile, []byte(finalOutput), shared.ConfigFilePerm); err != nil {
 		logger.Error("Failed to write graph file", zap.Error(err))
 		return fmt.Errorf("failed to write graph file: %w", err)
 	}

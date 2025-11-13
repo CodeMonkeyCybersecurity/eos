@@ -519,7 +519,7 @@ func BenchmarkRetryCommand(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RetryCommand(rc, 1, 0, "echo", "benchmark")
 	}
 }
@@ -530,7 +530,7 @@ func BenchmarkRetryCaptureOutput(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		RetryCommandCaptureRefactored(rc, 1, 0, "echo", "benchmark")
 	}
 }

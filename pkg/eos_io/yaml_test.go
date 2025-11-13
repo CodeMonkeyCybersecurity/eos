@@ -9,10 +9,12 @@ import (
 )
 
 func TestWriteYAML(t *testing.T) {
+	t.Parallel()
 	// Create temp directory for test files
 	tempDir := t.TempDir()
 
 	t.Run("writes_simple_struct_to_yaml", func(t *testing.T) {
+		t.Parallel()
 		// Create a simple struct to write
 		data := struct {
 			Name    string `yaml:"name"`
@@ -56,6 +58,7 @@ func TestWriteYAML(t *testing.T) {
 	})
 
 	t.Run("writes_nested_struct_to_yaml", func(t *testing.T) {
+		t.Parallel()
 		type Config struct {
 			Database struct {
 				Host string `yaml:"host"`
@@ -97,6 +100,7 @@ func TestWriteYAML(t *testing.T) {
 	})
 
 	t.Run("overwrites_existing_file", func(t *testing.T) {
+		t.Parallel()
 		filePath := filepath.Join(tempDir, "overwrite.yaml")
 
 		// Create initial file
@@ -135,6 +139,7 @@ func TestWriteYAML(t *testing.T) {
 	})
 
 	t.Run("handles_invalid_path", func(t *testing.T) {
+		t.Parallel()
 		// Try to write to an invalid path (non-existent directory)
 		invalidPath := "/nonexistent/directory/file.yaml"
 		data := struct{ Test string }{Test: "value"}
@@ -147,6 +152,7 @@ func TestWriteYAML(t *testing.T) {
 	})
 
 	t.Run("handles_context_cancellation", func(t *testing.T) {
+		t.Parallel()
 		filePath := filepath.Join(tempDir, "cancelled.yaml")
 		data := struct{ Test string }{Test: "value"}
 
@@ -162,9 +168,11 @@ func TestWriteYAML(t *testing.T) {
 }
 
 func TestReadYAML(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	t.Run("reads_yaml_file_successfully", func(t *testing.T) {
+		t.Parallel()
 		// Create a YAML file
 		yamlContent := `name: test-service
 version: "1.0.0"
@@ -204,6 +212,7 @@ database:
 	})
 
 	t.Run("reads_into_struct", func(t *testing.T) {
+		t.Parallel()
 		type Config struct {
 			Name     string   `yaml:"name"`
 			Version  string   `yaml:"version"`
@@ -248,6 +257,7 @@ features:
 	})
 
 	t.Run("handles_nonexistent_file", func(t *testing.T) {
+		t.Parallel()
 		nonexistentPath := filepath.Join(tempDir, "nonexistent.yaml")
 		var result map[string]interface{}
 		ctx := context.Background()
@@ -259,6 +269,7 @@ features:
 	})
 
 	t.Run("handles_invalid_yaml", func(t *testing.T) {
+		t.Parallel()
 		invalidYAML := `name: test
 invalid: [ unclosed array
 port: 8080`
@@ -279,6 +290,7 @@ port: 8080`
 	})
 
 	t.Run("handles_context_cancellation", func(t *testing.T) {
+		t.Parallel()
 		yamlContent := `test: value`
 		filePath := filepath.Join(tempDir, "cancel-test.yaml")
 		err := os.WriteFile(filePath, []byte(yamlContent), 0644)
@@ -297,6 +309,7 @@ port: 8080`
 }
 
 func TestParseYAMLString(t *testing.T) {
+	t.Parallel()
 	t.Run("parses_yaml_string_successfully", func(t *testing.T) {
 		yamlString := `name: string-test
 version: "3.0.0"
@@ -326,6 +339,7 @@ count: 42`
 	})
 
 	t.Run("parses_complex_yaml", func(t *testing.T) {
+		t.Parallel()
 		yamlString := `name: parse-test
 enabled: false
 items:
@@ -370,6 +384,7 @@ config:
 	})
 
 	t.Run("handles_empty_string", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		result, err := ParseYAMLString(ctx, "")
@@ -383,6 +398,7 @@ config:
 	})
 
 	t.Run("handles_invalid_yaml_string", func(t *testing.T) {
+		t.Parallel()
 		invalidYAML := `name: test
 invalid: [
 port: 8080`
@@ -397,9 +413,11 @@ port: 8080`
 }
 
 func TestWriteYAMLCompat(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	t.Run("writes_yaml_with_compatibility_mode", func(t *testing.T) {
+		t.Parallel()
 		data := map[string]interface{}{
 			"name":    "compat-test",
 			"version": "1.0.0",
@@ -438,9 +456,11 @@ func TestWriteYAMLCompat(t *testing.T) {
 }
 
 func TestReadYAMLCompat(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	t.Run("reads_yaml_with_compatibility_mode", func(t *testing.T) {
+		t.Parallel()
 		yamlContent := `name: compat-read-test
 version: "1.0.0"
 settings:
@@ -484,9 +504,11 @@ settings:
 
 // TestYAMLIntegration tests the integration between write and read functions
 func TestYAMLIntegration(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	t.Run("write_then_read_roundtrip", func(t *testing.T) {
+		t.Parallel()
 		type TestData struct {
 			Name     string            `yaml:"name"`
 			Values   []int             `yaml:"values"`

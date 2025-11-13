@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -65,7 +66,7 @@ else
 fi
 `
 
-	if err := os.WriteFile(scriptFile, []byte(script), 0755); err != nil {
+	if err := os.WriteFile(scriptFile, []byte(script), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to create post-reboot recovery script: %w", err)
 	}
 

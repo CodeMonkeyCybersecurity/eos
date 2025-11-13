@@ -1,14 +1,15 @@
 package read
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -101,7 +102,7 @@ func runReadDisk(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 	// Save to file if specified
 	if diskOutputFile != "" {
 		logger.Info("Saving report to file", zap.String("file", diskOutputFile))
-		if err := os.WriteFile(diskOutputFile, []byte(output), 0644); err != nil {
+		if err := os.WriteFile(diskOutputFile, []byte(output), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to save report to file: %w", err)
 		}
 		logger.Info("Report saved successfully", zap.String("file", diskOutputFile))

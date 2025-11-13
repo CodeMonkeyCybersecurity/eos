@@ -52,7 +52,7 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { //  Ignor
 		log.Debug(" Audit directory does not exist, creating", zap.String("path", shared.VaultLogsPath))
 	}
 
-	if err := os.MkdirAll(shared.VaultLogsPath, 0750); err != nil {
+	if err := os.MkdirAll(shared.VaultLogsPath, VaultDirPerm); err != nil {
 		log.Error(" Failed to create audit directory",
 			zap.String("path", shared.VaultLogsPath),
 			zap.Error(err))
