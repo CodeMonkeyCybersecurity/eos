@@ -2,6 +2,7 @@
 package service_installation
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,7 +80,7 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	_ = tmpScript.Close()
 
 	// Make executable
-	if err := os.Chmod(tmpScript.Name(), 0700); err != nil {
+	if err := os.Chmod(tmpScript.Name(), shared.SecretDirPerm); err != nil {
 		step1.Status = "failed"
 		step1.Error = fmt.Sprintf("Failed to make script executable: %v", err)
 		step1.Duration = time.Since(step1Start)

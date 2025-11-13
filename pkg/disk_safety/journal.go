@@ -1,6 +1,7 @@
 package disk_safety
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -34,7 +35,7 @@ func NewJournalStorage() (*JournalStorage, error) {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, shared.SecretDirPerm); err != nil {
 			return nil, fmt.Errorf("create journal dir %s: %w", dir, err)
 		}
 	}
@@ -292,7 +293,7 @@ func (js *JournalStorage) save(entry *JournalEntry) error {
 	}
 
 	filePath := filepath.Join(js.basePath, dir, entry.ID+".json")
-	if err := os.WriteFile(filePath, data, 0600); err != nil {
+	if err := os.WriteFile(filePath, data, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("write entry file: %w", err)
 	}
 

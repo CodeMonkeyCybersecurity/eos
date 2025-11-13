@@ -1,6 +1,7 @@
 package penpot
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -227,7 +228,7 @@ func (m *Manager) createTerraformConfig(ctx context.Context, mgr *Manager) error
 	logger.Info(" Creating Terraform configuration")
 
 	// Create work directory
-	if err := os.MkdirAll(m.config.WorkDir, 0755); err != nil {
+	if err := os.MkdirAll(m.config.WorkDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create work directory: %w", err)
 	}
 
@@ -291,7 +292,7 @@ output "namespace" {
 
 	// Write Terraform configuration
 	tfPath := filepath.Join(m.config.WorkDir, "main.tf")
-	if err := os.WriteFile(tfPath, []byte(terraformConfig), 0644); err != nil {
+	if err := os.WriteFile(tfPath, []byte(terraformConfig), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write Terraform config", zap.Error(err))
 		return fmt.Errorf("failed to write terraform config: %w", err)
 	}

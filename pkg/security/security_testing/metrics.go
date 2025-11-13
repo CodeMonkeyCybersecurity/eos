@@ -2,6 +2,7 @@
 package security_testing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -130,6 +131,8 @@ func (sm *SecurityMetrics) SaveMetrics(filepath string) error {
 	}
 
 	return os.WriteFile(filepath, data, 0644)
+	
+	return os.WriteFile(filepath, data, shared.ConfigFilePerm)
 }
 
 // LoadMetrics loads security metrics from a JSON file

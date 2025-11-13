@@ -14,6 +14,7 @@ Example command implementation:
 package cmd
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 
@@ -121,6 +122,7 @@ Example validation command:
 package cmd
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -299,7 +301,7 @@ func validateSizingBeforeDeployment(rc *eos_io.RuntimeContext, services []string
 
 	// Store sizing requirements for later validation
 	sizingData, _ := json.Marshal(result)
-	if err := os.WriteFile("/tmp/eos-sizing-requirements.json", sizingData, 0644); err != nil {
+	if err := os.WriteFile("/tmp/eos-sizing-requirements.json", sizingData, shared.ConfigFilePerm); err != nil {
 		logger.Warn("Failed to save sizing requirements", "error", err)
 	}
 

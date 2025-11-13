@@ -1,6 +1,7 @@
 package lvm
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -468,7 +469,7 @@ func mountLogicalVolume(rc *eos_io.RuntimeContext, device string, config *Logica
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create mount point
-	if err := os.MkdirAll(config.MountPoint, 0755); err != nil {
+	if err := os.MkdirAll(config.MountPoint, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create mount point: %w", err)
 	}
 

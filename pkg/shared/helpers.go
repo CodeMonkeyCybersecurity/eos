@@ -18,6 +18,15 @@ func CombineMarkers(additional ...string) []string {
 	return append(DefaultMarkers, additional...)
 }
 
+// GetEnvOrDefault gets an environment variable or returns a default value
+// This is a common utility for configuration with environment variable overrides
+func GetEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // SafeClose closes an io.Closer and logs a warning if it fails.
 func SafeClose(ctx context.Context, c io.Closer) {
 	if err := c.Close(); err != nil {

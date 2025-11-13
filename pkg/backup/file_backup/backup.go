@@ -2,6 +2,7 @@
 package file_backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -84,7 +85,7 @@ func BackupFile(rc *eos_io.RuntimeContext, config *FileBackupConfig, sourcePath 
 
 	// Create backup directory if needed
 	if config.CreateBackupDir {
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
+		if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 			operation.Success = false
 			operation.Message = fmt.Sprintf("Failed to create backup directory: %v", err)
 			return operation, fmt.Errorf("failed to create backup directory: %w", err)
@@ -267,7 +268,7 @@ func RestoreFile(rc *eos_io.RuntimeContext, config *FileBackupConfig, backupPath
 
 	// Create restore directory if needed
 	restoreDir := filepath.Dir(restorePath)
-	if err := os.MkdirAll(restoreDir, 0755); err != nil {
+	if err := os.MkdirAll(restoreDir, shared.ServiceDirPerm); err != nil {
 		operation.Success = false
 		operation.Message = fmt.Sprintf("Failed to create restore directory: %v", err)
 		return operation, fmt.Errorf("failed to create restore directory: %w", err)

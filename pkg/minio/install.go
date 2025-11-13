@@ -1,6 +1,7 @@
 package minio
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -145,7 +146,7 @@ func checkSystemResources(rc *eos_io.RuntimeContext) error {
 
 	// Check if we have write permissions
 	testFile := fmt.Sprintf("%s/.minio-test", storagePath)
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		return eos_err.NewUserError("no write permission for storage path %s: %v", storagePath, err)
 	}
 	_ = os.Remove(testFile)

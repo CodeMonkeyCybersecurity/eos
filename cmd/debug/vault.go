@@ -4,6 +4,7 @@
 package debug
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"strings"
@@ -326,7 +327,7 @@ func runVaultDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			zap.String("file", vaultDebugOutput),
 			zap.Int("size_bytes", len(output)))
 
-		if err := os.WriteFile(vaultDebugOutput, []byte(output), 0644); err != nil {
+		if err := os.WriteFile(vaultDebugOutput, []byte(output), shared.ConfigFilePerm); err != nil {
 			logger.Error("Failed to write output file",
 				zap.String("file", vaultDebugOutput),
 				zap.Error(err))

@@ -1,6 +1,7 @@
 package dev_environment
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/rand"
 	"fmt"
 	"os"
@@ -89,7 +90,7 @@ func ConfigureCodeServer(rc *eos_io.RuntimeContext, config *Config) (string, err
 	configFile := filepath.Join(configDir, "config.yaml")
 
 	// Create directory with proper ownership
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -124,7 +125,7 @@ password: %s
 cert: false
 `, CodeServerPort, password)
 
-	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(configFile, []byte(configContent), shared.SecretFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -206,7 +207,7 @@ func InstallClaudeExtension(rc *eos_io.RuntimeContext, config *Config) error {
 		extensionDir := filepath.Join(userHome, ".local", "share", "code-server", "extensions")
 
 		// Create directory
-		if err := os.MkdirAll(extensionDir, 0755); err != nil {
+		if err := os.MkdirAll(extensionDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create extensions directory: %w", err)
 		}
 

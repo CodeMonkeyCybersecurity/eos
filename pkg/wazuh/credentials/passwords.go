@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -270,7 +271,7 @@ func replaceInFile(filename, oldValue, newValue string) error {
 	// SECURITY: Write with 0600 permissions (owner read/write only)
 	// BEFORE: 0644 = -rw-r--r-- (world-readable, exposes passwords)
 	// AFTER:  0600 = -rw------- (owner-only, secure)
-	return os.WriteFile(filename, []byte(newContent), 0600)
+	return os.WriteFile(filename, []byte(newContent), shared.SecretFilePerm)
 }
 
 func generatePasswordHash(password string) (string, error) {

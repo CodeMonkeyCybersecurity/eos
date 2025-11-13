@@ -6,6 +6,7 @@
 package git
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -243,7 +244,7 @@ func CheckWritePermissions(ctx context.Context, path string) error {
 	logger := otelzap.Ctx(ctx)
 
 	// Ensure directory exists
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, shared.ServiceDirPerm); err != nil {
 		return eos_err.NewPermissionError(
 			path,
 			"create directory",
@@ -254,7 +255,7 @@ func CheckWritePermissions(ctx context.Context, path string) error {
 
 	// Try to write a test file
 	testFile := filepath.Join(path, ".eos-write-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		return eos_err.NewPermissionError(
 			path,
 			"write",

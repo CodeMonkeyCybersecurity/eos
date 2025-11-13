@@ -2,6 +2,7 @@
 package eos_unix
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -26,7 +27,7 @@ func GetCrontab() (string, error) {
 func BackupCrontab(content string) (string, error) {
 	timestamp := time.Now().Format("20060102-150405")
 	path := fmt.Sprintf("crontab.backup.%s", timestamp)
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), shared.ConfigFilePerm)
 	return path, err
 }
 

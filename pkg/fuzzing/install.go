@@ -1,6 +1,7 @@
 package fuzzing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -118,7 +119,7 @@ func setupFuzzingInfrastructure(config *Config, logger otelzap.LoggerWithCtx) er
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 		logger.Debug("Created fuzzing directory", zap.String("path", dir))
@@ -284,6 +285,8 @@ func createFuzzingConfig(config *Config, logger otelzap.LoggerWithCtx) error {
 		config.LogDir)
 
 	if err := os.WriteFile(configPath, []byte(configData), 0644); err != nil {
+	
+	if err := os.WriteFile(configPath, []byte(configData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
 
@@ -316,7 +319,7 @@ func FuzzSimple(f *testing.F) {
 `
 
 	testFile := filepath.Join(tempDir, "simple_fuzz_test.go")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write test file: %w", err)
 	}
 
@@ -326,7 +329,7 @@ func FuzzSimple(f *testing.F) {
 go 1.21
 `
 	modFile := filepath.Join(tempDir, "go.mod")
-	if err := os.WriteFile(modFile, []byte(modContent), 0644); err != nil {
+	if err := os.WriteFile(modFile, []byte(modContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write go.mod: %w", err)
 	}
 

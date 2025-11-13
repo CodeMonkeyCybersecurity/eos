@@ -193,7 +193,7 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 
 	// Create component directory
 	componentDir := filepath.Join(p.workDir, component.Name)
-	if err := os.MkdirAll(componentDir, 0755); err != nil {
+	if err := os.MkdirAll(componentDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create component directory: %w", err)
 	}
 
@@ -204,7 +204,7 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	}
 
 	mainTfPath := filepath.Join(componentDir, "main.tf")
-	if err := os.WriteFile(mainTfPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(mainTfPath, []byte(config), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write main.tf: %w", err)
 	}
 
@@ -215,12 +215,12 @@ func (p *Provider) Apply(ctx context.Context, component orchestrator.Component) 
 	}
 
 	jobsDir := filepath.Join(componentDir, "jobs")
-	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+	if err := os.MkdirAll(jobsDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create jobs directory: %w", err)
 	}
 
 	jobPath := filepath.Join(jobsDir, fmt.Sprintf("%s.nomad.hcl", component.Name))
-	if err := os.WriteFile(jobPath, []byte(jobSpec), 0644); err != nil {
+	if err := os.WriteFile(jobPath, []byte(jobSpec), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write nomad job file: %w", err)
 	}
 

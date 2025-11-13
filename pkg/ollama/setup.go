@@ -1,6 +1,7 @@
 package ollama
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 
@@ -46,7 +47,7 @@ func SetupOllama(rc *eos_io.RuntimeContext, config SetupConfig) error {
 		zap.Int("port", config.Port))
 
 	// Create config directory
-	if err := os.MkdirAll(ollamaDir, 0755); err != nil {
+	if err := os.MkdirAll(ollamaDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create config dir: %w", err)
 	}
 
@@ -136,7 +137,7 @@ func EnableGPUSupport(rc *eos_io.RuntimeContext) error {
 
 	// Create file if it doesn't exist
 	if _, err := os.Stat(rcPath); os.IsNotExist(err) {
-		if err := os.WriteFile(rcPath, []byte{}, 0644); err != nil {
+		if err := os.WriteFile(rcPath, []byte{}, shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to create shell config file: %w", err)
 		}
 	}

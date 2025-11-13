@@ -3,6 +3,7 @@
 package ai
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -201,12 +202,12 @@ func (ae *ActionExecutor) executeFileAction(rc *eos_io.RuntimeContext, action *A
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(targetPath), shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Write file
-	if err := os.WriteFile(targetPath, []byte(action.Content), 0644); err != nil {
+	if err := os.WriteFile(targetPath, []byte(action.Content), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -406,7 +407,7 @@ func (ae *ActionExecutor) createBackup(filePath string) error {
 	}
 
 	// Create backup directory
-	if err := os.MkdirAll(ae.backupDir, 0755); err != nil {
+	if err := os.MkdirAll(ae.backupDir, shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
@@ -424,12 +425,12 @@ func (ae *ActionExecutor) createBackup(filePath string) error {
 	backupPath := filepath.Join(ae.backupDir, relPath)
 
 	// Ensure backup directory exists
-	if err := os.MkdirAll(filepath.Dir(backupPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(backupPath), shared.ServiceDirPerm); err != nil {
 		return err
 	}
 
 	// Write backup file
-	return os.WriteFile(backupPath, content, 0644)
+	return os.WriteFile(backupPath, content, shared.ConfigFilePerm)
 }
 
 // ParseActionsFromResponse parses actions from AI response text

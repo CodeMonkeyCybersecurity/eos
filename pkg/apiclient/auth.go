@@ -15,8 +15,9 @@
 package apiclient
 
 import (
-	"fmt"
-	"os"
+    "errors"
+    "fmt"
+    "os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -278,7 +279,7 @@ func buildTokenNotFoundError(service string, auth AuthConfig) error {
 	msg += "5. Run interactively (will prompt for token):\n"
 	msg += fmt.Sprintf("   eos <command> (without --non-interactive flag)\n")
 
-	return fmt.Errorf(msg)
+    return errors.New(msg)
 }
 
 // buildBaseURLNotFoundError builds actionable error message for missing base URL
@@ -307,7 +308,7 @@ func buildBaseURLNotFoundError(service string, auth AuthConfig) error {
 	msg += "4. Run interactively (will prompt for URL):\n"
 	msg += fmt.Sprintf("   eos <command> (without --non-interactive flag)\n")
 
-	return fmt.Errorf(msg)
+    return errors.New(msg)
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

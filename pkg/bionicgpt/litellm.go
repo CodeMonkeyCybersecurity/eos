@@ -16,6 +16,7 @@
 package bionicgpt
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -137,7 +138,7 @@ func (bgi *BionicGPTInstaller) createLiteLLMConfig(ctx context.Context) error {
 	}
 
 	// Write configuration file
-	if err := os.WriteFile(litellmConfigPath, yamlData, 0644); err != nil {
+	if err := os.WriteFile(litellmConfigPath, yamlData, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write LiteLLM config file: %w", err)
 	}
 
@@ -174,7 +175,7 @@ AZURE_API_VERSION=%s
 
 	// Create .env.litellm file with appropriate permissions
 	// 0640 = owner read/write, group read, others none
-	if err := os.WriteFile(envPath, []byte(content), 0640); err != nil {
+	if err := os.WriteFile(envPath, []byte(content), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env.litellm file: %w", err)
 	}
 

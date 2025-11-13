@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -177,7 +178,7 @@ func ReplaceInFile(filename, oldValue, newValue string) error {
 	}
 
 	newContent := strings.ReplaceAll(string(content), oldValue, newValue)
-	return os.WriteFile(filename, []byte(newContent), 0644)
+	return os.WriteFile(filename, []byte(newContent), shared.ConfigFilePerm)
 }
 
 // GeneratePasswordHash generates a bcrypt hash for the given password

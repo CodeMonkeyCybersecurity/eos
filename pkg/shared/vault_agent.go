@@ -144,7 +144,7 @@ func EnsureSecretsDir() error {
 		zap.String("parent_dir", parentDir),
 		zap.String("initial_mode", "0755"))
 
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, ServiceDirPerm); err != nil {
 		log.Error("Failed to create parent directory",
 			zap.String("parent_dir", parentDir),
 			zap.Error(err))
@@ -161,7 +161,7 @@ func EnsureSecretsDir() error {
 		zap.String("target_mode", "0751"),
 		zap.String("reason", "allow vault user to traverse to subdirectories"))
 
-	if err := os.Chmod(parentDir, 0751); err != nil {
+	if err := os.Chmod(parentDir, SecretDirPerm); err != nil {
 		log.Warn("Failed to set parent directory permissions - vault user may not be able to access secrets",
 			zap.String("parent_dir", parentDir),
 			zap.String("attempted_mode", "0751"),
@@ -196,7 +196,7 @@ func EnsureSecretsDir() error {
 		zap.String("secrets_dir", dir),
 		zap.String("initial_mode", "0755"))
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, ServiceDirPerm); err != nil {
 		log.Error("Failed to create secrets directory",
 			zap.String("secrets_dir", dir),
 			zap.Error(err))
@@ -265,7 +265,7 @@ func EnsureSecretsDir() error {
 		zap.String("target_mode", "0700"),
 		zap.String("reason", "restrict access to vault user only"))
 
-	if err := os.Chmod(dir, 0700); err != nil {
+	if err := os.Chmod(dir, SecretDirPerm); err != nil {
 		log.Error("Failed to set permissions on secrets directory",
 			zap.String("secrets_dir", dir),
 			zap.String("attempted_mode", "0700"),

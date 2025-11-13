@@ -1,6 +1,7 @@
 package hashicorp
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -270,7 +271,7 @@ func (b *BaseInstaller) InstallBinary(config *InstallConfig) error {
 	}
 
 	// Set permissions
-	if err := os.Chmod(config.BinaryPath, 0755); err != nil {
+	if err := os.Chmod(config.BinaryPath, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to set binary permissions: %w", err)
 	}
 

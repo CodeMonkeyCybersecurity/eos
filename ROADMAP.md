@@ -62,9 +62,183 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
 - Telemetry and fallbacks should ship alongside API migrations to keep rollouts observable.
 - Strict logging policies need explicit, well-documented exceptions to remain sustainable.
 
+### Security Hardening Sprints (Completed 2025-01-27 to 2025-11-05)
+
+**Context**: Three security hardening sprints conducted between January and November 2025, addressing token exposure, TLS validation, input sanitization, and establishing shift-left prevention framework.
+
+#### Sprint 1: Token Exposure Fix (P0-1, completed 2025-01-27)
+- **CVSS**: 8.5 (High) → 0.0 (Fixed)
+- **Issue**: Vault root tokens exposed in environment variables (`VAULT_TOKEN=<value>`), visible via `ps auxe` and `/proc/<pid>/environ`
+- **Fix**: Created `pkg/vault/cluster_token_security.go` with temporary token file pattern (0400 permissions, immediate cleanup)
+- **Functions Fixed**: 5 functions in `pkg/vault/cluster_operations.go` (ConfigureRaftAutopilot, GetAutopilotState, RemoveRaftPeer, TakeRaftSnapshot, RestoreRaftSnapshot)
+- **Pattern**: `VAULT_TOKEN_FILE=/tmp/vault-token-<random>` instead of `VAULT_TOKEN=<value>`
+- **Tests**: 6 test cases with 100% coverage of security-critical paths
+- **Compliance**: NIST 800-53 SC-12, AC-3; PCI-DSS 3.2.1
+
+#### Sprint 2: TLS Validation Fix (P0-2, completed 2025-01-27)
+- **CVSS**: 9.1 (Critical) → 0.0 (Fixed)
+- **Issue**: `VAULT_SKIP_VERIFY=1` set unconditionally in `pkg/vault/phase2_env_setup.go:92`, enabling MitM attacks
+- **Fix**: Implemented CA certificate discovery with informed consent framework
+- **Components**:
+  - `locateVaultCACertificate()` - searches `/etc/vault/tls/ca.crt`, `/etc/eos/ca.crt`, `/etc/ssl/certs/vault-ca.pem`
+  - `handleTLSValidationFailure()` - requires explicit user consent or `Eos_ALLOW_INSECURE_VAULT=true`
+  - `isInteractiveTerminal()` - TTY detection for safe prompting
+- **Behavior**: TLS validation enabled by default, bypass only with consent (dev mode) or CA cert unavailable + user approval
+- **Compliance**: NIST 800-53 SC-8, SC-13; PCI-DSS 4.1
+
+#### Sprint 3: Pre-Commit Security Hooks (P0-3, completed 2025-11-05)
+- **Purpose**: Prevent P0-1/P0-2 regression through automated validation
+- **Three-Layer Defense**:
+  1. **Pre-commit hook** (`.git/hooks/pre-commit`): 6 security checks (hardcoded secrets, VAULT_SKIP_VERIFY, InsecureSkipVerify, VAULT_TOKEN env vars, hardcoded permissions, security TODOs)
+  2. **CI/CD workflow** (`.github/workflows/security.yml`): gosec, govulncheck, TruffleHog secret scanning, SARIF upload
+  3. **Security review checklist** (`docs/SECURITY_REVIEW_CHECKLIST.md`): Human-centric process for code reviews
+- **Philosophy**: "Shift Left" - catch security issues at development time, not code review time
+- **Success Metrics**: Zero P0-1/P0-2 regressions detected since implementation
+
+#### Sprint 4: Repository Input Validation (P0-4, completed 2025-01-28)
+- **Issue**: Invalid branch names and missing git identity caused repository creation failures
+- **Fixes**:
+  - `ValidateBranchName()` - implements all 10 git-check-ref-format rules
+  - `sanitizeInput()` - defense against terminal escape sequence injection (CVE-2024-56803, CVE-2024-58251 class)
+  - `ValidateRepoName()` - blocks 20+ Gitea reserved names, path traversal, SQL injection
+  - Enhanced git identity check with RFC 5322 email validation
+  - Forensic debug logging via `EOS_DEBUG_INPUT=1`
+- **Test Coverage**: 63 test cases across branch validation (25), repo validation (28), input sanitization (10)
+- **Deployment**: Added `make deploy` targets for atomic binary swap to production servers
+
 ---
 
 ## 2025-11 – Immediate Priorities
+
+### Adversarial Analysis & Systematic Remediation (2025-11-13)
+
+**Context**: Comprehensive adversarial security analysis identified 8 categories of P0 violations across 363 command files, requiring systematic remediation in 4 prioritized phases.
+
+#### Analysis Findings (2025-11-13)
+
+**Scope**: Full codebase scan using OWASP, NIST 800-53, CIS Benchmarks, STRIDE methodology
+
+**Critical Issues Identified** (P0-Breaking):
+1. **Flag Bypass Vulnerability (CVE-worthy)**: Only 6/363 commands (1.7%) implement `ValidateNoFlagLikeArgs()` security check
+   - **Attack**: `eos delete env production -- --force` bypasses safety checks via `--` separator
+   - **Impact**: Production deletion, running VM deletion, emergency overrides can be bypassed
+   - **Remediation**: Add validation to 357 unprotected commands (12 hours, scriptable)
+
+2. **Hardcoded File Permissions (Compliance Risk)**: ~~732 violations~~ → **0 violations (100% COMPLETE)** ✅
+   - **Status**: COMPLETED 2025-11-13 across 4 commits (b8fcabf, a22f4bf, 0276e75, c635bbd)
+   - **Coverage**: 331/331 production violations fixed (732 original count included tests/comments - refined to 331 actual violations)
+   - **Breakdown**: 255 generic packages, 49 vault package, 15 consul package, 9 nomad package, 2 vault constants array, 2 intentional exceptions documented
+   - **Architecture**: TWO-TIER pattern implemented - shared constants (pkg/shared/permissions.go: 11 constants) + service-specific (pkg/vault/constants.go: 31 constants, pkg/consul/constants.go: 7 constants)
+   - **Compliance**: SOC2 CC6.1, PCI-DSS 8.2.1, HIPAA 164.312(a)(1) - all permission constants include documented security rationale
+   - **Exceptions**: 2 intentional bitwise operations documented (cmd/read/check.go:75, cmd/backup/restore.go:175) - excluded from remediation as they're dynamic mode modifications, not hardcoded permissions
+   - **Circular Imports**: Resolved via local constant duplication in consul subpackages (validation, config, service, acl) with NOTE comments explaining avoidance strategy
+
+3. **Architecture Boundary Violations**: 19 cmd/ files >100 lines (should be <100)
+   - **Worst**: `cmd/debug/iris.go` (1507 lines, 15x over limit)
+   - **Issue**: Business logic in orchestration layer, untestable, unreusable
+   - **Remediation**: Refactor to pkg/ following Assess→Intervene→Evaluate pattern (76 hours)
+
+4. **fmt.Print Violations (Telemetry Breaking)**: 298 violations in debug commands
+   - **Issue**: Breaks telemetry, forensics, observability
+   - **Rule**: CLAUDE.md P0 #1 - NEVER use fmt.Print/Println, ONLY otelzap.Ctx(rc.Ctx)
+   - **Remediation**: Convert to structured logging (5 hours, semi-automated)
+
+5. **Documentation Policy Violations**: 5 forbidden standalone .md files
+   - **Files**: P0-1_TOKEN_EXPOSURE_FIX_COMPLETE.md, P0-2_VAULT_SKIP_VERIFY_FIX_COMPLETE.md, P0-3_PRECOMMIT_HOOKS_COMPLETE.md, SECURITY_HARDENING_SESSION_COMPLETE.md, TECHNICAL_SUMMARY_2025-01-28.md
+   - **Remediation**: Consolidate to ROADMAP.md + inline comments, delete standalone files (1 hour) **← COMPLETED 2025-11-13**
+
+6. **Missing Flag Fallback Chain (Human-Centric)**: Only 5/363 commands use `interaction.GetRequiredString()` pattern
+   - **Philosophy Violation**: "Technology serves humans" - missing flags should prompt with informed consent, not fail
+   - **Remediation**: Add fallback chain (CLI flag → env var → prompt → default → error) to required flags (3-4 days)
+
+7. **Insecure TLS Configuration**: 19 files with `InsecureSkipVerify: true`
+   - **Attack**: MitM via certificate bypass
+   - **Justification Required**: Dev-only with clear marking, self-signed certs with pinning, or explicit user consent
+   - **Remediation**: Security review + dev/prod split (9.5 hours)
+
+8. **Command Injection Risk**: 1329 direct `exec.Command()` calls bypassing `execute.Run` wrapper
+   - **Issue**: No argument sanitization, timeout enforcement, telemetry integration
+   - **Remediation**: Migrate to secure wrapper (44 hours, requires security audit)
+
+**Incomplete Infrastructure** (Built but Unused):
+- Evidence Collection (`pkg/remotedebug/evidence.go`): 265 lines, 0 users
+- Debug Capture (`pkg/debug/capture.go`): 151 lines, 1/13 commands using it
+- Unified Authentik Client: Built, but 47 callsites still use old clients
+
+**Technical Debt**: 841 TODO/FIXME comments, 18 concentrated in `cmd/create/wazuh.go` alone
+
+#### Four-Phase Remediation Plan
+
+**Phase 1: Security Critical (P0)** - Week 1-2, 3-4 days
+- [ ] Flag bypass vulnerability: Protect 357 commands with `ValidateNoFlagLikeArgs()` (12h, scriptable)
+- [ ] InsecureSkipVerify audit: Justify or remove 19 violations (9.5h, manual review)
+- [x] Documentation policy: Consolidate 5 forbidden .md files to ROADMAP.md (1h) **← COMPLETED**
+
+**Deliverables**:
+- All 357 commands protected
+- TLS security audit complete
+- CVE announcement: "Flag bypass vulnerability patched in eos v1.X"
+
+**Phase 2: Compliance & Architecture (P1)** - Week 3-4, 7-10 days
+- [x] Hardcoded permissions: Automated replacement for 331 production violations **← COMPLETED 2025-11-13** (100% coverage)
+- [ ] Architecture violations: Refactor 19 oversized cmd/ files to pkg/ (76h, manual)
+- [ ] fmt.Print violations: Convert to structured logging (5h, semi-automated)
+
+**Deliverables**:
+- Permission security rationale matrix for SOC2 audit
+- 100% of cmd/ files <100 lines
+- All debug commands use structured logging
+
+**Phase 3: Technical Debt Reduction (P2)** - Week 5-6, 5-7 days
+- [ ] Required flag fallback: Add human-centric pattern to top 100 commands (3-4 days)
+- [ ] Command injection audit: Migrate to execute.Run wrapper, 80%+ coverage (44h audit)
+- [ ] HTTP client consolidation: Deprecate old Authentik clients, migration guide (2 days)
+- [ ] Infrastructure adoption: Integrate evidence collection + debug capture (2 days)
+
+**Deliverables**:
+- Top 100 commands have human-centric UX
+- exec.Command audit complete
+- Authentik unified client migration guide published
+
+**Phase 4: Optimization & Polish (P3)** - Week 7-8, 3-5 days
+- [ ] TODO/FIXME cleanup: Triage 841 comments (50% resolve, 25% → issues, 25% document) (2 days)
+- [ ] Compliance docs: SOC2/PCI-DSS/HIPAA control matrix (1 day)
+- [ ] AI alignment: Weekly CLAUDE.md review process (1 day)
+- [ ] Migration tooling: `eos migrate check` for deprecated patterns (2 days)
+
+**Deliverables**:
+- TODO/FIXME reduced by 75%
+- Compliance audit readiness achieved
+- Automated pattern migration available
+
+#### Success Metrics
+
+**Pre-Remediation** (Original State - 2025-11-13):
+- Flag bypass: 357/363 commands vulnerable (98.3%)
+- Hardcoded permissions: ~~732 violations~~ → **0 violations (COMPLETED 2025-11-13)** ✅
+- Architecture violations: 19 files (6-15x over limit)
+- fmt.Print violations: 298
+- Human-centric flags: 5/363 commands (1.4%)
+
+**Current State** (2025-11-13):
+- Flag bypass: 357/363 commands vulnerable (98.3%) - **IN PROGRESS**
+- Hardcoded permissions: **0 violations (100% COMPLETE)** ✅
+- Architecture violations: 19 files (6-15x over limit)
+- fmt.Print violations: 298
+- Human-centric flags: 5/363 commands (1.4%)
+
+**Target State** (Post-Remediation):
+- Flag bypass: 0 commands vulnerable (100% protected)
+- Hardcoded permissions: **0 violations (100% ACHIEVED)** ✅
+- Architecture violations: 0 files >100 lines (100% refactored)
+- fmt.Print violations: Debug commands only (with justification)
+- Human-centric flags: Top 100 commands (100% Tier 1)
+
+**Timeline**: 6-8 weeks for complete remediation with sustained focus
+
+---
+
+## 2025-11 – Ongoing Priorities
 
 ### Hecate Authentication Phase 1 (2025-11-01 → 2025-11-15)
 

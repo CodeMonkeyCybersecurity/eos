@@ -3,6 +3,7 @@
 package logger
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -67,7 +68,7 @@ func LogCommandEnd(cmd string, traceID string, start time.Time) {
 func ResolveLogPath(rc *eos_io.RuntimeContext) string {
 	for _, path := range PlatformLogPaths() {
 		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, shared.SecretDirPerm); err != nil {
 			continue
 		}
 		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
@@ -89,7 +90,7 @@ func ResolveLogPath(rc *eos_io.RuntimeContext) string {
 func TryWritablePath(paths []string) (string, error) {
 	for _, path := range paths {
 		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, shared.SecretDirPerm); err != nil {
 			continue
 		}
 		if file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {

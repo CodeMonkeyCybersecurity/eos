@@ -6,6 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/cephfs"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -34,6 +35,12 @@ Prerequisites:
 
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 
 		logger.Info("Starting CephFS cluster deployment")
 
@@ -155,6 +162,12 @@ Examples:
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
+
 		name := args[0]
 
 		replication, _ := cmd.Flags().GetInt("replication")
@@ -213,6 +226,12 @@ Examples:
 	Args: cobra.ExactArgs(2),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+	// CRITICAL: Detect flag-like args (P0-1 fix)
+	if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+		return err
+	}
+
 
 		volumeName := args[0]
 		mountPoint := args[1]

@@ -1,6 +1,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -76,7 +77,7 @@ server {
 
 	// Write configuration file
 	configFile := fmt.Sprintf("/etc/nginx/sites-available/%s", config.Name)
-	if err := os.WriteFile(configFile, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(configFile, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write nginx config: %w", err)
 	}
 
@@ -133,11 +134,13 @@ func configureCaddyBackend(rc *eos_io.RuntimeContext, config *BackendConfig) err
 	configDir := filepath.Dir(configFile)
 
 	// Create sites directory if it doesn't exist
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create caddy sites directory: %w", err)
 	}
 
 	if err := os.WriteFile(configFile, buf.Bytes(), 0644); err != nil {
+	
+	if err := os.WriteFile(configFile, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write caddy config: %w", err)
 	}
 

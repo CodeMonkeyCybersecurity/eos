@@ -3,6 +3,7 @@
 package add
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -173,7 +174,7 @@ func BackupCaddyfile(rc *eos_io.RuntimeContext) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Ensure backup directory exists
-	if err := os.MkdirAll(BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(BackupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func BackupCaddyfile(rc *eos_io.RuntimeContext) (string, error) {
 	}
 
 	// Write backup
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write backup: %w", err)
 	}
 
@@ -347,7 +348,7 @@ func AppendRoute(rc *eos_io.RuntimeContext, routeConfig string) error {
 	updatedContent += "\n" + routeConfig
 
 	// Write updated Caddyfile
-	if err := os.WriteFile(CaddyfilePath, []byte(updatedContent), 0644); err != nil {
+	if err := os.WriteFile(CaddyfilePath, []byte(updatedContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write Caddyfile: %w", err)
 	}
 

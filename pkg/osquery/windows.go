@@ -3,6 +3,7 @@
 package osquery
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -126,7 +127,7 @@ func configureWindowsService(rc *eos_io.RuntimeContext) error {
 	configDir := filepath.Dir(paths.ConfigPath)
 	logger.Info(" Creating configuration directory",
 		zap.String("path", configDir))
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, shared.ServiceDirPerm); err != nil {
 		logger.Error(" Failed to create config directory",
 			zap.Error(err),
 			zap.String("path", configDir))
@@ -137,7 +138,7 @@ func configureWindowsService(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Writing osquery configuration",
 		zap.String("path", paths.ConfigPath))
 	configContent := GetWindowsConfig()
-	if err := os.WriteFile(paths.ConfigPath, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(paths.ConfigPath, []byte(configContent), shared.ConfigFilePerm); err != nil {
 		logger.Error(" Failed to write configuration",
 			zap.Error(err),
 			zap.String("path", paths.ConfigPath))

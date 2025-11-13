@@ -2,6 +2,7 @@
 package container
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"fmt"
 	"os"
@@ -32,7 +33,7 @@ type JenkinsOptions struct {
 func WriteAndUpJenkins(rc *eos_io.RuntimeContext, appName string, opts JenkinsOptions) error {
 	// 1) make sure /opt/<appName> exists
 	dir := filepath.Join("/opt", appName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 
@@ -44,7 +45,7 @@ func WriteAndUpJenkins(rc *eos_io.RuntimeContext, appName string, opts JenkinsOp
 
 	// 3) write the file
 	target := filepath.Join(dir, "docker-compose.yml")
-	if err := os.WriteFile(target, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(target, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("write compose file: %w", err)
 	}
 

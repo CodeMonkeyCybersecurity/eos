@@ -10,6 +10,7 @@
 package consultemplate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/user"
@@ -372,7 +373,7 @@ func (i *Installer) extractBinary(zipPath, destPath string) error {
 	}
 
 	// Make executable
-	if err := os.Chmod(destPath, 0755); err != nil {
+	if err := os.Chmod(destPath, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to make binary executable: %w", err)
 	}
 

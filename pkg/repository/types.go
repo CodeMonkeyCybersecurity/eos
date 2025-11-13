@@ -13,17 +13,25 @@ type GiteaConfig struct {
 
 // RepoOptions describes options supplied by the user for repository creation.
 type RepoOptions struct {
-	Path           string
-	Name           string
-	Description    string
-	Private        bool
-	Organization   string
-	Remote         string
-	Branch         string
-	DryRun         bool
-	NoPush         bool
-	NonInteractive bool
-	SaveConfig     bool
+    Path           string
+    Name           string
+    Description    string
+    Private        bool
+    Organization   string
+    Remote         string
+    Branch         string
+    DryRun         bool
+    NoPush         bool
+    NonInteractive bool
+    SaveConfig     bool
+    // Auth controls preferred remote URL type: "ssh" or "https" (default: ssh)
+    Auth               string
+    // AutoFixOwnership attempts to change repo ownership to the invoking user when run via sudo
+    AutoFixOwnership   bool
+    // SSHGenerateKey will generate an ed25519 SSH key if missing when Auth=ssh
+    SSHGenerateKey     bool
+    // ConfigureCredHelper sets a platform-appropriate credential.helper when Auth=https
+    ConfigureCredHelper bool
 }
 
 // ApplyDefaults populates empty option fields with values from preferences or path.

@@ -233,3 +233,112 @@ func verifyGoModules(rc *eos_io.RuntimeContext, sourceDir string, check *BuildIn
 	check.GoModulesVerified = true
 	return nil
 }
+
+// VerifyGoToolchainAvailability verifies that the required Go toolchain version is available
+// for the current operating system and architecture (GOOS/GOARCH).
+//
+// P0-1 FIX: Prevent build failures from missing Go toolchains
+// SECURITY: Fails fast before pulling updates that require unavailable toolchains
+// RATIONALE: go.mod can specify Go versions that don't exist for current arch (e.g., Go 1.25 on ARM64)
+//
+// Returns:
+//   - requiredVersion: The Go version specified in go.mod (e.g., "1.25")
+//   - currentVersion: The currently installed Go version (e.g., "1.25.3")
+//   - error: Non-nil if toolchain is unavailable or cannot be verified
+func VerifyGoToolchainAvailability(rc *eos_io.RuntimeContext, goPath, sourceDir string) (requiredVersion string, currentVersion string, err error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Step 1: Read required Go version from go.mod
+	goModPath := filepath.Join(sourceDir, "go.mod")
+	goModContent, err := os.ReadFile(goModPath)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read go.mod: %w", err)
+	}
+
+	// Parse go.mod to extract Go version
+	// Format: "go 1.25" or "go 1.25.3"
+	lines := strings.Split(string(goModContent), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "go ") {
+			requiredVersion = strings.TrimSpace(strings.TrimPrefix(line, "go"))
+			break
+		}
+	}
+
+	if requiredVersion == "" {
+		return "", "", fmt.Errorf("go.mod does not specify a Go version")
+	}
+
+	logger.Debug("Found required Go version in go.mod",
+		zap.String("version", requiredVersion),
+		zap.String("go_mod", goModPath))
+
+	// Step 2: Get currently installed Go version
+	versionCmd := exec.Command(goPath, "version")
+	versionOutput, err := versionCmd.Output()
+	if err != nil {
+		return requiredVersion, "", fmt.Errorf("failed to get current Go version: %w", err)
+	}
+
+	// Parse "go version go1.25.3 linux/arm64" -> "1.25.3"
+	versionStr := strings.TrimSpace(string(versionOutput))
+	parts := strings.Fields(versionStr)
+	if len(parts) < 3 {
+		return requiredVersion, "", fmt.Errorf("unexpected go version output format: %s", versionStr)
+	}
+	currentVersion = strings.TrimPrefix(parts[2], "go")
+
+	logger.Debug("Current Go version",
+		zap.String("version", currentVersion),
+		zap.String("full_output", versionStr))
+
+	// Step 3: Test if Go can download the required toolchain for current arch
+	// CRITICAL: This detects architecture-specific toolchain availability issues
+	// Example: "go: download go1.25 for linux/arm64: toolchain not available"
+	logger.Info("Verifying Go toolchain availability for current architecture",
+		zap.String("required", requiredVersion),
+		zap.String("current", currentVersion))
+
+	// Use 'go version' with the required version to trigger toolchain download check
+	// This doesn't actually build anything, just verifies toolchain can be downloaded
+	testCmd := exec.Command(goPath, "env", "GOVERSION")
+	testCmd.Dir = sourceDir
+	testOutput, err := testCmd.CombinedOutput()
+	if err != nil {
+		output := strings.TrimSpace(string(testOutput))
+		logger.Error("Go toolchain verification failed",
+			zap.String("required_version", requiredVersion),
+			zap.String("current_version", currentVersion),
+			zap.String("output", output),
+			zap.Error(err))
+
+		return requiredVersion, currentVersion, fmt.Errorf(
+			"Go toolchain %s is not available for your architecture\n\n"+
+				"Required by go.mod: go %s\n"+
+				"Your system: %s\n"+
+				"Output: %s\n\n"+
+				"CAUSE: The code requires Go %s, but this version is not yet available\n"+
+				"       for your operating system/architecture combination.\n\n"+
+				"OPTIONS:\n"+
+				"  1. Wait for upstream to release required toolchain for your arch\n"+
+				"  2. Downgrade go.mod to use an available Go version\n"+
+				"  3. Build on a different architecture where the toolchain is available\n\n"+
+				"To check available toolchains:\n"+
+				"  go install golang.org/dl/go%s@latest\n"+
+				"  go%s download  # This will show if toolchain exists",
+			requiredVersion,
+			requiredVersion,
+			versionStr,
+			output,
+			requiredVersion,
+			requiredVersion,
+			requiredVersion)
+	}
+
+	logger.Info("✓ Go toolchain verified available",
+		zap.String("required", requiredVersion),
+		zap.String("current", currentVersion))
+
+	return requiredVersion, currentVersion, nil
+}

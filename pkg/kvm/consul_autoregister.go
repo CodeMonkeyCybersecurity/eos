@@ -332,20 +332,20 @@ func WriteConsulCloudInitISO(rc *eos_io.RuntimeContext, vmName string, cloudInit
 
 	// ASSESS - Create ISO directory structure
 	isoDir := filepath.Join("/srv/iso", vmName)
-	if err := os.MkdirAll(isoDir, 0755); err != nil {
+	if err := os.MkdirAll(isoDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create ISO directory: %w", err)
 	}
 
 	// Write user-data
 	userDataPath := filepath.Join(isoDir, "user-data")
-	if err := os.WriteFile(userDataPath, []byte(cloudInit), 0644); err != nil {
+	if err := os.WriteFile(userDataPath, []byte(cloudInit), shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write user-data: %w", err)
 	}
 
 	// Write meta-data
 	metaData := fmt.Sprintf("instance-id: %s\nlocal-hostname: %s\n", vmName, vmName)
 	metaDataPath := filepath.Join(isoDir, "meta-data")
-	if err := os.WriteFile(metaDataPath, []byte(metaData), 0644); err != nil {
+	if err := os.WriteFile(metaDataPath, []byte(metaData), shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to write meta-data: %w", err)
 	}
 

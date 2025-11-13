@@ -4,6 +4,7 @@
 package fix
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"fmt"
 	"os"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -398,7 +398,7 @@ func RepairVaultAddresses(rc *eos_io.RuntimeContext, dryRun bool) (int, int, err
 
 	// INTERVENE: Create backup before modification
 	backupPath := fmt.Sprintf("%s.backup.%s", configPath, fmt.Sprintf("%d", os.Getpid()))
-	if err := os.WriteFile(backupPath, data, 0640); err != nil {
+	if err := os.WriteFile(backupPath, data, vault.VaultConfigPerm); err != nil {
 		return issuesFound, 0, fmt.Errorf("failed to create backup: %w", err)
 	}
 	logger.Info("Created configuration backup", zap.String("backup_path", backupPath))
@@ -428,7 +428,7 @@ func RepairVaultAddresses(rc *eos_io.RuntimeContext, dryRun bool) (int, int, err
 	}
 
 	// Write updated configuration
-	if err := os.WriteFile(configPath, []byte(newContent), 0640); err != nil {
+	if err := os.WriteFile(configPath, []byte(newContent), vault.VaultConfigPerm); err != nil {
 		return issuesFound, 0, fmt.Errorf("failed to write updated config: %w", err)
 	}
 

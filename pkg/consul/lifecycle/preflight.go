@@ -285,7 +285,7 @@ func checkDiskSpace(rc *eos_io.RuntimeContext) error {
 
 	minSpaceGB := 1
 	for _, dir := range dataDirs {
-		if err := os.MkdirAll(filepath.Dir(dir), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dir), consul.ConsulOptDirPerm); err != nil {
 			continue
 		}
 
@@ -357,14 +357,14 @@ func checkUserPermissions(rc *eos_io.RuntimeContext) error {
 
 	for _, dir := range testDirs {
 		// Try to create directory
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, consul.ConsulOptDirPerm); err != nil {
 			inaccessible = append(inaccessible, dir)
 			continue
 		}
 
 		// Try to write a test file
 		testFile := filepath.Join(dir, ".permission_test")
-		if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		if err := os.WriteFile(testFile, []byte("test"), consul.ConsulConfigPerm); err != nil {
 			inaccessible = append(inaccessible, dir)
 			continue
 		}

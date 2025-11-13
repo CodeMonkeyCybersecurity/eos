@@ -252,7 +252,59 @@ const (
 
 	// Environment variable names (for validation)
 	EnvVarLiteLLMMasterKey = "LITELLM_MASTER_KEY"
+	EnvVarOpenAIAPIKey     = "OPENAI_API_KEY"
+	EnvVarEmbeddingsAPIKey = "EMBEDDINGS_API_KEY"
+
+	// LiteLLM API endpoints
+	LiteLLMHealthEndpoint     = "/health/readiness"
+	LiteLLMKeyGenerateEndpoint = "/key/generate"
+	LiteLLMKeyDeleteEndpoint   = "/key/delete"
+	LiteLLMModelsEndpoint      = "/v1/models"
+
+	// API key configuration
+	APIKeyAlias          = "moni-application"
+	APIKeyDurationNever  = "" // Empty string means never expire
+
+	// Model names for virtual key generation
+	ModelMoni          = "Moni"
+	ModelMoni41        = "Moni-4.1"
+	ModelMoniO3        = "Moni-o3"
+	ModelNomicEmbed    = "nomic-embed-text"
+
+	// Backup configuration for API key rotation
+	EnvFileBackupFormat = ".env.backup.20060102_150405"
 )
+
+// RotateAPIKeysConfig contains configuration for API key rotation
+type RotateAPIKeysConfig struct {
+	InstallDir   string // Installation directory (default: /opt/bionicgpt)
+	DryRun       bool   // Show what would be done without making changes
+	SkipBackup   bool   // Skip .env file backup
+	SkipVerify   bool   // Skip verification after rotation
+	SkipRestart  bool   // Skip app restart after rotation
+}
+
+// LiteLLMKeyGenerateRequest represents the request to generate a new virtual key
+type LiteLLMKeyGenerateRequest struct {
+	Models   []string          `json:"models"`
+	Duration interface{}       `json:"duration"` // null for never expire
+	KeyAlias string            `json:"key_alias"`
+	Metadata map[string]string `json:"metadata"`
+}
+
+// LiteLLMKeyGenerateResponse represents the response from key generation
+type LiteLLMKeyGenerateResponse struct {
+	Key       string                 `json:"key"`
+	KeyName   string                 `json:"key_name,omitempty"`
+	KeyAlias  string                 `json:"key_alias,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	ExpiresAt interface{}            `json:"expires_at,omitempty"`
+}
+
+// LiteLLMKeyDeleteRequest represents the request to delete virtual keys
+type LiteLLMKeyDeleteRequest struct {
+	Keys []string `json:"keys"`
+}
 
 // Timeouts and retry configuration (durations, not constants)
 var (

@@ -1,6 +1,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -340,13 +341,13 @@ func (t *TerraformClient) Apply(ctx context.Context, module string, config strin
 		zap.String("module", module))
 
 	// Ensure workspace exists
-	if err := os.MkdirAll(t.workspace, 0755); err != nil {
+	if err := os.MkdirAll(t.workspace, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create terraform workspace: %w", err)
 	}
 
 	// Write the configuration
 	configPath := filepath.Join(t.workspace, fmt.Sprintf("%s.tf", module))
-	if err := os.WriteFile(configPath, []byte(config), 0644); err != nil {
+	if err := os.WriteFile(configPath, []byte(config), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write terraform config: %w", err)
 	}
 

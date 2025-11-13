@@ -1,6 +1,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -168,7 +169,7 @@ func (eu *EosUpdater) CreateBackup() error {
 		return fmt.Errorf("failed to read current binary: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, currentBinary, 0755); err != nil {
+	if err := os.WriteFile(backupPath, currentBinary, shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("failed to write backup: %w", err)
 	}
 
@@ -291,7 +292,7 @@ func (eu *EosUpdater) BuildBinary() (string, error) {
 		zap.String("size_human", fmt.Sprintf("%.2f MB", float64(binaryInfo.Size())/(1024*1024))))
 
 	// Set execute permissions
-	if err := os.Chmod(tempBinary, 0755); err != nil {
+	if err := os.Chmod(tempBinary, shared.ExecutablePerm); err != nil {
 		_ = os.Remove(tempBinary)
 		return "", fmt.Errorf("failed to set execute permissions: %w", err)
 	}
@@ -366,7 +367,7 @@ func (eu *EosUpdater) InstallBinary(sourcePath string) error {
 			return fmt.Errorf("failed to read temp binary for copy: %w", err)
 		}
 
-		if err := os.WriteFile(eu.config.BinaryPath, input, 0755); err != nil {
+		if err := os.WriteFile(eu.config.BinaryPath, input, shared.ExecutablePerm); err != nil {
 			return fmt.Errorf("failed to copy new binary to destination: %w", err)
 		}
 	}

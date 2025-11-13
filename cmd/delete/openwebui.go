@@ -2,6 +2,7 @@
 package delete
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -144,7 +145,7 @@ func runDeleteOpenWebUI(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 				zap.String("output", checkOutput))
 		} else {
 			// Create backup directory
-			if err := os.MkdirAll(backupDir, 0755); err != nil {
+			if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 				logger.Error("Failed to create backup directory",
 					zap.String("dir", backupDir),
 					zap.Error(err))

@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/output"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/security/security_permissions"
 	"github.com/spf13/cobra"
@@ -67,6 +68,11 @@ Available categories: ssh, system, ssl`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// CRITICAL: Detect flag-like args (P0-1 fix)
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 
 		logger.Info("Checking security permissions",
 			zap.Strings("categories", args),

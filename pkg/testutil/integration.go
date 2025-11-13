@@ -69,7 +69,7 @@ func (s *IntegrationTestSuite) setupEnvironment() {
 
 	for _, dir := range dirs {
 		fullPath := filepath.Join(s.tempDir, dir)
-		err := os.MkdirAll(fullPath, 0755)
+		err := os.MkdirAll(fullPath, shared.ServiceDirPerm)
 		if err != nil {
 			s.t.Fatalf("Failed to create test directory %s: %v", fullPath, err)
 		}
@@ -108,7 +108,7 @@ aRb6WpY/8lQZd+gx109OS2I6tKn9DyYw+fwZ+k+lMMS4lF1YnJuTU5LTRTOfDrOJ
 -----END CERTIFICATE-----`
 
 	certPath := filepath.Join(s.tempDir, "vault/tls/tls.crt")
-	err := os.WriteFile(certPath, []byte(mockCert), 0644)
+	err := os.WriteFile(certPath, []byte(mockCert), shared.ConfigFilePerm)
 	if err != nil {
 		s.t.Fatalf("Failed to create mock certificate: %v", err)
 	}

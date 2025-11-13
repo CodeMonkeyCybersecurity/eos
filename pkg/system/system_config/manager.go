@@ -220,7 +220,7 @@ func BackupFile(filePath string) (string, error) {
 		return "", fmt.Errorf("failed to read file for backup: %w", err)
 	}
 
-	if err := os.WriteFile(backupPath, content, 0644); err != nil {
+	if err := os.WriteFile(backupPath, content, shared.ConfigFilePerm); err != nil {
 		return "", fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -229,7 +229,7 @@ func BackupFile(filePath string) (string, error) {
 
 // EnsureDirectory creates a directory if it doesn't exist
 func EnsureDirectory(dirPath string) error {
-	return os.MkdirAll(dirPath, 0755)
+	return os.MkdirAll(dirPath, shared.ServiceDirPerm)
 }
 
 // WriteFile writes content to a file with proper permissions

@@ -3,6 +3,7 @@
 package ollama
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"net/http"
 	"os"
@@ -35,7 +36,7 @@ func EnsureInstalled(rc *eos_io.RuntimeContext) error {
 	ollamaDir := filepath.Join(home, ".ollama")
 	serveLogPath := filepath.Join(ollamaDir, "serve.log")
 
-	if err := os.MkdirAll(ollamaDir, 0755); err != nil {
+	if err := os.MkdirAll(ollamaDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create ollama config dir: %w", err)
 	}
 

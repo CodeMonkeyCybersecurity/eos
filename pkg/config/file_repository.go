@@ -2,6 +2,7 @@
 package config
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -43,7 +44,7 @@ func (r *FileRepository) Read(ctx context.Context, path string) ([]byte, error) 
 func (r *FileRepository) Write(ctx context.Context, path string, data []byte, perm FilePermission) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 

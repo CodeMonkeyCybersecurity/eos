@@ -2,6 +2,7 @@
 package security
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -41,7 +42,7 @@ type AuditLogger struct {
 // NewAuditLogger creates a new security audit logger
 func NewAuditLogger(rc *eos_io.RuntimeContext, logDir string) (*AuditLogger, error) {
 	// Ensure audit log directory exists with secure permissions
-	if err := os.MkdirAll(logDir, 0700); err != nil {
+	if err := os.MkdirAll(logDir, shared.SecretDirPerm); err != nil {
 		return nil, fmt.Errorf("creating audit log directory: %w", err)
 	}
 

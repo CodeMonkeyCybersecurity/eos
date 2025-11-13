@@ -2,6 +2,7 @@
 package cron_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"crypto/sha256"
 	"fmt"
@@ -506,7 +507,7 @@ func createCronBackup(rc *eos_io.RuntimeContext, config *CronConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create backup directory
-	if err := os.MkdirAll(config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -538,7 +539,7 @@ func createCronBackup(rc *eos_io.RuntimeContext, config *CronConfig) error {
 	}
 
 	// Write backup file
-	if err := os.WriteFile(backupPath, output, 0644); err != nil {
+	if err := os.WriteFile(backupPath, output, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
 

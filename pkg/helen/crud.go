@@ -1,6 +1,7 @@
 package helen
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -327,7 +328,7 @@ func Backup(rc *eos_io.RuntimeContext, namespace string, backupPath string) erro
 		zap.String("backup_path", backupPath))
 
 	// Create backup directory
-	if err := os.MkdirAll(filepath.Dir(backupPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(backupPath), shared.ServiceDirPerm); err != nil {
 		logger.Error("Failed to create backup directory", zap.Error(err))
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}

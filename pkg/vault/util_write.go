@@ -120,14 +120,14 @@ func WriteFallbackSecrets(rc *eos_io.RuntimeContext, name string, secrets map[st
 	path := xdg.XDGConfigPath(shared.EosID, filepath.Join(name, "config.json"))
 	otelzap.Ctx(rc.Ctx).Debug("Writing fallback secrets", zap.String("path", path))
 
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), VaultDataDirPerm); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 	data, err := json.MarshalIndent(secrets, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal fallback secrets: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	if err := os.WriteFile(path, data, VaultSecretFilePerm); err != nil {
 		return fmt.Errorf("write fallback secrets: %w", err)
 	}
 	return nil
@@ -158,7 +158,7 @@ func WriteSecret(rc *eos_io.RuntimeContext, client *api.Client, path string, dat
 
 // WriteFallbackJSON saves any struct as JSON to the given path (used for Vault fallback or CLI secrets).
 func WriteFallbackJSON(rc *eos_io.RuntimeContext, path string, data any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), VaultDataDirPerm); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
@@ -167,7 +167,7 @@ func WriteFallbackJSON(rc *eos_io.RuntimeContext, path string, data any) error {
 		return fmt.Errorf("marshal fallback JSON: %w", err)
 	}
 
-	if err := os.WriteFile(path, b, 0600); err != nil {
+	if err := os.WriteFile(path, b, VaultSecretFilePerm); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 

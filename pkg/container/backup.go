@@ -3,6 +3,7 @@
 package container
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -557,7 +558,7 @@ func createBackupDirectoryStructure(rc *eos_io.RuntimeContext, backupPath string
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return err
 		}
 	}
@@ -657,7 +658,7 @@ func backupVolumes(rc *eos_io.RuntimeContext, volumes []VolumeInfo, backupDir st
 
 		volumeBackupDir := filepath.Join(backupDir, fmt.Sprintf("%s_%s", volume.Name, timestamp))
 
-		if err := os.MkdirAll(volumeBackupDir, 0755); err != nil {
+		if err := os.MkdirAll(volumeBackupDir, shared.ServiceDirPerm); err != nil {
 			return err
 		}
 

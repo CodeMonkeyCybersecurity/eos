@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -39,6 +41,11 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+
+		// CRITICAL: Detect flag-like args (P0-1 fix)
+		if err := verify.ValidateNoFlagLikeArgs(args); err != nil {
+			return err
+		}
 
 		snapshotID := args[0]
 		repoName, _ := cmd.Flags().GetString("repo")
@@ -85,7 +92,7 @@ Examples:
 		}
 
 		// Ensure target directory exists
-		if err := os.MkdirAll(target, 0755); err != nil {
+		if err := os.MkdirAll(target, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("creating target directory: %w", err)
 		}
 
@@ -165,6 +172,9 @@ Examples:
 
 				// Ensure directories are accessible
 				if info.IsDir() {
+					// INTENTIONAL EXCEPTION (P0-2): Bitwise OR operation, not hardcoded permission
+					// Adds owner rwx bits to existing mode during backup restore
+					// Preserves group/other bits while ensuring owner can access restored directories
 					if err := os.Chmod(path, info.Mode()|0700); err != nil {
 						logger.Warn("Failed to set directory permissions",
 							zap.String("path", path),

@@ -4,6 +4,7 @@
 package cephfs
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -134,7 +135,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 	// Check if mount point exists
 	if _, err := os.Stat(config.MountPoint); os.IsNotExist(err) {
 		logger.Debug("Creating mount point directory")
-		if err := os.MkdirAll(config.MountPoint, 0755); err != nil {
+		if err := os.MkdirAll(config.MountPoint, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create mount point: %w", err)
 		}
 	}
@@ -174,7 +175,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Test write access
 	testFile := filepath.Join(config.MountPoint, ".eos_test")
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		logger.Warn("Mount point is read-only",
 			zap.String("mountPoint", config.MountPoint))
 	} else {

@@ -8,6 +8,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -380,7 +381,7 @@ func (sm *StateManager) BackupState(rc *eos_io.RuntimeContext, backupPath string
 	}
 
 	// Write to backup file
-	if err := os.WriteFile(backupPath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(backupPath, jsonData, shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write backup: %w", err)
 	}
 

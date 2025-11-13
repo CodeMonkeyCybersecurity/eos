@@ -35,7 +35,7 @@ Examples:
 }
 
 func init() {
-	CreateCmd.AddCommand(createRepoCmd)
+    CreateCmd.AddCommand(createRepoCmd)
 
 	createRepoCmd.Flags().StringP("name", "n", "", "Repository name (default: directory name)")
 	createRepoCmd.Flags().StringP("description", "d", "", "Repository description")
@@ -43,10 +43,14 @@ func init() {
 	createRepoCmd.Flags().StringP("org", "o", "", "Create repository under an organization")
 	createRepoCmd.Flags().String("remote", "origin", "Git remote name to use")
 	createRepoCmd.Flags().String("branch", "main", "Default branch name")
-	createRepoCmd.Flags().Bool("no-push", false, "Do not push to the remote after creation")
-	createRepoCmd.Flags().Bool("dry-run", false, "Show planned actions without applying changes")
-	createRepoCmd.Flags().Bool("non-interactive", false, "Disable interactive prompts")
-	createRepoCmd.Flags().Bool("save-config", false, "Persist answers for future runs in .eos/create-repo.yaml")
+    createRepoCmd.Flags().Bool("no-push", false, "Do not push to the remote after creation")
+    createRepoCmd.Flags().Bool("dry-run", false, "Show planned actions without applying changes")
+    createRepoCmd.Flags().Bool("non-interactive", false, "Disable interactive prompts")
+    createRepoCmd.Flags().Bool("save-config", false, "Persist answers for future runs in .eos/create-repo.yaml")
+    createRepoCmd.Flags().String("auth", "ssh", "Preferred auth for git remote: ssh or https")
+    createRepoCmd.Flags().Bool("auto-fix-ownership", false, "If run with sudo, chown the repo to the original user")
+    createRepoCmd.Flags().Bool("ssh-generate-key", true, "Generate an SSH key if missing when --auth=ssh")
+    createRepoCmd.Flags().Bool("configure-credential-helper", true, "Configure git credential.helper for HTTPS when --auth=https")
 }
 
 func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -164,28 +168,36 @@ func runCreateRepo(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	name, _ := cmd.Flags().GetString("name")
 	description, _ := cmd.Flags().GetString("description")
-	private, _ := cmd.Flags().GetBool("private")
-	org, _ := cmd.Flags().GetString("org")
-	remote, _ := cmd.Flags().GetString("remote")
-	branch, _ := cmd.Flags().GetString("branch")
-	noPush, _ := cmd.Flags().GetBool("no-push")
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	// nonInteractive already parsed above for preflight checks
-	saveConfig, _ := cmd.Flags().GetBool("save-config")
+    private, _ := cmd.Flags().GetBool("private")
+    org, _ := cmd.Flags().GetString("org")
+    remote, _ := cmd.Flags().GetString("remote")
+    branch, _ := cmd.Flags().GetString("branch")
+    noPush, _ := cmd.Flags().GetBool("no-push")
+    dryRun, _ := cmd.Flags().GetBool("dry-run")
+    // nonInteractive already parsed above for preflight checks
+    saveConfig, _ := cmd.Flags().GetBool("save-config")
+    auth, _ := cmd.Flags().GetString("auth")
+    autoFixOwnership, _ := cmd.Flags().GetBool("auto-fix-ownership")
+    sshGenKey, _ := cmd.Flags().GetBool("ssh-generate-key")
+    cfgCredHelper, _ := cmd.Flags().GetBool("configure-credential-helper")
 
-	opts := &repository.RepoOptions{
-		Path:           absPath,
-		Name:           name,
-		Description:    description,
-		Private:        private,
-		Organization:   org,
-		Remote:         remote,
-		Branch:         branch,
-		DryRun:         dryRun,
-		NoPush:         noPush,
-		NonInteractive: nonInteractive,
-		SaveConfig:     saveConfig,
-	}
+    opts := &repository.RepoOptions{
+        Path:           absPath,
+        Name:           name,
+        Description:    description,
+        Private:        private,
+        Organization:   org,
+        Remote:         remote,
+        Branch:         branch,
+        DryRun:         dryRun,
+        NoPush:         noPush,
+        NonInteractive: nonInteractive,
+        SaveConfig:     saveConfig,
+        Auth:               strings.ToLower(strings.TrimSpace(auth)),
+        AutoFixOwnership:   autoFixOwnership,
+        SSHGenerateKey:     sshGenKey,
+        ConfigureCredHelper: cfgCredHelper,
+    }
 
 	prefsPath := repository.PreferencesPath(absPath)
 	prefs, err := repository.LoadRepoPreferences(prefsPath)

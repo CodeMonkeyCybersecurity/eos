@@ -4,6 +4,7 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -85,7 +86,7 @@ EXAMPLES:
 		log.Info("Adding Trivy APT repository")
 		repoLine := "deb https://aquasecurity.github.io/trivy-repo/deb stable main\n"
 		// SECURITY: Use direct file write instead of shell echo redirection
-		if err := os.WriteFile("/etc/apt/sources.list.d/trivy.list", []byte(repoLine), 0644); err != nil {
+		if err := os.WriteFile("/etc/apt/sources.list.d/trivy.list", []byte(repoLine), shared.ConfigFilePerm); err != nil {
 			log.Error("Failed to write repository file", zap.Error(err))
 			return fmt.Errorf("failed to write Trivy repository file: %w", err)
 		}

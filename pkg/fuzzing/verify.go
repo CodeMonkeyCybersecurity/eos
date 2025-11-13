@@ -1,6 +1,7 @@
 package fuzzing
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -356,7 +357,7 @@ func FuzzVerification(f *testing.F) {
 `
 
 	testFile := filepath.Join(tempDir, "verify_test.go")
-	if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write verification test: %w", err)
 	}
 
@@ -366,7 +367,7 @@ func FuzzVerification(f *testing.F) {
 go 1.21
 `
 	modFile := filepath.Join(tempDir, "go.mod")
-	if err := os.WriteFile(modFile, []byte(modContent), 0644); err != nil {
+	if err := os.WriteFile(modFile, []byte(modContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write go.mod: %w", err)
 	}
 
@@ -392,7 +393,7 @@ func verifyOutputHandling(logger otelzap.LoggerWithCtx) error {
 
 	// Test that we can write to the temp directory
 	testFile := filepath.Join(tempDir, "output_test.txt")
-	if err := os.WriteFile(testFile, []byte("test output"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test output"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("output handling verification failed: %w", err)
 	}
 

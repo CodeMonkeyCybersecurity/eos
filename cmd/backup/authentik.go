@@ -2,6 +2,7 @@
 package backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -209,7 +210,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		backupDir := "/mnt/eos-backups/authentik"
 
 		// Create backup directory if it doesn't exist
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
+		if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 			logger.Warn("Failed to create /mnt backup directory, using current directory",
 				zap.Error(err))
 			output = fmt.Sprintf("authentik-backup-%s.%s", timestamp, format)
@@ -221,7 +222,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	// Create backup directory if needed
 	backupDir := filepath.Dir(output)
 	if backupDir != "." && backupDir != "/" {
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
+		if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create backup directory: %w", err)
 		}
 	}
@@ -260,7 +261,7 @@ func backupAuthentik(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(output, data, 0600); err != nil {
+	if err := os.WriteFile(output, data, shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to save backup: %w", err)
 	}
 
@@ -744,7 +745,7 @@ func restoreAuthentikBackup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 			logger.Warn("Failed to create pre-restore backup", zap.Error(err))
 		} else {
 			preBackupData, _ := yaml.Marshal(preBackupConfig)
-			if err := os.WriteFile(preBackupFile, preBackupData, 0600); err != nil {
+			if err := os.WriteFile(preBackupFile, preBackupData, shared.SecretFilePerm); err != nil {
 				logger.Warn("Failed to save pre-restore backup", zap.Error(err))
 			} else {
 				logger.Info("Pre-restore backup created", zap.String("file", preBackupFile))

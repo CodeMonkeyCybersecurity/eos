@@ -216,7 +216,7 @@ func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 	path := shared.VaultInitPath
 	dir := filepath.Dir(path)
 
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, VaultDataDirPerm); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to create init directory", zap.String("dir", dir), zap.Error(err))
 		return fmt.Errorf("create init dir: %w", err)
 	}

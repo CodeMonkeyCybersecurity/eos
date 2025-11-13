@@ -2,6 +2,7 @@
 package ceph
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
 	"os"
@@ -220,7 +221,7 @@ func validateBootstrapPreconditions(logger otelzap.LoggerWithCtx, config *Bootst
 	}
 
 	for _, dir := range requiredDirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 
@@ -288,7 +289,7 @@ rbd cache writethrough until flush = true
 		}
 	}
 
-	if err := os.WriteFile(confPath, []byte(confContent), 0644); err != nil {
+	if err := os.WriteFile(confPath, []byte(confContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write ceph.conf: %w", err)
 	}
 
@@ -384,7 +385,7 @@ func createSecureKeyring(name string) (string, error) {
 	tmpFile.Close()
 
 	// Set restrictive permissions (owner read/write only)
-	if err := os.Chmod(keyringPath, 0600); err != nil {
+	if err := os.Chmod(keyringPath, shared.SecretFilePerm); err != nil {
 		os.Remove(keyringPath)
 		return "", fmt.Errorf("failed to set permissions: %w", err)
 	}
@@ -431,7 +432,7 @@ func mkfsMonitor(logger otelzap.LoggerWithCtx, config *BootstrapConfig, monKeyri
 
 	// Create monitor data directory
 	logger.Debug("Creating monitor data directory", zap.String("path", monDataDir))
-	if err := os.MkdirAll(monDataDir, 0755); err != nil {
+	if err := os.MkdirAll(monDataDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create monitor data directory: %w", err)
 	}
 
@@ -489,7 +490,7 @@ func fixMonitorOwnership(logger otelzap.LoggerWithCtx, config *BootstrapConfig) 
 	if err := os.Chown(adminKeyring, uid, gid); err != nil {
 		logger.Warn("Failed to chown admin keyring", zap.Error(err))
 	}
-	if err := os.Chmod(adminKeyring, 0600); err != nil {
+	if err := os.Chmod(adminKeyring, shared.SecretFilePerm); err != nil {
 		logger.Warn("Failed to chmod admin keyring", zap.Error(err))
 	}
 
@@ -501,7 +502,7 @@ func fixMonitorOwnership(logger otelzap.LoggerWithCtx, config *BootstrapConfig) 
 			if err := os.Chown(keyringPath, uid, gid); err != nil {
 				logger.Warn("Failed to chown "+dir+" keyring", zap.Error(err))
 			}
-			if err := os.Chmod(keyringPath, 0600); err != nil {
+			if err := os.Chmod(keyringPath, shared.SecretFilePerm); err != nil {
 				logger.Warn("Failed to chmod "+dir+" keyring", zap.Error(err))
 			}
 		}

@@ -80,17 +80,18 @@ func runConsulTokenRead(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 
 	// ASSESS - Get Vault client
 	vaultClient, err := vault.GetVaultClient(rc)
-	if err != nil {
-		return eos_err.NewUserError(
-			"Failed to connect to Vault.\n\n" +
-				"The Consul bootstrap token is stored in Vault at:\n" +
-				"  secret/consul/bootstrap-token\n\n" +
-				"Remediation:\n" +
-				"  - Ensure Vault is installed: eos create vault\n" +
-				"  - Ensure Vault is unsealed: vault status\n" +
-				"  - Check Vault agent is running: systemctl status vault-agent-eos\n\n" +
-				fmt.Sprintf("Error: %v", err))
-	}
+    if err != nil {
+        return eos_err.NewUserError(
+            "Failed to connect to Vault.\n\n"+
+                "The Consul bootstrap token is stored in Vault at:\n"+
+                "  secret/consul/bootstrap-token\n\n"+
+                "Remediation:\n"+
+                "  - Ensure Vault is installed: eos create vault\n"+
+                "  - Ensure Vault is unsealed: vault status\n"+
+                "  - Check Vault agent is running: systemctl status vault-agent-eos\n\n"+
+                "Error: %v",
+            err)
+    }
 
 	// Discover environment from Consul (required for Vault path)
 	env, err := consulenv.DiscoverFromConsul(rc)
@@ -113,15 +114,16 @@ func runConsulTokenRead(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	logger.Info("Retrieving Consul bootstrap token from Vault")
 
 	token, err := consulacl.GetBootstrapTokenFromVault(rc, vaultClient, env)
-	if err != nil {
-		return eos_err.NewUserError(
-			"Failed to retrieve Consul bootstrap token from Vault.\n\n" +
-				"The token may not exist yet. Bootstrap ACLs first:\n" +
-				"  eos update consul --bootstrap-token\n\n" +
-				"Or check if token exists in Vault:\n" +
-				"  vault kv get secret/consul/bootstrap-token\n\n" +
-				fmt.Sprintf("Error: %v", err))
-	}
+    if err != nil {
+        return eos_err.NewUserError(
+            "Failed to retrieve Consul bootstrap token from Vault.\n\n"+
+                "The token may not exist yet. Bootstrap ACLs first:\n"+
+                "  eos update consul --bootstrap-token\n\n"+
+                "Or check if token exists in Vault:\n"+
+                "  vault kv get secret/consul/bootstrap-token\n\n"+
+                "Error: %v",
+            err)
+    }
 
 	if token == "" {
 		return eos_err.NewUserError(

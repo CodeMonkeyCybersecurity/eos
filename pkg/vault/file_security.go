@@ -56,7 +56,7 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 
 	// Ensure parent directory exists
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, VaultDataDirPerm); err != nil {
 		return fmt.Errorf("failed to create token directory %s: %w", dir, err)
 	}
 

@@ -1,6 +1,7 @@
 package file_backup
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -79,7 +80,7 @@ func (fbm *FileBackupManager) BackupFile(rc *eos_io.RuntimeContext, sourcePath s
 	// Create backup directory if needed
 	if fbm.config.CreateBackupDir || options.DryRun {
 		if !options.DryRun {
-			if err := os.MkdirAll(backupDir, 0755); err != nil {
+			if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 				operation.Success = false
 				operation.Message = fmt.Sprintf("Failed to create backup directory: %v", err)
 				logger.Error("Failed to create backup directory", zap.String("dir", backupDir), zap.Error(err))
@@ -292,7 +293,7 @@ func (fbm *FileBackupManager) RestoreFile(rc *eos_io.RuntimeContext, backupPath,
 
 	// Create target directory if needed
 	targetDir := filepath.Dir(restorePath)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, shared.ServiceDirPerm); err != nil {
 		operation.Success = false
 		operation.Message = fmt.Sprintf("Failed to create target directory: %v", err)
 		logger.Error("Failed to create target directory", zap.String("dir", targetDir), zap.Error(err))

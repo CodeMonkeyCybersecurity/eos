@@ -3,6 +3,7 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -104,7 +105,7 @@ server_type = "%s"
 location = "%s"`, serverType, location)
 		}
 
-		if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), shared.ConfigFilePerm); err != nil {
 			return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 		}
 
@@ -115,7 +116,7 @@ location = "%s"`, serverType, location)
 				content, err := os.ReadFile(file)
 				if err == nil {
 					destPath := filepath.Join(outputDir, file)
-					if err := os.WriteFile(destPath, content, 0644); err != nil {
+					if err := os.WriteFile(destPath, content, shared.ConfigFilePerm); err != nil {
 						logger.Error("Failed to write configuration file", zap.String("file", file), zap.Error(err))
 						return fmt.Errorf("failed to copy %s: %w", file, err)
 					}

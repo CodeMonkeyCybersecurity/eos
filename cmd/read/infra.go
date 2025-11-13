@@ -1,6 +1,7 @@
 package read
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -262,7 +263,7 @@ and continuing with available data sources.`,
 			zap.String("directory", outputDir),
 			zap.String("permissions", "0755"))
 
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 			logger.Error(" Failed to create output directory",
 				zap.Error(err),
 				zap.String("directory", outputDir))

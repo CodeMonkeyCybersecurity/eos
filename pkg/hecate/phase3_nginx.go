@@ -42,7 +42,7 @@ func BuildNginxEnvironment(rc *eos_io.RuntimeContext, backendIP string) error {
 	log.Info(" Building Nginx configs for Hecate...")
 
 	// Step 1: Render and save StreamIncludeTemplate
-	if err := os.WriteFile(HecateStreamIncludePath, []byte(StreamIncludeTemplate), 0644); err != nil {
+	if err := os.WriteFile(HecateStreamIncludePath, []byte(StreamIncludeTemplate), shared.ConfigFilePerm); err != nil {
 		log.Error("Failed to write stream include config", zap.Error(err))
 		return err
 	}
@@ -80,7 +80,7 @@ func BuildNginxEnvironment(rc *eos_io.RuntimeContext, backendIP string) error {
 			return err
 		}
 
-		if err := os.WriteFile(svc.OutputFile, []byte(rendered), 0644); err != nil {
+		if err := os.WriteFile(svc.OutputFile, []byte(rendered), shared.ConfigFilePerm); err != nil {
 			log.Error("Failed to write Nginx config", zap.String("path", svc.OutputFile), zap.Error(err))
 			return err
 		}

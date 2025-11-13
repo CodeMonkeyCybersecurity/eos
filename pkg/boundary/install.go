@@ -105,7 +105,7 @@ func (bi *BoundaryInstaller) Install() error {
 		bi.config.Version, bi.config.Version, arch)
 
 	tmpDir := "/tmp/boundary-install"
-	_ = os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, shared.ServiceDirPerm)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
@@ -134,9 +134,9 @@ func (bi *BoundaryInstaller) Install() error {
 	if err := userMgr.CreateSystemUser("boundary", "/var/lib/boundary"); err != nil {
 		return fmt.Errorf("failed to create boundary user: %w", err)
 	}
-	_ = os.MkdirAll("/etc/boundary.d", 0755)
-	_ = os.MkdirAll("/var/lib/boundary", 0700)
-	_ = os.MkdirAll("/var/log/boundary", 0755)
+	_ = os.MkdirAll("/etc/boundary.d", shared.ServiceDirPerm)
+	_ = os.MkdirAll("/var/lib/boundary", shared.SecretDirPerm)
+	_ = os.MkdirAll("/var/log/boundary", shared.ServiceDirPerm)
 	_ = bi.runner.Run("chown", "-R", "boundary:boundary", "/var/lib/boundary")
 	_ = bi.runner.Run("chown", "-R", "boundary:boundary", "/var/log/boundary")
 
@@ -181,7 +181,7 @@ kms "aead" {
   key = "8fZBjCUfN0TzjEGLQldGY4+iE9AkOvCfjh7+p0GcvFo="
   key_id = "global_recovery"
 }`, shared.GetInternalHostname(), shared.GetInternalHostname())
-		_ = os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), 0640)
+		_ = os.WriteFile("/etc/boundary.d/boundary.hcl", []byte(config), shared.SecureConfigFilePerm)
 		_ = bi.runner.Run("chown", "boundary:boundary", "/etc/boundary.d/boundary.hcl")
 	}
 
@@ -203,7 +203,7 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target`
 
-	_ = os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), 0644)
+	_ = os.WriteFile("/etc/systemd/system/boundary.service", []byte(serviceContent), shared.ConfigFilePerm)
 	_ = bi.runner.Run("systemctl", "daemon-reload")
 
 	if !bi.config.DevMode {

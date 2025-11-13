@@ -2,6 +2,7 @@
 package disk_management
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -233,7 +234,7 @@ func MountPartition(rc *eos_io.RuntimeContext, device string, mountPoint string,
 		zap.String("mount_point", mountPoint))
 
 	// Create mount point if it doesn't exist
-	if err := os.MkdirAll(mountPoint, 0755); err != nil {
+	if err := os.MkdirAll(mountPoint, shared.ServiceDirPerm); err != nil {
 		operation.Success = false
 		operation.Message = fmt.Sprintf("Failed to create mount point: %v", err)
 		logger.Error("Failed to create mount point", zap.Error(err))
@@ -308,4 +309,6 @@ func backupPartitionTable(rc *eos_io.RuntimeContext, device string) error {
 	}
 
 	return os.WriteFile(backupFile, output, 0644)
+}
+	return os.WriteFile(backupFile, output, shared.ConfigFilePerm)
 }

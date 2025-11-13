@@ -2,6 +2,7 @@
 package security_permissions
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"io/fs"
 	"os"
@@ -463,7 +464,7 @@ func createBackup(config *SecurityConfig, path string) error {
 	}
 
 	// Create backup directory if it doesn't exist
-	if err := os.MkdirAll(config.BackupDirectory, 0700); err != nil {
+	if err := os.MkdirAll(config.BackupDirectory, shared.SecretDirPerm); err != nil {
 		return err
 	}
 
@@ -478,7 +479,7 @@ func createBackup(config *SecurityConfig, path string) error {
 
 	backupData := fmt.Sprintf("%s: %o\n", path, stat.Mode()&os.ModePerm)
 
-	return os.WriteFile(backupFile, []byte(backupData), 0600)
+	return os.WriteFile(backupFile, []byte(backupData), shared.SecretFilePerm)
 }
 
 func shouldExcludePath(config *SecurityConfig, path string) bool {

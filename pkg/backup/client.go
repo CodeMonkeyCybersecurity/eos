@@ -81,7 +81,7 @@ func (c *Client) runResticWithInitRetry(initAttempted bool, args ...string) ([]b
 	defer passwordFile.Close()
 
 	// Set restrictive permissions (owner read-only)
-	if err := os.Chmod(passwordFile.Name(), 0400); err != nil {
+	if err := os.Chmod(passwordFile.Name(), shared.ReadOnlySecretFilePerm); err != nil {
 		return nil, fmt.Errorf("setting password file permissions: %w", err)
 	}
 
@@ -668,7 +668,7 @@ func (c *Client) Restore(snapshotID, target string) error {
 		zap.String("target", target))
 
 	// Ensure target directory exists
-	if err := os.MkdirAll(target, 0755); err != nil {
+	if err := os.MkdirAll(target, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("creating target directory: %w", err)
 	}
 

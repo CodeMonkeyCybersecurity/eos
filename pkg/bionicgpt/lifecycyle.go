@@ -3,6 +3,7 @@
 package bionicgpt
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -271,7 +272,7 @@ func RunDeleteBionicGPT(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 		logger.Info("Creating backup of BionicGPT data volumes")
 
 		// Create backup directory
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
+		if err := os.MkdirAll(backupDir, shared.ServiceDirPerm); err != nil {
 			logger.Error("Failed to create backup directory",
 				zap.String("dir", backupDir),
 				zap.Error(err))

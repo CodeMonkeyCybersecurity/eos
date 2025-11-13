@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/user"
@@ -212,7 +213,7 @@ func (m *MFAManager) preFlightChecks() error {
 
 	// Check /etc/pam.d is writable
 	testFile := "/etc/pam.d/.eos-write-test"
-	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("cannot write to /etc/pam.d/: %w", err)
 	}
 	_ = os.Remove(testFile)
@@ -232,7 +233,7 @@ func (m *MFAManager) createBackups() error {
 	m.backupDir = fmt.Sprintf("/etc/eos/mfa-backup-%s",
 		time.Now().Format("20060102-150405"))
 
-	if err := os.MkdirAll(m.backupDir, 0700); err != nil {
+	if err := os.MkdirAll(m.backupDir, shared.SecretDirPerm); err != nil {
 		return fmt.Errorf("create backup directory: %w", err)
 	}
 
@@ -267,7 +268,7 @@ func (m *MFAManager) createBackups() error {
 	// Create restore script
 	restoreScript := m.generateRestoreScript()
 	restorePath := filepath.Join(m.backupDir, "restore.sh")
-	if err := os.WriteFile(restorePath, []byte(restoreScript), 0700); err != nil {
+	if err := os.WriteFile(restorePath, []byte(restoreScript), shared.ExecutablePerm); err != nil {
 		return fmt.Errorf("write restore script: %w", err)
 	}
 

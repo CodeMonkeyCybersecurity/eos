@@ -4,6 +4,7 @@
 package cephfs
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -424,7 +425,7 @@ func PerformBasicConnectivityTest(rc *eos_io.RuntimeContext, config *Config) err
 
 	// Test mount point creation (if needed for future CephFS mount tests)
 	testDir := "/tmp/cephfs-connectivity-test"
-	if err := os.MkdirAll(testDir, 0755); err != nil {
+	if err := os.MkdirAll(testDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create test directory: %w", err)
 	}
 	defer func() {
@@ -435,7 +436,7 @@ func PerformBasicConnectivityTest(rc *eos_io.RuntimeContext, config *Config) err
 
 	// Test file creation
 	testFile := testDir + "/test.txt"
-	if err := os.WriteFile(testFile, []byte(TestFileContent), 0644); err != nil {
+	if err := os.WriteFile(testFile, []byte(TestFileContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to create test file: %w", err)
 	}
 

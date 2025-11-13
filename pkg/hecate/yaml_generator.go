@@ -3,6 +3,7 @@
 package hecate
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -608,7 +609,7 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 		logger.Info("Output directory already exists", zap.String("path", outputDir))
 	} else if os.IsNotExist(err) {
 		logger.Info("Creating output directory", zap.String("path", outputDir))
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, shared.ServiceDirPerm); err != nil {
 			return fmt.Errorf("failed to create output directory %s: %w\n"+
 				"Possible causes:\n"+
 				"  - Permission denied (try: sudo eos create hecate ...)\n"+
@@ -621,7 +622,7 @@ func GenerateFromYAML(rc *eos_io.RuntimeContext, config *YAMLHecateConfig, outpu
 
 	// Create logs directories
 	logsDir := filepath.Join(outputDir, "logs")
-	if err := os.MkdirAll(filepath.Join(logsDir, "caddy"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(logsDir, "caddy"), shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create logs directory: %w", err)
 	}
 
@@ -821,13 +822,13 @@ type nginxStreamData struct {
 func generateYAMLNginxConfig(config *YAMLHecateConfig, outputDir string) error {
 	// Create nginx.conf
 	nginxConfPath := filepath.Join(outputDir, "nginx.conf")
-	if err := os.WriteFile(nginxConfPath, []byte(nginxConfTemplate), 0644); err != nil {
+	if err := os.WriteFile(nginxConfPath, []byte(nginxConfTemplate), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write nginx.conf: %w", err)
 	}
 
 	// Create stream directory
 	streamDir := filepath.Join(outputDir, "conf.d", "stream")
-	if err := os.MkdirAll(streamDir, 0755); err != nil {
+	if err := os.MkdirAll(streamDir, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create stream dir: %w", err)
 	}
 
@@ -963,7 +964,7 @@ COMPOSE_PORT_HTTPS=%s
 	}
 
 	// Write with restricted permissions (0600 = owner read/write only)
-	if err := os.WriteFile(envPath, []byte(envContent), 0600); err != nil {
+	if err := os.WriteFile(envPath, []byte(envContent), shared.SecretFilePerm); err != nil {
 		return fmt.Errorf("failed to write .env file %s: %w\n"+
 			"Ensure you have write permissions to the output directory", envPath, err)
 	}
@@ -1041,7 +1042,7 @@ net.core.wmem_max = 2500000
 	logger.Debug("Writing persistent sysctl configuration",
 		zap.String("path", sysctlConfPath))
 
-	if err := os.WriteFile(sysctlConfPath, []byte(sysctlContent), 0644); err != nil {
+	if err := os.WriteFile(sysctlConfPath, []byte(sysctlContent), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write sysctl config file %s: %w", sysctlConfPath, err)
 	}
 

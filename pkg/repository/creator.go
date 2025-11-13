@@ -1,16 +1,23 @@
 package repository
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
-	"os"
-	"strings"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+    "bufio"
+    "errors"
+    "fmt"
+    "os"
+    "os/exec"
+    "os/user"
+    "path/filepath"
+    "runtime"
+    "strings"
 
-	"code.gitea.io/sdk/gitea"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
+    "code.gitea.io/sdk/gitea"
+    giteaSDK "code.gitea.io/sdk/gitea"
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+    "github.com/CodeMonkeyCybersecurity/eos/pkg/git/safety"
+    "github.com/uptrace/opentelemetry-go-extra/otelzap"
+    "go.uber.org/zap"
 )
 
 // Creator orchestrates local git initialization and remote Gitea provisioning.
@@ -39,7 +46,7 @@ func NewCreator(rc *eos_io.RuntimeContext, opts *RepoOptions, git *GitWrapper, c
 
 // Create executes the workflow.
 func (c *Creator) Create() (*CreationResult, error) {
-	logger := otelzap.Ctx(c.rc.Ctx)
+    logger := otelzap.Ctx(c.rc.Ctx)
 
 	if err := c.ensurePath(); err != nil {
 		return nil, err
@@ -52,31 +59,47 @@ func (c *Creator) Create() (*CreationResult, error) {
 		return nil, c.describeDryRun()
 	}
 
-	if err := c.ensureGitRepository(); err != nil {
-		return nil, err
-	}
+    if err := c.ensureGitRepository(); err != nil {
+        return nil, err
+    }
 
-	if err := c.ensureBranch(); err != nil {
-		return nil, err
-	}
+    // Optional: if running via sudo and requested, fix ownership to the original user
+    if err := c.maybeFixOwnership(); err != nil {
+        logger.Warn("Ownership fix encountered an issue", zap.Error(err))
+    }
+
+    if err := c.ensureBranch(); err != nil {
+        return nil, err
+    }
 
 	if err := c.ensureInitialCommit(); err != nil {
 		return nil, err
 	}
 
-	var remoteRepo *gitea.Repository
-	pushed := false
+    var remoteRepo *gitea.Repository
+    pushed := false
 
 	if c.giteaClient != nil {
-		repo, err := c.ensureRemoteRepository()
-		if err != nil {
-			return nil, err
-		}
-		remoteRepo = repo
+        repo, err := c.ensureRemoteRepository()
+        if err != nil {
+            return nil, err
+        }
+        remoteRepo = repo
 
-		if err := c.ensureRemoteConfigured(repo); err != nil {
-			return nil, err
-		}
+        // If user prefers SSH, ensure an SSH key exists and is uploaded to Gitea
+        if strings.ToLower(strings.TrimSpace(c.opts.Auth)) == "ssh" {
+            if err := c.ensureSSHAuthSetup(); err != nil {
+                logger.Warn("SSH auth setup failed; will fall back to HTTPS if needed", zap.Error(err))
+            }
+        } else if c.opts.ConfigureCredHelper {
+            if err := ensureCredentialHelperConfigured(c.rc); err != nil {
+                logger.Warn("Failed to configure git credential.helper", zap.Error(err))
+            }
+        }
+
+        if err := c.ensureRemoteConfigured(repo); err != nil {
+            return nil, err
+        }
 
 		if !c.opts.NoPush {
 			if err := c.git.Push(c.opts.Remote, c.opts.Branch); err != nil {
@@ -132,24 +155,222 @@ func (c *Creator) ensurePath() error {
 }
 
 func (c *Creator) ensureGitRepository() error {
-	logger := otelzap.Ctx(c.rc.Ctx)
+    logger := otelzap.Ctx(c.rc.Ctx)
 
-	if c.git.IsRepository() {
-		logger.Info("Git repository already initialized", zap.String("path", c.opts.Path))
-		return nil
-	}
+    if c.git.IsRepository() {
+        logger.Info("Git repository already initialized", zap.String("path", c.opts.Path))
+        // Ensure git safe.directory is configured to prevent dubious ownership errors
+        if err := safety.EnsureSafeDirectory(c.rc, c.opts.Path); err != nil {
+            logger.Warn("Failed to register repository as safe for git", zap.Error(err))
+        }
+        return nil
+    }
 
-	logger.Info("Initializing new git repository", zap.String("path", c.opts.Path))
-	if err := c.git.InitRepository(); err != nil {
-		return fmt.Errorf("failed to initialize git repository: %w", err)
-	}
-	c.gitCreated = true
+    logger.Info("Initializing new git repository", zap.String("path", c.opts.Path))
+    if err := c.git.InitRepository(); err != nil {
+        return fmt.Errorf("failed to initialize git repository: %w", err)
+    }
+    c.gitCreated = true
 
-	if err := c.git.SetDefaultBranch(c.opts.Branch); err != nil {
-		logger.Warn("Failed to set git default branch", zap.Error(err))
-	}
+    if err := c.git.SetDefaultBranch(c.opts.Branch); err != nil {
+        logger.Warn("Failed to set git default branch", zap.Error(err))
+    }
 
-	return nil
+    // Configure git safe.directory for the newly created repository
+    if err := safety.EnsureSafeDirectory(c.rc, c.opts.Path); err != nil {
+        logger.Warn("Failed to register repository as safe for git", zap.Error(err))
+    }
+
+    return nil
+}
+
+// maybeFixOwnership attempts to change repository ownership to the invoking user when
+// run via sudo (root euid with SUDO_USER set). In interactive mode, asks for consent
+// unless AutoFixOwnership is true. Non-interactive requires AutoFixOwnership.
+func (c *Creator) maybeFixOwnership() error {
+    logger := otelzap.Ctx(c.rc.Ctx)
+    if os.Geteuid() != 0 {
+        return nil
+    }
+    sudoUser := strings.TrimSpace(os.Getenv("SUDO_USER"))
+    if sudoUser == "" {
+        return nil
+    }
+
+    // Only fix if requested or user confirms
+    proceed := c.opts.AutoFixOwnership
+    if !c.opts.NonInteractive && !proceed {
+        proceed = promptYesNo(fmt.Sprintf("Detected sudo context. Change ownership of %s to %s?", c.opts.Path, sudoUser), true)
+    }
+    if c.opts.NonInteractive && !proceed {
+        logger.Info("Skipping ownership change (non-interactive and no auto-fix)")
+        return nil
+    }
+
+    u, err := user.Lookup(sudoUser)
+    if err != nil {
+        return fmt.Errorf("lookup sudo user %s: %w", sudoUser, err)
+    }
+    // Convert to numeric UID,GID
+    // On Unix, u.Uid/u.Gid are strings; parse to ints
+    // Use Chown with uid/gid
+    uid, gid, convErr := parseUIDGID(u)
+    if convErr != nil {
+        return convErr
+    }
+
+    logger.Info("Adjusting repository ownership",
+        zap.String("path", c.opts.Path),
+        zap.String("user", sudoUser))
+
+    return chownRecursive(c.opts.Path, uid, gid)
+}
+
+func parseUIDGID(u *user.User) (int, int, error) {
+    // Only valid on Unix-like systems
+    //nolint:gomnd
+    var uid, gid int
+    var err error
+    if uid, err = atoi(u.Uid); err != nil {
+        return 0, 0, fmt.Errorf("parse uid: %w", err)
+    }
+    if gid, err = atoi(u.Gid); err != nil {
+        return 0, 0, fmt.Errorf("parse gid: %w", err)
+    }
+    return uid, gid, nil
+}
+
+func atoi(s string) (int, error) {
+    var n int
+    _, err := fmt.Sscanf(s, "%d", &n)
+    if err != nil {
+        return 0, err
+    }
+    return n, nil
+}
+
+func chownRecursive(root string, uid, gid int) error {
+    return filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+        if err != nil {
+            return err
+        }
+        // Use Lchown semantics for symlinks if available; os.Chown follows symlink target
+        // For simplicity and safety here, skip symlinks
+        if d.Type()&os.ModeSymlink != 0 {
+            return nil
+        }
+        if chErr := os.Chown(p, uid, gid); chErr != nil {
+            return chErr
+        }
+        return nil
+    })
+}
+
+// ensureSSHAuthSetup ensures an SSH key exists locally and is uploaded to Gitea.
+// Best-effort; logs warnings and continues on failure.
+func (c *Creator) ensureSSHAuthSetup() error {
+    logger := otelzap.Ctx(c.rc.Ctx)
+    // Determine default key path
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return fmt.Errorf("resolve home dir: %w", err)
+    }
+    sshDir := filepath.Join(homeDir, ".ssh")
+    pub := filepath.Join(sshDir, "id_ed25519.pub")
+    pri := filepath.Join(sshDir, "id_ed25519")
+
+    if _, err := os.Stat(pub); err != nil {
+        if os.IsNotExist(err) {
+            if !c.opts.NonInteractive && !c.opts.SSHGenerateKey {
+                // Ask if we should generate a key
+                if !promptYesNo("No SSH key found. Generate an ed25519 key now?", true) {
+                    return fmt.Errorf("no SSH key present and user declined generation")
+                }
+            }
+            if c.opts.NonInteractive && !c.opts.SSHGenerateKey {
+                return fmt.Errorf("no SSH key present and ssh-generate-key is false")
+            }
+            if genErr := generateSSHKey(pri); genErr != nil {
+                return genErr
+            }
+        } else {
+            return fmt.Errorf("check ssh key: %w", err)
+        }
+    }
+
+    // Ensure key is registered in Gitea
+    if c.giteaClient != nil {
+        if err := ensureKeyInGitea(c.giteaClient.client, pub); err != nil {
+            logger.Warn("Failed to upload SSH key to Gitea", zap.Error(err))
+        } else {
+            logger.Info("SSH key is present in Gitea")
+        }
+    }
+    return nil
+}
+
+func generateSSHKey(privatePath string) error {
+    // Ensure directory exists
+    if err := os.MkdirAll(filepath.Dir(privatePath), shared.SecretDirPerm); err != nil {
+        return fmt.Errorf("create .ssh dir: %w", err)
+    }
+    // Use ssh-keygen to create key without passphrase (interactive passphrases are out-of-scope here)
+    cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-N", "", "-f", privatePath)
+    if out, err := cmd.CombinedOutput(); err != nil {
+        return fmt.Errorf("ssh-keygen failed: %w (%s)", err, strings.TrimSpace(string(out)))
+    }
+    return nil
+}
+
+func ensureKeyInGitea(c *giteaSDK.Client, pubPath string) error {
+    data, err := os.ReadFile(pubPath)
+    if err != nil {
+        return fmt.Errorf("read public key: %w", err)
+    }
+    pub := strings.TrimSpace(string(data))
+    // List existing keys
+    keys, _, err := c.ListMyPublicKeys(giteaSDK.ListPublicKeysOptions{})
+    if err != nil {
+        return fmt.Errorf("list public keys: %w", err)
+    }
+    for _, k := range keys {
+        if strings.TrimSpace(k.Key) == pub {
+            return nil // already present
+        }
+    }
+    title := fmt.Sprintf("EOS %s", filepath.Base(pubPath))
+    _, _, err = c.CreatePublicKey(giteaSDK.CreateKeyOption{Title: title, Key: pub})
+    if err != nil {
+        return fmt.Errorf("create public key: %w", err)
+    }
+    return nil
+}
+
+// ensureCredentialHelperConfigured sets a platform-appropriate credential.helper for HTTPS
+func ensureCredentialHelperConfigured(rc *eos_io.RuntimeContext) error {
+    var helper string
+    // Very simple platform detection
+    goos := runtime.GOOS
+    switch goos {
+    case "darwin":
+        helper = "osxkeychain"
+    case "windows":
+        helper = "manager"
+    default:
+        helper = "libsecret"
+    }
+    // Check current value
+    cmd := exec.Command("git", "config", "--global", "credential.helper")
+    if out, err := cmd.CombinedOutput(); err == nil {
+        if strings.TrimSpace(string(out)) != "" {
+            return nil // already set
+        }
+    }
+    set := exec.Command("git", "config", "--global", "credential.helper", helper)
+    if out, err := set.CombinedOutput(); err != nil {
+        return fmt.Errorf("set credential.helper: %w (%s)", err, strings.TrimSpace(string(out)))
+    }
+    return nil
 }
 
 func (c *Creator) ensureBranch() error {
@@ -256,25 +477,27 @@ func (c *Creator) ensureRemoteRepository() (*gitea.Repository, error) {
 }
 
 func (c *Creator) ensureRemoteConfigured(repo *gitea.Repository) error {
-	if repo == nil {
-		return nil
-	}
+    if repo == nil {
+        return nil
+    }
 
-	logger := otelzap.Ctx(c.rc.Ctx)
+    logger := otelzap.Ctx(c.rc.Ctx)
 
 	remoteExists, err := c.git.RemoteExists(c.opts.Remote)
 	if err != nil {
 		return fmt.Errorf("failed to inspect git remote %s: %w", c.opts.Remote, err)
 	}
 
-	targetURL := repo.CloneURL
-	if targetURL == "" {
-		if repo.SSHURL != "" {
-			targetURL = repo.SSHURL
-		} else {
-			targetURL = repo.HTMLURL
-		}
-	}
+    // Choose URL based on preferred auth
+    targetURL := ""
+    preferSSH := strings.ToLower(strings.TrimSpace(c.opts.Auth)) != "https"
+    if preferSSH && repo.SSHURL != "" {
+        targetURL = repo.SSHURL
+    } else if repo.CloneURL != "" {
+        targetURL = repo.CloneURL
+    } else if repo.HTMLURL != "" {
+        targetURL = repo.HTMLURL
+    }
 
 	if remoteExists {
 		if c.opts.NonInteractive {

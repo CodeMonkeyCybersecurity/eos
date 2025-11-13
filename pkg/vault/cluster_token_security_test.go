@@ -198,8 +198,8 @@ func TestTokenFileNotInEnvironment(t *testing.T) {
 	}
 }
 
-// TestSanitizeTokenForLogging verifies token sanitization
-func TestSanitizeTokenForLogging(t *testing.T) {
+// TestSanitizeTokenForLogging_Basic verifies token sanitization (basic cases)
+func TestSanitizeTokenForLogging_Basic(t *testing.T) {
 	tests := []struct {
 		name     string
 		token    string

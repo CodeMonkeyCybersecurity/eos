@@ -3,6 +3,7 @@
 package terraform
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"runtime"
@@ -77,7 +78,7 @@ func (ti *TerraformInstaller) Install() error {
 		ti.config.Version, ti.config.Version, arch)
 
 	tmpDir := "/tmp/terraform-install"
-	_ = os.MkdirAll(tmpDir, 0755)
+	_ = os.MkdirAll(tmpDir, shared.ServiceDirPerm)
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Download and extract
@@ -103,7 +104,7 @@ func (ti *TerraformInstaller) Install() error {
 	}
 
 	// Setup plugin cache dir
-	_ = os.MkdirAll(ti.config.PluginCacheDir, 0755)
+	_ = os.MkdirAll(ti.config.PluginCacheDir, shared.ServiceDirPerm)
 
 	// Phase 3: EVALUATE
 	if output, err := ti.runner.RunOutput("terraform", "version"); err != nil {

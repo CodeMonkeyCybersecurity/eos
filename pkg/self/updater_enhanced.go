@@ -6,6 +6,7 @@
 package self
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -238,7 +239,8 @@ func (eeu *EnhancedEosUpdater) verifySourceDirectory() error {
 	return git.VerifyRepository(eeu.rc, eeu.config.SourceDir)
 }
 
-// checkGitRepositoryState checks for uncommitted changes
+// checkGitRepositoryState checks for uncommitted changes and prompts for informed consent
+// P0-3 FIX: Human-centric validation - don't proceed blindly with uncommitted changes
 func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	eeu.logger.Info("Checking git repository state")
 
@@ -248,13 +250,86 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 	}
 
 	if state.HasChanges {
+		// P0-3 FIX: If RequireCleanWorkingTree is explicitly set, fail immediately
 		if eeu.enhancedConfig.RequireCleanWorkingTree {
 			return fmt.Errorf("repository has uncommitted changes and clean working tree is required")
 		}
 
-		eeu.logger.Warn("Repository has uncommitted changes, will use git pull --autostash")
-		// Note: We don't stash here - we let git pull --autostash handle it
-		// This is more reliable and doesn't leave orphaned stashes
+		// P0-3 FIX: Human-centric informed consent
+		// Explain risks and let user decide
+		eeu.logger.Warn("Uncommitted changes detected in source repository",
+			zap.String("repo", eeu.config.SourceDir))
+
+		// Check if we're in non-interactive mode (no TTY)
+		if !term.IsTerminal(int(os.Stdin.Fd())) {
+			return fmt.Errorf("cannot proceed with uncommitted changes in non-interactive mode\n\n"+
+				"Repository: %s\n\n"+
+				"Options:\n"+
+				"  1. Commit your changes: git -C %s commit -am \"your message\"\n"+
+				"  2. Stash your changes: git -C %s stash\n"+
+				"  3. Discard your changes: git -C %s reset --hard\n\n"+
+				"Then re-run: eos self update",
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir)
+		}
+
+		// Interactive mode - prompt for informed consent
+		fmt.Println()
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println("⚠️  WARNING: Uncommitted Changes Detected")
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println()
+		fmt.Printf("Repository: %s\n", eeu.config.SourceDir)
+		fmt.Println()
+		fmt.Println("You have uncommitted changes in your Eos source directory.")
+		fmt.Println()
+		fmt.Println("RISKS:")
+		fmt.Println("  • If the update fails, your changes will be preserved BUT")
+		fmt.Println("  • The repository will be in an inconsistent state")
+		fmt.Println("  • Rollback will restore your changes, but this adds complexity")
+		fmt.Println()
+		fmt.Println("SAFER OPTIONS:")
+		fmt.Println("  1. Cancel now, commit your changes, then re-run update")
+		fmt.Println("  2. Cancel now, stash your changes, then re-run update")
+		fmt.Println("  3. Cancel now, discard your changes, then re-run update")
+		fmt.Println()
+		fmt.Println("OR:")
+		fmt.Println("  4. Continue at your own risk (changes will be auto-stashed)")
+		fmt.Println()
+		fmt.Println("═══════════════════════════════════════════════════════════════")
+		fmt.Println()
+
+		// Use interaction package for consistent prompting
+		// Default to NO (safer option)
+		proceed, err := interaction.PromptYesNoSafe(eeu.rc, "Continue with uncommitted changes?", false)
+		if err != nil {
+			return fmt.Errorf("failed to get user input: %w", err)
+		}
+
+		if !proceed {
+			eeu.logger.Info("Update cancelled by user - uncommitted changes need attention")
+			return fmt.Errorf("update cancelled by user\n\n"+
+				"Please handle uncommitted changes before updating:\n"+
+				"  • Commit: git -C %s commit -am \"your message\"\n"+
+				"  • Stash:  git -C %s stash\n"+
+				"  • Reset:  git -C %s reset --hard\n\n"+
+				"Then re-run: eos self update",
+				eeu.config.SourceDir,
+				eeu.config.SourceDir,
+				eeu.config.SourceDir)
+		}
+
+		// User chose to continue - warn and proceed
+		eeu.logger.Warn("User chose to proceed with uncommitted changes",
+			zap.String("repo", eeu.config.SourceDir))
+		fmt.Println()
+		fmt.Println("Proceeding with update (uncommitted changes will be auto-stashed)...")
+		fmt.Println()
+
+		// Note: P0-2 already implemented stash tracking, so this is now safe
+		// Changes will be stashed before pull and restored if rollback needed
 	} else {
 		eeu.logger.Info(" Working tree is clean")
 	}
@@ -272,6 +347,7 @@ func (eeu *EnhancedEosUpdater) checkRunningProcesses() error {
 
 // verifyBuildDependencies checks that we can build eos
 // HUMAN-CENTRIC: Guides user through installing missing dependencies with informed consent
+// P0-1 FIX: Verify Go toolchain availability BEFORE pulling updates
 func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 	eeu.logger.Info("Verifying build dependencies")
 
@@ -303,6 +379,22 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 			"https://github.com/CodeMonkeyCybersecurity/eos/issues",
 			result.MissingCephLibs)
 	}
+
+	// P0-1 FIX: Verify Go toolchain is available for current architecture
+	// CRITICAL: Check BEFORE pulling updates to avoid failed build + broken rollback
+	// RATIONALE: Prevents "go: download go1.25 for linux/arm64: toolchain not available" errors
+	eeu.logger.Info("Verifying Go toolchain availability for current architecture")
+	requiredVer, currentVer, err := build.VerifyGoToolchainAvailability(eeu.rc, eeu.goPath, eeu.config.SourceDir)
+	if err != nil {
+		return fmt.Errorf("Go toolchain pre-check failed: %w\n\n"+
+			"IMPORTANT: Cannot proceed with update because required Go version\n"+
+			"is not available for your system architecture.\n\n"+
+			"This check runs BEFORE pulling updates to prevent build failures.", err)
+	}
+
+	eeu.logger.Info("✓ Go toolchain verified",
+		zap.String("required_version", requiredVer),
+		zap.String("current_version", currentVer))
 
 	eeu.logger.Info(" Build dependencies verified and ready")
 	return nil
@@ -680,7 +772,7 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	eeu.logger.Debug("Pre-allocated backup path for transaction",
 		zap.String("path", expectedBackupPath))
 
-	if err := os.MkdirAll(eeu.config.BackupDir, 0755); err != nil {
+	if err := os.MkdirAll(eeu.config.BackupDir, shared.ServiceDirPerm); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
@@ -769,10 +861,25 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 	return currentHash, nil
 }
 
-// pullLatestCodeWithVerification pulls code and verifies something actually changed
+// pullLatestCodeWithVerification pulls code with stash tracking for rollback safety
+// P0-2 FIX: Uses manual stash management to track stash ref for rollback
 // Returns true if code changed, false if already up-to-date
 func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
-	return git.PullWithVerification(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	// Use stash tracking version for rollback safety
+	codeChanged, stashRef, err := git.PullWithStashTracking(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	if err != nil {
+		return false, err
+	}
+
+	// Store stash ref in transaction for rollback
+	eeu.transaction.GitStashRef = stashRef
+
+	if stashRef != "" {
+		eeu.logger.Info("Stash tracked in transaction for rollback",
+			zap.String("ref", stashRef[:8]+"..."))
+	}
+
+	return codeChanged, nil
 }
 
 // installBinaryAtomic installs the binary atomically with flock-based locking
@@ -815,7 +922,7 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 			return fmt.Errorf("failed to read new binary: %w", err)
 		}
 
-		if err := os.WriteFile(tempName, input, 0755); err != nil {
+		if err := os.WriteFile(tempName, input, shared.ExecutablePerm); err != nil {
 			return fmt.Errorf("failed to write temp binary: %w", err)
 		}
 
@@ -930,7 +1037,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 
 				// Atomic write: write to temp, then rename
 				tempPath := eeu.config.BinaryPath + ".restore"
-				if err := os.WriteFile(tempPath, backup, 0755); err != nil {
+				if err := os.WriteFile(tempPath, backup, shared.ExecutablePerm); err != nil {
 					return fmt.Errorf("failed to write restored binary: %w", err)
 				}
 
@@ -1017,6 +1124,45 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("✓ Git repository reset to previous commit")
+				return nil
+			},
+		},
+		{
+			Name:        "restore_stash",
+			Description: "Restore uncommitted changes from stash",
+			Required:    false, // Best-effort, not critical (stash is preserved for manual recovery)
+			Execute: func() error {
+				// P0-2 FIX: Restore stash after git reset to recover uncommitted changes
+				if eeu.transaction.GitStashRef == "" {
+					eeu.logger.Debug("No stash to restore (stashRef empty)")
+					return nil
+				}
+
+				// Only restore stash if we actually reverted the git repository
+				if !eeu.transaction.ChangesPulled {
+					eeu.logger.Debug("Git not reverted, no need to restore stash")
+					return nil
+				}
+
+				eeu.logger.Info("Restoring uncommitted changes from stash",
+					zap.String("ref", eeu.transaction.GitStashRef[:8]+"..."))
+
+				// Use helper function from git package
+				if err := git.RestoreStash(eeu.rc, eeu.config.SourceDir, eeu.transaction.GitStashRef); err != nil {
+					// Don't fail rollback if stash restore fails
+					// Stash is still preserved for manual recovery
+					eeu.logger.Warn("Failed to restore stash automatically",
+						zap.Error(err),
+						zap.String("stash_ref", eeu.transaction.GitStashRef[:8]+"..."))
+					return fmt.Errorf("failed to restore stash (stash preserved): %w\n\n"+
+						"Your uncommitted changes are saved in stash.\n"+
+						"Manual recovery:\n"+
+						"  git -C %s stash list\n"+
+						"  git -C %s stash apply %s",
+						err, eeu.config.SourceDir, eeu.config.SourceDir, eeu.transaction.GitStashRef)
+				}
+
+				eeu.logger.Info("✓ Uncommitted changes restored from stash")
 				return nil
 			},
 		},

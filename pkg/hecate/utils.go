@@ -85,13 +85,13 @@ func RenderBundleFragments(
 			return fmt.Errorf("failed to render Caddyfile: %w", err)
 		}
 
-		if err := os.MkdirAll(caddyTargetDir, 0755); err != nil {
+		if err := os.MkdirAll(caddyTargetDir, shared.ServiceDirPerm); err != nil {
 			log.Error("Failed to create Caddy dir", zap.Error(err))
 			return fmt.Errorf("failed to create Caddy dir: %w", err)
 		}
 
 		filePath := fmt.Sprintf("%s/%s.caddy", caddyTargetDir, serviceKey)
-		err = os.WriteFile(filePath, []byte(content), 0644)
+		err = os.WriteFile(filePath, []byte(content), shared.ConfigFilePerm)
 		if err != nil {
 			log.Error("Failed to write Caddy", zap.Error(err))
 			return fmt.Errorf("failed to write Caddy: %w", err)
@@ -107,13 +107,13 @@ func RenderBundleFragments(
 			return fmt.Errorf("failed to render Nginx stream blocks: %w", err)
 		}
 
-		if err := os.MkdirAll(nginxTargetDir, 0755); err != nil {
+		if err := os.MkdirAll(nginxTargetDir, shared.ServiceDirPerm); err != nil {
 			log.Error("Failed to create Nginx dir", zap.Error(err))
 			return fmt.Errorf("failed to create Nginx dir: %w", err)
 		}
 
 		filePath := fmt.Sprintf("%s/%s.conf", nginxTargetDir, serviceKey)
-		err = os.WriteFile(filePath, []byte(rendered), 0644)
+		err = os.WriteFile(filePath, []byte(rendered), shared.ConfigFilePerm)
 		if err != nil {
 			log.Error("Failed to write Nginx block", zap.Error(err))
 			return fmt.Errorf("failed to write Nginx: %w", err)
@@ -196,7 +196,7 @@ func RenderAndWriteTemplate(
 		return fmt.Errorf("failed to render template: %w", err)
 	}
 
-	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(outputPath, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		log.Error("Failed to write rendered file", zap.Error(err), zap.String("path", outputPath))
 		return fmt.Errorf("failed to write file: %w", err)
 	}

@@ -59,15 +59,15 @@ func NewExecutor(rc *eos_io.RuntimeContext, service string) (*Executor, error) {
 		zap.String("service", service))
 
 	// Step 1: Load API definition from YAML
-	definition, err := LoadDefinition(service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load API definition for %s: %w\n\n"+
-			"Troubleshooting:\n"+
-			"  1. Check if pkg/%s/api_definition.yaml exists\n"+
-			"  2. Validate YAML syntax\n"+
-			"  3. See pkg/apiclient/README.md for schema details",
-			service, service, err)
-	}
+    definition, err := LoadDefinition(service)
+    if err != nil {
+        return nil, fmt.Errorf("failed to load API definition for %s: %w\n\n"+
+            "Troubleshooting:\n"+
+            "  1. Check if pkg/%s/api_definition.yaml exists\n"+
+            "  2. Validate YAML syntax\n"+
+            "  3. See pkg/apiclient/README.md for schema details",
+            service, err, service)
+    }
 
 	logger.Debug("API definition loaded",
 		zap.String("service", definition.Service),
@@ -76,33 +76,35 @@ func NewExecutor(rc *eos_io.RuntimeContext, service string) (*Executor, error) {
 
 	// Step 2: Discover authentication token
 	// PRIORITY: env_file → consul → vault → env_var → prompt
-	token, tokenSource, err := DiscoverAuthToken(rc, definition.Auth, service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover authentication token for %s: %w\n\n"+
-			"Troubleshooting:\n"+
-			"  1. Check %s for %s\n"+
-			"  2. Verify Consul KV key %s (if using Consul)\n"+
-			"  3. Verify Vault path %s (if using Vault)\n"+
-			"  4. Run: eos debug %s",
-			service, definition.Auth.TokenEnvFile, definition.Auth.TokenEnvVar,
-			definition.Auth.TokenConsulKey, definition.Auth.TokenVaultPath, service, err)
-	}
+    token, tokenSource, err := DiscoverAuthToken(rc, definition.Auth, service)
+    if err != nil {
+        return nil, fmt.Errorf("failed to discover authentication token for %s: %w\n\n"+
+            "Troubleshooting:\n"+
+            "  1. Check %s for %s\n"+
+            "  2. Verify Consul KV key %s (if using Consul)\n"+
+            "  3. Verify Vault path %s (if using Vault)\n"+
+            "  4. Run: eos debug %s",
+            service, err,
+            definition.Auth.TokenEnvFile, definition.Auth.TokenEnvVar,
+            definition.Auth.TokenConsulKey, definition.Auth.TokenVaultPath, service)
+    }
 
 	logger.Debug("Authentication token discovered",
 		zap.String("source", tokenSource)) // NEVER log token value (P0 security)
 
 	// Step 3: Discover base URL
 	// PRIORITY: env_file → consul → definition.BaseURL → env_var → prompt
-	baseURL, baseURLSource, err := DiscoverBaseURL(rc, definition.Auth, definition.BaseURL, service)
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover base URL for %s: %w\n\n"+
-			"Troubleshooting:\n"+
-			"  1. Check %s for %s\n"+
-			"  2. Verify Consul KV key %s (if using Consul)\n"+
-			"  3. Set base_url in api_definition.yaml",
-			service, definition.Auth.BaseURLEnvFile, definition.Auth.BaseURLEnvVar,
-			definition.Auth.BaseURLConsulKey, err)
-	}
+    baseURL, baseURLSource, err := DiscoverBaseURL(rc, definition.Auth, definition.BaseURL, service)
+    if err != nil {
+        return nil, fmt.Errorf("failed to discover base URL for %s: %w\n\n"+
+            "Troubleshooting:\n"+
+            "  1. Check %s for %s\n"+
+            "  2. Verify Consul KV key %s (if using Consul)\n"+
+            "  3. Set base_url in api_definition.yaml",
+            service, err,
+            definition.Auth.BaseURLEnvFile, definition.Auth.BaseURLEnvVar,
+            definition.Auth.BaseURLConsulKey)
+    }
 
 	logger.Info("Base URL discovered",
 		zap.String("base_url", baseURL),
