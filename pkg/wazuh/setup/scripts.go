@@ -1,11 +1,69 @@
-// cmd/create/wazuh_templates.go
-// Embedded templates for Wazuh integration scripts
+// pkg/wazuh/setup/scripts.go
+// Integration script installation and templates
+//
+// Created by Code Monkey Cybersecurity
+// ABN: 77 177 673 061
 
-package create
+package setup
 
-import "strings"
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
-func getCustomIrisShellScript() string {
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+// InstallIntegrationScripts installs the shell and Python scripts for the integration
+func InstallIntegrationScripts(rc *eos_io.RuntimeContext, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	shellScript := GetCustomIrisShellScript()
+	pythonScript := GetCustomIrisPythonScript(shared.GetInternalHostname())
+
+	shellPath := config.IntegrationsDir + "/" + config.IntegrationName
+	pythonPath := config.IntegrationsDir + "/" + config.IntegrationName + ".py"
+
+	// Write shell script
+	if err := os.WriteFile(shellPath, []byte(shellScript), shared.SecretDirPerm); err != nil {
+		return fmt.Errorf("failed to write shell script: %w", err)
+	}
+
+	// Write Python script
+	if err := os.WriteFile(pythonPath, []byte(pythonScript), shared.SecureConfigFilePerm); err != nil {
+		return fmt.Errorf("failed to write Python script: %w", err)
+	}
+
+	// Set ownership to root:wazuh
+	chownCmd := exec.Command("chown", "root:wazuh", shellPath)
+	if err := chownCmd.Run(); err != nil {
+		logger.Warn("Could not set ownership on shell script",
+			zap.String("path", shellPath),
+			zap.Error(err))
+	}
+
+	chownCmd = exec.Command("chown", "root:wazuh", pythonPath)
+	if err := chownCmd.Run(); err != nil {
+		logger.Warn("Could not set ownership on Python script",
+			zap.String("path", pythonPath),
+			zap.Error(err))
+	}
+
+	logger.Info("Integration scripts installed",
+		zap.String("shell_script", shellPath),
+		zap.String("python_script", pythonPath),
+		zap.String("shell_perms", "750"),
+		zap.String("python_perms", "640"))
+
+	return nil
+}
+
+// GetCustomIrisShellScript returns the shell wrapper script template
+func GetCustomIrisShellScript() string {
 	return `#!/bin/sh
 # Copyright (C) 2015, Wazuh Inc.
 # Created by Wazuh, Inc. <info@wazuh.com>.
@@ -47,7 +105,8 @@ ${WAZUH_PATH}/${WPYTHON_BIN} ${PYTHON_SCRIPT} "$@"
 `
 }
 
-func getCustomIrisPythonScript(hostname string) string {
+// GetCustomIrisPythonScript returns the Python integration script template
+func GetCustomIrisPythonScript(hostname string) string {
 	template := `#!/usr/bin/env python3
 """
 Wazuh Iris Integration
@@ -219,7 +278,7 @@ if __name__ == "__main__":
         test_payload = {
             "timestamp": "2025-10-07T12:00:00.000+0800",
             "rule": {"level": 10, "description": "Test alert", "id": "999999"},
-            "agent": {"id": "000", "name": "test", "ip": "shared.GetInternalHostname"},
+            "agent": {"id": "000", "name": "test", "ip": "HOSTNAME_PLACEHOLDER"},
             "manager": {"name": "test"},
             "data": {
                 "vulnerability": {
@@ -238,5 +297,5 @@ if __name__ == "__main__":
         main(sys.argv)
 `
 	// Replace the placeholder with actual hostname
-	return strings.ReplaceAll(template, "shared.GetInternalHostname", hostname)
+	return strings.ReplaceAll(template, "HOSTNAME_PLACEHOLDER", hostname)
 }
