@@ -1,6 +1,5 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.24
 go 1.24.6
 
 toolchain go1.24.7

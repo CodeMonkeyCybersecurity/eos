@@ -59,7 +59,7 @@ EXAMPLES (DEPRECATED - use 'eos update <service> --fix' instead):
 // AddSubcommands adds all fix subcommands
 func AddSubcommands() {
 	FixCmd.AddCommand(vaultFixCmd)
-	FixCmd.AddCommand(irisFixCmd)
+	// irisFixCmd removed - use 'eos repair iris' instead
 	FixCmd.AddCommand(mattermostFixCmd)
 	FixCmd.AddCommand(consulFixCmd)
 }
