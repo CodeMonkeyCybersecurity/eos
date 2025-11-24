@@ -2,16 +2,16 @@
 
 *Last Updated: 2025-01-23*
 
-**Eos** is a powerful Go-based CLI tool that simplifies Ubuntu server administration through automation, orchestration, and security hardening. Built by Code Monkey Cybersecurity, Eos transforms complex server management tasks into simple, reliable commands.
+**Eos** is a powerful Go-based CLI tool that helps people 'get started' Ubuntu server administration through automation, orchestration, and security hardening. Built by Cybermonkey Ethical Technologies, Eos transforms complex server management tasks into simple, reliable commands.
 
 ## Philosophy
 
 Eos embodies **"Solve problems once, encode in Eos, never solve again"**:
 
-- **Human-Centric**: Technology serves humans with actionable output, informed consent, and barriers-to-entry reduction
-- **Evidence-Based**: Decisions grounded in security research and best practices with adversarial collaboration
-- **Sustainable Innovation**: Maintainable code, comprehensive documentation, iterative improvement
-- **Iterative Evolution**: Build on what exists, enhance rather than replace, encode solutions permanently
+- **Human-Centric**: Technology serves humans with actionable output, informed consent, and barriers-to-entry reduction, intuitive, Feminist, Encourage self-efficacy, Education; Safe, effective, high-quality; Reduce the digital divide, intuitive and easy to use 
+- **Evidence-Based**: Decisions grounded in security research and best practices with adversarial collaboration, Error correction, Value for time, value for money, Essential eight aligned
+- **Sustainable Innovation**: Maintainable code, comprehensive documentation, iterative evoulution, Build on what exists, enhance rather than replace, encode solutions permanently
+- **Collaborative and listening**: - Ownership accountability responsibility, Open source, listens carefully to what the user and machine are saying to help them collaborate properly
 
 ## Overview
 
