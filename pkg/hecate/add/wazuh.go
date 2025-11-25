@@ -292,7 +292,7 @@ func (w *WazuhIntegrator) buildValidationError(backend string, attempts []endpoi
 	errorMsg.WriteString(fmt.Sprintf("  3. Test connectivity: curl -k https://%s/\n", backend))
 	errorMsg.WriteString("  4. Skip validation (if you know service is running): --skip-backend-check\n")
 
-	return eos_err.NewUserError(errorMsg.String())
+	return eos_err.NewUserError("%s", errorMsg.String())
 }
 
 // ConfigureAuthentication sets up Authentik SAML provider for Wazuh

@@ -11,13 +11,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 // TestPlatformStubBehavior verifies that platform stubs return appropriate errors
 func TestPlatformStubBehavior(t *testing.T) {
 	rc := testutil.TestContext(t)
-	logger := otelzap.Ctx(rc.Ctx).Logger().Logger
 
 	// Test NewCephClient stub behavior
 	t.Run("NewCephClient_returns_platform_error_on_unsupported_platform", func(t *testing.T) {
@@ -79,7 +77,6 @@ func TestPlatformStubBehavior(t *testing.T) {
 	t.Run("CreateVolume_returns_platform_error_on_unsupported_platform", func(t *testing.T) {
 		config := &Config{
 			Name:            "test-volume",
-			Size:            "10G",
 			ReplicationSize: 3,
 			PGNum:           128,
 		}
@@ -104,8 +101,8 @@ func TestPlatformStubBehavior(t *testing.T) {
 	// Test CreateMountPoint stub behavior
 	t.Run("CreateMountPoint_returns_platform_error_on_unsupported_platform", func(t *testing.T) {
 		config := &Config{
-			Name:      "test-volume",
-			MountPath: "/mnt/cephfs",
+			Name:       "test-volume",
+			MountPoint: "/mnt/cephfs",
 		}
 
 		err := CreateMountPoint(rc, config)
@@ -156,7 +153,7 @@ func TestPlatformStubBehavior(t *testing.T) {
 
 		// Test CreateVolume stub (method, not function)
 		err = stubClient.CreateVolume(rc, &VolumeCreateOptions{
-			VolumeName: "test",
+			Name: "test",
 		})
 		assert.Error(t, err)
 
@@ -184,7 +181,6 @@ func TestValidateConfig_CrossPlatform(t *testing.T) {
 			name: "valid_config",
 			config: &Config{
 				Name:            "test-volume",
-				Size:            "10G",
 				ReplicationSize: 3,
 				PGNum:           128,
 			},
@@ -193,7 +189,6 @@ func TestValidateConfig_CrossPlatform(t *testing.T) {
 		{
 			name: "missing_name",
 			config: &Config{
-				Size:            "10G",
 				ReplicationSize: 3,
 				PGNum:           128,
 			},
@@ -262,9 +257,9 @@ func TestValidateConfig_CrossPlatform(t *testing.T) {
 // TestBuildMountArgs_CrossPlatform verifies mount args building
 func TestBuildMountArgs_CrossPlatform(t *testing.T) {
 	config := &Config{
-		Name:      "test-volume",
-		MountPath: "/mnt/cephfs",
-		MonHosts:  []string{"10.0.0.1", "10.0.0.2"},
+		Name:         "test-volume",
+		MountPoint:   "/mnt/cephfs",
+		MonitorHosts: []string{"10.0.0.1", "10.0.0.2"},
 	}
 
 	args := BuildMountArgs(config)
@@ -282,9 +277,9 @@ func TestBuildMountArgs_CrossPlatform(t *testing.T) {
 // TestShouldPersistMount_CrossPlatform verifies mount persistence logic
 func TestShouldPersistMount_CrossPlatform(t *testing.T) {
 	config := &Config{
-		Name:      "test-volume",
-		MountPath: "/mnt/cephfs",
-		Persist:   true,
+		Name:         "test-volume",
+		MountPoint:   "/mnt/cephfs",
+		MountOptions: []string{"_netdev"},
 	}
 
 	shouldPersist := ShouldPersistMount(config)

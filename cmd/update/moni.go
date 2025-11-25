@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt/apikeys"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt/postinstall"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/bionicgpt/refresh"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -294,34 +293,6 @@ func runMoniPostInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []st
 	return nil
 }
 
-// runMoniRotateAPIKeys handles the API key rotation
-// Orchestration layer: delegates to pkg/bionicgpt/apikeys for business logic
-func runMoniRotateAPIKeys(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Starting Moni API key rotation",
-		zap.String("install_dir", moniInstallDir))
-
-	// Build configuration
-	config := &apikeys.Config{
-		InstallDir: moniInstallDir,
-	}
-
-	// Validate configuration
-	if err := config.Validate(); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	// Execute API key rotation
-	if err := apikeys.Execute(rc, config); err != nil {
-		logger.Error("API key rotation failed", zap.Error(err))
-		return fmt.Errorf("API key rotation failed: %w", err)
-	}
-
-	logger.Info("API key rotation completed successfully")
-	return nil
-}
-
 // runMoniRefresh handles the refresh operation
 // Orchestration layer: delegates to pkg/bionicgpt/refresh for business logic
 func runMoniRefresh(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -403,6 +374,9 @@ func runMoniRotateAPIKeys(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	logger.Info("📝 Monitor logs:")
 	logger.Info("   docker compose -f /opt/bionicgpt/docker-compose.yml logs -f app litellm-proxy")
 	logger.Info("")
+
+	return nil
+}
 
 // runMoniInit handles the Moni initialization worker
 // Orchestration layer: delegates to pkg/moni for business logic

@@ -18,10 +18,16 @@ import (
 )
 
 var (
-	sshDebugFormat     string
-	sshDebugClientOnly bool
-	sshDebugKeyPath    string
-	sshDebugSanitize   bool
+	sshDebugFormat            string
+	sshDebugClientOnly        bool
+	sshDebugKeyPath           string
+	sshDebugSanitize          bool
+	sshDebugTestForwarding    bool
+	sshDebugHost              string
+	sshDebugUser              string
+	sshDebugPort              string
+	sshDebugPassword          string
+	sshDebugForwardTestTarget string
 )
 
 var sshDebugCmd = &cobra.Command{
@@ -65,6 +71,9 @@ USAGE EXAMPLES:
   # Sanitize sensitive data before sharing
   eos debug ssh user@host --sanitize
 
+  # Test that port forwarding is allowed on the target
+  eos debug ssh --test-forwarding --host vhost1 --user henry
+
 TROUBLESHOOTING COMMON ISSUES:
 
 1. "Permission denied (publickey)" errors:
@@ -92,11 +101,21 @@ func init() {
 	sshDebugCmd.Flags().BoolVar(&sshDebugClientOnly, "client-only", false, "Run client-side diagnostics only (no server connection)")
 	sshDebugCmd.Flags().StringVar(&sshDebugKeyPath, "key", "", "Path to SSH private key (auto-detected if not specified)")
 	sshDebugCmd.Flags().BoolVar(&sshDebugSanitize, "sanitize", false, "Redact sensitive information (keys, paths)")
+	sshDebugCmd.Flags().BoolVar(&sshDebugTestForwarding, "test-forwarding", false, "Test whether SSH port forwarding is permitted on the target")
+	sshDebugCmd.Flags().StringVar(&sshDebugHost, "host", "", "Target host for --test-forwarding (e.g., vhost1 or user@vhost1)")
+	sshDebugCmd.Flags().StringVar(&sshDebugUser, "user", "", "SSH username for --test-forwarding")
+	sshDebugCmd.Flags().StringVar(&sshDebugPort, "port", "22", "SSH port for --test-forwarding")
+	sshDebugCmd.Flags().StringVar(&sshDebugPassword, "password", "", "SSH password for --test-forwarding (optional if key auth works)")
+	sshDebugCmd.Flags().StringVar(&sshDebugForwardTestTarget, "forward-target", "127.0.0.1:22", "Destination to probe through the forwarded connection")
 
 	debugCmd.AddCommand(sshDebugCmd)
 }
 
 func runSSHDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	if sshDebugTestForwarding {
+		return runSSHForwardingTest(rc)
+	}
+
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Determine target (if provided)
@@ -168,6 +187,40 @@ func runSSHDebug(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 	}
 
 	return nil
+}
+
+func runSSHForwardingTest(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if sshDebugHost == "" {
+		return fmt.Errorf("--host is required when using --test-forwarding")
+	}
+
+	connCfg, err := ssh.BuildConnectionConfig(sshDebugHost, sshDebugUser, sshDebugPort, sshDebugKeyPath, sshDebugPassword, "")
+	if err != nil {
+		return err
+	}
+
+	result, err := ssh.TestForwarding(rc, connCfg, sshDebugForwardTestTarget)
+	if err != nil {
+		return err
+	}
+
+	if result.Success {
+		logger.Info("SSH port forwarding test passed",
+			zap.String("host", connCfg.Host),
+			zap.String("user", connCfg.User),
+			zap.String("target", result.Target),
+			zap.String("message", result.Message))
+		return nil
+	}
+
+	logger.Warn("SSH port forwarding test failed",
+		zap.String("host", connCfg.Host),
+		zap.String("user", connCfg.User),
+		zap.String("target", result.Target),
+		zap.String("message", result.Message))
+	return fmt.Errorf("port forwarding blocked: %s", result.Message)
 }
 
 // formatSSHDiagnosticReport formats the diagnostic report based on the requested format

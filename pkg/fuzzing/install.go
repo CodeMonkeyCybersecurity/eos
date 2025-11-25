@@ -284,8 +284,6 @@ func createFuzzingConfig(config *Config, logger otelzap.LoggerWithCtx) error {
 		config.ParallelJobs,
 		config.LogDir)
 
-	if err := os.WriteFile(configPath, []byte(configData), 0644); err != nil {
-	
 	if err := os.WriteFile(configPath, []byte(configData), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}

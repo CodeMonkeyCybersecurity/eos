@@ -3,10 +3,12 @@ package remotedebug
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 // SSHClient wraps the SSH connection with helper methods
@@ -66,6 +68,14 @@ func createSSHConnection(config *Config, strategy string) (*ssh.Client, error) {
 	// Add password auth if provided
 	if config.Password != "" {
 		authMethods = append(authMethods, ssh.Password(config.Password))
+	}
+
+	// Try SSH agent if available
+	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
+		if conn, err := net.Dial("unix", sock); err == nil {
+			agentClient := agent.NewClient(conn)
+			authMethods = append(authMethods, ssh.PublicKeysCallback(agentClient.Signers))
+		}
 	}
 
 	if len(authMethods) == 0 {
@@ -214,6 +224,14 @@ func (c *SSHClient) Close() error {
 		return c.client.Close()
 	}
 	return nil
+}
+
+// Dial opens a forwarded connection through the SSH session (used for forwarding tests).
+func (c *SSHClient) Dial(network, address string) (net.Conn, error) {
+	if c.client == nil {
+		return nil, fmt.Errorf("ssh client not connected")
+	}
+	return c.client.Dial(network, address)
 }
 
 // IsConnected checks if the SSH connection is still active

@@ -138,8 +138,6 @@ func configureCaddyBackend(rc *eos_io.RuntimeContext, config *BackendConfig) err
 		return fmt.Errorf("failed to create caddy sites directory: %w", err)
 	}
 
-	if err := os.WriteFile(configFile, buf.Bytes(), 0644); err != nil {
-	
 	if err := os.WriteFile(configFile, buf.Bytes(), shared.ConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write caddy config: %w", err)
 	}

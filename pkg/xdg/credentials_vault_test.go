@@ -624,8 +624,10 @@ func BenchmarkVaultOperations(b *testing.B) {
 	SetCredentialStore(mock)
 
 	b.Run("save_credential", func(b *testing.B) {
+		idx := 0
 		for b.Loop() {
-			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", i), "pass")
+			_, _ = SaveCredential("benchapp", fmt.Sprintf("user%d", idx), "pass")
+			idx++
 		}
 	})
 

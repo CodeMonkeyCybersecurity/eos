@@ -25,15 +25,6 @@ type OAuth2ProviderRequest struct {
 
 // OAuth2ProviderResponse represents the response when creating/fetching an OAuth2 provider
 type OAuth2ProviderResponse struct {
-	PK                int    `json:"pk"`
-	Name              string `json:"name"`
-	AuthorizationFlow string `json:"authorization_flow"`
-	ClientType        string `json:"client_type"`
-	ClientID          string `json:"client_id"`
-	ClientSecret      string `json:"client_secret"`
-	RedirectURIs      string `json:"redirect_uris"`
-	PropertyMappings  []int  `json:"property_mappings,omitempty"`
-	SigningKey        string `json:"signing_key,omitempty"`
 	PK                int      `json:"pk"`
 	Name              string   `json:"name"`
 	AuthorizationFlow string   `json:"authorization_flow"`

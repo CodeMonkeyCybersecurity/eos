@@ -308,7 +308,5 @@ func backupPartitionTable(rc *eos_io.RuntimeContext, device string) error {
 		return fmt.Errorf("failed to dump partition table: %w", err)
 	}
 
-	return os.WriteFile(backupFile, output, 0644)
-}
 	return os.WriteFile(backupFile, output, shared.ConfigFilePerm)
 }

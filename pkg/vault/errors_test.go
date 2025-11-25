@@ -220,8 +220,10 @@ func BenchmarkIsSecretNotFound(b *testing.B) {
 	}
 
 	b.ResetTimer()
+	idx := 0
 	for b.Loop() {
-		_ = IsSecretNotFound(errors[i%len(errors)])
+		_ = IsSecretNotFound(errors[idx%len(errors)])
+		idx++
 	}
 }
 

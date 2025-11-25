@@ -15,10 +15,15 @@ import (
 
 // TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
-	sshHost     string
-	sshKeyPath  string
-	sshHosts    string
-	sshUsername string
+	sshHost                string
+	sshKeyPath             string
+	sshHosts               string
+	sshUsername            string
+	sshEnableForwarding    bool
+	sshForwardUser         string
+	sshForwardPort         string
+	sshForwardPassword     string
+	sshForwardSudoPassword string
 )
 
 var SecureSSHCmd = &cobra.Command{
@@ -35,6 +40,10 @@ Examples:
   eos secure ssh --host user@hostname --key ~/.ssh/id_rsa
   eos secure ssh  # Interactive mode`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		if sshEnableForwarding {
+			return runEnableSSHForwarding(rc)
+		}
+
 		otelzap.Ctx(rc.Ctx).Info("Starting SSH security diagnostics")
 
 		// Get SSH host if not provided
@@ -259,4 +268,58 @@ func init() {
 	// Add flags for copy-keys command
 	CopyKeysCmd.Flags().StringVar(&sshHosts, "hosts", "", "Comma-separated list of hosts to copy keys to")
 	CopyKeysCmd.Flags().StringVar(&sshUsername, "user", "", "SSH username for remote hosts")
+
+	SecureSSHCmd.Flags().BoolVar(&sshEnableForwarding, "enable-forwarding", false, "Enable SSH port forwarding (AllowTcpForwarding/AllowStreamLocalForwarding yes, remove PermitOpen)")
+	SecureSSHCmd.Flags().StringVar(&sshForwardUser, "user", "", "SSH username for --enable-forwarding")
+	SecureSSHCmd.Flags().StringVar(&sshForwardPort, "port", "22", "SSH port for --enable-forwarding")
+	SecureSSHCmd.Flags().StringVar(&sshForwardPassword, "password", "", "SSH password for --enable-forwarding (optional if key auth works)")
+	SecureSSHCmd.Flags().StringVar(&sshForwardSudoPassword, "sudo-pass", "", "Sudo password for remote host (defaults to --password)")
+}
+
+func runEnableSSHForwarding(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if sshHost == "" {
+		var err error
+		sshHost, err = interaction.PromptUser(rc, "Enter SSH host (user@hostname[:port]): ")
+		if err != nil {
+			return fmt.Errorf("failed to get SSH host: %w", err)
+		}
+	}
+
+	connCfg, err := ssh.BuildConnectionConfig(sshHost, sshForwardUser, sshForwardPort, sshKeyPath, sshForwardPassword, sshForwardSudoPassword)
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Enabling SSH forwarding on host",
+		zap.String("host", connCfg.Host),
+		zap.String("user", connCfg.User),
+		zap.String("port", connCfg.Port))
+
+	client, err := ssh.ConnectSSHClient(rc, connCfg)
+	if err != nil {
+		return fmt.Errorf("failed to connect to %s: %w", connCfg.Host, err)
+	}
+	defer func() { _ = client.Close() }()
+
+	result, err := ssh.EnableSSHForwarding(rc, client)
+	if err != nil {
+		return err
+	}
+
+	logger.Info("SSH forwarding enabled",
+		zap.String("backup", result.BackupPath),
+		zap.String("restart_command", result.RestartCommand),
+		zap.String("validation", result.ValidationOutput))
+
+	if result.Status != nil {
+		logger.Info("Forwarding status",
+			zap.String("allow_tcp_forwarding", result.Status.AllowTcpForwarding),
+			zap.String("allow_stream_local_forwarding", result.Status.AllowStreamLocalForwarding),
+			zap.Strings("permit_open", result.Status.PermitOpen),
+			zap.String("service_status", result.Status.ServiceStatus))
+	}
+
+	return nil
 }

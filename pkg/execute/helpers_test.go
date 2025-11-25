@@ -409,8 +409,9 @@ func TestHelpersEdgeCases(t *testing.T) {
 
 // Benchmark Tests
 func BenchmarkMax(b *testing.B) {
+	x, y := 1, 2
 	for b.Loop() {
-		max(i, i+1)
+		_ = max(x, y)
 	}
 }
 

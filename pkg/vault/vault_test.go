@@ -485,7 +485,9 @@ func BenchmarkSanitizeKey(b *testing.B) {
 	}
 
 	b.ResetTimer()
+	idx := 0
 	for b.Loop() {
-		_ = sanitizeKey(keys[i%len(keys)])
+		_ = sanitizeKey(keys[idx%len(keys)])
+		idx++
 	}
 }
