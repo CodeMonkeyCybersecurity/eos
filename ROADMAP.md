@@ -125,13 +125,18 @@ Use the dated sections below for sequencing, dependencies, and detailed task lis
    - **Remediation**: Add validation to 357 unprotected commands (12 hours, scriptable)
 
 2. **Hardcoded File Permissions (Compliance Risk)**: ~~732 violations~~ → **0 violations (100% COMPLETE)** ✅
-   - **Status**: COMPLETED 2025-11-13 across 4 commits (b8fcabf, a22f4bf, 0276e75, c635bbd)
+   - **Status**: COMPLETED 2025-11-13 across 6 commits (b8fcabf, a22f4bf, 0276e75, c635bbd, 92a552d, 91c6bf1, 753bd37)
    - **Coverage**: 331/331 production violations fixed (732 original count included tests/comments - refined to 331 actual violations)
    - **Breakdown**: 255 generic packages, 49 vault package, 15 consul package, 9 nomad package, 2 vault constants array, 2 intentional exceptions documented
    - **Architecture**: TWO-TIER pattern implemented - shared constants (pkg/shared/permissions.go: 11 constants) + service-specific (pkg/vault/constants.go: 31 constants, pkg/consul/constants.go: 7 constants)
    - **Compliance**: SOC2 CC6.1, PCI-DSS 8.2.1, HIPAA 164.312(a)(1) - all permission constants include documented security rationale
    - **Exceptions**: 2 intentional bitwise operations documented (cmd/read/check.go:75, cmd/backup/restore.go:175) - excluded from remediation as they're dynamic mode modifications, not hardcoded permissions
    - **Circular Imports**: Resolved via local constant duplication in consul subpackages (validation, config, service, acl) with NOTE comments explaining avoidance strategy
+   - **Compliance Artifacts** (commit 753bd37):
+     - Evidence Matrix: pkg/vault/constants.go (lines 391-506) - maps 31 constants to SOC2/PCI-DSS/HIPAA controls, audit-ready documentation
+     - Sync Verification: scripts/verify_constant_sync.sh - automated drift detection for 11 duplicated constants, CI/CD ready, all checks pass
+   - **Verification** (commit 91c6bf1): golangci-lint v2 compatibility fixed, linter runs successfully (52 pre-existing issues documented), build produces 93M ELF executable
+   - **Test Status**: Pre-existing failures documented (vault auth timeout, shared fuzz timeout) - unrelated to P0-2, all permission code compiles successfully
 
 3. **Architecture Boundary Violations**: 19 cmd/ files >100 lines (should be <100)
    - **Worst**: `cmd/debug/iris.go` (1507 lines, 15x over limit)
