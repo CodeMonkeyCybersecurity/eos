@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -86,7 +86,7 @@ jobs:
       matrix:
         focus: [crypto, security, input-validation, template-injection]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -139,7 +139,7 @@ jobs:
     timeout-minutes: 45
     needs: quick-validation
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -178,7 +178,7 @@ jobs:
     needs: [security-fuzzing, architecture-testing]
     if: ${{ github.event.inputs.enable_chaos == 'true' || github.event_name == 'schedule' }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -214,7 +214,7 @@ jobs:
     timeout-minutes: 30
     needs: quick-validation
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -242,7 +242,7 @@ jobs:
     timeout-minutes: 20
     needs: quick-validation
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -276,7 +276,7 @@ jobs:
     timeout-minutes: 25
     needs: quick-validation
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -322,7 +322,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -418,7 +418,7 @@ jobs:
     timeout-minutes: 480 # 8 hours
     if: github.event_name == 'schedule'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Set up Go
       uses: actions/setup-go@v4
