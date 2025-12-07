@@ -39,6 +39,15 @@ type Config struct {
 
 	// DryRun shows what would be done without making changes
 	DryRun bool
+
+	// InstallAITools enables installation of AI coding assistants (Claude Code, Codex)
+	InstallAITools bool
+
+	// SkipClaudeCode skips Claude Code installation when InstallAITools is true
+	SkipClaudeCode bool
+
+	// SkipCodex skips OpenAI Codex CLI installation when InstallAITools is true
+	SkipCodex bool
 }
 
 // DefaultConfig returns a configuration optimized for remote IDE development
@@ -53,6 +62,9 @@ func DefaultConfig() *Config {
 		SkipFirewall:         false,
 		SkipSSHRestart:       false,
 		DryRun:               false,
+		InstallAITools:       true, // Install AI tools by default
+		SkipClaudeCode:       false,
+		SkipCodex:            false,
 	}
 }
 
@@ -85,6 +97,15 @@ type InstallResult struct {
 
 	// AccessInstructions contains user-facing access information
 	AccessInstructions string
+
+	// AIToolsInstalled lists which AI tools were installed
+	AIToolsInstalled []string
+
+	// ClaudeCodeInstalled indicates if Claude Code was installed
+	ClaudeCodeInstalled bool
+
+	// CodexInstalled indicates if OpenAI Codex CLI was installed
+	CodexInstalled bool
 }
 
 // Constants for SSH configuration optimized for remote IDE development

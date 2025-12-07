@@ -73,6 +73,17 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 		}
 	}
 
+	// INTERVENE - Install AI coding tools
+	if config.InstallAITools {
+		logger.Info("Installing AI coding tools")
+		if err := InstallAITools(rc, config, result); err != nil {
+			// Non-fatal - log warning but continue
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("AI tools installation had issues: %v", err))
+			logger.Warn("AI tools installation had issues", zap.Error(err))
+		}
+	}
+
 	// EVALUATE - Generate access instructions
 	result.AccessInstructions = GenerateAccessInstructions(rc, config, result)
 
@@ -200,6 +211,16 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 		sb.WriteString("\n")
 	}
 
+	// AI Tools installed
+	if len(result.AIToolsInstalled) > 0 {
+		sb.WriteString("AI Coding Tools Installed:\n")
+		sb.WriteString(strings.Repeat("-", 30) + "\n")
+		for _, tool := range result.AIToolsInstalled {
+			sb.WriteString(fmt.Sprintf("  ✓ %s\n", tool))
+		}
+		sb.WriteString("\n")
+	}
+
 	// Supported IDEs
 	sb.WriteString("Supported IDEs:\n")
 	sb.WriteString(strings.Repeat("-", 30) + "\n")
@@ -222,4 +243,121 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 
 	logger.Debug("Generated access instructions")
 	return sb.String()
+}
+
+// InstallAITools installs AI coding assistants (Claude Code, OpenAI Codex CLI)
+func InstallAITools(rc *eos_io.RuntimeContext, config *Config, result *InstallResult) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing AI coding tools",
+		zap.Bool("skip_claude", config.SkipClaudeCode),
+		zap.Bool("skip_codex", config.SkipCodex),
+		zap.Bool("dry_run", config.DryRun))
+
+	result.AIToolsInstalled = []string{}
+	var lastErr error
+
+	// Install Claude Code
+	if !config.SkipClaudeCode {
+		if err := installClaudeCode(rc, config, result); err != nil {
+			logger.Warn("Claude Code installation failed", zap.Error(err))
+			lastErr = err
+		}
+	}
+
+	// Install OpenAI Codex CLI
+	if !config.SkipCodex {
+		if err := installCodexCLI(rc, config, result); err != nil {
+			logger.Warn("OpenAI Codex CLI installation failed", zap.Error(err))
+			lastErr = err
+		}
+	}
+
+	return lastErr
+}
+
+// installClaudeCode installs Claude Code using the official installer
+func installClaudeCode(rc *eos_io.RuntimeContext, config *Config, result *InstallResult) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing Claude Code")
+
+	// Check if already installed
+	if _, err := exec.LookPath("claude"); err == nil {
+		logger.Info("Claude Code already installed")
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "Claude Code (already installed)")
+		result.ClaudeCodeInstalled = true
+		return nil
+	}
+
+	if config.DryRun {
+		logger.Info("DRY RUN: Would install Claude Code via: curl -fsSL https://claude.ai/install.sh | bash")
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "Claude Code (would install)")
+		return nil
+	}
+
+	// Install using the official installer script
+	// Run as the target user, not as root
+	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
+
+	// If we're running as root with SUDO_USER, run as that user instead
+	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
+		installCmd = exec.Command("su", "-", config.User, "-c", "curl -fsSL https://claude.ai/install.sh | bash")
+	}
+
+	output, err := installCmd.CombinedOutput()
+	if err != nil {
+		logger.Error("Claude Code installation failed",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return fmt.Errorf("claude code installation failed: %w (output: %s)", err, string(output))
+	}
+
+	logger.Info("Claude Code installed successfully")
+	result.AIToolsInstalled = append(result.AIToolsInstalled, "Claude Code")
+	result.ClaudeCodeInstalled = true
+	return nil
+}
+
+// installCodexCLI installs OpenAI Codex CLI via npm
+func installCodexCLI(rc *eos_io.RuntimeContext, config *Config, result *InstallResult) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Installing OpenAI Codex CLI")
+
+	// Check if npm is available
+	if _, err := exec.LookPath("npm"); err != nil {
+		logger.Warn("npm not found, skipping Codex CLI installation")
+		result.Warnings = append(result.Warnings,
+			"npm not found - install Node.js to use OpenAI Codex CLI: sudo apt install nodejs npm")
+		return fmt.Errorf("npm not found: install Node.js first")
+	}
+
+	// Check if already installed
+	checkCmd := exec.Command("npm", "list", "-g", "@openai/codex")
+	if err := checkCmd.Run(); err == nil {
+		logger.Info("OpenAI Codex CLI already installed")
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "OpenAI Codex CLI (already installed)")
+		result.CodexInstalled = true
+		return nil
+	}
+
+	if config.DryRun {
+		logger.Info("DRY RUN: Would install OpenAI Codex CLI via: npm install -g @openai/codex")
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "OpenAI Codex CLI (would install)")
+		return nil
+	}
+
+	// Install globally via npm
+	// Run as root if we have root privileges (npm -g requires it)
+	installCmd := exec.Command("npm", "install", "-g", "@openai/codex")
+	output, err := installCmd.CombinedOutput()
+	if err != nil {
+		logger.Error("OpenAI Codex CLI installation failed",
+			zap.Error(err),
+			zap.String("output", string(output)))
+		return fmt.Errorf("codex cli installation failed: %w (output: %s)", err, string(output))
+	}
+
+	logger.Info("OpenAI Codex CLI installed successfully")
+	result.AIToolsInstalled = append(result.AIToolsInstalled, "OpenAI Codex CLI")
+	result.CodexInstalled = true
+	return nil
 }

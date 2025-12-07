@@ -28,18 +28,26 @@ var CreateCodeCmd = &cobra.Command{
 - Cursor
 - JetBrains Gateway
 
-This command optimizes SSH configuration to prevent common issues like:
-- "Too many logins" errors (increases MaxSessions)
-- IDE disconnections during idle (enables ClientAliveInterval)
-- Connection drops during network blips (increases ClientAliveCountMax)
-- Port forwarding issues (enables AllowTcpForwarding)
+This command:
+1. Optimizes SSH configuration to prevent common issues:
+   - "Too many logins" errors (increases MaxSessions)
+   - IDE disconnections during idle (enables ClientAliveInterval)
+   - Connection drops during network blips (increases ClientAliveCountMax)
+   - Port forwarding issues (enables AllowTcpForwarding)
 
-It also configures firewall rules to allow SSH from trusted networks.
+2. Configures firewall rules to allow SSH from trusted networks
+
+3. Installs AI coding tools:
+   - Claude Code (via curl -fsSL https://claude.ai/install.sh | bash)
+   - OpenAI Codex CLI (via npm install -g @openai/codex)
 
 Example:
   sudo eos create code
   sudo eos create code --user henry
-  sudo eos create code --max-sessions 30 --dry-run`,
+  sudo eos create code --max-sessions 30 --dry-run
+  sudo eos create code --skip-ai-tools          # Skip AI tools installation
+  sudo eos create code --skip-claude            # Only install Codex
+  sudo eos create code --skip-codex             # Only install Claude Code`,
 	RunE: eos_cli.Wrap(runCreateCode),
 }
 
@@ -59,6 +67,11 @@ func init() {
 	CreateCodeCmd.Flags().Bool("skip-firewall", false, "Skip firewall configuration")
 	CreateCodeCmd.Flags().Bool("skip-ssh-restart", false, "Skip SSH service restart")
 	CreateCodeCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
+
+	// AI tools flags
+	CreateCodeCmd.Flags().Bool("skip-ai-tools", false, "Skip installation of AI coding tools (Claude Code, Codex)")
+	CreateCodeCmd.Flags().Bool("skip-claude", false, "Skip Claude Code installation")
+	CreateCodeCmd.Flags().Bool("skip-codex", false, "Skip OpenAI Codex CLI installation")
 
 	// Network flags
 	CreateCodeCmd.Flags().StringSlice("allowed-networks", []string{},
@@ -106,6 +119,19 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	if networks, err := cmd.Flags().GetStringSlice("allowed-networks"); err == nil {
 		config.AllowedNetworks = networks
+	}
+
+	// AI tools flags
+	if skipAITools, err := cmd.Flags().GetBool("skip-ai-tools"); err == nil && skipAITools {
+		config.InstallAITools = false
+	}
+
+	if skipClaude, err := cmd.Flags().GetBool("skip-claude"); err == nil {
+		config.SkipClaudeCode = skipClaude
+	}
+
+	if skipCodex, err := cmd.Flags().GetBool("skip-codex"); err == nil {
+		config.SkipCodex = skipCodex
 	}
 
 	logger.Info("Starting remote IDE development setup",
