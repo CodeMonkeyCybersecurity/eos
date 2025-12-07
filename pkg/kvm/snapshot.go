@@ -441,8 +441,6 @@ func (sm *SnapshotManager) backupSnapshotIntervention(rc *eos_io.RuntimeContext,
 	timestamp := time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(sm.config.BackupDir, fmt.Sprintf("%s_%s_%s", sm.config.VMName, snapshotName, timestamp))
 
-	if err := os.MkdirAll(backupPath, 0755); err != nil {
-	
 	if err := os.MkdirAll(backupPath, shared.ServiceDirPerm); err != nil {
 		return fmt.Errorf("failed to create backup path: %w", err)
 	}
