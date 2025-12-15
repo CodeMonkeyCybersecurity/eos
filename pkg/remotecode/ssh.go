@@ -473,10 +473,18 @@ func GetSSHConfigDir(username string) (string, error) {
 	return filepath.Join(homeDir, ".ssh"), nil
 }
 
+// CleanupResult contains the results of IDE server cleanup
+type CleanupResult struct {
+	VersionsRemoved int
+	SpaceRecovered  int64
+	Errors          []string
+}
+
 // CleanupOldServers removes old windsurf-server and code-server installations
 // This helps prevent disk space issues from accumulating old IDE servers
-func CleanupOldServers(rc *eos_io.RuntimeContext, username string) error {
+func CleanupOldServers(rc *eos_io.RuntimeContext, username string) *CleanupResult {
 	logger := otelzap.Ctx(rc.Ctx)
+	result := &CleanupResult{}
 
 	// Determine home directory
 	homeDir := "/root"
@@ -507,20 +515,96 @@ func CleanupOldServers(rc *eos_io.RuntimeContext, username string) error {
 			logger.Warn("Failed to read server bin directory",
 				zap.String("dir", binDir),
 				zap.Error(err))
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to read %s: %v", binDir, err))
 			continue
 		}
 
-		// Keep only the 2 most recent versions, remove others
-		if len(entries) <= 2 {
+		// Keep only IDEServerRetainCount most recent versions, remove others
+		if len(entries) <= IDEServerRetainCount {
+			logger.Debug("Server directory within retention limit",
+				zap.String("dir", serverDir),
+				zap.Int("versions", len(entries)),
+				zap.Int("retain_count", IDEServerRetainCount))
 			continue
+		}
+
+		// Get file info with modification times for sorting
+		type versionEntry struct {
+			entry   os.DirEntry
+			modTime int64
+			size    int64
+		}
+		var versions []versionEntry
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			entryPath := filepath.Join(binDir, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				logger.Warn("Failed to get entry info",
+					zap.String("path", entryPath),
+					zap.Error(err))
+				continue
+			}
+			// Calculate directory size
+			dirSize := getDirSize(entryPath)
+			versions = append(versions, versionEntry{
+				entry:   entry,
+				modTime: info.ModTime().Unix(),
+				size:    dirSize,
+			})
 		}
 
 		// Sort by modification time (most recent first)
-		// Note: In production, would implement proper sorting
-		logger.Info("Found old server versions to clean",
+		for i := 0; i < len(versions)-1; i++ {
+			for j := i + 1; j < len(versions); j++ {
+				if versions[j].modTime > versions[i].modTime {
+					versions[i], versions[j] = versions[j], versions[i]
+				}
+			}
+		}
+
+		// Delete versions beyond the retain count
+		for i := IDEServerRetainCount; i < len(versions); i++ {
+			entryPath := filepath.Join(binDir, versions[i].entry.Name())
+			logger.Info("Removing old IDE server version",
+				zap.String("path", entryPath),
+				zap.Int64("size_bytes", versions[i].size))
+
+			if err := os.RemoveAll(entryPath); err != nil {
+				logger.Warn("Failed to remove old server version",
+					zap.String("path", entryPath),
+					zap.Error(err))
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to remove %s: %v", entryPath, err))
+				continue
+			}
+
+			result.VersionsRemoved++
+			result.SpaceRecovered += versions[i].size
+		}
+
+		logger.Info("Cleaned up old server versions",
 			zap.String("server_dir", serverDir),
-			zap.Int("versions", len(entries)))
+			zap.Int("versions_removed", result.VersionsRemoved),
+			zap.Int64("space_recovered_bytes", result.SpaceRecovered))
 	}
 
-	return nil
+	return result
+}
+
+// getDirSize calculates the total size of a directory
+func getDirSize(path string) int64 {
+	var size int64
+	_ = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
 }

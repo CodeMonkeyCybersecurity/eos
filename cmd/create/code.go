@@ -76,6 +76,14 @@ func init() {
 	// Network flags
 	CreateCodeCmd.Flags().StringSlice("allowed-networks", []string{},
 		"Additional CIDR ranges to allow SSH from (e.g., 203.0.113.0/24)")
+
+	// Windsurf-specific flags
+	CreateCodeCmd.Flags().Bool("skip-connectivity-check", false,
+		"Skip Windsurf domain connectivity check (use if you know connectivity works)")
+	CreateCodeCmd.Flags().Bool("cleanup-ide-servers", false,
+		"Clean up old IDE server versions to recover disk space")
+	CreateCodeCmd.Flags().Bool("no-client-config", false,
+		"Skip generating SSH config for client machine")
 }
 
 func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -132,6 +140,19 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	if skipCodex, err := cmd.Flags().GetBool("skip-codex"); err == nil {
 		config.SkipCodex = skipCodex
+	}
+
+	// Windsurf-specific flags
+	if skipConnCheck, err := cmd.Flags().GetBool("skip-connectivity-check"); err == nil {
+		config.SkipConnectivityCheck = skipConnCheck
+	}
+
+	if cleanupServers, err := cmd.Flags().GetBool("cleanup-ide-servers"); err == nil {
+		config.CleanupIDEServers = cleanupServers
+	}
+
+	if noClientConfig, err := cmd.Flags().GetBool("no-client-config"); err == nil && noClientConfig {
+		config.GenerateClientConfig = false
 	}
 
 	logger.Info("Starting remote IDE development setup",

@@ -4,6 +4,30 @@ trap 'echo " Installation failed on line $LINENO"; exit 1' ERR
 
 log() { echo "[$1] $2"; }
 
+declare -A GO_CHECKSUMS=(
+  ["linux_amd64"]="0000000000000000000000000000000000000000000000000000000000000000"
+  ["linux_arm64"]="0000000000000000000000000000000000000000000000000000000000000000"
+)
+
+GITHUB_CLI_KEY_SHA256="0000000000000000000000000000000000000000000000000000000000000000"
+
+verify_checksum() {
+  local file="$1"
+  local expected="$2"
+  if [[ -z "$expected" ]]; then
+    log ERR " Missing checksum for $file"
+    exit 1
+  fi
+  local actual
+  actual=$(sha256sum "$file" | awk '{print $1}')
+  if [[ "$actual" != "$expected" ]]; then
+    log ERR " Checksum mismatch for $file"
+    log ERR " Expected: $expected"
+    log ERR " Actual:   $actual"
+    exit 1
+  fi
+}
+
 # --- Platform Detection ---
 PLATFORM=""
 IS_LINUX=false
@@ -169,12 +193,16 @@ install_go() {
       
       log INFO " Downloading Go ${GO_VERSION} from ${download_url}..."
       cd /tmp
-      curl -LO "$download_url"
+      curl --fail --retry 3 --retry-delay 2 -LO "$download_url"
       
       if [ ! -f "$go_tarball" ]; then
         log ERR " Failed to download Go archive"
         exit 1
       fi
+
+      local checksum_key="${os}_${arch}"
+      local expected_checksum="${GO_CHECKSUMS[$checksum_key]}"
+      verify_checksum "$go_tarball" "$expected_checksum"
       
       # Verify download
       if ! file "$go_tarball" | grep -q "gzip compressed data"; then
@@ -257,8 +285,11 @@ install_github_cli() {
     fi
   elif $IS_DEBIAN; then
     # Install GitHub CLI on Debian-based systems
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    tmp_key=$(mktemp)
+    curl --fail --retry 3 --retry-delay 2 -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o "$tmp_key"
+    verify_checksum "$tmp_key" "$GITHUB_CLI_KEY_SHA256"
+    install -m 644 "$tmp_key" /usr/share/keyrings/githubcli-archive-keyring.gpg
+    rm -f "$tmp_key"
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
     apt-get update
     apt-get install -y gh

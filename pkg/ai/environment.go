@@ -3,10 +3,16 @@
 package ai
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -19,22 +25,52 @@ import (
 
 // EnvironmentAnalyzer analyzes the current environment
 type EnvironmentAnalyzer struct {
-	workingDir  string
-	maxFiles    int
-	maxLogLines int
+	workingDir         string
+	maxFiles           int
+	maxLogLines        int
+	includeSecretFiles bool
+	redactSensitive    bool
 }
 
 // NewEnvironmentAnalyzer creates a new environment analyzer
-func NewEnvironmentAnalyzer(workingDir string) *EnvironmentAnalyzer {
+func NewEnvironmentAnalyzer(workingDir string, opts ...EnvironmentOption) *EnvironmentAnalyzer {
 	if workingDir == "" {
 		workingDir, _ = os.Getwd()
 	}
-	return &EnvironmentAnalyzer{
-		workingDir:  workingDir,
-		maxFiles:    50,
-		maxLogLines: 100,
+	ea := &EnvironmentAnalyzer{
+		workingDir:      workingDir,
+		maxFiles:        50,
+		maxLogLines:     100,
+		redactSensitive: true,
+	}
+	for _, opt := range opts {
+		opt(ea)
+	}
+	return ea
+}
+
+// EnvironmentOption configures the analyzer behavior
+type EnvironmentOption func(*EnvironmentAnalyzer)
+
+// WithSecretInclusion toggles whether secret-like files are analyzed
+func WithSecretInclusion(include bool) EnvironmentOption {
+	return func(ea *EnvironmentAnalyzer) {
+		ea.includeSecretFiles = include
 	}
 }
+
+// WithSecretRedaction toggles whether sensitive values are redacted
+func WithSecretRedaction(enabled bool) EnvironmentOption {
+	return func(ea *EnvironmentAnalyzer) {
+		ea.redactSensitive = enabled
+	}
+}
+
+var (
+	secretKeyValueRegex    = regexp.MustCompile(`(?i)(token|password|secret|apikey|api_key|bearer|session|authorization)[\s:=\"']+([A-Za-z0-9\-_.:/+=]+)`) //nolint:lll
+	secretHighEntropyRegex = regexp.MustCompile(`[A-Za-z0-9+/=_-]{40,}`)
+	secretFileIndicators   = []string{".pem", ".key", "id_rsa", "id_dsa", "kubeconfig", ".kube", ".env", ".p12", ".pfx", ".secrets", "credentials"}
+)
 
 // AnalyzeEnvironment performs a comprehensive analysis of the current environment
 func (ea *EnvironmentAnalyzer) AnalyzeEnvironment(rc *eos_io.RuntimeContext) (*EnvironmentContext, error) {
@@ -109,6 +145,9 @@ func (ea *EnvironmentAnalyzer) analyzeFileSystem(rc *eos_io.RuntimeContext) (*Fi
 
 		// Analyze files
 		if !d.IsDir() {
+			if !ea.includeSecretFiles && ea.isSecretFile(path) {
+				return nil
+			}
 			fileInfo, err := ea.analyzeFile(path)
 			if err != nil {
 				return nil // Continue on errors
@@ -160,15 +199,9 @@ func (ea *EnvironmentAnalyzer) analyzeFile(path string) (*FileInfo, error) {
 		IsDirectory: stat.IsDir(),
 	}
 
-	// Get file content excerpt for small files
-	if !stat.IsDir() && stat.Size() < 10*1024 { // < 10KB
-		if content, err := os.ReadFile(path); err == nil {
-			lines := strings.Split(string(content), "\n")
-			if len(lines) > 10 {
-				fileInfo.Excerpt = strings.Join(lines[:10], "\n") + "\n... (truncated)"
-			} else {
-				fileInfo.Excerpt = string(content)
-			}
+	if !stat.IsDir() {
+		if summary, err := ea.buildFileSummary(path, stat.Size()); err == nil {
+			fileInfo.Excerpt = summary
 		}
 	}
 
@@ -449,6 +482,53 @@ func (ea *EnvironmentAnalyzer) getTerraformState(rc *eos_io.RuntimeContext) (*Te
 	return state, nil
 }
 
+func (ea *EnvironmentAnalyzer) buildFileSummary(path string, size int64) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	maxSample := int64(256 * 1024)
+	sampleSize := size
+	if sampleSize > maxSample {
+		sampleSize = maxSample
+	}
+	buf := make([]byte, sampleSize)
+	readBytes, err := io.ReadFull(file, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return "", err
+	}
+	buf = buf[:readBytes]
+	lineCount := bytes.Count(buf, []byte("\n")) + 1
+	sum := sha256.Sum256(buf)
+	truncated := ""
+	if size > maxSample {
+		truncated = " (partial hash)"
+	}
+	return fmt.Sprintf("size=%d bytes, approx_lines=%d, sha256=%s%s", size, lineCount, hex.EncodeToString(sum[:8]), truncated), nil
+}
+
+func (ea *EnvironmentAnalyzer) isSecretFile(path string) bool {
+	lowerPath := strings.ToLower(path)
+	base := strings.ToLower(filepath.Base(path))
+	for _, indicator := range secretFileIndicators {
+		key := strings.ToLower(indicator)
+		if strings.Contains(lowerPath, key) || strings.HasSuffix(base, key) {
+			return true
+		}
+	}
+	return false
+}
+
+func (ea *EnvironmentAnalyzer) redact(text string) string {
+	if !ea.redactSensitive || strings.TrimSpace(text) == "" {
+		return text
+	}
+	sanitized := secretKeyValueRegex.ReplaceAllString(text, "$1 <redacted>")
+	sanitized = secretHighEntropyRegex.ReplaceAllString(sanitized, "<redacted>")
+	return sanitized
+}
+
 // analyzeLogs analyzes recent logs
 func (ea *EnvironmentAnalyzer) analyzeLogs(rc *eos_io.RuntimeContext) (*LogContext, error) {
 	logs := &LogContext{}
@@ -501,7 +581,7 @@ func (ea *EnvironmentAnalyzer) getSystemLogs(rc *eos_io.RuntimeContext) ([]LogEn
 			Timestamp: time.Now(), // Simplified - would parse actual timestamp
 			Level:     "INFO",     // Simplified - would parse actual level
 			Service:   "system",
-			Message:   strings.TrimSpace(line),
+			Message:   ea.redact(strings.TrimSpace(line)),
 			Source:    "system",
 		}
 
@@ -555,7 +635,7 @@ func (ea *EnvironmentAnalyzer) getDockerLogs(rc *eos_io.RuntimeContext) ([]LogEn
 				Timestamp: time.Now(),
 				Level:     "INFO",
 				Service:   container,
-				Message:   strings.TrimSpace(line),
+				Message:   ea.redact(strings.TrimSpace(line)),
 				Source:    "docker",
 			}
 

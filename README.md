@@ -102,6 +102,32 @@ eos create wazuh              # SIEM and threat detection
 eos create bionicgpt          # Private AI assistant with RAG
 eos create ollama             # Local LLM runtime
 
+## AI-driven remediation safeguards
+
+- Environment analysis now sanitizes outputs, redacts credential-like tokens, and prompts for operator consent before sharing summaries with Anthropic/OpenAI.
+- Action execution is constrained by a local policy that enforces workspace allowlists, command/argument limits, and records every action in `.eos-ai-audit/actions.log`.
+- `--auto-fix` requires a signed policy file unless you confirm each action interactively.
+
+Example `~/.config/eos/ai-config.yaml` fragment:
+
+```yaml
+action_security:
+  workspace_allowlist:
+    - /opt/eos
+  allowed_commands:
+    - docker
+    - systemctl
+    - terraform
+data_sharing:
+  include_secret_files: false
+  redact_sensitive: true
+  require_consent: true
+policy_secrets:
+  - deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+```
+
+Auto-fix policies are JSON documents signed with one of the `policy_secrets`. Point `--auto-fix-policy` at the signed file when using `--auto-fix` to enable unattended remediation.
+
 # Web Services
 eos create mattermost         # Team collaboration
 eos create hecate             # Reverse proxy (Caddy-based)

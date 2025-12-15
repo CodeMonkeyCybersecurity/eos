@@ -48,23 +48,38 @@ type Config struct {
 
 	// SkipCodex skips OpenAI Codex CLI installation when InstallAITools is true
 	SkipCodex bool
+
+	// ClaudeInstallerSHA256 optionally overrides the pinned installer checksum
+	ClaudeInstallerSHA256 string
+
+	// SkipConnectivityCheck skips Windsurf domain connectivity check
+	SkipConnectivityCheck bool
+
+	// CleanupIDEServers enables cleanup of old IDE server versions
+	CleanupIDEServers bool
+
+	// GenerateClientConfig generates SSH config for client machine
+	GenerateClientConfig bool
 }
 
 // DefaultConfig returns a configuration optimized for remote IDE development
 func DefaultConfig() *Config {
 	return &Config{
-		MaxSessions:          MaxSessionsDefault,
-		ClientAliveInterval:  ClientAliveIntervalDefault,
-		ClientAliveCountMax:  ClientAliveCountMaxDefault,
-		AllowTcpForwarding:   true,
-		AllowAgentForwarding: true,
-		AllowedNetworks:      []string{},
-		SkipFirewall:         false,
-		SkipSSHRestart:       false,
-		DryRun:               false,
-		InstallAITools:       true, // Install AI tools by default
-		SkipClaudeCode:       false,
-		SkipCodex:            false,
+		MaxSessions:           MaxSessionsDefault,
+		ClientAliveInterval:   ClientAliveIntervalDefault,
+		ClientAliveCountMax:   ClientAliveCountMaxDefault,
+		AllowTcpForwarding:    true,
+		AllowAgentForwarding:  true,
+		AllowedNetworks:       []string{},
+		SkipFirewall:          false,
+		SkipSSHRestart:        false,
+		DryRun:                false,
+		InstallAITools:        true, // Install AI tools by default
+		SkipClaudeCode:        false,
+		SkipCodex:             false,
+		SkipConnectivityCheck: false,
+		CleanupIDEServers:     false, // Opt-in cleanup of old IDE servers
+		GenerateClientConfig:  true,  // Generate client SSH config by default
 	}
 }
 
@@ -106,6 +121,15 @@ type InstallResult struct {
 
 	// CodexInstalled indicates if OpenAI Codex CLI was installed
 	CodexInstalled bool
+
+	// ClientSSHConfig contains the generated SSH config for the user's client machine
+	ClientSSHConfig string
+
+	// IDEServersCleanedUp indicates how many old IDE server versions were removed
+	IDEServersCleanedUp int
+
+	// DiskSpaceRecovered is bytes recovered from IDE server cleanup
+	DiskSpaceRecovered int64
 }
 
 // Constants for SSH configuration optimized for remote IDE development
@@ -145,10 +169,10 @@ const (
 
 // SSHSettings maps setting names to their descriptions for documentation
 var SSHSettings = map[string]string{
-	"MaxSessions": "Maximum number of open shell, login or subsystem (e.g. sftp) sessions permitted per network connection",
-	"ClientAliveInterval": "Sets a timeout interval in seconds after which if no data has been received from the client, sshd will send a message through the encrypted channel to request a response",
-	"ClientAliveCountMax": "Sets the number of client alive messages which may be sent without sshd receiving any messages back from the client",
-	"AllowTcpForwarding": "Specifies whether TCP forwarding is permitted",
+	"MaxSessions":          "Maximum number of open shell, login or subsystem (e.g. sftp) sessions permitted per network connection",
+	"ClientAliveInterval":  "Sets a timeout interval in seconds after which if no data has been received from the client, sshd will send a message through the encrypted channel to request a response",
+	"ClientAliveCountMax":  "Sets the number of client alive messages which may be sent without sshd receiving any messages back from the client",
+	"AllowTcpForwarding":   "Specifies whether TCP forwarding is permitted",
 	"AllowAgentForwarding": "Specifies whether ssh-agent forwarding is permitted",
 }
 
@@ -160,3 +184,21 @@ var SupportedIDEs = []string{
 	"Cursor",
 	"JetBrains Gateway",
 }
+
+const (
+	claudeInstallerURL           = "https://claude.ai/install.sh"
+	claudeInstallerDefaultSHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
+	// WindsurfREHDomain is the domain Windsurf downloads its remote server from
+	WindsurfREHDomain = "windsurf-stable.codeiumdata.com"
+
+	// MinDiskSpaceMB is minimum free disk space in MB recommended for IDE servers
+	// Windsurf-reh is ~500MB, plus room for extensions and cache
+	MinDiskSpaceMB = 2048
+
+	// IDEServerRetainCount is how many old IDE server versions to keep during cleanup
+	IDEServerRetainCount = 2
+
+	// ConnectivityCheckTimeout is the timeout for network connectivity checks
+	ConnectivityCheckTimeout = 10 * time.Second
+)

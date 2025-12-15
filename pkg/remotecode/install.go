@@ -4,12 +4,19 @@
 package remotecode
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -35,7 +42,7 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 	}
 
 	// ASSESS - Check prerequisites
-	if err := CheckPrerequisites(rc); err != nil {
+	if err := CheckPrerequisites(rc, config); err != nil {
 		return nil, fmt.Errorf("prerequisites check failed: %w", err)
 	}
 
@@ -84,6 +91,25 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 		}
 	}
 
+	// INTERVENE - Cleanup old IDE servers if requested
+	if config.CleanupIDEServers {
+		logger.Info("Cleaning up old IDE server versions")
+		cleanupResult := CleanupOldServers(rc, config.User)
+		result.IDEServersCleanedUp = cleanupResult.VersionsRemoved
+		result.DiskSpaceRecovered = cleanupResult.SpaceRecovered
+		if len(cleanupResult.Errors) > 0 {
+			for _, e := range cleanupResult.Errors {
+				result.Warnings = append(result.Warnings, e)
+			}
+		}
+	}
+
+	// Generate client SSH config if requested
+	if config.GenerateClientConfig {
+		hostname := shared.GetInternalHostname()
+		result.ClientSSHConfig = GenerateClientSSHConfig(hostname, config.User, shared.PortSSH)
+	}
+
 	// EVALUATE - Generate access instructions
 	result.AccessInstructions = GenerateAccessInstructions(rc, config, result)
 
@@ -96,7 +122,7 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 }
 
 // CheckPrerequisites verifies the system is ready for setup
-func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
+func CheckPrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Checking prerequisites for remote IDE setup")
 
@@ -105,9 +131,19 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("this command requires root privileges, please run with sudo")
 	}
 
-	// Check for SSH daemon
+	// Check architecture - Windsurf only supports x64
+	arch := runtime.GOARCH
+	if arch != "amd64" {
+		return fmt.Errorf("Windsurf IDE only supports x64 (amd64) architecture, but this server is %s\n\n"+
+			"Alternative: Use VS Code Remote SSH or JetBrains Gateway which support ARM64", arch)
+	}
+	logger.Info("Architecture check passed", zap.String("arch", arch))
+
+	// Check for SSH daemon - offer to install if missing
 	if _, err := os.Stat(SSHConfigPath); err != nil {
-		return fmt.Errorf("SSH server not installed (missing %s)", SSHConfigPath)
+		if err := checkAndInstallOpenSSH(rc); err != nil {
+			return err
+		}
 	}
 
 	// Check for required commands
@@ -118,8 +154,100 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
+	// Check Windsurf connectivity (unless skipped)
+	if !config.SkipConnectivityCheck {
+		if err := checkWindsurfConnectivity(rc); err != nil {
+			return err
+		}
+	} else {
+		logger.Info("Skipping Windsurf connectivity check (--skip-connectivity-check)")
+	}
+
 	logger.Info("All prerequisites satisfied")
 	return nil
+}
+
+// checkAndInstallOpenSSH checks for OpenSSH server and offers to install it
+func checkAndInstallOpenSSH(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("OpenSSH server not detected, checking if installation is needed")
+
+	result, err := interaction.CheckDependencyWithPrompt(rc, interaction.DependencyConfig{
+		Name:         "OpenSSH Server",
+		Description:  "Required for remote IDE connections (Windsurf, VS Code, etc.)",
+		CheckCommand: "sshd",
+		CheckArgs:    []string{"-t"},
+		InstallCmd:   "apt update && apt install -y openssh-server && systemctl enable --now ssh",
+		StartCmd:     "systemctl start ssh",
+		Required:     true,
+		AutoInstall:  true,
+		AutoStart:    true,
+	})
+
+	if err != nil {
+		return fmt.Errorf("OpenSSH server setup failed: %w", err)
+	}
+
+	if result.UserDecline {
+		return fmt.Errorf("OpenSSH server is required for remote IDE development\n\n" +
+			"Install manually with:\n  sudo apt install openssh-server\n  sudo systemctl enable --now ssh")
+	}
+
+	return nil
+}
+
+// checkWindsurfConnectivity verifies the server can reach Windsurf REH download server
+func checkWindsurfConnectivity(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Windsurf connectivity", zap.String("domain", WindsurfREHDomain))
+
+	url := fmt.Sprintf("https://%s", WindsurfREHDomain)
+
+	ctx, cancel := context.WithTimeout(rc.Ctx, ConnectivityCheckTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create connectivity check request: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout: ConnectivityCheckTimeout,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("cannot reach Windsurf server (%s): %w\n\n"+
+			"Windsurf IDE downloads its remote server component on first connection.\n"+
+			"Without access to %s, remote connections will fail.\n\n"+
+			"Remediation:\n"+
+			"  1. Check firewall rules: ensure outbound HTTPS (443) is allowed\n"+
+			"  2. Check proxy settings: configure HTTP_PROXY/HTTPS_PROXY if needed\n"+
+			"  3. Whitelist domain: %s\n\n"+
+			"To skip this check (if you know connectivity works):\n"+
+			"  eos create code --skip-connectivity-check",
+			WindsurfREHDomain, err, WindsurfREHDomain, WindsurfREHDomain)
+	}
+	defer resp.Body.Close()
+
+	logger.Info("Windsurf connectivity check passed",
+		zap.String("domain", WindsurfREHDomain),
+		zap.Int("status_code", resp.StatusCode))
+
+	return nil
+}
+
+// GenerateClientSSHConfig creates a ready-to-use SSH config entry for the client machine
+func GenerateClientSSHConfig(hostname, username string, port int) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Host %s\n", hostname))
+	sb.WriteString(fmt.Sprintf("    HostName %s\n", hostname))
+	sb.WriteString(fmt.Sprintf("    User %s\n", username))
+	sb.WriteString(fmt.Sprintf("    Port %d\n", port))
+	sb.WriteString("    ForwardAgent yes\n")
+	sb.WriteString("    ServerAliveInterval 60\n")
+	sb.WriteString("    ServerAliveCountMax 3\n")
+	return sb.String()
 }
 
 // GetCurrentUser returns the actual user (not root when using sudo)
@@ -169,6 +297,15 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 	sb.WriteString(fmt.Sprintf("  Cursor:      %s@%s\n", config.User, hostname))
 	sb.WriteString("\n")
 
+	// Client SSH Config (if generated)
+	if result.ClientSSHConfig != "" {
+		sb.WriteString("SSH Config for Your Client Machine:\n")
+		sb.WriteString(strings.Repeat("-", 30) + "\n")
+		sb.WriteString("Add to ~/.ssh/config on your local machine:\n\n")
+		sb.WriteString(result.ClientSSHConfig)
+		sb.WriteString("\n")
+	}
+
 	// SSH changes made
 	if len(result.SSHChanges) > 0 {
 		sb.WriteString("SSH Configuration Changes:\n")
@@ -178,7 +315,7 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 			if !change.Applied {
 				status = "○"
 			}
-			sb.WriteString(fmt.Sprintf("  %s %s: %s → %s\n",
+			sb.WriteString(fmt.Sprintf("  %s %s: %s -> %s\n",
 				status, change.Setting, change.OldValue, change.NewValue))
 			sb.WriteString(fmt.Sprintf("    Reason: %s\n", change.Reason))
 		}
@@ -201,12 +338,21 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 		sb.WriteString("\n")
 	}
 
+	// IDE Server cleanup results
+	if result.IDEServersCleanedUp > 0 {
+		sb.WriteString("IDE Server Cleanup:\n")
+		sb.WriteString(strings.Repeat("-", 30) + "\n")
+		sb.WriteString(fmt.Sprintf("  Versions removed: %d\n", result.IDEServersCleanedUp))
+		sb.WriteString(fmt.Sprintf("  Space recovered: %s\n", formatBytes(result.DiskSpaceRecovered)))
+		sb.WriteString("\n")
+	}
+
 	// Warnings
 	if len(result.Warnings) > 0 {
 		sb.WriteString("Warnings:\n")
 		sb.WriteString(strings.Repeat("-", 30) + "\n")
 		for _, warning := range result.Warnings {
-			sb.WriteString(fmt.Sprintf("  ⚠ %s\n", warning))
+			sb.WriteString(fmt.Sprintf("  ! %s\n", warning))
 		}
 		sb.WriteString("\n")
 	}
@@ -229,6 +375,17 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 	}
 	sb.WriteString("\n")
 
+	// Windsurf-specific guidance
+	sb.WriteString("Windsurf IDE Notes:\n")
+	sb.WriteString(strings.Repeat("-", 30) + "\n")
+	sb.WriteString("  ! Do NOT install Microsoft 'Remote - SSH' extension in Windsurf\n")
+	sb.WriteString("    (Windsurf has built-in SSH support that conflicts with it)\n\n")
+	sb.WriteString("  First connection may be slow (~1-2 min) as windsurf-reh downloads\n\n")
+	sb.WriteString("  If 'Cascade failed to start' appears:\n")
+	sb.WriteString("    Toggle the Cascade button in bottom-right corner repeatedly\n")
+	sb.WriteString("    until it connects (known Windsurf bug)\n")
+	sb.WriteString("\n")
+
 	// Troubleshooting
 	sb.WriteString("Troubleshooting:\n")
 	sb.WriteString(strings.Repeat("-", 30) + "\n")
@@ -240,9 +397,30 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 	sb.WriteString("    sudo journalctl -u ssh -f\n")
 	sb.WriteString("  Restart SSH:\n")
 	sb.WriteString("    sudo systemctl restart sshd\n")
+	sb.WriteString("  Clean up old IDE servers:\n")
+	sb.WriteString("    eos create code --cleanup-ide-servers\n")
 
 	logger.Debug("Generated access instructions")
 	return sb.String()
+}
+
+// formatBytes formats bytes into human-readable format
+func formatBytes(bytes int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MB))
+	case bytes >= KB:
+		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(KB))
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
 }
 
 // InstallAITools installs AI coding assistants (Claude Code, OpenAI Codex CLI)
@@ -289,20 +467,32 @@ func installClaudeCode(rc *eos_io.RuntimeContext, config *Config, result *Instal
 	}
 
 	if config.DryRun {
-		logger.Info("DRY RUN: Would install Claude Code via: curl -fsSL https://claude.ai/install.sh | bash")
+		logger.Info("DRY RUN: Would download and verify Claude Code installer", zap.String("url", claudeInstallerURL))
 		result.AIToolsInstalled = append(result.AIToolsInstalled, "Claude Code (would install)")
 		return nil
 	}
 
-	// Install using the official installer script
-	// Run as the target user, not as root
-	installCmd := exec.Command("bash", "-c", "curl -fsSL https://claude.ai/install.sh | bash")
-
-	// If we're running as root with SUDO_USER, run as that user instead
-	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
-		installCmd = exec.Command("su", "-", config.User, "-c", "curl -fsSL https://claude.ai/install.sh | bash")
+	expectedChecksum := claudeInstallerDefaultSHA256
+	if envChecksum := strings.TrimSpace(os.Getenv("CLAUDE_INSTALLER_SHA256")); envChecksum != "" {
+		expectedChecksum = envChecksum
+	}
+	if config.ClaudeInstallerSHA256 != "" {
+		expectedChecksum = config.ClaudeInstallerSHA256
+	}
+	if expectedChecksum == "" || expectedChecksum == claudeInstallerDefaultSHA256 {
+		return fmt.Errorf("Claude Code installer checksum not configured; set CLAUDE_INSTALLER_SHA256 or update configuration")
 	}
 
+	installerPath, err := downloadInstallerWithChecksum(claudeInstallerURL, expectedChecksum)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(installerPath)
+
+	installCmd := exec.Command("bash", installerPath)
+	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
+		installCmd = exec.Command("su", "-", config.User, "-c", fmt.Sprintf("bash %s", installerPath))
+	}
 	output, err := installCmd.CombinedOutput()
 	if err != nil {
 		logger.Error("Claude Code installation failed",
@@ -360,4 +550,32 @@ func installCodexCLI(rc *eos_io.RuntimeContext, config *Config, result *InstallR
 	result.AIToolsInstalled = append(result.AIToolsInstalled, "OpenAI Codex CLI")
 	result.CodexInstalled = true
 	return nil
+}
+
+func downloadInstallerWithChecksum(url, expectedChecksum string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to download Claude Code installer: %w\nOffline installation: download %s on a trusted workstation, verify checksum %s, then transfer the script to this host and run 'bash <file>'", err, url, expectedChecksum)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to download Claude Code installer: HTTP %d", resp.StatusCode)
+	}
+	file, err := os.CreateTemp("", "claude-installer-*.sh")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary installer file: %w", err)
+	}
+	defer file.Close()
+	hasher := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(file, hasher), resp.Body); err != nil {
+		return "", fmt.Errorf("failed to save installer: %w", err)
+	}
+	actual := hex.EncodeToString(hasher.Sum(nil))
+	if !strings.EqualFold(actual, expectedChecksum) {
+		return "", fmt.Errorf("installer checksum mismatch: expected %s, got %s", expectedChecksum, actual)
+	}
+	if err := file.Chmod(0o700); err != nil {
+		return "", fmt.Errorf("failed to set installer permissions: %w", err)
+	}
+	return file.Name(), nil
 }
