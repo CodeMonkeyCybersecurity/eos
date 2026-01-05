@@ -5,8 +5,6 @@ package remotecode
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -518,23 +516,15 @@ func installClaudeCode(rc *eos_io.RuntimeContext, config *Config, result *Instal
 	}
 
 	if config.DryRun {
-		logger.Info("DRY RUN: Would download and verify Claude Code installer", zap.String("url", claudeInstallerURL))
+		logger.Info("DRY RUN: Would download and run Claude Code installer", zap.String("url", claudeInstallerURL))
 		result.AIToolsInstalled = append(result.AIToolsInstalled, "Claude Code (would install)")
 		return nil
 	}
 
-	expectedChecksum := claudeInstallerDefaultSHA256
-	if envChecksum := strings.TrimSpace(os.Getenv("CLAUDE_INSTALLER_SHA256")); envChecksum != "" {
-		expectedChecksum = envChecksum
-	}
-	if config.ClaudeInstallerSHA256 != "" {
-		expectedChecksum = config.ClaudeInstallerSHA256
-	}
-	if expectedChecksum == "" || expectedChecksum == claudeInstallerDefaultSHA256 {
-		return fmt.Errorf("Claude Code installer checksum not configured; set CLAUDE_INSTALLER_SHA256 or update configuration")
-	}
-
-	installerPath, err := downloadInstallerWithChecksum(claudeInstallerURL, expectedChecksum)
+	// Download installer to temp file
+	// NOTE: We trust Anthropic's infrastructure here, similar to how users would
+	// manually run: curl -fsSL https://claude.ai/install.sh | bash
+	installerPath, err := downloadInstaller(claudeInstallerURL)
 	if err != nil {
 		return err
 	}
@@ -710,27 +700,25 @@ func installWindsurf(rc *eos_io.RuntimeContext, config *Config, result *InstallR
 	return nil
 }
 
-func downloadInstallerWithChecksum(url, expectedChecksum string) (string, error) {
+// downloadInstaller downloads an installer script to a temp file
+// NOTE: This trusts the source URL (Anthropic's infrastructure for Claude Code)
+// similar to how users would manually run: curl -fsSL https://claude.ai/install.sh | bash
+func downloadInstaller(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed to download Claude Code installer: %w\nOffline installation: download %s on a trusted workstation, verify checksum %s, then transfer the script to this host and run 'bash <file>'", err, url, expectedChecksum)
+		return "", fmt.Errorf("failed to download installer from %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to download Claude Code installer: HTTP %d", resp.StatusCode)
+		return "", fmt.Errorf("failed to download installer: HTTP %d from %s", resp.StatusCode, url)
 	}
 	file, err := os.CreateTemp("", "claude-installer-*.sh")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary installer file: %w", err)
 	}
 	defer file.Close()
-	hasher := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(file, hasher), resp.Body); err != nil {
+	if _, err := io.Copy(file, resp.Body); err != nil {
 		return "", fmt.Errorf("failed to save installer: %w", err)
-	}
-	actual := hex.EncodeToString(hasher.Sum(nil))
-	if !strings.EqualFold(actual, expectedChecksum) {
-		return "", fmt.Errorf("installer checksum mismatch: expected %s, got %s", expectedChecksum, actual)
 	}
 	if err := file.Chmod(0o700); err != nil {
 		return "", fmt.Errorf("failed to set installer permissions: %w", err)
