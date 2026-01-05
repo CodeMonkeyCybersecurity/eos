@@ -22,8 +22,9 @@ var CreateCodeCmd = &cobra.Command{
 	Aliases: []string{"remotecode", "remote-code", "ide"},
 	Short:   "Configure SSH for remote IDE development (Windsurf, Claude Code, VS Code)",
 	Long: `Configure your server for remote IDE development with:
-- Windsurf (Codeium's AI IDE)
+- Windsurf (Codeium's AI IDE) - x86_64 only
 - Claude Code (Anthropic's AI coding assistant)
+- OpenAI Codex CLI
 - VS Code Remote SSH
 - Cursor
 - JetBrains Gateway
@@ -37,17 +38,27 @@ This command:
 
 2. Configures firewall rules to allow SSH from trusted networks
 
-3. Installs AI coding tools:
-   - Claude Code (via curl -fsSL https://claude.ai/install.sh | bash)
+3. Installs AI coding tools (idempotent - skips if already installed):
+   - Claude Code (via official installer)
    - OpenAI Codex CLI (via npm install -g @openai/codex)
+   - Windsurf IDE (x86_64 only, via .deb package)
+
+4. Sets up automatic hourly backups of coding sessions:
+   - Claude Code conversations (~/.claude/projects/)
+   - Codex sessions (~/.codex/sessions/)
+   - Backup scripts installed to ~/bin/
+   - Cron job configured for periodic backups
 
 Example:
   sudo eos create code
   sudo eos create code --user henry
   sudo eos create code --max-sessions 30 --dry-run
   sudo eos create code --skip-ai-tools          # Skip AI tools installation
-  sudo eos create code --skip-claude            # Only install Codex
-  sudo eos create code --skip-codex             # Only install Claude Code`,
+  sudo eos create code --skip-claude            # Only install Codex/Windsurf
+  sudo eos create code --skip-codex             # Only install Claude/Windsurf
+  sudo eos create code --skip-windsurf          # Skip Windsurf (or on ARM)
+  sudo eos create code --skip-session-backups   # Skip session backup setup
+  sudo eos create code --backup-interval 30min  # Backup every 30 minutes`,
 	RunE: eos_cli.Wrap(runCreateCode),
 }
 
@@ -69,9 +80,14 @@ func init() {
 	CreateCodeCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 
 	// AI tools flags
-	CreateCodeCmd.Flags().Bool("skip-ai-tools", false, "Skip installation of AI coding tools (Claude Code, Codex)")
+	CreateCodeCmd.Flags().Bool("skip-ai-tools", false, "Skip installation of AI coding tools (Claude Code, Codex, Windsurf)")
 	CreateCodeCmd.Flags().Bool("skip-claude", false, "Skip Claude Code installation")
 	CreateCodeCmd.Flags().Bool("skip-codex", false, "Skip OpenAI Codex CLI installation")
+	CreateCodeCmd.Flags().Bool("skip-windsurf", false, "Skip Windsurf IDE installation (x86_64 only)")
+
+	// Session backup flags
+	CreateCodeCmd.Flags().Bool("skip-session-backups", false, "Skip setting up automatic session backups")
+	CreateCodeCmd.Flags().String("backup-interval", "hourly", "Session backup frequency: 30min, hourly, 6hours, daily")
 
 	// Network flags
 	CreateCodeCmd.Flags().StringSlice("allowed-networks", []string{},
@@ -142,6 +158,19 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		config.SkipCodex = skipCodex
 	}
 
+	if skipWindsurf, err := cmd.Flags().GetBool("skip-windsurf"); err == nil {
+		config.SkipWindsurf = skipWindsurf
+	}
+
+	// Session backup flags
+	if skipSessionBackups, err := cmd.Flags().GetBool("skip-session-backups"); err == nil {
+		config.SkipSessionBackups = skipSessionBackups
+	}
+
+	if backupInterval, err := cmd.Flags().GetString("backup-interval"); err == nil {
+		config.SessionBackupInterval = parseBackupInterval(backupInterval)
+	}
+
 	// Windsurf-specific flags
 	if skipConnCheck, err := cmd.Flags().GetBool("skip-connectivity-check"); err == nil {
 		config.SkipConnectivityCheck = skipConnCheck
@@ -196,4 +225,25 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	logger.Info("Remote IDE development setup completed")
 	return nil
+}
+
+// parseBackupInterval converts user-friendly interval names to cron expressions
+func parseBackupInterval(interval string) string {
+	switch interval {
+	case "30min", "30m", "30minutes":
+		return "*/30 * * * *"
+	case "hourly", "1h", "hour":
+		return "0 * * * *"
+	case "6hours", "6h":
+		return "0 */6 * * *"
+	case "daily", "1d", "day":
+		return "0 0 * * *"
+	default:
+		// If it looks like a cron expression, use it directly
+		if strings.Contains(interval, "*") || strings.Contains(interval, "/") {
+			return interval
+		}
+		// Default to hourly
+		return "0 * * * *"
+	}
 }

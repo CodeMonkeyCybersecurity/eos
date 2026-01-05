@@ -91,6 +91,28 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 		}
 	}
 
+	// INTERVENE - Set up session backups
+	if config.SetupSessionBackups && !config.SkipSessionBackups {
+		logger.Info("Setting up coding session backups")
+		backupConfig := &SessionBackupConfig{
+			User:         config.User,
+			CronInterval: config.SessionBackupInterval,
+			DryRun:       config.DryRun,
+		}
+		backupResult, err := SetupSessionBackups(rc, backupConfig)
+		if err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Session backup setup had issues: %v", err))
+			logger.Warn("Session backup setup had issues", zap.Error(err))
+		} else {
+			result.SessionBackupsConfigured = true
+			result.SessionBackupResult = backupResult
+			logger.Info("Session backups configured",
+				zap.Bool("cron_configured", backupResult.CronConfigured),
+				zap.Int("scripts_installed", len(backupResult.ScriptsInstalled)))
+		}
+	}
+
 	// INTERVENE - Cleanup old IDE servers if requested
 	if config.CleanupIDEServers {
 		logger.Info("Cleaning up old IDE server versions")
@@ -367,6 +389,26 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 		sb.WriteString("\n")
 	}
 
+	// Session backups configured
+	if result.SessionBackupsConfigured && result.SessionBackupResult != nil {
+		sb.WriteString("Session Backups:\n")
+		sb.WriteString(strings.Repeat("-", 30) + "\n")
+		if result.SessionBackupResult.CronConfigured {
+			sb.WriteString(fmt.Sprintf("  Schedule: %s\n", result.SessionBackupResult.CronInterval))
+		}
+		sb.WriteString(fmt.Sprintf("  Backup dir: %s\n", result.SessionBackupResult.BackupDir))
+		if result.SessionBackupResult.ClaudeDataFound {
+			sb.WriteString("  Claude Code data: found\n")
+		}
+		if result.SessionBackupResult.CodexDataFound {
+			sb.WriteString("  Codex data: found\n")
+		}
+		sb.WriteString("\n")
+		sb.WriteString("  Manage backups: ~/bin/setup-coding-session-backups.sh\n")
+		sb.WriteString("  Export to Markdown: ~/bin/export-coding-sessions.sh --today\n")
+		sb.WriteString("\n")
+	}
+
 	// Supported IDEs
 	sb.WriteString("Supported IDEs:\n")
 	sb.WriteString(strings.Repeat("-", 30) + "\n")
@@ -423,12 +465,13 @@ func formatBytes(bytes int64) string {
 	}
 }
 
-// InstallAITools installs AI coding assistants (Claude Code, OpenAI Codex CLI)
+// InstallAITools installs AI coding assistants (Claude Code, OpenAI Codex CLI, Windsurf)
 func InstallAITools(rc *eos_io.RuntimeContext, config *Config, result *InstallResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Installing AI coding tools",
 		zap.Bool("skip_claude", config.SkipClaudeCode),
 		zap.Bool("skip_codex", config.SkipCodex),
+		zap.Bool("skip_windsurf", config.SkipWindsurf),
 		zap.Bool("dry_run", config.DryRun))
 
 	result.AIToolsInstalled = []string{}
@@ -447,6 +490,14 @@ func InstallAITools(rc *eos_io.RuntimeContext, config *Config, result *InstallRe
 		if err := installCodexCLI(rc, config, result); err != nil {
 			logger.Warn("OpenAI Codex CLI installation failed", zap.Error(err))
 			lastErr = err
+		}
+	}
+
+	// Install Windsurf (x86_64 only)
+	if !config.SkipWindsurf {
+		if err := installWindsurf(rc, config, result); err != nil {
+			logger.Warn("Windsurf installation skipped or failed", zap.Error(err))
+			// Don't set lastErr - Windsurf skip is informational on non-x86
 		}
 	}
 
@@ -549,6 +600,113 @@ func installCodexCLI(rc *eos_io.RuntimeContext, config *Config, result *InstallR
 	logger.Info("OpenAI Codex CLI installed successfully")
 	result.AIToolsInstalled = append(result.AIToolsInstalled, "OpenAI Codex CLI")
 	result.CodexInstalled = true
+	return nil
+}
+
+// installWindsurf installs Windsurf IDE (x86_64 only)
+// NOTE: Windsurf is a desktop IDE that runs on the CLIENT machine, not the server.
+// This function installs it on the server for local development or if the server
+// has a desktop environment. For remote SSH use, Windsurf should be installed on
+// the local machine and will connect via SSH.
+func installWindsurf(rc *eos_io.RuntimeContext, config *Config, result *InstallResult) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Checking Windsurf installation requirements")
+
+	// Check architecture - Windsurf only supports x86_64
+	arch := runtime.GOARCH
+	if arch != "amd64" {
+		logger.Info("Windsurf not available on this architecture",
+			zap.String("arch", arch),
+			zap.String("required", "amd64"))
+		result.AIToolsInstalled = append(result.AIToolsInstalled,
+			fmt.Sprintf("Windsurf (skipped - requires x86_64, got %s)", arch))
+		return fmt.Errorf("windsurf requires x86_64 architecture, this system is %s", arch)
+	}
+
+	// Check if windsurf is already installed
+	if _, err := exec.LookPath("windsurf"); err == nil {
+		logger.Info("Windsurf already installed")
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "Windsurf (already installed)")
+		result.WindsurfInstalled = true
+		return nil
+	}
+
+	// Check if the .deb package is available in standard locations
+	windsurfDebPath := "/tmp/windsurf.deb"
+
+	if config.DryRun {
+		logger.Info("DRY RUN: Would install Windsurf IDE",
+			zap.String("arch", arch))
+		result.AIToolsInstalled = append(result.AIToolsInstalled, "Windsurf (would install)")
+		return nil
+	}
+
+	// Try to download and install Windsurf
+	// Windsurf provides a .deb package for Ubuntu/Debian
+	windsurfDownloadURL := "https://windsurf-stable.codeiumdata.com/linux-x64/stable/latest/Windsurf.deb"
+
+	logger.Info("Downloading Windsurf", zap.String("url", windsurfDownloadURL))
+
+	// Download the .deb file
+	resp, err := http.Get(windsurfDownloadURL)
+	if err != nil {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Failed to download Windsurf: %v. Install manually from https://codeium.com/windsurf", err))
+		return fmt.Errorf("failed to download windsurf: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		result.Warnings = append(result.Warnings,
+			fmt.Sprintf("Failed to download Windsurf: HTTP %d. Install manually from https://codeium.com/windsurf", resp.StatusCode))
+		return fmt.Errorf("failed to download windsurf: HTTP %d", resp.StatusCode)
+	}
+
+	// Save to temp file
+	debFile, err := os.Create(windsurfDebPath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for windsurf: %w", err)
+	}
+	defer os.Remove(windsurfDebPath)
+
+	if _, err := io.Copy(debFile, resp.Body); err != nil {
+		debFile.Close()
+		return fmt.Errorf("failed to save windsurf package: %w", err)
+	}
+	debFile.Close()
+
+	logger.Info("Installing Windsurf package")
+
+	// Install using dpkg
+	installCmd := exec.Command("dpkg", "-i", windsurfDebPath)
+	output, err := installCmd.CombinedOutput()
+	if err != nil {
+		// Try to fix dependencies
+		logger.Warn("dpkg install had issues, attempting to fix dependencies",
+			zap.String("output", string(output)))
+
+		fixCmd := exec.Command("apt-get", "install", "-f", "-y")
+		fixOutput, fixErr := fixCmd.CombinedOutput()
+		if fixErr != nil {
+			logger.Error("Failed to fix Windsurf dependencies",
+				zap.Error(fixErr),
+				zap.String("output", string(fixOutput)))
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Windsurf installation had dependency issues. Run: sudo apt-get install -f"))
+			return fmt.Errorf("windsurf dependency fix failed: %w", fixErr)
+		}
+	}
+
+	// Verify installation
+	if _, err := exec.LookPath("windsurf"); err != nil {
+		result.Warnings = append(result.Warnings,
+			"Windsurf package installed but 'windsurf' command not found in PATH")
+		return fmt.Errorf("windsurf installed but not in PATH")
+	}
+
+	logger.Info("Windsurf installed successfully")
+	result.AIToolsInstalled = append(result.AIToolsInstalled, "Windsurf")
+	result.WindsurfInstalled = true
 	return nil
 }
 

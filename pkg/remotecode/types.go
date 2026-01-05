@@ -60,6 +60,19 @@ type Config struct {
 
 	// GenerateClientConfig generates SSH config for client machine
 	GenerateClientConfig bool
+
+	// SkipWindsurf skips Windsurf installation when InstallAITools is true
+	// NOTE: Windsurf is only available on x86_64 architecture
+	SkipWindsurf bool
+
+	// SetupSessionBackups enables automatic backup of coding sessions
+	SetupSessionBackups bool
+
+	// SkipSessionBackups skips session backup setup (use with --skip-ai-tools or separately)
+	SkipSessionBackups bool
+
+	// SessionBackupInterval is the cron schedule for session backups (e.g., "0 * * * *" for hourly)
+	SessionBackupInterval string
 }
 
 // DefaultConfig returns a configuration optimized for remote IDE development
@@ -77,9 +90,13 @@ func DefaultConfig() *Config {
 		InstallAITools:        true, // Install AI tools by default
 		SkipClaudeCode:        false,
 		SkipCodex:             false,
+		SkipWindsurf:          false,
 		SkipConnectivityCheck: false,
 		CleanupIDEServers:     false, // Opt-in cleanup of old IDE servers
 		GenerateClientConfig:  true,  // Generate client SSH config by default
+		SetupSessionBackups:   true,  // Set up session backups by default
+		SkipSessionBackups:    false,
+		SessionBackupInterval: DefaultBackupInterval, // Hourly by default
 	}
 }
 
@@ -130,6 +147,15 @@ type InstallResult struct {
 
 	// DiskSpaceRecovered is bytes recovered from IDE server cleanup
 	DiskSpaceRecovered int64
+
+	// WindsurfInstalled indicates if Windsurf was installed
+	WindsurfInstalled bool
+
+	// SessionBackupsConfigured indicates if session backups were set up
+	SessionBackupsConfigured bool
+
+	// SessionBackupResult contains details about session backup setup
+	SessionBackupResult *SessionBackupResult
 }
 
 // Constants for SSH configuration optimized for remote IDE development
