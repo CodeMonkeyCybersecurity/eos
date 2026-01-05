@@ -192,9 +192,14 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// Display what will be configured
 	fmt.Println("\nRemote IDE Development Setup")
 	fmt.Println(strings.Repeat("=", 40))
-	fmt.Println("\nThis will configure your server for remote development with:")
-	for _, ide := range remotecode.SupportedIDEs {
-		fmt.Printf("  ✓ %s\n", ide)
+	fmt.Println("\nThis will:")
+	fmt.Println("  1. Optimize SSH settings for remote IDE connections")
+	fmt.Println("  2. Configure firewall rules for SSH access")
+	if config.InstallAITools {
+		fmt.Println("  3. Install AI coding tools (Claude Code, Codex CLI)")
+	}
+	if config.SetupSessionBackups && !config.SkipSessionBackups {
+		fmt.Println("  4. Set up automatic session backups")
 	}
 	fmt.Println()
 

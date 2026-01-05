@@ -407,12 +407,13 @@ func GenerateAccessInstructions(rc *eos_io.RuntimeContext, config *Config, resul
 		sb.WriteString("\n")
 	}
 
-	// Supported IDEs
-	sb.WriteString("Supported IDEs:\n")
+	// Compatible IDEs (these run on your LOCAL machine, not the server)
+	sb.WriteString("Compatible IDEs (install on your local machine):\n")
 	sb.WriteString(strings.Repeat("-", 30) + "\n")
-	for _, ide := range SupportedIDEs {
-		sb.WriteString(fmt.Sprintf("  ✓ %s\n", ide))
-	}
+	sb.WriteString("  - Windsurf (Codeium) - https://windsurf.com\n")
+	sb.WriteString("  - VS Code Remote SSH - https://code.visualstudio.com\n")
+	sb.WriteString("  - Cursor - https://cursor.com\n")
+	sb.WriteString("  - JetBrains Gateway - https://jetbrains.com/remote-development/gateway\n")
 	sb.WriteString("\n")
 
 	// Windsurf-specific guidance
