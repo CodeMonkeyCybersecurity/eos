@@ -6,8 +6,8 @@
 package self
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -525,8 +525,27 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	}
 	eeu.logger.Debug("Disk space re-verification passed")
 
+	// Get current git commit to embed in binary
+	// This enables self-update to detect when binary is stale vs source
+	currentCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
+	if err != nil {
+		eeu.logger.Warn("Could not get git commit for build embedding", zap.Error(err))
+		currentCommit = "" // Build will work, just without commit tracking
+	}
+
+	// Build ldflags to embed version info
+	// Format: -X 'package.Variable=value'
+	buildTime := time.Now().UTC().Format(time.RFC3339)
+	ldflags := fmt.Sprintf("-X 'github.com/CodeMonkeyCybersecurity/eos/pkg/shared.BuildCommit=%s' "+
+		"-X 'github.com/CodeMonkeyCybersecurity/eos/pkg/shared.BuildTime=%s'",
+		currentCommit, buildTime)
+
+	eeu.logger.Debug("Embedding build info",
+		zap.String("commit", currentCommit[:min(8, len(currentCommit))]+"..."),
+		zap.String("time", buildTime))
+
 	// Build command - use the Go path we found during verification
-	buildArgs := []string{"build", "-o", tempBinary, "."}
+	buildArgs := []string{"build", "-ldflags", ldflags, "-o", tempBinary, "."}
 	buildCmd := exec.Command(eeu.goPath, buildArgs...)
 	buildCmd.Dir = eeu.config.SourceDir
 
@@ -621,22 +640,36 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	}
 	eeu.transaction.ChangesPulled = codeChanged
 
-	// If no code changes, check if binary needs rebuilding
-	if !codeChanged && eeu.enhancedConfig.VerifyVersionChange {
-		// Verify current binary is still valid and up-to-date
-		if _, err := os.Stat(eeu.config.BinaryPath); err == nil {
-			eeu.logger.Info(" No code changes detected, verifying current binary")
+	// Check if binary needs rebuilding by comparing embedded commit vs source HEAD
+	// This is the key fix: even if git pull returns no changes (already up-to-date),
+	// the binary might have been built from an older commit
+	sourceCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
+	if err != nil {
+		eeu.logger.Warn("Could not get source commit for comparison", zap.Error(err))
+		// Continue with rebuild to be safe
+	} else {
+		binaryCommit := shared.BuildCommit
+		eeu.logger.Info("Comparing binary vs source commit",
+			zap.String("binary_commit", truncateCommit(binaryCommit)),
+			zap.String("source_commit", truncateCommit(sourceCommit)))
 
-			// Re-verify current binary hash matches what we expect
-			currentVerifyHash, err := crypto.HashFile(eeu.config.BinaryPath)
-			if err == nil && currentVerifyHash == currentHash {
-				eeu.logger.Info(" Current binary is up-to-date, skipping rebuild",
-					zap.String("sha256", currentHash[:16]+"..."))
-				eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
-				return nil
-			}
+		// If binary was built from same commit as source HEAD, skip rebuild
+		if binaryCommit != "" && binaryCommit == sourceCommit {
+			eeu.logger.Info(" Binary is built from current source commit, skipping rebuild",
+				zap.String("commit", truncateCommit(sourceCommit)))
+			eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
+			return nil
 		}
-		eeu.logger.Info(" Current binary needs verification, proceeding with rebuild")
+
+		// Binary needs rebuild - either no commit embedded or commits don't match
+		if binaryCommit == "" {
+			eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
+				zap.String("source_commit", truncateCommit(sourceCommit)))
+		} else {
+			eeu.logger.Info(" Binary commit differs from source, rebuilding",
+				zap.String("binary_commit", truncateCommit(binaryCommit)),
+				zap.String("source_commit", truncateCommit(sourceCommit)))
+		}
 	}
 
 	// Step 3: Build new binary
@@ -1537,4 +1570,16 @@ func (eeu *EnhancedEosUpdater) installGoVersion(version string) error {
 	eeu.goPath = "/usr/local/go/bin/go"
 
 	return nil
+}
+
+// truncateCommit returns the first 8 characters of a commit hash for logging
+// Returns "(none)" for empty strings to make logs more readable
+func truncateCommit(commit string) string {
+	if commit == "" {
+		return "(none)"
+	}
+	if len(commit) > 8 {
+		return commit[:8]
+	}
+	return commit
 }
