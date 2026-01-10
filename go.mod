@@ -29,7 +29,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/consul/api v1.20.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/go-version v1.7.0
+	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/hashicorp/nomad/api v0.0.0-20251105172100-f20a01eda06e
 	github.com/hashicorp/terraform-exec v0.24.0
