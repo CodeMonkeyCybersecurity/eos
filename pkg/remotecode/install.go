@@ -152,12 +152,20 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 
 	// Check architecture - Windsurf only supports x64
+	// If --skip-windsurf is set, we don't enforce this check
 	arch := runtime.GOARCH
-	if arch != "amd64" {
+	if arch != "amd64" && !config.SkipWindsurf {
 		return fmt.Errorf("Windsurf IDE only supports x64 (amd64) architecture, but this server is %s\n\n"+
-			"Alternative: Use VS Code Remote SSH or JetBrains Gateway which support ARM64", arch)
+			"Alternative: Use VS Code Remote SSH or JetBrains Gateway which support ARM64\n\n"+
+			"To proceed without Windsurf installation:\n"+
+			"  eos create code --skip-windsurf", arch)
 	}
-	logger.Info("Architecture check passed", zap.String("arch", arch))
+	if arch != "amd64" {
+		logger.Info("Non-x86_64 architecture detected, Windsurf will be skipped",
+			zap.String("arch", arch))
+	} else {
+		logger.Info("Architecture check passed", zap.String("arch", arch))
+	}
 
 	// Check for SSH daemon - offer to install if missing
 	if _, err := os.Stat(SSHConfigPath); err != nil {
@@ -174,13 +182,15 @@ func CheckPrerequisites(rc *eos_io.RuntimeContext, config *Config) error {
 		}
 	}
 
-	// Check Windsurf connectivity (unless skipped)
-	if !config.SkipConnectivityCheck {
+	// Check Windsurf connectivity (unless skipped or not applicable)
+	if !config.SkipConnectivityCheck && !config.SkipWindsurf && arch == "amd64" {
 		if err := checkWindsurfConnectivity(rc); err != nil {
 			return err
 		}
-	} else {
+	} else if config.SkipConnectivityCheck {
 		logger.Info("Skipping Windsurf connectivity check (--skip-connectivity-check)")
+	} else if config.SkipWindsurf || arch != "amd64" {
+		logger.Info("Skipping Windsurf connectivity check (Windsurf not being installed)")
 	}
 
 	logger.Info("All prerequisites satisfied")
