@@ -49,6 +49,7 @@ type EnhancedUpdateConfig struct {
 	UpdateSystemPackages    bool // Run system package manager update (apt/yum/dnf)
 	UpdateGoVersion         bool // Check and update Go compiler if needed
 	ForcePackageErrors      bool // Continue despite package manager errors (not recommended)
+	ForceClean              bool // Reset repository to clean state before update (nuclear option)
 }
 
 // EnhancedEosUpdater handles self-update with comprehensive error recovery
@@ -203,6 +204,15 @@ func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
 		return err
 	}
 
+	// 1b. Handle --force-clean: Reset repository to clean state (nuclear option)
+	if eeu.enhancedConfig.ForceClean {
+		eeu.logger.Warn("Force clean requested - resetting repository to clean state")
+		if err := eeu.forceCleanRepository(); err != nil {
+			return fmt.Errorf("force clean failed: %w", err)
+		}
+		eeu.logger.Info("Repository reset to clean state")
+	}
+
 	// 2. Check git repository state
 	if err := eeu.checkGitRepositoryState(); err != nil {
 		return err
@@ -237,6 +247,60 @@ func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
 // verifySourceDirectory ensures we have a valid git repository
 func (eeu *EnhancedEosUpdater) verifySourceDirectory() error {
 	return git.VerifyRepository(eeu.rc, eeu.config.SourceDir)
+}
+
+// forceCleanRepository resets the repository to a clean state
+// This is the "nuclear option" for recovering from broken git states
+func (eeu *EnhancedEosUpdater) forceCleanRepository() error {
+	repoDir := eeu.config.SourceDir
+
+	// Step 1: Abort any in-progress merge
+	eeu.logger.Info("Checking for in-progress merge...")
+	mergeAbortCmd := exec.Command("git", "-C", repoDir, "merge", "--abort")
+	if output, err := mergeAbortCmd.CombinedOutput(); err != nil {
+		eeu.logger.Debug("No merge to abort (expected if not in merge state)",
+			zap.String("output", string(output)))
+	} else {
+		eeu.logger.Info("Aborted in-progress merge")
+	}
+
+	// Step 2: Drop all stashes (they're likely causing issues)
+	eeu.logger.Info("Clearing stash...")
+	stashClearCmd := exec.Command("git", "-C", repoDir, "stash", "clear")
+	if output, err := stashClearCmd.CombinedOutput(); err != nil {
+		eeu.logger.Warn("Failed to clear stash",
+			zap.Error(err),
+			zap.String("output", string(output)))
+	}
+
+	// Step 3: Fetch latest from origin
+	eeu.logger.Info("Fetching latest from origin...")
+	fetchCmd := exec.Command("git", "-C", repoDir, "fetch", "origin")
+	if output, err := fetchCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git fetch failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Step 4: Reset hard to origin/main
+	eeu.logger.Warn("Resetting repository to origin/main (discarding all local changes)...")
+	resetCmd := exec.Command("git", "-C", repoDir, "reset", "--hard", "origin/"+eeu.config.GitBranch)
+	output, err := resetCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git reset --hard failed: %w\nOutput: %s", err, string(output))
+	}
+
+	eeu.logger.Info("Repository reset successfully",
+		zap.String("output", strings.TrimSpace(string(output))))
+
+	// Step 5: Clean untracked files
+	eeu.logger.Info("Cleaning untracked files...")
+	cleanCmd := exec.Command("git", "-C", repoDir, "clean", "-fd")
+	if output, err := cleanCmd.CombinedOutput(); err != nil {
+		eeu.logger.Warn("git clean failed (non-fatal)",
+			zap.Error(err),
+			zap.String("output", string(output)))
+	}
+
+	return nil
 }
 
 // checkGitRepositoryState checks for uncommitted changes and prompts for informed consent

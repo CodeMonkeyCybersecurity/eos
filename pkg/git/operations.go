@@ -213,9 +213,35 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		zap.String("repo", repoDir),
 		zap.String("branch", branch))
 
+	// RESILIENCE: Check for and recover from existing merge conflicts FIRST
+	// This prevents the "needs merge" error that blocks stash operations
+	hasConflicts, conflictedFiles, err := HasMergeConflicts(rc, repoDir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to check for merge conflicts: %w", err)
+	}
+
+	if hasConflicts {
+		logger.Warn("Repository has existing merge conflicts, attempting auto-recovery",
+			zap.Strings("files", conflictedFiles))
+
+		if err := RecoverFromMergeConflicts(rc, repoDir); err != nil {
+			return false, "", fmt.Errorf("repository has unresolved merge conflicts: %w\n\n"+
+				"Conflicted files: %v\n\n"+
+				"Manual recovery required:\n"+
+				"  cd %s\n"+
+				"  git status                    # See conflict details\n"+
+				"  git merge --abort             # Abort the merge\n"+
+				"  # OR: git reset --hard HEAD   # Discard all changes\n"+
+				"  # Then re-run the update",
+				err, conflictedFiles, repoDir)
+		}
+
+		logger.Info("Successfully recovered from merge conflicts, proceeding with update")
+	}
+
 	// SECURITY CHECK: Verify remote is trusted BEFORE pulling
 	if err := VerifyTrustedRemote(rc, repoDir); err != nil {
-		return false, "", err  // Error already includes detailed message
+		return false, "", err // Error already includes detailed message
 	}
 
 	// Get commit before pull
@@ -408,6 +434,119 @@ func RestoreStash(rc *eos_io.RuntimeContext, repoDir, stashRef string) error {
 
 	logger.Info("Stash restored successfully",
 		zap.String("ref", stashRef[:8]+"..."))
+
+	return nil
+}
+
+// HasMergeConflicts checks if the repository has unresolved merge conflicts
+// This detects the "needs merge" state that prevents stash/pull operations
+func HasMergeConflicts(rc *eos_io.RuntimeContext, repoDir string) (bool, []string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// git status --porcelain shows merge conflicts as lines starting with "UU", "AA", "DD", etc.
+	statusCmd := exec.Command("git", "-C", repoDir, "status", "--porcelain")
+	statusOutput, err := statusCmd.Output()
+	if err != nil {
+		return false, nil, fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	var conflictedFiles []string
+	lines := strings.Split(string(statusOutput), "\n")
+	for _, line := range lines {
+		if len(line) < 2 {
+			continue
+		}
+		// Merge conflicts show as: UU, AA, DD, AU, UA, DU, UD
+		// First two characters are the status codes
+		x, y := line[0], line[1]
+		isConflict := x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D')
+		if isConflict && len(line) > 3 {
+			conflictedFiles = append(conflictedFiles, strings.TrimSpace(line[3:]))
+		}
+	}
+
+	if len(conflictedFiles) > 0 {
+		logger.Warn("Repository has merge conflicts",
+			zap.Strings("files", conflictedFiles))
+		return true, conflictedFiles, nil
+	}
+
+	return false, nil, nil
+}
+
+// RecoverFromMergeConflicts attempts to automatically resolve merge conflicts
+// by resetting to HEAD (discarding the merge attempt)
+// Returns true if recovery was successful
+func RecoverFromMergeConflicts(rc *eos_io.RuntimeContext, repoDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	hasConflicts, files, err := HasMergeConflicts(rc, repoDir)
+	if err != nil {
+		return fmt.Errorf("failed to check for conflicts: %w", err)
+	}
+
+	if !hasConflicts {
+		logger.Debug("No merge conflicts to recover from")
+		return nil
+	}
+
+	logger.Warn("Attempting automatic recovery from merge conflicts",
+		zap.Strings("conflicted_files", files))
+
+	// Try to abort any in-progress merge
+	mergeAbortCmd := exec.Command("git", "-C", repoDir, "merge", "--abort")
+	if output, err := mergeAbortCmd.CombinedOutput(); err != nil {
+		logger.Debug("git merge --abort failed (may not be in merge state)",
+			zap.Error(err),
+			zap.String("output", string(output)))
+	} else {
+		logger.Info("Successfully aborted in-progress merge")
+		return nil
+	}
+
+	// If merge --abort didn't work, try reset --hard HEAD
+	// This discards all uncommitted changes but resolves the conflict state
+	logger.Warn("Merge abort failed, attempting git reset --hard HEAD")
+	resetCmd := exec.Command("git", "-C", repoDir, "reset", "--hard", "HEAD")
+	output, err := resetCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to reset repository: %w\nOutput: %s\n\n"+
+			"Manual recovery required:\n"+
+			"  cd %s\n"+
+			"  git status  # See conflicted files\n"+
+			"  git merge --abort  # Or: git reset --hard HEAD\n"+
+			"  # Then re-run install.sh or eos self update",
+			err, strings.TrimSpace(string(output)), repoDir)
+	}
+
+	logger.Info("Repository reset to clean state",
+		zap.String("output", strings.TrimSpace(string(output))))
+
+	return nil
+}
+
+// EnsureCleanState ensures the repository is in a clean state before operations
+// If conflicts are detected, attempts automatic recovery
+// If uncommitted changes exist (non-conflict), they are preserved
+func EnsureCleanState(rc *eos_io.RuntimeContext, repoDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// First check for merge conflicts (blocking issue)
+	hasConflicts, files, err := HasMergeConflicts(rc, repoDir)
+	if err != nil {
+		return err
+	}
+
+	if hasConflicts {
+		logger.Warn("Repository has merge conflicts, attempting recovery",
+			zap.Strings("files", files))
+
+		if err := RecoverFromMergeConflicts(rc, repoDir); err != nil {
+			return fmt.Errorf("repository has unresolved merge conflicts that could not be auto-resolved: %w", err)
+		}
+
+		logger.Info("Successfully recovered from merge conflicts")
+	}
 
 	return nil
 }

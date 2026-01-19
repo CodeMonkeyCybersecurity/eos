@@ -581,19 +581,68 @@ update_from_git() {
     log INFO " Pulling latest changes from GitHub..."
     cd "$Eos_SRC_DIR"
 
-    # Save any local changes first
+    # RESILIENCE: Check for and recover from merge conflicts FIRST
+    # This is the most common cause of "needs merge" errors
+    if git status --porcelain | grep -qE '^(U.|.U|AA|DD)'; then
+      log WARN " Repository has unresolved merge conflicts, attempting auto-recovery..."
+
+      # Try to abort any in-progress merge
+      if git merge --abort 2>/dev/null; then
+        log INFO " Successfully aborted in-progress merge"
+      else
+        # If merge --abort didn't work, reset to HEAD
+        log WARN " Merge abort failed, resetting to HEAD..."
+        if git reset --hard HEAD; then
+          log INFO " Repository reset to clean state"
+        else
+          log ERR " Failed to recover from merge conflicts"
+          log ERR " Manual recovery required:"
+          log ERR "   cd $Eos_SRC_DIR"
+          log ERR "   git status"
+          log ERR "   git merge --abort  # or: git reset --hard HEAD"
+          log ERR " Then re-run install.sh"
+          exit 1
+        fi
+      fi
+    fi
+
+    # Save any local changes first (only if not in conflict state)
     if git diff --quiet && git diff --cached --quiet; then
       log INFO " No local changes detected"
     else
       log INFO " Stashing local changes before pull..."
-      git stash push -m "install.sh auto-stash $(date +%Y%m%d-%H%M%S)"
+      if ! git stash push -m "install.sh auto-stash $(date +%Y%m%d-%H%M%S)"; then
+        log WARN " Failed to stash changes, attempting recovery..."
+        # Stash might fail if there are still issues - try reset
+        if git reset --hard HEAD; then
+          log INFO " Repository reset to clean state (local changes discarded)"
+        else
+          log ERR " Failed to prepare repository for update"
+          log ERR " Manual recovery required: git reset --hard HEAD"
+          exit 1
+        fi
+      fi
     fi
 
-    # Pull latest
-    if git pull origin main; then
-      log INFO " Successfully pulled latest changes"
+    # Pull latest with fast-forward only (safer, avoids merge conflicts)
+    if git pull --ff-only origin main 2>/dev/null; then
+      log INFO " Successfully pulled latest changes (fast-forward)"
     else
-      log WARN " Git pull failed, continuing with existing code"
+      # Fast-forward failed, try regular pull
+      log INFO " Fast-forward not possible, attempting regular pull..."
+      if git pull origin main; then
+        log INFO " Successfully pulled latest changes"
+      else
+        log WARN " Git pull failed"
+        # Check if we now have conflicts
+        if git status --porcelain | grep -qE '^(U.|.U|AA|DD)'; then
+          log WARN " Pull created merge conflicts, aborting merge..."
+          git merge --abort 2>/dev/null || git reset --hard HEAD
+          log INFO " Merge aborted, continuing with existing code"
+        else
+          log INFO " Continuing with existing code"
+        fi
+      fi
     fi
   else
     log INFO " Not a git repository, using existing code"
