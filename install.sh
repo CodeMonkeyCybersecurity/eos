@@ -5,8 +5,8 @@ trap 'echo " Installation failed on line $LINENO"; exit 1' ERR
 log() { echo "[$1] $2"; }
 
 declare -A GO_CHECKSUMS=(
-  ["linux_amd64"]="9e9b755d63b36acf30c12a9a3fc379243714c1c6d3dd72861da637f336ebb35b"
-  ["linux_arm64"]="b00b694903d126c588c378e72d3545549935d3982635ba3f7a964c9fa23fe3b9"
+  ["linux_amd64"]="f022b6aad78e362bcba9b0b94d09ad58c5a70c6ba3b7582905fababf5fe0181a"
+  ["linux_arm64"]="738ef87d79c34272424ccdf83302b7b0300b8b096ed443896089306117943dd5"
 )
 
 GITHUB_CLI_KEY_SHA256="20e0125d6f6e077a9ad46f03371bc26d90b04939fb95170f5a1905099cc6bcc0"
@@ -63,7 +63,7 @@ Eos_BUILD_PATH="$Eos_SRC_DIR/$Eos_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$Eos_BINARY_NAME"
 
 # Go installation settings
-GO_VERSION="1.25.5"
+GO_VERSION="1.25.6"
 GO_INSTALL_DIR="/usr/local"
 
 # --- Directories ---

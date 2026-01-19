@@ -541,6 +541,15 @@ func installClaudeCode(rc *eos_io.RuntimeContext, config *Config, result *Instal
 	}
 	defer os.Remove(installerPath)
 
+	// If running as root but installing for another user, we need to make the
+	// installer readable by that user. The file is created with 0700 by default.
+	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
+		// Make the installer readable and executable by everyone (it's a temp file)
+		if err := os.Chmod(installerPath, 0755); err != nil {
+			logger.Warn("Failed to chmod installer for user access", zap.Error(err))
+		}
+	}
+
 	installCmd := exec.Command("bash", installerPath)
 	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
 		installCmd = exec.Command("su", "-", config.User, "-c", fmt.Sprintf("bash %s", installerPath))
@@ -714,6 +723,9 @@ func installWindsurf(rc *eos_io.RuntimeContext, config *Config, result *InstallR
 // downloadInstaller downloads an installer script to a temp file
 // NOTE: This trusts the source URL (Anthropic's infrastructure for Claude Code)
 // similar to how users would manually run: curl -fsSL https://claude.ai/install.sh | bash
+//
+// We use /var/tmp instead of /tmp because /tmp is often mounted with noexec
+// for security reasons, which prevents running scripts from there.
 func downloadInstaller(url string) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -723,7 +735,15 @@ func downloadInstaller(url string) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to download installer: HTTP %d from %s", resp.StatusCode, url)
 	}
-	file, err := os.CreateTemp("", "claude-installer-*.sh")
+
+	// Use /var/tmp instead of /tmp - /tmp often has noexec mount option
+	// which prevents script execution. /var/tmp typically allows execution.
+	tempDir := "/var/tmp"
+	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
+		tempDir = os.TempDir() // Fall back to default if /var/tmp doesn't exist
+	}
+
+	file, err := os.CreateTemp(tempDir, "claude-installer-*.sh")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary installer file: %w", err)
 	}
