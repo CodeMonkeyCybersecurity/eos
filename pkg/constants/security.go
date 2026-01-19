@@ -5,6 +5,8 @@
 
 package constants
 
+import "strings"
+
 // TrustedGitRemotes defines the only acceptable git remote URLs for eos updates
 // SECURITY: Only these remotes are trusted for self-update operations
 // Any other remote will be REJECTED to prevent malicious code injection
@@ -47,9 +49,11 @@ var DefaultGPGSettings = GPGVerificationSettings{
 }
 
 // IsTrustedRemote checks if a remote URL is in the trusted whitelist
+// NOTE: GitHub URLs are case-insensitive for org/repo names, so we compare
+// case-insensitively to accept both "Eos" and "eos" as valid
 func IsTrustedRemote(remoteURL string) bool {
 	for _, trusted := range TrustedRemotes {
-		if remoteURL == trusted {
+		if strings.EqualFold(remoteURL, trusted) {
 			return true
 		}
 	}
