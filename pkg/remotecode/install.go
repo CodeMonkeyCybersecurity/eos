@@ -89,13 +89,21 @@ func Install(rc *eos_io.RuntimeContext, config *Config) (*InstallResult, error) 
 		}
 	}
 
-	// INTERVENE - Set up session backups
+	// INTERVENE - Set up session backups (restic-based with deduplication)
 	if config.SetupSessionBackups && !config.SkipSessionBackups {
-		logger.Info("Setting up coding session backups")
+		logger.Info("Setting up coding session backups (restic)")
 		backupConfig := &SessionBackupConfig{
 			User:         config.User,
 			CronInterval: config.SessionBackupInterval,
 			DryRun:       config.DryRun,
+			UseRestic:    config.UseRestic,
+			RetentionPolicy: &ResticRetentionPolicy{
+				KeepWithin:  config.ResticKeepWithin,
+				KeepHourly:  config.ResticKeepHourly,
+				KeepDaily:   config.ResticKeepDaily,
+				KeepWeekly:  config.ResticKeepWeekly,
+				KeepMonthly: config.ResticKeepMonthly,
+			},
 		}
 		backupResult, err := SetupSessionBackups(rc, backupConfig)
 		if err != nil {

@@ -89,6 +89,14 @@ func init() {
 	CreateCodeCmd.Flags().Bool("skip-session-backups", false, "Skip setting up automatic session backups")
 	CreateCodeCmd.Flags().String("backup-interval", "hourly", "Session backup frequency: 30min, hourly, 6hours, daily")
 
+	// Restic backup flags
+	CreateCodeCmd.Flags().Bool("use-restic", true, "[DEPRECATED] Restic is now mandatory; this flag is ignored")
+	CreateCodeCmd.Flags().String("keep-within", "48h", "Keep all snapshots within this duration")
+	CreateCodeCmd.Flags().Int("keep-hourly", 24, "Number of hourly snapshots to keep after keep-within")
+	CreateCodeCmd.Flags().Int("keep-daily", 7, "Number of daily snapshots to keep")
+	CreateCodeCmd.Flags().Int("keep-weekly", 4, "Number of weekly snapshots to keep")
+	CreateCodeCmd.Flags().Int("keep-monthly", 12, "Number of monthly snapshots to keep")
+
 	// Network flags
 	CreateCodeCmd.Flags().StringSlice("allowed-networks", []string{},
 		"Additional CIDR ranges to allow SSH from (e.g., 203.0.113.0/24)")
@@ -169,6 +177,31 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	if backupInterval, err := cmd.Flags().GetString("backup-interval"); err == nil {
 		config.SessionBackupInterval = parseBackupInterval(backupInterval)
+	}
+
+	// Restic backup flags
+	if useRestic, err := cmd.Flags().GetBool("use-restic"); err == nil {
+		config.UseRestic = useRestic
+	}
+
+	if keepWithin, err := cmd.Flags().GetString("keep-within"); err == nil {
+		config.ResticKeepWithin = keepWithin
+	}
+
+	if keepHourly, err := cmd.Flags().GetInt("keep-hourly"); err == nil {
+		config.ResticKeepHourly = keepHourly
+	}
+
+	if keepDaily, err := cmd.Flags().GetInt("keep-daily"); err == nil {
+		config.ResticKeepDaily = keepDaily
+	}
+
+	if keepWeekly, err := cmd.Flags().GetInt("keep-weekly"); err == nil {
+		config.ResticKeepWeekly = keepWeekly
+	}
+
+	if keepMonthly, err := cmd.Flags().GetInt("keep-monthly"); err == nil {
+		config.ResticKeepMonthly = keepMonthly
 	}
 
 	// Windsurf-specific flags

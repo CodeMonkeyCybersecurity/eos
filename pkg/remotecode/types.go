@@ -73,6 +73,24 @@ type Config struct {
 
 	// SessionBackupInterval is the cron schedule for session backups (e.g., "0 * * * *" for hourly)
 	SessionBackupInterval string
+
+	// UseRestic enables restic-based backups with deduplication (default: true)
+	UseRestic bool
+
+	// ResticKeepWithin sets how long to keep all snapshots (default: "48h")
+	ResticKeepWithin string
+
+	// ResticKeepHourly sets hourly snapshots to keep after KeepWithin (default: 24)
+	ResticKeepHourly int
+
+	// ResticKeepDaily sets daily snapshots to keep (default: 7)
+	ResticKeepDaily int
+
+	// ResticKeepWeekly sets weekly snapshots to keep (default: 4)
+	ResticKeepWeekly int
+
+	// ResticKeepMonthly sets monthly snapshots to keep (default: 12)
+	ResticKeepMonthly int
 }
 
 // DefaultConfig returns a configuration optimized for remote IDE development
@@ -97,6 +115,12 @@ func DefaultConfig() *Config {
 		SetupSessionBackups:   true,  // Set up session backups by default
 		SkipSessionBackups:    false,
 		SessionBackupInterval: DefaultBackupInterval, // Hourly by default
+		UseRestic:             true,                  // Use restic for deduplication
+		ResticKeepWithin:      "48h",                 // Keep all snapshots within 48h
+		ResticKeepHourly:      24,                    // Then keep 24 hourly
+		ResticKeepDaily:       7,                     // Then 7 daily
+		ResticKeepWeekly:      4,                     // Then 4 weekly
+		ResticKeepMonthly:     12,                    // Then 12 monthly
 	}
 }
 
