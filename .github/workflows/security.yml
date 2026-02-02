@@ -81,7 +81,7 @@ jobs:
           echo "✓ All checks passed"
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: gosec-results.sarif
