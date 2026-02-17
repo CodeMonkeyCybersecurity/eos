@@ -5,6 +5,7 @@ package backup
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -91,6 +92,15 @@ type Settings struct {
 
 	// Notification settings
 	Notifications Notifications `yaml:"notifications,omitempty"`
+
+	// HooksPolicy controls executable allowlisting for backup hooks.
+	HooksPolicy HooksPolicy `yaml:"hooks_policy,omitempty"`
+}
+
+// HooksPolicy defines global hook authorization settings.
+type HooksPolicy struct {
+	Enabled         *bool    `yaml:"enabled,omitempty"`
+	AllowedCommands []string `yaml:"allowed_commands,omitempty"`
 }
 
 // Notifications defines notification settings
@@ -118,38 +128,52 @@ func LoadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	for _, configPath := range configReadPaths() {
+		source := classifyConfigPath(configPath)
 		logger.Info("Loading backup configuration",
 			zap.String("path", configPath))
 
 		if _, err := os.Stat(configPath); err != nil {
-			if os.IsNotExist(err) || os.IsPermission(err) {
+			if os.IsNotExist(err) {
 				continue
 			}
+			if os.IsPermission(err) {
+				recordConfigLoad("permission_denied", false)
+				recordConfigSource(source, false)
+				return nil, fmt.Errorf("permission denied reading config path %q: %w", configPath, err)
+			}
 			recordConfigLoad(configPath, false)
+			recordConfigSource(source, false)
 			return nil, fmt.Errorf("stating config file %q: %w", configPath, err)
 		}
 
 		data, err := os.ReadFile(configPath)
 		if err != nil {
 			if os.IsPermission(err) {
-				continue
+				recordConfigLoad("permission_denied", false)
+				recordConfigSource(source, false)
+				return nil, fmt.Errorf("permission denied reading config file %q: %w", configPath, err)
 			}
 			recordConfigLoad(configPath, false)
+			recordConfigSource(source, false)
 			return nil, fmt.Errorf("reading config file %q: %w", configPath, err)
 		}
 
 		var config Config
 		if err := yaml.Unmarshal(data, &config); err != nil {
 			recordConfigLoad(configPath, false)
+			recordConfigSource(source, false)
 			return nil, fmt.Errorf("parsing config file %q: %w", configPath, err)
 		}
+		config.applyDefaults()
 
 		// Validate configuration
 		if err := config.Validate(); err != nil {
 			recordConfigLoad(configPath, false)
+			recordConfigSource(source, false)
 			return nil, fmt.Errorf("invalid configuration %q: %w", configPath, err)
 		}
 		recordConfigLoad(configPath, true)
+		recordConfigSource(source, true)
 
 		logger.Info("Configuration loaded successfully",
 			zap.String("path", configPath),
@@ -161,7 +185,10 @@ func LoadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	logger.Info("No configuration file found, using defaults",
 		zap.Strings("paths", configReadPaths()))
 	recordConfigLoad("defaults", true)
-	return defaultConfig(), nil
+	recordConfigSource("defaults", true)
+	config := defaultConfig()
+	config.applyDefaults()
+	return config, nil
 }
 
 // SaveConfig saves the backup configuration
@@ -198,6 +225,30 @@ func configReadPaths() []string {
 	paths := make([]string, len(configReadCandidates))
 	copy(paths, configReadCandidates)
 	return paths
+}
+
+func classifyConfigPath(path string) string {
+	switch path {
+	case ConfigFile:
+		return "canonical"
+	case LegacyConfigFile:
+		return "legacy"
+	default:
+		if strings.HasSuffix(path, "/backup.yaml") {
+			return "canonical"
+		}
+		if strings.HasSuffix(path, "/backup/config.yaml") {
+			return "legacy"
+		}
+		return "custom"
+	}
+}
+
+func (c *Config) applyDefaults() {
+	if c.Settings.HooksPolicy.Enabled == nil {
+		enabled := true
+		c.Settings.HooksPolicy.Enabled = &enabled
+	}
 }
 
 // Validate checks if the configuration is valid

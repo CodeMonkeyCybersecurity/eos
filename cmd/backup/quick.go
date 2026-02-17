@@ -154,31 +154,34 @@ func resolveQuickBackupRepository(rc *eos_io.RuntimeContext) (string, backup.Rep
 		return "", backup.Repository{}, fmt.Errorf("loading backup configuration: %w", err)
 	}
 
-	repoName := strings.TrimSpace(config.DefaultRepository)
-	if repoName != "" {
-		if _, ok := config.Repositories[repoName]; !ok {
-			return "", backup.Repository{}, fmt.Errorf("default repository %q not found in configuration", repoName)
-		}
+	if repoName, err := backup.ResolveRepositoryNameFromConfig(config, ""); err == nil {
 		repo := config.Repositories[repoName]
+		backup.RecordRepositoryResolution("quick_default", true)
 		logger.Info("Using default repository for quick backup",
 			zap.String("repository", repoName))
 		return repoName, repo, nil
+	} else if config.DefaultRepository != "" {
+		backup.RecordRepositoryResolution("quick_default", false)
+		return "", backup.Repository{}, err
 	}
 
-	if _, ok := config.Repositories[backup.QuickBackupRepositoryName]; ok {
-		repo := config.Repositories[backup.QuickBackupRepositoryName]
+	if repoName, err := backup.ResolveRepositoryNameFromConfig(config, backup.QuickBackupRepositoryName); err == nil {
+		repo := config.Repositories[repoName]
+		backup.RecordRepositoryResolution("quick_named", true)
 		logger.Info("Using quick backup repository from configuration",
 			zap.String("repository", backup.QuickBackupRepositoryName))
-		return backup.QuickBackupRepositoryName, repo, nil
+		return repoName, repo, nil
 	}
 
 	if len(config.Repositories) == 0 {
+		backup.RecordRepositoryResolution("quick_default", false)
 		return "", backup.Repository{}, fmt.Errorf("no repositories configured; add at least one in %s", backup.ConfigFile)
 	}
 
 	if len(config.Repositories) == 1 {
 		for name := range config.Repositories {
 			repo := config.Repositories[name]
+			backup.RecordRepositoryResolution("quick_single_repo", true)
 			logger.Info("Using sole configured repository for quick backup",
 				zap.String("repository", name))
 			return name, repo, nil
@@ -191,6 +194,7 @@ func resolveQuickBackupRepository(rc *eos_io.RuntimeContext) (string, backup.Rep
 	}
 	sort.Strings(repoNames)
 
+	backup.RecordRepositoryResolution("quick_single_repo", false)
 	return "", backup.Repository{}, eos_err.NewExpectedError(rc.Ctx, fmt.Errorf(
 		"multiple repositories configured (%s) but no default_repository set; update %s to select one",
 		strings.Join(repoNames, ", "), backup.ConfigFile))

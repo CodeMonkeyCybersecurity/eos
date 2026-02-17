@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -65,6 +66,15 @@ func TestResolveRepositoryNameFromConfig(t *testing.T) {
 			t.Fatal("expected error for missing repository")
 		}
 	})
+}
+
+func TestRecordRepositoryResolution_CustomSource(t *testing.T) {
+	before := readExpvarInt(t, backupRepositoryResolutionTotal, "quick_default_success")
+	RecordRepositoryResolution("quick_default", true)
+	after := readExpvarInt(t, backupRepositoryResolutionTotal, "quick_default_success")
+	if after <= before {
+		t.Fatalf("expected quick_default_success to increase, before=%d after=%d", before, after)
+	}
 }
 
 func readExpvarInt(t *testing.T, m interface{ Get(string) expvar.Var }, key string) int64 {
@@ -131,6 +141,9 @@ profiles:
 	if cfg.DefaultRepository != "local" {
 		t.Fatalf("DefaultRepository = %q, want local", cfg.DefaultRepository)
 	}
+	if got := readExpvarInt(t, backupConfigSourceTotal, "legacy_success"); got == 0 {
+		t.Fatalf("expected legacy_success counter to be > 0, got %d", got)
+	}
 
 	if err := SaveConfig(rc, cfg); err != nil {
 		t.Fatalf("SaveConfig() error = %v", err)
@@ -138,6 +151,67 @@ profiles:
 
 	if _, err := os.Stat(canonicalPath); err != nil {
 		t.Fatalf("canonical config file not written: %v", err)
+	}
+}
+
+func TestLoadConfigPermissionDeniedFailsFast(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission-denied test requires non-root execution")
+	}
+
+	rc := testRuntimeContext()
+	tmpDir := t.TempDir()
+
+	canonicalPath := filepath.Join(tmpDir, "backup.yaml")
+	legacyPath := filepath.Join(tmpDir, "backup", "config.yaml")
+
+	origRead := configReadCandidates
+	t.Cleanup(func() {
+		configReadCandidates = origRead
+	})
+	configReadCandidates = []string{canonicalPath, legacyPath}
+
+	legacyContent := []byte(`
+default_repository: local
+repositories:
+  local:
+    name: local
+    backend: local
+    url: /var/lib/eos/backups
+profiles:
+  system:
+    name: system
+    repository: local
+    paths:
+      - /etc
+`)
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(legacyPath, legacyContent, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := os.WriteFile(canonicalPath, legacyContent, 0o600); err != nil {
+		t.Fatalf("WriteFile() canonical error = %v", err)
+	}
+	if err := os.Chmod(canonicalPath, 0); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(canonicalPath, 0o600)
+	})
+
+	before := readExpvarInt(t, backupConfigLoadTotal, "permission_denied_failure")
+	_, err := LoadConfig(rc)
+	if err == nil {
+		t.Fatal("expected permission denied error")
+	}
+	if !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("expected permission denied error, got %v", err)
+	}
+	after := readExpvarInt(t, backupConfigLoadTotal, "permission_denied_failure")
+	if after <= before {
+		t.Fatalf("expected permission_denied_failure to increase, before=%d after=%d", before, after)
 	}
 }
 
@@ -172,5 +246,118 @@ func TestStoreLocalPassword(t *testing.T) {
 
 	if err := storeLocalPassword("../bad", "x"); err == nil {
 		t.Fatal("expected invalid repository name error")
+	}
+}
+
+func TestEnsureSecretsDirSecure_FixesMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	secretsPath := filepath.Join(tmpDir, "secrets")
+	if err := os.MkdirAll(secretsPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.Chmod(secretsPath, 0o755); err != nil {
+		t.Fatalf("Chmod() error = %v", err)
+	}
+
+	if err := ensureSecretsDirSecure(secretsPath); err != nil {
+		t.Fatalf("ensureSecretsDirSecure() error = %v", err)
+	}
+
+	info, err := os.Stat(secretsPath)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if info.Mode().Perm() != PasswordDirPerm {
+		t.Fatalf("secrets directory mode = %o, want %o", info.Mode().Perm(), PasswordDirPerm)
+	}
+}
+
+func TestEnsureSecretsDirSecure_RejectsWrongOwner(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root to change directory owner for ownership validation test")
+	}
+
+	tmpDir := t.TempDir()
+	secretsPath := filepath.Join(tmpDir, "secrets")
+	if err := os.MkdirAll(secretsPath, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.Chown(secretsPath, 65534, 65534); err != nil {
+		t.Fatalf("Chown() error = %v", err)
+	}
+
+	if err := ensureSecretsDirSecure(secretsPath); err == nil {
+		t.Fatal("expected ownership validation failure")
+	}
+}
+
+func TestGetRepositoryPassword_VaultFirstFallback(t *testing.T) {
+	rc := testRuntimeContext()
+	tmpDir := t.TempDir()
+
+	origRead := configReadCandidates
+	origWritePath := configWritePath
+	origWriteDir := configWriteDir
+	origSecrets := secretsDirPath
+	origVaultAddr := os.Getenv("VAULT_ADDR")
+	origVaultToken := os.Getenv("VAULT_TOKEN")
+	t.Cleanup(func() {
+		configReadCandidates = origRead
+		configWritePath = origWritePath
+		configWriteDir = origWriteDir
+		secretsDirPath = origSecrets
+		_ = os.Setenv("VAULT_ADDR", origVaultAddr)
+		_ = os.Setenv("VAULT_TOKEN", origVaultToken)
+	})
+
+	configPath := filepath.Join(tmpDir, "backup.yaml")
+	configReadCandidates = []string{configPath}
+	configWritePath = configPath
+	configWriteDir = tmpDir
+	secretsDirPath = filepath.Join(tmpDir, "secrets")
+
+	cfg := &Config{
+		DefaultRepository: "repo-a",
+		Repositories: map[string]Repository{
+			"repo-a": {Name: "repo-a", Backend: "local", URL: filepath.Join(tmpDir, "repo-a")},
+		},
+		Profiles: map[string]Profile{
+			"system": {Name: "system", Repository: "repo-a", Paths: []string{tmpDir}},
+		},
+	}
+	if err := SaveConfig(rc, cfg); err != nil {
+		t.Fatalf("SaveConfig() error = %v", err)
+	}
+	if err := storeLocalPassword("repo-a", "fallback-password"); err != nil {
+		t.Fatalf("storeLocalPassword() error = %v", err)
+	}
+
+	if err := os.Setenv("VAULT_ADDR", "http://127.0.0.1:18200"); err != nil {
+		t.Fatalf("Setenv VAULT_ADDR error = %v", err)
+	}
+	_ = os.Unsetenv("VAULT_TOKEN")
+
+	client, err := NewClient(rc, "repo-a")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	beforeVaultFailure := readExpvarInt(t, backupPasswordSourceTotal, "vault_failure")
+	beforeLocalSuccess := readExpvarInt(t, backupPasswordSourceTotal, "secrets_password_file_success")
+	password, err := client.getRepositoryPassword()
+	if err != nil {
+		t.Fatalf("getRepositoryPassword() error = %v", err)
+	}
+	if password != "fallback-password" {
+		t.Fatalf("password = %q, want fallback-password", password)
+	}
+
+	afterVaultFailure := readExpvarInt(t, backupPasswordSourceTotal, "vault_failure")
+	afterLocalSuccess := readExpvarInt(t, backupPasswordSourceTotal, "secrets_password_file_success")
+	if afterVaultFailure <= beforeVaultFailure {
+		t.Fatalf("expected vault_failure to increase, before=%d after=%d", beforeVaultFailure, afterVaultFailure)
+	}
+	if afterLocalSuccess <= beforeLocalSuccess {
+		t.Fatalf("expected secrets_password_file_success to increase, before=%d after=%d", beforeLocalSuccess, afterLocalSuccess)
 	}
 }

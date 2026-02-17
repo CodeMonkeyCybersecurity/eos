@@ -264,6 +264,16 @@ const (
 	HookMaxOutputSize = 1024 * 1024 // 1MB
 )
 
+var (
+	// DefaultAllowedHookCommands defines secure defaults for executable hooks.
+	DefaultAllowedHookCommands = []string{
+		"/usr/bin/restic",
+		"/usr/bin/rsync",
+		"/usr/bin/tar",
+		"/usr/bin/gzip",
+	}
+)
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Notification Configuration
 // ═══════════════════════════════════════════════════════════════════════════
