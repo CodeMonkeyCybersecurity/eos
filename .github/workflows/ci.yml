@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+env:
+  GO_VERSION: "1.25.x"
+
+jobs:
+  ci-unit:
+    name: ci-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests with race and coverage
+        run: go test -short -race -coverprofile=unit.coverage.out -covermode=atomic ./pkg/...
+
+      - name: Enforce unit coverage >= 70%
+        run: |
+          COVERAGE=$(go tool cover -func=unit.coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "Unit coverage: ${COVERAGE}%"
+          awk "BEGIN {exit !($COVERAGE >= 70)}" || (echo "Coverage below 70%" && exit 1)
+
+      - name: Flaky retry summary
+        run: |
+          set +e
+          OUT=flaky-summary.txt
+          echo "Flakiness retry summary" > "$OUT"
+          echo "" >> "$OUT"
+          PACKAGES=(
+            "./pkg/httpclient"
+            "./pkg/apiclient"
+            "./pkg/hecate/api"
+          )
+          FAIL=0
+          for PKG in "${PACKAGES[@]}"; do
+            echo "Testing ${PKG} 3x..." | tee -a "$OUT"
+            if go test -count=3 -race "${PKG}" >> "$OUT" 2>&1; then
+              echo "  stable" | tee -a "$OUT"
+            else
+              echo "  flaky_or_failing" | tee -a "$OUT"
+              FAIL=1
+            fi
+            echo "" >> "$OUT"
+          done
+          if [ "$FAIL" -ne 0 ]; then
+            echo "Flaky retry summary found failures"
+            cat "$OUT"
+            exit 1
+          fi
+
+      - name: Upload unit artifacts
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: ci-unit-artifacts
+          path: |
+            unit.coverage.out
+            flaky-summary.txt
+
+  ci-integration:
+    name: ci-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      vault:
+        image: hashicorp/vault:1.16
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: test-token
+          VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+        ports:
+          - 8200:8200
+        options: >-
+          --cap-add=IPC_LOCK
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for Vault
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8200/v1/sys/health >/dev/null; then
+              echo "Vault is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Vault failed to start"
+          exit 1
+
+      - name: Run integration test suite
+        env:
+          VAULT_ADDR: http://127.0.0.1:8200
+          VAULT_TOKEN: test-token
+          POSTGRES_URL: postgres://postgres:testpass@localhost:5432/testdb?sslmode=disable
+        run: |
+          go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
+          go test -v -timeout=15m -tags=integration ./pkg/vault/...
+
+  ci-e2e-smoke:
+    name: ci-e2e-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run smoke e2e tests
+        run: go test -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/...
+
+  ci-e2e-full:
+    name: ci-e2e-full
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run full e2e tests (guarded)
+        env:
+          EOS_E2E_FULL_APPROVED: "true"
+        run: go test -v -tags=e2e_full -timeout=60m ./test/e2e/full/...

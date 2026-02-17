@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -138,15 +139,17 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 // Execute initializes and runs the root command.
 func Execute(rc *eos_io.RuntimeContext) {
-	// Skip telemetry for now to avoid hangs
-	// _ = telemetry.Init("eos")
+	logger := otelzap.Ctx(rc.Ctx)
+	if err := telemetry.Init("eos"); err != nil {
+		// Fail-open: telemetry must never block command execution.
+		logger.Warn("Telemetry initialization failed; continuing without telemetry", zap.Error(err))
+	}
 
 	// Register all subcommands first
 	RegisterCommands(rc)
 
 	// Simple execution without watchdog
 	if err := RootCmd.Execute(); err != nil {
-		logger := otelzap.Ctx(rc.Ctx)
 		if eos_err.IsExpectedUserError(err) {
 			logger.Info("Command completed with expected error", zap.Error(err))
 			os.Exit(0)

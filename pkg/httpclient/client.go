@@ -31,9 +31,7 @@ type Client struct {
 
 // NewClient creates a new HTTP client with the provided configuration
 func NewClient(config *Config) (*Client, error) {
-	if config == nil {
-		config = DefaultConfig()
-	}
+	config = hydrateConfig(config)
 
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
@@ -77,6 +75,50 @@ func NewClient(config *Config) (*Client, error) {
 		rateLimiter: rateLimiter,
 		logger:      logger,
 	}, nil
+}
+
+func hydrateConfig(config *Config) *Config {
+	defaults := DefaultConfig()
+	if config == nil {
+		return defaults
+	}
+
+	if config.Headers == nil {
+		config.Headers = map[string]string{}
+	}
+	if config.TLSConfig == nil {
+		config.TLSConfig = defaults.TLSConfig
+	}
+	if config.AuthConfig == nil {
+		config.AuthConfig = defaults.AuthConfig
+	}
+	if config.AuthConfig.CustomHeaders == nil {
+		config.AuthConfig.CustomHeaders = map[string]string{}
+	}
+	if config.AuthConfig.TokenHeader == "" {
+		config.AuthConfig.TokenHeader = defaults.AuthConfig.TokenHeader
+	}
+	if config.AuthConfig.TokenPrefix == "" {
+		config.AuthConfig.TokenPrefix = defaults.AuthConfig.TokenPrefix
+	}
+	if config.RetryConfig == nil {
+		config.RetryConfig = defaults.RetryConfig
+	}
+	if config.PoolConfig == nil {
+		config.PoolConfig = defaults.PoolConfig
+	}
+	if config.LogConfig == nil {
+		config.LogConfig = defaults.LogConfig
+	}
+
+	if config.Timeout == 0 {
+		config.Timeout = defaults.Timeout
+	}
+	if config.UserAgent == "" {
+		config.UserAgent = defaults.UserAgent
+	}
+
+	return config
 }
 
 // NewClientWithContext creates a new HTTP client with context-aware logger
