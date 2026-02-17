@@ -134,6 +134,8 @@ jobs:
           POSTGRES_URL: postgres://postgres:testpass@localhost:5432/testdb?sslmode=disable
         run: |
           go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
+          # Backup integration layer (20% test pyramid allocation for backup workflow)
+          go test -v -timeout=15m -run Integration ./pkg/backup/...
           go test -v -timeout=15m -tags=integration ./pkg/vault/...
 
   ci-e2e-smoke:
@@ -155,6 +157,11 @@ jobs:
 
       - name: Run smoke e2e tests
         run: go test -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/...
+
+      - name: Run backup e2e smoke tests
+        run: |
+          # Backup e2e layer (10% test pyramid allocation for backup workflow)
+          go test -v -tags=e2e_smoke -timeout=10m -run Backup ./test/e2e/smoke/...
 
   ci-e2e-full:
     name: ci-e2e-full

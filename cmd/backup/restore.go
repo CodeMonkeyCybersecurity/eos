@@ -3,9 +3,9 @@
 package backup
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"encoding/json"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"path/filepath"
 
@@ -55,17 +55,11 @@ Examples:
 		verify, _ := cmd.Flags().GetBool("verify")
 		force, _ := cmd.Flags().GetBool("force")
 
-		// Use default repository if not specified
-		if repoName == "" {
-			config, err := backup.LoadConfig(rc)
-			if err != nil {
-				return fmt.Errorf("loading configuration: %w", err)
-			}
-			repoName = config.DefaultRepository
-			if repoName == "" {
-				return fmt.Errorf("no repository specified and no default configured")
-			}
+		resolvedRepoName, err := backup.ResolveRepositoryName(rc, repoName)
+		if err != nil {
+			return err
 		}
+		repoName = resolvedRepoName
 
 		logger.Info("Starting restore operation",
 			zap.String("snapshot", snapshotID),

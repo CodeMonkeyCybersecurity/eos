@@ -17,11 +17,19 @@ import "time"
 const (
 	// ConfigDir is the root directory for backup configuration
 	// RATIONALE: Centralized configuration follows FHS 3.0 /etc/[service] pattern
-	ConfigDir = "/etc/eos/backup"
+	ConfigDir = "/etc/eos"
 
-	// ConfigFile is the main backup configuration file
-	// RATIONALE: YAML format for human readability and multi-environment support
-	ConfigFile = "/etc/eos/backup/config.yaml"
+	// ConfigFile is the canonical backup configuration file
+	// RATIONALE: Preserve existing operator-facing path (/etc/eos/backup.yaml)
+	ConfigFile = "/etc/eos/backup.yaml"
+
+	// LegacyConfigDir is the previous backup configuration directory
+	// RATIONALE: Backward-compatible reads during migration
+	LegacyConfigDir = "/etc/eos/backup"
+
+	// LegacyConfigFile is the previous backup configuration file path
+	// RATIONALE: Backward-compatible reads during migration
+	LegacyConfigFile = "/etc/eos/backup/config.yaml"
 
 	// SecretsDir is the local directory for password fallback storage
 	// RATIONALE: Separate from config for security (different permissions)
@@ -65,9 +73,9 @@ const (
 	PasswordFilePerm = 0400
 
 	// PasswordDirPerm is the permission for secrets directory
-	// RATIONALE: Owner read/execute only for directory traversal
-	// SECURITY: Directory must be traversable to read password files
-	PasswordDirPerm = 0500
+	// RATIONALE: Owner read/write/execute to support secure file creation/rotation
+	// SECURITY: Directory remains root-only; no group/other access
+	PasswordDirPerm = 0700
 
 	// StateDirPerm is the permission for state directory
 	// RATIONALE: Owner full control, no group/other access

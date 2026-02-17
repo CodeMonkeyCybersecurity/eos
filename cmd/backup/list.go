@@ -166,17 +166,11 @@ Examples:
 		filterHost, _ := cmd.Flags().GetString("host")
 		filterPath, _ := cmd.Flags().GetString("path")
 
-		// Use default repository if not specified
-		if repoName == "" {
-			config, err := backup.LoadConfig(rc)
-			if err != nil {
-				return fmt.Errorf("loading configuration: %w", err)
-			}
-			repoName = config.DefaultRepository
-			if repoName == "" {
-				return fmt.Errorf("no repository specified and no default configured")
-			}
+		resolvedRepoName, err := backup.ResolveRepositoryName(rc, repoName)
+		if err != nil {
+			return err
 		}
+		repoName = resolvedRepoName
 
 		logger.Info("Listing snapshots",
 			zap.String("repository", repoName),

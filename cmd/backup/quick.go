@@ -25,10 +25,10 @@ import (
 var quickBackupCmd = &cobra.Command{
 	Use:   ". [directory]",
 	Short: "Quick backup of current (or specified) directory",
-	Long: `Instantly backup the current directory or specified path with timestamp.
+	Long: fmt.Sprintf(`Instantly backup the current directory or specified path with timestamp.
 
 This command reuses your existing backup configuration:
-- Uses the default repository defined in /etc/eos/backup.yaml
+- Uses the default repository defined in %s
 - Honors repository credentials and password files you already manage
 - Timestamps each backup automatically
 - Recursive by default
@@ -41,7 +41,7 @@ Examples:
 
 Restore:
   eos restore . [snapshot-id]                # Restore latest or specific snapshot
-  eos restore . --target /tmp/restored       # Restore to different location`,
+  eos restore . --target /tmp/restored       # Restore to different location`, backup.ConfigFile),
 
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -173,7 +173,7 @@ func resolveQuickBackupRepository(rc *eos_io.RuntimeContext) (string, backup.Rep
 	}
 
 	if len(config.Repositories) == 0 {
-		return "", backup.Repository{}, fmt.Errorf("no repositories configured; add at least one in /etc/eos/backup.yaml")
+		return "", backup.Repository{}, fmt.Errorf("no repositories configured; add at least one in %s", backup.ConfigFile)
 	}
 
 	if len(config.Repositories) == 1 {
@@ -192,8 +192,8 @@ func resolveQuickBackupRepository(rc *eos_io.RuntimeContext) (string, backup.Rep
 	sort.Strings(repoNames)
 
 	return "", backup.Repository{}, eos_err.NewExpectedError(rc.Ctx, fmt.Errorf(
-		"multiple repositories configured (%s) but no default_repository set; update /etc/eos/backup.yaml to select one",
-		strings.Join(repoNames, ", ")))
+		"multiple repositories configured (%s) but no default_repository set; update %s to select one",
+		strings.Join(repoNames, ", "), backup.ConfigFile))
 }
 
 func init() {
