@@ -138,17 +138,11 @@ func ReadSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 	snapshotID := args[0]
 	repoName, _ := cmd.Flags().GetString("repo")
 
-	// Use default repository if not specified
-	if repoName == "" {
-		config, err := LoadConfig(rc)
-		if err != nil {
-			return fmt.Errorf("loading configuration: %w", err)
-		}
-		repoName = config.DefaultRepository
-		if repoName == "" {
-			return fmt.Errorf("no repository specified and no default configured")
-		}
+	resolvedRepoName, err := ResolveRepositoryName(rc, repoName)
+	if err != nil {
+		return err
 	}
+	repoName = resolvedRepoName
 
 	logger.Info("Reading snapshot information",
 		zap.String("snapshot", snapshotID),

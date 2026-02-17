@@ -29,6 +29,7 @@ type AIAssistant struct {
 	model     string
 	client    *httpclient.Client
 	maxTokens int
+	config    *AIConfig
 
 	// Azure OpenAI specific fields
 	azureEndpoint   string
@@ -329,6 +330,7 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		azureDeployment: azureDeployment,
 		client:          client,
 		maxTokens:       maxTokens,
+		config:          config,
 	}, nil
 }
 
@@ -392,6 +394,16 @@ func (ai *AIAssistant) Chat(rc *eos_io.RuntimeContext, ctx *ConversationContext,
 		zap.Int("completion_tokens", response.Usage.CompletionTokens))
 
 	return response, nil
+}
+
+// Provider returns the configured AI provider identifier
+func (ai *AIAssistant) Provider() string {
+	return ai.provider
+}
+
+// Config exposes the loaded AI configuration for downstream callers
+func (ai *AIAssistant) Config() *AIConfig {
+	return ai.config
 }
 
 // sendRequest sends the HTTP request to the AI service
@@ -539,9 +551,14 @@ You should be conversational, helpful, and focus on practical solutions that imp
 }
 
 // BuildEnvironmentPrompt creates a detailed prompt with environment context
-func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
+func BuildEnvironmentPrompt(ctx *ConversationContext, provider, userQuery string) string {
 	var prompt strings.Builder
 
+	prompt.WriteString("!!! OPERATOR WARNING !!!\n")
+	if provider == "" {
+		provider = "configured AI provider"
+	}
+	prompt.WriteString(fmt.Sprintf("Sanitized environment details below will be sent to %s once you consent.\n", provider))
 	prompt.WriteString("=== CURRENT ENVIRONMENT CONTEXT ===\n\n")
 
 	if ctx.Environment != nil {
@@ -556,10 +573,7 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 			if len(fs.ComposeFiles) > 0 {
 				prompt.WriteString("Docker Compose Files:\n")
 				for _, file := range fs.ComposeFiles {
-					prompt.WriteString(fmt.Sprintf("- %s (modified: %s)\n", file.Path, file.ModTime.Format("2006-01-02 15:04:05")))
-					if file.Excerpt != "" {
-						prompt.WriteString(fmt.Sprintf("  Content excerpt: %s\n", file.Excerpt))
-					}
+					prompt.WriteString(fmt.Sprintf("- %s (modified: %s) summary: %s\n", file.Path, file.ModTime.Format("2006-01-02 15:04:05"), summarizeForPrompt(file.Excerpt)))
 				}
 				prompt.WriteString("\n")
 			}
@@ -575,7 +589,7 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 			if len(fs.ConfigFiles) > 0 {
 				prompt.WriteString("Configuration Files:\n")
 				for _, file := range fs.ConfigFiles {
-					prompt.WriteString(fmt.Sprintf("- %s (modified: %s)\n", file.Path, file.ModTime.Format("2006-01-02 15:04:05")))
+					prompt.WriteString(fmt.Sprintf("- %s (modified: %s) summary: %s\n", file.Path, file.ModTime.Format("2006-01-02 15:04:05"), summarizeForPrompt(file.Excerpt)))
 				}
 				prompt.WriteString("\n")
 			}
@@ -625,4 +639,16 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 	prompt.WriteString(userQuery)
 
 	return prompt.String()
+}
+
+func summarizeForPrompt(value string) string {
+	safe := strings.TrimSpace(value)
+	if safe == "" {
+		return "summary unavailable"
+	}
+	safe = strings.ReplaceAll(safe, "\n", " ")
+	if len(safe) > 200 {
+		safe = safe[:200] + "..."
+	}
+	return safe
 }

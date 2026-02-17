@@ -6,16 +6,20 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	hecatemon "github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/monitoring"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/temporal"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/gorilla/mux"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
@@ -23,14 +27,145 @@ import (
 
 // Handler provides HTTP handlers for the Hecate API
 type Handler struct {
-	rc *eos_io.RuntimeContext
+	rc                   *eos_io.RuntimeContext
+	tokenValidator       TokenValidator
+	metricsCollector     MetricsCollector
+	prometheusCollector  func(*eos_io.RuntimeContext) (string, error)
+	totalRequests        atomic.Int64
+	totalResponseNanos   atomic.Int64
+	inFlightRequests     atomic.Int64
+	requestsByStatusCode sync.Map // int -> *atomic.Int64
+}
+
+// TokenValidationResult represents the result of API token validation.
+type TokenValidationResult struct {
+	Valid    bool
+	Subject  string
+	Policies []string
+}
+
+// TokenValidator validates API tokens for authenticated endpoints.
+type TokenValidator interface {
+	ValidateToken(ctx context.Context, token string) (*TokenValidationResult, error)
+}
+
+// MetricsCollector defines the metrics API dependency for easier testing.
+type MetricsCollector interface {
+	CollectMetrics() (*hecatemon.MetricsSnapshot, error)
+}
+
+// LengthTokenValidator provides a local baseline validator.
+type LengthTokenValidator struct {
+	MinLength int
+}
+
+func (v *LengthTokenValidator) ValidateToken(_ context.Context, token string) (*TokenValidationResult, error) {
+	minLen := v.MinLength
+	if minLen <= 0 {
+		minLen = 32
+	}
+	return &TokenValidationResult{
+		Valid: len(token) >= minLen,
+	}, nil
+}
+
+// VaultTokenValidator validates tokens via Vault lookup-self when configured.
+type VaultTokenValidator struct {
+	addr       string
+	httpClient *http.Client
+}
+
+func NewVaultTokenValidator(addr string) *VaultTokenValidator {
+	return &VaultTokenValidator{
+		addr: strings.TrimSpace(addr),
+		httpClient: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
+}
+
+func (v *VaultTokenValidator) ValidateToken(ctx context.Context, token string) (*TokenValidationResult, error) {
+	if v.addr == "" {
+		return nil, fmt.Errorf("vault address not configured")
+	}
+
+	cfg := vaultapi.DefaultConfig()
+	cfg.Address = v.addr
+	cfg.HttpClient = v.httpClient
+
+	client, err := vaultapi.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize vault client: %w", err)
+	}
+	client.SetToken(token)
+
+	secret, err := client.Auth().Token().LookupSelfWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("vault token lookup failed: %w", err)
+	}
+	if secret == nil || secret.Data == nil {
+		return &TokenValidationResult{Valid: false}, nil
+	}
+
+	var policies []string
+	if rawPolicies, ok := secret.Data["policies"].([]interface{}); ok {
+		policies = make([]string, 0, len(rawPolicies))
+		for _, p := range rawPolicies {
+			if s, ok := p.(string); ok {
+				policies = append(policies, s)
+			}
+		}
+	}
+
+	subject := ""
+	if displayName, ok := secret.Data["display_name"].(string); ok {
+		subject = displayName
+	}
+
+	return &TokenValidationResult{
+		Valid:    true,
+		Subject:  subject,
+		Policies: policies,
+	}, nil
 }
 
 // NewHandler creates a new API handler
 func NewHandler(rc *eos_io.RuntimeContext) *Handler {
-	return &Handler{
-		rc: rc,
+	caddyMetricsURL := strings.TrimSpace(os.Getenv("HECATE_CADDY_METRICS_URL"))
+	if caddyMetricsURL == "" {
+		caddyMetricsURL = "http://localhost:2019"
 	}
+	authentikURL := strings.TrimSpace(os.Getenv("HECATE_AUTHENTIK_URL"))
+
+	vaultAddr := strings.TrimSpace(os.Getenv("VAULT_ADDR"))
+	baseValidator := &LengthTokenValidator{MinLength: 32}
+	validator := TokenValidator(baseValidator)
+	if vaultAddr != "" {
+		validator = &fallbackTokenValidator{
+			primary:  NewVaultTokenValidator(vaultAddr),
+			fallback: baseValidator,
+		}
+	}
+
+	return &Handler{
+		rc:                  rc,
+		tokenValidator:      validator,
+		metricsCollector:    hecatemon.NewMetricsCollector(rc, caddyMetricsURL, authentikURL),
+		prometheusCollector: hecatemon.CollectPrometheusMetrics,
+	}
+}
+
+type fallbackTokenValidator struct {
+	primary  TokenValidator
+	fallback TokenValidator
+}
+
+func (v *fallbackTokenValidator) ValidateToken(ctx context.Context, token string) (*TokenValidationResult, error) {
+	res, err := v.primary.ValidateToken(ctx, token)
+	if err == nil && res != nil {
+		return res, nil
+	}
+	return v.fallback.ValidateToken(ctx, token)
 }
 
 // CreateRoute handles POST /api/v1/routes
@@ -481,21 +616,68 @@ func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 // GetMetrics handles GET /api/v1/metrics
 func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
+	logger := otelzap.Ctx(h.rc.Ctx)
+
+	snapshot, err := h.metricsCollector.CollectMetrics()
+	if err != nil {
+		logger.Warn("Failed to collect external metrics; returning API-only metrics", zap.Error(err))
+	}
+
+	routes := map[string]RouteMetrics{}
+	system := SystemMetrics{}
+	if snapshot != nil {
+		for domain, routeMetric := range snapshot.Routes {
+			routes[domain] = RouteMetrics{
+				RequestCount:   routeMetric.RequestCount,
+				ResponseTime:   routeMetric.ResponseTime,
+				ErrorRate:      routeMetric.ErrorRate,
+				BytesIn:        routeMetric.BytesIn,
+				BytesOut:       routeMetric.BytesOut,
+				ActiveRequests: routeMetric.ActiveRequests,
+			}
+		}
+
+		system.TotalRoutes = snapshot.System.TotalRoutes
+		system.HealthyRoutes = snapshot.System.HealthyRoutes
+		system.UnhealthyRoutes = snapshot.System.UnhealthyRoutes
+		system.SystemLoad = snapshot.System.SystemLoad
+		system.MemoryUsage = snapshot.System.MemoryUsage
+		system.TotalRequests = snapshot.System.TotalRequests
+		system.AverageResponseTime = snapshot.System.AverageResponseTime
+	}
+
+	totalRequests := h.totalRequests.Load()
+	totalResponseNanos := h.totalResponseNanos.Load()
+	if totalRequests > 0 {
+		system.AverageResponseTime = time.Duration(totalResponseNanos / totalRequests)
+	}
+	system.TotalRequests += totalRequests
+
 	response := MetricsResponse{
 		Timestamp: time.Now(),
-		Routes:    make(map[string]RouteMetrics),
-		System: SystemMetrics{
-			TotalRoutes:         0,
-			HealthyRoutes:       0,
-			UnhealthyRoutes:     0,
-			TotalRequests:       0,
-			AverageResponseTime: 0,
-			SystemLoad:          0.1,
-			MemoryUsage:         0.3,
+		Routes:    routes,
+		System:    system,
+		API: APIMetrics{
+			TotalRequests:   totalRequests,
+			InFlight:        h.inFlightRequests.Load(),
+			AverageLatency:  system.AverageResponseTime,
+			StatusCodeCount: h.snapshotStatusCodes(),
 		},
 	}
 
 	h.respondJSON(w, http.StatusOK, response)
+}
+
+// GetPrometheusMetrics handles GET /metrics with Prometheus exposition format.
+func (h *Handler) GetPrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	metricsOutput, err := h.prometheusCollector(h.rc)
+	if err != nil {
+		h.respondError(w, http.StatusServiceUnavailable, "Failed to collect Prometheus metrics", err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(metricsOutput))
 }
 
 // GetWorkflowStatus handles GET /api/v1/workflows/{id}/status
@@ -693,10 +875,16 @@ func (h *Handler) authenticationMiddleware(next http.Handler) http.Handler {
 
 		token := strings.TrimPrefix(authHeader, bearerPrefix)
 
-		// SECURITY: Validate token with Vault
-		// TODO: Implement proper Vault token validation
-		// For now, check token is not empty and has minimum length
-		if len(token) < 32 {
+		validation, err := h.tokenValidator.ValidateToken(r.Context(), token)
+		if err != nil {
+			logger.Warn("API request token validation failed",
+				zap.String("path", r.URL.Path),
+				zap.Error(err))
+
+			h.respondError(w, http.StatusUnauthorized, "Token validation failed", err)
+			return
+		}
+		if validation == nil || !validation.Valid {
 			logger.Warn("API request has invalid token",
 				zap.String("path", r.URL.Path),
 				zap.Int("token_length", len(token)))
@@ -706,18 +894,56 @@ func (h *Handler) authenticationMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// TODO: Add Vault token validation here:
-		// 1. Call Vault's /v1/auth/token/lookup-self endpoint
-		// 2. Verify token is not expired
-		// 3. Verify token has required policies/capabilities
-		// 4. Add token metadata to request context
-
 		logger.Debug("API request authenticated",
 			zap.String("path", r.URL.Path),
-			zap.String("method", r.Method))
+			zap.String("method", r.Method),
+			zap.String("subject", validation.Subject))
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+type statusRecordingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusRecordingResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (h *Handler) apiMetricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		h.inFlightRequests.Add(1)
+
+		srw := &statusRecordingResponseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+		defer func() {
+			h.inFlightRequests.Add(-1)
+			h.totalRequests.Add(1)
+			h.totalResponseNanos.Add(time.Since(start).Nanoseconds())
+
+			counterAny, _ := h.requestsByStatusCode.LoadOrStore(srw.statusCode, &atomic.Int64{})
+			counterAny.(*atomic.Int64).Add(1)
+		}()
+
+		next.ServeHTTP(srw, r)
+	})
+}
+
+func (h *Handler) snapshotStatusCodes() map[int]int64 {
+	results := map[int]int64{}
+	h.requestsByStatusCode.Range(func(k, v interface{}) bool {
+		code := k.(int)
+		count := v.(*atomic.Int64).Load()
+		results[code] = count
+		return true
+	})
+	return results
 }
 
 // SetupRoutes sets up the API routes
@@ -729,6 +955,9 @@ func (h *Handler) SetupRoutes() *mux.Router {
 
 	// SECURITY: Apply security headers middleware to all routes
 	router.Use(securityHeadersMiddleware)
+
+	// Track API request volume/latency/status for observability.
+	router.Use(h.apiMetricsMiddleware)
 
 	// API v1 routes
 	v1 := router.PathPrefix("/api/v1").Subrouter()
@@ -758,6 +987,7 @@ func (h *Handler) SetupRoutes() *mux.Router {
 	// System endpoints
 	v1.HandleFunc("/health", h.HealthCheck).Methods("GET")
 	v1.HandleFunc("/metrics", h.GetMetrics).Methods("GET")
+	router.HandleFunc("/metrics", h.GetPrometheusMetrics).Methods("GET")
 
 	// Workflow management
 	v1.HandleFunc("/workflows/{id}/status", h.GetWorkflowStatus).Methods("GET")

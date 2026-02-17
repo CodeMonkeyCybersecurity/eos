@@ -5,6 +5,9 @@ package backup
 import (
 	"crypto/rand"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -13,6 +16,8 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+var secretsDirPath = SecretsDir
 
 func CreateRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -80,7 +85,7 @@ func CreateRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	}
 
 	// Store password in Vault
-	vaultPath := fmt.Sprintf("eos/backup/repositories/%s", name)
+	vaultPath := fmt.Sprintf("%s/%s", VaultPasswordPathPrefix, name)
 	logger.Info("Storing repository password in Vault",
 		zap.String("path", vaultPath))
 
@@ -98,9 +103,9 @@ func CreateRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		}
 	} else {
 		secretData := map[string]interface{}{
-			"password": password,
-			"backend":  backend,
-			"url":      url,
+			VaultPasswordKey: password,
+			"backend":        backend,
+			"url":            url,
 		}
 
 		err = vault.WriteToVault(rc, vaultPath, secretData)
@@ -261,7 +266,26 @@ func generateSecurePassword() (string, error) {
 }
 
 func storeLocalPassword(repoName, password string) error {
-	// Store password in local secrets directory
-	// Implementation would ensure proper permissions
+	repoName = strings.TrimSpace(repoName)
+	if repoName == "" {
+		return fmt.Errorf("repository name is required")
+	}
+	if strings.Contains(repoName, "/") || strings.Contains(repoName, "..") {
+		return fmt.Errorf("invalid repository name %q", repoName)
+	}
+
+	if err := os.MkdirAll(secretsDirPath, PasswordDirPerm); err != nil {
+		return fmt.Errorf("creating secrets directory: %w", err)
+	}
+
+	passwordPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.password", repoName))
+	if err := os.WriteFile(passwordPath, []byte(password), PasswordFilePerm); err != nil {
+		return fmt.Errorf("writing password file: %w", err)
+	}
+
+	if err := os.Chmod(passwordPath, PasswordFilePerm); err != nil {
+		return fmt.Errorf("setting password file permissions: %w", err)
+	}
+
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -51,6 +52,17 @@ func (m *mockHTTPClient) DoRequest(ctx context.Context, method, path string, bod
 
 	if resp, ok := m.responses[path]; ok {
 		return resp, nil
+	}
+
+	// Fallback: allow base-path mock entries when request includes query params.
+	if idx := strings.Index(path, "?"); idx >= 0 {
+		basePath := path[:idx]
+		if err, ok := m.errors[basePath]; ok {
+			return nil, err
+		}
+		if resp, ok := m.responses[basePath]; ok {
+			return resp, nil
+		}
 	}
 
 	return nil, fmt.Errorf("mock: no response configured for %s %s", method, path)

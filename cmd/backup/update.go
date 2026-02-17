@@ -8,8 +8,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -73,12 +73,9 @@ Examples:
 		}
 
 		// Determine repository
-		repoName := profile.Repository
-		if repoName == "" {
-			repoName = config.DefaultRepository
-			if repoName == "" {
-				return fmt.Errorf("no repository specified and no default configured")
-			}
+		repoName, err := backup.ResolveRepositoryNameFromConfig(config, profile.Repository)
+		if err != nil {
+			return err
 		}
 
 		logger.Info("Using repository",

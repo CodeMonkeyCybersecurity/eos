@@ -223,11 +223,13 @@ func (c *Config) Validate() error {
 		if c.RetryConfig.MaxRetries < 0 {
 			return &ConfigError{Field: "RetryConfig.MaxRetries", Message: "cannot be negative"}
 		}
-		if c.RetryConfig.InitialDelay <= 0 {
-			return &ConfigError{Field: "RetryConfig.InitialDelay", Message: "must be positive"}
-		}
-		if c.RetryConfig.Multiplier <= 1.0 {
-			return &ConfigError{Field: "RetryConfig.Multiplier", Message: "must be greater than 1.0"}
+		if c.RetryConfig.MaxRetries > 0 {
+			if c.RetryConfig.InitialDelay <= 0 {
+				return &ConfigError{Field: "RetryConfig.InitialDelay", Message: "must be positive"}
+			}
+			if c.RetryConfig.Multiplier <= 1.0 {
+				return &ConfigError{Field: "RetryConfig.Multiplier", Message: "must be greater than 1.0"}
+			}
 		}
 	}
 

@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/mail"
 	"path"
+	"strings"
 	ttxt "text/template" // aliased as ttxt below
 	"time"
 
@@ -102,7 +103,16 @@ func RenderEmail(a Alert) (Rendered, error) {
 	if out.Text == "" {
 		return out, errors.New("render: empty plain-text output")
 	}
+	out = sanitizeRendered(out)
+
 	return out, nil
+}
+
+func sanitizeRendered(in Rendered) Rendered {
+	in.Subject = strings.ReplaceAll(in.Subject, "\x00", "")
+	in.Text = strings.ReplaceAll(in.Text, "\x00", "")
+	in.HTML = strings.ReplaceAll(in.HTML, "\x00", "")
+	return in
 }
 
 // ────────────────── helpers ──────────────────

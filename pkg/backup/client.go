@@ -283,7 +283,7 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	}
 
 	// 2. Global secrets directory fallback (used by managed repositories)
-	secretsPasswordPath := filepath.Join(SecretsDir, fmt.Sprintf("%s.password", c.repository.Name))
+	secretsPasswordPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.password", c.repository.Name))
 	if password, err := readPasswordFile(secretsPasswordPath); err == nil {
 		logger.Debug("Using secrets directory password file",
 			zap.String("path", secretsPasswordPath))
@@ -307,7 +307,7 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	}
 
 	// 4a. Secrets directory .env file (fallback for non-local repositories)
-	secretsEnvPath := filepath.Join(SecretsDir, fmt.Sprintf("%s.env", c.repository.Name))
+	secretsEnvPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.env", c.repository.Name))
 	if password, err := readPasswordFromEnvFile(secretsEnvPath); err == nil {
 		logger.Debug("Using secrets .env file for restic password",
 			zap.String("path", secretsEnvPath))

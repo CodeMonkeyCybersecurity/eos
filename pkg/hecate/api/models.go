@@ -282,6 +282,15 @@ type MetricsResponse struct {
 	Timestamp time.Time               `json:"timestamp"`
 	Routes    map[string]RouteMetrics `json:"routes"`
 	System    SystemMetrics           `json:"system"`
+	API       APIMetrics              `json:"api"`
+}
+
+// APIMetrics represents metrics emitted by the API layer itself.
+type APIMetrics struct {
+	TotalRequests   int64         `json:"total_requests"`
+	InFlight        int64         `json:"in_flight"`
+	AverageLatency  time.Duration `json:"average_latency"`
+	StatusCodeCount map[int]int64 `json:"status_code_count"`
 }
 
 // RouteMetrics represents metrics for a specific route

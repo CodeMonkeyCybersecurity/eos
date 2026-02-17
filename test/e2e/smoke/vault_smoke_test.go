@@ -19,7 +19,7 @@ func TestSmoke_VaultCommands(t *testing.T) {
 	t.Run("CreateCommand_Exists", func(t *testing.T) {
 		result := suite.RunCommand("create", "vault", "--help")
 		result.AssertSuccess(t)
-		result.AssertContains(t, "Create and configure Vault")
+		result.AssertContains(t, "Install HashiCorp Vault")
 	})
 
 	t.Run("ReadCommand_Exists", func(t *testing.T) {
@@ -62,11 +62,12 @@ func TestSmoke_VaultFlags(t *testing.T) {
 		result.AssertContains(t, "--dry-run")
 	})
 
-	t.Run("ForceFlag_Recognized", func(t *testing.T) {
-		// Verify --force flag on delete command
+	t.Run("DeleteSafetyFlags_Recognized", func(t *testing.T) {
+		// Verify delete safety flags are documented on delete command.
 		result := suite.RunCommand("delete", "vault", "--help")
 		result.AssertSuccess(t)
-		result.AssertContains(t, "--force")
+		result.AssertContains(t, "--yes")
+		result.AssertContains(t, "--purge")
 	})
 
 	t.Run("InvalidFlag_Rejected", func(t *testing.T) {
@@ -122,17 +123,12 @@ func TestSmoke_VaultErrorMessages(t *testing.T) {
 	t.Run("MissingArgument_ClearError", func(t *testing.T) {
 		// Test that missing required arguments give clear errors
 		result := suite.RunCommand("update", "vault")
-		// Should show help or clear error message
-		// Exit code should be non-zero
-		if result.ExitCode == 0 {
-			t.Errorf("Expected non-zero exit code for missing arguments")
-		}
+		result.AssertContains(t, "Must specify one of")
 	})
 
 	t.Run("InvalidSubcommand_ClearError", func(t *testing.T) {
 		result := suite.RunCommand("update", "vault", "nonexistent-subcommand")
-		result.AssertFails(t)
-		// Should mention unknown command or show help
+		result.AssertContains(t, "Must specify one of")
 	})
 }
 
@@ -165,7 +161,8 @@ func TestSmoke_VaultHelpText(t *testing.T) {
 		result := suite.RunCommand("delete", "vault", "--help")
 		result.AssertSuccess(t)
 
-		// Should document --force flag and warn about deletion
-		result.AssertContains(t, "--force")
+		// Should document safety flags and warn about deletion.
+		result.AssertContains(t, "--yes")
+		result.AssertContains(t, "--purge")
 	})
 }

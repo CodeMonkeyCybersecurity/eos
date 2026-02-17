@@ -201,12 +201,17 @@ func TestPasswordRetrievalIntegration(t *testing.T) {
 	}
 
 	t.Run("vault unavailable fallback", func(t *testing.T) {
+		originalSecretsDir := secretsDirPath
+		secretsDirPath = filepath.Join(repo.TempDir, "secrets", "backup")
+		t.Cleanup(func() {
+			secretsDirPath = originalSecretsDir
+		})
+
 		// Create local password file
-		secretsDir := filepath.Join(repo.TempDir, "secrets", "backup")
-		err := os.MkdirAll(secretsDir, 0700)
+		err := os.MkdirAll(secretsDirPath, 0700)
 		require.NoError(t, err)
 
-		passwordFile := filepath.Join(secretsDir, fmt.Sprintf("%s.password", repo.Name))
+		passwordFile := filepath.Join(secretsDirPath, fmt.Sprintf("%s.password", repo.Name))
 		err = os.WriteFile(passwordFile, []byte(repo.Password), 0600)
 		require.NoError(t, err)
 
@@ -223,13 +228,18 @@ func TestPasswordRetrievalIntegration(t *testing.T) {
 	})
 
 	t.Run("no password available", func(t *testing.T) {
+		originalSecretsDir := secretsDirPath
+		secretsDirPath = t.TempDir()
+		t.Cleanup(func() {
+			secretsDirPath = originalSecretsDir
+		})
+
 		// Test case where neither Vault nor local file is available
 		client.repository.Name = "nonexistent-repo"
 
 		// This should result in an error when getRepositoryPassword is called
 		// Since we can't easily mock Vault here, we test the error conditions
-		secretsDir := "/var/lib/eos/secrets/backup"
-		passwordFile := filepath.Join(secretsDir, "nonexistent-repo.password")
+		passwordFile := filepath.Join(secretsDirPath, "nonexistent-repo.password")
 
 		// Verify file doesn't exist
 		_, err := os.Stat(passwordFile)

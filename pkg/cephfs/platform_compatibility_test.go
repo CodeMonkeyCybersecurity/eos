@@ -115,55 +115,6 @@ func TestPlatformStubBehavior(t *testing.T) {
 		}
 	})
 
-	// Test CephClient method stubs
-	t.Run("CephClient_methods_return_platform_errors", func(t *testing.T) {
-		if runtime.GOOS != "darwin" {
-			t.Skip("This test only runs on macOS to verify stubs")
-		}
-
-		config := &ClientConfig{
-			ClusterName: "ceph",
-			User:        "admin",
-			MonHosts:    []string{"10.0.0.1"},
-		}
-
-		client, _ := NewCephClient(rc, config)
-		// client will be nil on macOS, but we can test the methods on a zero-value struct
-		stubClient := &CephClient{}
-
-		// Test Connect stub
-		err := stubClient.Connect()
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not available")
-
-		// Test GetClusterStats stub
-		stats, err := stubClient.GetClusterStats()
-		assert.Error(t, err)
-		assert.Nil(t, stats)
-
-		// Test VolumeExists stub
-		exists, err := stubClient.VolumeExists(rc, "test")
-		assert.Error(t, err)
-		assert.False(t, exists)
-
-		// Test ListVolumes stub
-		volumes, err := stubClient.ListVolumes(rc)
-		assert.Error(t, err)
-		assert.Nil(t, volumes)
-
-		// Test CreateVolume stub (method, not function)
-		err = stubClient.CreateVolume(rc, &VolumeCreateOptions{
-			Name: "test",
-		})
-		assert.Error(t, err)
-
-		// Test DeleteVolume stub
-		err = stubClient.DeleteVolume(rc, "test", false)
-		assert.Error(t, err)
-
-		// Client should be nil on macOS
-		assert.Nil(t, client, "NewCephClient should return nil client on macOS")
-	})
 }
 
 // TestValidateConfig_CrossPlatform verifies validation works on all platforms

@@ -44,7 +44,7 @@ func TestNewClient(t *testing.T) {
 				Timeout: -1 * time.Second,
 			},
 			wantErr: true,
-			errMsg:  "invalid timeout",
+			errMsg:  "must be positive",
 		},
 		{
 			name: "with TLS config",
@@ -65,6 +65,13 @@ func TestNewClient(t *testing.T) {
 					RequestsPerSecond: 10,
 					BurstSize:         5,
 				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "partial config is hydrated",
+			config: &Config{
+				Timeout: 5 * time.Second,
 			},
 			wantErr: false,
 		},
@@ -512,10 +519,56 @@ func TestHeaderInjection(t *testing.T) {
 
 	ctx := context.Background()
 	resp, err := client.Get(ctx, server.URL)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid header field value")
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+}
+
+// TestHeaderInjectionBlockedAtTransport confirms malformed headers never reach server.
+func TestHeaderInjectionBlockedAtTransport(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("request unexpectedly reached server with malformed header")
+	}))
+	defer server.Close()
+
+	config := DefaultConfig()
+	config.Headers = map[string]string{
+		"X-Test-Header": "test\r\nX-Injected: malicious",
+	}
+
+	client, err := NewClient(config)
+	require.NoError(t, err)
+
+	_, err = client.Get(context.Background(), server.URL)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid header field value")
+}
+
+func TestHeaderInjectionSanitizedPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for name, values := range r.Header {
+			for _, value := range values {
+				w.Header().Add("Echo-"+name, value)
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	config := DefaultConfig()
+	config.Headers = map[string]string{
+		"X-Normal": "normal value",
+	}
+
+	client, err := NewClient(config)
+	require.NoError(t, err)
+
+	resp, err := client.Get(context.Background(), server.URL)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Verify headers were properly sanitized or handled
 	injected := resp.Header.Get("Echo-X-Injected")
 	assert.Empty(t, injected, "Header injection vulnerability detected")
 }
