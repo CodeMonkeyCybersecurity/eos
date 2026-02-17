@@ -54,8 +54,8 @@ func TestRenderEmail(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotEmpty(t, r.Text)
 				if r.HTML != "" {
-					assert.Contains(t, r.HTML, "<b>Bold</b>")
-					assert.Contains(t, r.HTML, "<i>italic</i>")
+					assert.Contains(t, r.HTML, "&lt;b&gt;Bold&lt;/b&gt;")
+					assert.Contains(t, r.HTML, "&lt;i&gt;italic&lt;/i&gt;")
 				}
 			},
 		},

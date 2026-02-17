@@ -43,11 +43,65 @@ var CreateBackupCmd = &cobra.Command{
 then creates a backup of specified directories.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		backupOpts.Host, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "host", "Enter backup host", false)
-		backupOpts.User, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "user", "Enter backup user", false)
-		backupOpts.RepoDir, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "repo-dir", "Enter remote restic repo directory", false)
-		backupOpts.PasswordFile, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "password-file", "Enter restic password file", false)
-		pathsFlag, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "paths", "Enter paths to backup (comma separated)", false)
+		hostFlag, _ := cmd.Flags().GetString("host")
+		hostWasSet := cmd.Flags().Changed("host")
+		hostResult, err := interaction.GetRequiredString(rc, hostFlag, hostWasSet, &interaction.RequiredFlagConfig{
+			FlagName:      "host",
+			PromptMessage: "Enter backup host: ",
+			HelpText:      "Hostname or IP of the restic repository server",
+		})
+		if err != nil {
+			return err
+		}
+		backupOpts.Host = hostResult.Value
+
+		userFlag, _ := cmd.Flags().GetString("user")
+		userWasSet := cmd.Flags().Changed("user")
+		userResult, err := interaction.GetRequiredString(rc, userFlag, userWasSet, &interaction.RequiredFlagConfig{
+			FlagName:      "user",
+			PromptMessage: "Enter backup user: ",
+			HelpText:      "SSH user used to connect to the backup server",
+		})
+		if err != nil {
+			return err
+		}
+		backupOpts.User = userResult.Value
+
+		repoFlag, _ := cmd.Flags().GetString("repo-dir")
+		repoWasSet := cmd.Flags().Changed("repo-dir")
+		repoResult, err := interaction.GetRequiredString(rc, repoFlag, repoWasSet, &interaction.RequiredFlagConfig{
+			FlagName:      "repo-dir",
+			PromptMessage: "Enter remote restic repo directory: ",
+			HelpText:      "Directory on the backup host that stores restic repositories",
+		})
+		if err != nil {
+			return err
+		}
+		backupOpts.RepoDir = repoResult.Value
+
+		passwordFileFlag, _ := cmd.Flags().GetString("password-file")
+		passwordFileWasSet := cmd.Flags().Changed("password-file")
+		passwordFileResult, err := interaction.GetRequiredString(rc, passwordFileFlag, passwordFileWasSet, &interaction.RequiredFlagConfig{
+			FlagName:      "password-file",
+			PromptMessage: "Enter restic password file: ",
+			HelpText:      "Local file path that stores the restic repository password",
+		})
+		if err != nil {
+			return err
+		}
+		backupOpts.PasswordFile = passwordFileResult.Value
+
+		pathsFlagValue, _ := cmd.Flags().GetString("paths")
+		pathsWasSet := cmd.Flags().Changed("paths")
+		pathsResult, err := interaction.GetRequiredString(rc, pathsFlagValue, pathsWasSet, &interaction.RequiredFlagConfig{
+			FlagName:      "paths",
+			PromptMessage: "Enter paths to backup (comma separated): ",
+			HelpText:      "Specify one or more directories to include in the restic backup",
+		})
+		if err != nil {
+			return err
+		}
+		pathsFlag = pathsResult.Value
 		if pathsFlag != "" {
 			for _, p := range strings.Split(pathsFlag, ",") {
 				p = strings.TrimSpace(p)

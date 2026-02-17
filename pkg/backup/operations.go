@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
@@ -200,6 +202,7 @@ type BackupOperation struct {
 // BackupClient interface for testing
 type BackupClient interface {
 	Backup(profileName string) error
+	ListSnapshots() ([]Snapshot, error)
 }
 
 // Assess checks if backup can proceed
@@ -210,9 +213,15 @@ func (b *BackupOperation) Assess(ctx context.Context) (*patterns.AssessmentResul
 
 	prerequisites := make(map[string]bool)
 
-	// Check repository exists
-	// TODO: Implement repository check
-	prerequisites["repository_exists"] = true
+	// Check repository selection
+	prerequisites["repository_exists"] = strings.TrimSpace(b.RepoName) != ""
+	if !prerequisites["repository_exists"] {
+		return &patterns.AssessmentResult{
+			CanProceed:    false,
+			Reason:        "repository is required",
+			Prerequisites: prerequisites,
+		}, nil
+	}
 
 	// Check paths exist
 	for _, path := range b.Profile.Paths {
@@ -227,16 +236,35 @@ func (b *BackupOperation) Assess(ctx context.Context) (*patterns.AssessmentResul
 		prerequisites[fmt.Sprintf("path_%s", path)] = true
 	}
 
-	// Check disk space
-	// TODO: Implement disk space check
-	prerequisites["disk_space_available"] = true
+	availableBytes, err := availableDiskBytes(b.Profile.Paths[0])
+	if err != nil {
+		prerequisites["disk_space_available"] = false
+		return &patterns.AssessmentResult{
+			CanProceed:    false,
+			Reason:        fmt.Sprintf("failed to assess disk space: %v", err),
+			Prerequisites: prerequisites,
+		}, nil
+	}
+
+	prerequisites["disk_space_available"] = availableBytes > 0
+	if !prerequisites["disk_space_available"] {
+		return &patterns.AssessmentResult{
+			CanProceed:    false,
+			Reason:        "insufficient disk space available for backup",
+			Prerequisites: prerequisites,
+		}, nil
+	}
 
 	return &patterns.AssessmentResult{
 		CanProceed:    true,
 		Prerequisites: prerequisites,
 		Context: map[string]interface{}{
-			"paths_count": len(b.Profile.Paths),
-			"tags_count":  len(b.Profile.Tags),
+			"paths_count":       len(b.Profile.Paths),
+			"tags_count":        len(b.Profile.Tags),
+			"available_bytes":   availableBytes,
+			"repository_name":   b.RepoName,
+			"profile_name":      b.ProfileName,
+			"profile_has_hooks": b.Profile.Hooks != nil,
 		},
 	}, nil
 }
@@ -248,16 +276,18 @@ func (b *BackupOperation) Intervene(ctx context.Context, assessment *patterns.As
 		zap.Bool("dry_run", b.DryRun))
 
 	if b.DryRun {
-		// TODO: Implement dry run
+		changes := make([]patterns.Change, 0, len(b.Profile.Paths))
+		for _, path := range b.Profile.Paths {
+			changes = append(changes, patterns.Change{
+				Type:        "dry_run_path",
+				Description: fmt.Sprintf("Would back up path %s", path),
+			})
+		}
+
 		return &patterns.InterventionResult{
 			Success: true,
 			Message: "dry run completed",
-			Changes: []patterns.Change{
-				{
-					Type:        "dry_run",
-					Description: "Simulated backup operation",
-				},
-			},
+			Changes: changes,
 		}, nil
 	}
 
@@ -294,16 +324,62 @@ func (b *BackupOperation) Evaluate(ctx context.Context, intervention *patterns.I
 
 	validations := make(map[string]patterns.ValidationResult)
 
-	// TODO: Verify backup in repository
-	validations["backup_exists"] = patterns.ValidationResult{
-		Passed:  true,
-		Message: "backup verified in repository",
+	if b.DryRun {
+		validations["backup_exists"] = patterns.ValidationResult{
+			Passed:  true,
+			Message: "dry run: backup execution intentionally skipped",
+		}
+		validations["backup_integrity"] = patterns.ValidationResult{
+			Passed:  true,
+			Message: "dry run: integrity verification intentionally skipped",
+		}
+
+		return &patterns.EvaluationResult{
+			Success:     true,
+			Message:     "backup dry run validated successfully",
+			Validations: validations,
+		}, nil
 	}
 
-	// TODO: Check backup integrity
+	snapshots, err := b.Client.ListSnapshots()
+	if err != nil {
+		return &patterns.EvaluationResult{
+			Success: false,
+			Message: "backup validation failed",
+			Validations: map[string]patterns.ValidationResult{
+				"backup_exists": {
+					Passed:  false,
+					Message: fmt.Sprintf("failed to list snapshots: %v", err),
+				},
+			},
+		}, nil
+	}
+
+	hasSnapshot := len(snapshots) > 0
+	validations["backup_exists"] = patterns.ValidationResult{
+		Passed:  hasSnapshot,
+		Message: fmt.Sprintf("found %d snapshots in repository", len(snapshots)),
+	}
+
+	recentSnapshot := false
+	cutoff := time.Now().Add(-24 * time.Hour)
+	for _, snapshot := range snapshots {
+		if snapshot.Time.After(cutoff) {
+			recentSnapshot = true
+			break
+		}
+	}
 	validations["backup_integrity"] = patterns.ValidationResult{
-		Passed:  true,
-		Message: "backup integrity verified",
+		Passed:  hasSnapshot && recentSnapshot,
+		Message: "at least one recent snapshot exists",
+	}
+
+	if !validations["backup_exists"].Passed || !validations["backup_integrity"].Passed {
+		return &patterns.EvaluationResult{
+			Success:     false,
+			Message:     "backup validation failed",
+			Validations: validations,
+		}, nil
 	}
 
 	return &patterns.EvaluationResult{
@@ -311,6 +387,15 @@ func (b *BackupOperation) Evaluate(ctx context.Context, intervention *patterns.I
 		Message:     "backup validated successfully",
 		Validations: validations,
 	}, nil
+}
+
+func availableDiskBytes(path string) (uint64, error) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return 0, err
+	}
+
+	return stat.Bavail * uint64(stat.Bsize), nil
 }
 
 // NotificationOperation implements AIE pattern for sending notifications

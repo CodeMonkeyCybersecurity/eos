@@ -37,11 +37,13 @@ By default, system packages are updated. Use flags to control behavior.
 Flags:
   --system-packages   Update system packages (default: true)
   --go-version        Update Go compiler to latest version
+  --force-clean       Reset repository to clean state (nuclear option for broken repos)
 
 Examples:
   eos self update                              # Update EOS binary + system packages (default)
   eos self update --system-packages=false      # Update only EOS binary
   eos self update --go-version                 # Update EOS + system packages + Go compiler
+  eos self update --force-clean                # Reset repo to clean state, then update
   eos self update --system-packages=false --go-version  # Update EOS + Go compiler only`,
 		RunE: eos.Wrap(updateEos),
 	}
@@ -58,6 +60,7 @@ from masterless mode to a fully managed node.`,
 	updateSystemPackages bool
 	updateGoVersion      bool
 	forcePackageErrors   bool
+	forceClean           bool
 )
 
 func init() {
@@ -70,6 +73,7 @@ func init() {
 	UpdateCmd.Flags().BoolVar(&updateSystemPackages, "system-packages", true, "Update system packages (apt/yum/dnf/pacman)")
 	UpdateCmd.Flags().BoolVar(&updateGoVersion, "go-version", false, "Update Go compiler to latest version")
 	UpdateCmd.Flags().BoolVar(&forcePackageErrors, "force-package-errors", false, "Continue despite system package update errors (not recommended)")
+	UpdateCmd.Flags().BoolVar(&forceClean, "force-clean", false, "Reset repository to clean state before update (discards local changes)")
 
 	// Setup EnrollCmd flags
 	setupEnrollFlags()
@@ -225,6 +229,7 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		UpdateSystemPackages:    updateSystemPackages, // Update system packages if requested
 		UpdateGoVersion:         updateGoVersion,      // Update Go version if requested
 		ForcePackageErrors:      forcePackageErrors,   // Continue despite package errors (not recommended)
+		ForceClean:              forceClean,           // Reset repository to clean state (nuclear option)
 	}
 
 	updater := selfpkg.NewEnhancedEosUpdater(rc, config)

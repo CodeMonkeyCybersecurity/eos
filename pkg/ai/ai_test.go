@@ -851,3 +851,9 @@ func TestInputValidation(t *testing.T) {
 		assert.Equal(t, 30, config.Timeout)
 	})
 }
+func TestBuildEnvironmentPromptIncludesWarning(t *testing.T) {
+	ctx := NewConversationContext(GetInfrastructureSystemPrompt())
+	prompt := BuildEnvironmentPrompt(ctx, "demo-provider", "hello")
+	require.Contains(t, prompt, "WARNING")
+	require.Contains(t, prompt, "demo-provider")
+}

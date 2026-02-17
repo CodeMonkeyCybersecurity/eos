@@ -124,6 +124,12 @@ func validateEmail(value string) error {
 		return fmt.Errorf("email cannot be empty\n" +
 			"Format: user@example.com")
 	}
+	if strings.ContainsAny(value, "\r\n\t`$\\") {
+		return fmt.Errorf("invalid email address: %s\n"+
+			"Format: user@example.com\n"+
+			"Error: contains prohibited characters",
+			value)
+	}
 
 	_, err := mail.ParseAddress(value)
 	if err != nil {
@@ -131,6 +137,21 @@ func validateEmail(value string) error {
 			"Format: user@example.com\n"+
 			"Error: %v",
 			value, err)
+	}
+
+	parts := strings.Split(value, "@")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid email address: %s\n"+
+			"Format: user@example.com\n"+
+			"Error: invalid @ separator",
+			value)
+	}
+	domain := parts[1]
+	if !strings.Contains(domain, ".") {
+		return fmt.Errorf("invalid email address: %s\n"+
+			"Format: user@example.com\n"+
+			"Error: missing top-level domain",
+			value)
 	}
 
 	return nil

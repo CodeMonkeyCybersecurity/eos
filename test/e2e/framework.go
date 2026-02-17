@@ -1,4 +1,4 @@
-//go:build e2e
+//go:build e2e_smoke || e2e_full
 
 // End-to-End Testing Framework for Eos
 // Provides utilities for testing complete user workflows
@@ -62,21 +62,19 @@ func NewE2ETestSuite(t *testing.T, name string) *E2ETestSuite {
 func (s *E2ETestSuite) findOrBuildBinary() string {
 	s.T.Helper()
 
-	// Check if binary already exists in /tmp
-	tmpBinary := "/tmp/eos-test"
-	if _, err := os.Stat(tmpBinary); err == nil {
-		s.Logger.Info("Using existing test binary", zap.String("path", tmpBinary))
-		return tmpBinary
-	}
-
 	// Build binary for testing
 	s.Logger.Info("Building eos binary for E2E testing")
 
-	// Determine project root (go up from test/e2e/ to root)
-	projectRoot, err := filepath.Abs("../..")
+	// Determine project root by walking up to the directory containing go.mod.
+	projectRoot, err := findProjectRoot()
 	require.NoError(s.T, err, "failed to determine project root")
 
-	buildCmd := exec.Command("go", "build", "-o", tmpBinary, "./cmd/")
+	// Use a project-local bin directory to avoid noexec tmp mounts.
+	binDir := filepath.Join(projectRoot, "outputs", "e2e-bin")
+	require.NoError(s.T, os.MkdirAll(binDir, 0o755), "failed to create e2e bin directory")
+	tmpBinary := filepath.Join(binDir, s.Name+"-eos-test")
+
+	buildCmd := exec.Command("go", "build", "-o", tmpBinary, ".")
 	buildCmd.Dir = projectRoot
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
@@ -86,6 +84,25 @@ func (s *E2ETestSuite) findOrBuildBinary() string {
 
 	s.Logger.Info("Built test binary", zap.String("path", tmpBinary))
 	return tmpBinary
+}
+
+func findProjectRoot() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	dir := wd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("could not find go.mod from %s", wd)
+		}
+		dir = parent
+	}
 }
 
 // RunCommand executes an eos command and returns output

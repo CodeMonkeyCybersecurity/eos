@@ -3,25 +3,33 @@
 package ai
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // ActionExecutor executes AI-suggested actions
 type ActionExecutor struct {
-	workingDir string
-	backupDir  string
-	dryRun     bool
+	workingDir   string
+	workspaceDir string
+	backupDir    string
+	dryRun       bool
+	policy       *ActionExecutionPolicy
+	auditPath    string
+	auditOnce    sync.Once
+	auditMu      sync.Mutex
 }
 
 // Action represents an action that can be executed
@@ -35,6 +43,129 @@ type Action struct {
 	Environment map[string]string `json:"environment"`
 	Metadata    map[string]any    `json:"metadata"`
 	Validation  *ActionValidation `json:"validation,omitempty"`
+}
+
+func (a *Action) ensureMetadata() {
+	if a.Metadata == nil {
+		a.Metadata = map[string]any{}
+	}
+}
+
+func (a *Action) setResolvedTarget(path string) {
+	a.ensureMetadata()
+	a.Metadata[metadataResolvedTargetKey] = path
+}
+
+func (a *Action) resolvedTarget() string {
+	if a == nil || a.Metadata == nil {
+		return ""
+	}
+	if v, ok := a.Metadata[metadataResolvedTargetKey]; ok {
+		if resolved, ok := v.(string); ok {
+			return resolved
+		}
+	}
+	return ""
+}
+
+// ActionExecutionPolicy enforces guardrails on AI-generated actions
+type ActionExecutionPolicy struct {
+	WorkspaceAllowlist []string
+	AllowedCommands    []string
+	DeniedArguments    []string
+	MaxArguments       int
+	MaxCommandLength   int
+}
+
+// ActionAuditEntry captures each executed action for forensic review
+type ActionAuditEntry struct {
+	Timestamp         time.Time      `json:"timestamp"`
+	Type              ActionType     `json:"type"`
+	Description       string         `json:"description"`
+	Target            string         `json:"target"`
+	Command           string         `json:"command"`
+	Arguments         []string       `json:"arguments"`
+	Success           bool           `json:"success"`
+	Error             string         `json:"error,omitempty"`
+	ValidationProfile string         `json:"validation_profile,omitempty"`
+	Metadata          map[string]any `json:"metadata,omitempty"`
+}
+
+func (policy *ActionExecutionPolicy) ResolveTarget(baseDir, target string) (string, error) {
+	if policy == nil {
+		return "", fmt.Errorf("execution policy not configured")
+	}
+	cleaned := filepath.Clean(target)
+	var candidate string
+	if filepath.IsAbs(cleaned) {
+		candidate = cleaned
+	} else {
+		candidate = filepath.Join(baseDir, cleaned)
+	}
+	absCandidate := candidate
+	if abs, err := filepath.Abs(candidate); err == nil {
+		absCandidate = abs
+	}
+	if err := ensureWithinAllowlist(absCandidate, policy.WorkspaceAllowlist); err != nil {
+		return "", err
+	}
+	if err := rejectSymlinkTraversal(baseDir, absCandidate); err != nil {
+		return "", err
+	}
+	return absCandidate, nil
+}
+
+func ensureWithinAllowlist(target string, allowlist []string) error {
+	if len(allowlist) == 0 {
+		return fmt.Errorf("no workspace allowlist configured")
+	}
+	for _, allowed := range allowlist {
+		if allowed == "" {
+			continue
+		}
+		normalized := filepath.Clean(allowed)
+		if abs, err := filepath.Abs(normalized); err == nil {
+			normalized = abs
+		}
+		rel, err := filepath.Rel(normalized, target)
+		if err != nil {
+			continue
+		}
+		if rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !strings.HasPrefix(rel, "../")) {
+			return nil
+		}
+	}
+	return fmt.Errorf("target %s outside authorized workspace", target)
+}
+
+func rejectSymlinkTraversal(baseDir, target string) error {
+	rel, err := filepath.Rel(baseDir, target)
+	if err != nil {
+		return err
+	}
+	if rel == "." {
+		return nil
+	}
+	sep := string(filepath.Separator)
+	current := baseDir
+	segments := strings.Split(rel, sep)
+	for _, segment := range segments {
+		if segment == "" || segment == "." {
+			continue
+		}
+		current = filepath.Join(current, segment)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				break
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("symlink traversal detected at %s", current)
+		}
+	}
+	return nil
 }
 
 // ActionType represents the type of action
@@ -52,12 +183,29 @@ const (
 	ActionTypeConsul     ActionType = "consul"
 )
 
+var (
+	defaultAllowedCommands = []string{
+		"bash", "sh", "cat", "cp", "mv", "chmod", "chown", "ls", "grep", "sed", "tee", "make",
+		"go", "git", "terraform", "vault", "consul", "docker", "kubectl", "helm", "systemctl",
+		"journalctl", "netstat", "ss", "openssl", "env",
+	}
+	defaultDeniedArguments = []string{"--force", "--delete", "--remove", "--recursive", "-rf", "rm", "mkfs", "dd", "poweroff", "shutdown", "reboot", "halt"}
+)
+
+const (
+	metadataValidationProfileKey = "validation_profile"
+	metadataResolvedTargetKey    = "__resolved_target"
+)
+
 // ActionValidation represents validation rules for actions
 type ActionValidation struct {
 	RequireConfirmation bool     `json:"require_confirmation"`
 	RestrictedPaths     []string `json:"restricted_paths"`
 	AllowedCommands     []string `json:"allowed_commands"`
 	MaxFileSize         int64    `json:"max_file_size"`
+	MaxArguments        int      `json:"max_arguments"`
+	MaxCommandLength    int      `json:"max_command_length"`
+	ValidationProfile   string   `json:"validation_profile"`
 }
 
 // ActionResult represents the result of an action execution
@@ -72,17 +220,27 @@ type ActionResult struct {
 }
 
 // NewActionExecutor creates a new action executor
-func NewActionExecutor(workingDir string, dryRun bool) *ActionExecutor {
+func NewActionExecutor(workingDir string, dryRun bool, policy *ActionExecutionPolicy) *ActionExecutor {
 	if workingDir == "" {
 		workingDir, _ = os.Getwd()
 	}
+	cleanWorkingDir := filepath.Clean(workingDir)
+	if abs, err := filepath.Abs(cleanWorkingDir); err == nil {
+		cleanWorkingDir = abs
+	}
 
-	backupDir := filepath.Join(workingDir, ".eos-ai-backups", time.Now().Format("20060102-150405"))
+	backupDir := filepath.Join(cleanWorkingDir, ".eos-ai-backups", time.Now().Format("20060102-150405"))
+	auditDir := filepath.Join(cleanWorkingDir, ".eos-ai-audit")
+	_ = os.MkdirAll(auditDir, shared.ServiceDirPerm)
+	auditPath := filepath.Join(auditDir, "actions.log")
 
 	return &ActionExecutor{
-		workingDir: workingDir,
-		backupDir:  backupDir,
-		dryRun:     dryRun,
+		workingDir:   cleanWorkingDir,
+		workspaceDir: cleanWorkingDir,
+		backupDir:    backupDir,
+		dryRun:       dryRun,
+		policy:       policy,
+		auditPath:    auditPath,
 	}
 }
 
@@ -90,6 +248,7 @@ func NewActionExecutor(workingDir string, dryRun bool) *ActionExecutor {
 func (ae *ActionExecutor) ExecuteAction(rc *eos_io.RuntimeContext, action *Action) (*ActionResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	start := time.Now()
+	ae.ensurePolicy()
 
 	logger.Info("Executing action",
 		zap.String("type", string(action.Type)),
@@ -100,11 +259,14 @@ func (ae *ActionExecutor) ExecuteAction(rc *eos_io.RuntimeContext, action *Actio
 		Success: false,
 		Message: action.Description,
 	}
+	defer func() {
+		result.Duration = time.Since(start)
+		ae.recordAudit(action, result)
+	}()
 
 	// Validate action
 	if err := ae.validateAction(action); err != nil {
 		result.Error = fmt.Sprintf("Action validation failed: %v", err)
-		result.Duration = time.Since(start)
 		return result, err
 	}
 
@@ -139,41 +301,47 @@ func (ae *ActionExecutor) ExecuteAction(rc *eos_io.RuntimeContext, action *Actio
 		logger.Info("Action executed successfully")
 	}
 
-	result.Duration = time.Since(start)
 	return result, err
+}
+
+func (ae *ActionExecutor) ensurePolicy() *ActionExecutionPolicy {
+	if ae.policy == nil {
+		ae.policy = &ActionExecutionPolicy{
+			WorkspaceAllowlist: []string{ae.workspaceDir},
+			AllowedCommands:    append([]string{}, defaultAllowedCommands...),
+			DeniedArguments:    append([]string{}, defaultDeniedArguments...),
+			MaxArguments:       defaultMaxArguments,
+			MaxCommandLength:   defaultMaxCommandLength,
+		}
+	}
+	return ae.policy
 }
 
 // validateAction validates an action before execution
 func (ae *ActionExecutor) validateAction(action *Action) error {
+	if action == nil {
+		return errors.New("action cannot be nil")
+	}
+	action.ensureMetadata()
 	if action.Validation == nil {
-		return nil
+		return fmt.Errorf("action %q missing validation metadata", action.Description)
 	}
-
-	// Check restricted paths
-	if action.Target != "" {
-		targetPath := filepath.Join(ae.workingDir, action.Target)
-		for _, restricted := range action.Validation.RestrictedPaths {
-			if strings.HasPrefix(targetPath, restricted) {
-				return fmt.Errorf("action targets restricted path: %s", restricted)
-			}
+	if action.Validation.ValidationProfile == "" {
+		if profile, ok := action.Metadata[metadataValidationProfileKey].(string); ok && profile != "" {
+			action.Validation.ValidationProfile = profile
 		}
 	}
-
-	// Check allowed commands
-	if action.Type == ActionTypeCommand && len(action.Validation.AllowedCommands) > 0 {
-		allowed := false
-		for _, allowedCmd := range action.Validation.AllowedCommands {
-			if action.Command == allowedCmd {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return fmt.Errorf("command not in allowed list: %s", action.Command)
-		}
+	if action.Validation.ValidationProfile == "" {
+		return fmt.Errorf("action %q missing validation profile", action.Description)
 	}
 
-	// Check file size limits
+	if err := ae.validateTargetPath(action); err != nil {
+		return err
+	}
+	if err := ae.validateCommand(action); err != nil {
+		return err
+	}
+
 	if (action.Type == ActionTypeFileCreate || action.Type == ActionTypeFileModify) &&
 		action.Validation.MaxFileSize > 0 {
 		if int64(len(action.Content)) > action.Validation.MaxFileSize {
@@ -184,9 +352,97 @@ func (ae *ActionExecutor) validateAction(action *Action) error {
 	return nil
 }
 
+func (ae *ActionExecutor) validateTargetPath(action *Action) error {
+	if action.Target == "" {
+		return nil
+	}
+	policy := ae.ensurePolicy()
+	resolved, err := policy.ResolveTarget(ae.workspaceDir, action.Target)
+	if err != nil {
+		return err
+	}
+	for _, restricted := range action.Validation.RestrictedPaths {
+		if strings.HasPrefix(resolved, restricted) {
+			return fmt.Errorf("action targets restricted path: %s", restricted)
+		}
+	}
+	action.setResolvedTarget(resolved)
+	return nil
+}
+
+func (ae *ActionExecutor) validateCommand(action *Action) error {
+	if action.Type != ActionTypeCommand {
+		return nil
+	}
+	policy := ae.ensurePolicy()
+	allowed := policy.AllowedCommands
+	if len(action.Validation.AllowedCommands) > 0 {
+		allowed = action.Validation.AllowedCommands
+	}
+	if len(allowed) > 0 {
+		allowedMatch := false
+		for _, cmd := range allowed {
+			if action.Command == cmd {
+				allowedMatch = true
+				break
+			}
+		}
+		if !allowedMatch {
+			return fmt.Errorf("command not in allowed list: %s", action.Command)
+		}
+	}
+
+	maxArgs := action.Validation.MaxArguments
+	if maxArgs == 0 {
+		maxArgs = policy.MaxArguments
+	}
+	if maxArgs > 0 && len(action.Arguments) > maxArgs {
+		return fmt.Errorf("command exceeds maximum allowed arguments (%d)", maxArgs)
+	}
+
+	maxLen := action.Validation.MaxCommandLength
+	if maxLen == 0 {
+		maxLen = policy.MaxCommandLength
+	}
+	commandLine := strings.TrimSpace(strings.Join(append([]string{action.Command}, action.Arguments...), " "))
+	if maxLen > 0 && len(commandLine) > maxLen {
+		return fmt.Errorf("command exceeds maximum allowed length (%d)", maxLen)
+	}
+
+	denied := policy.DeniedArguments
+	for _, arg := range append([]string{action.Command}, action.Arguments...) {
+		lowerArg := strings.ToLower(arg)
+		for _, banned := range denied {
+			if strings.Contains(lowerArg, strings.ToLower(banned)) {
+				return fmt.Errorf("argument '%s' violates execution policy", arg)
+			}
+		}
+	}
+	return nil
+}
+
+func (ae *ActionExecutor) resolvedPathForAction(action *Action) (string, error) {
+	if resolved := action.resolvedTarget(); resolved != "" {
+		return resolved, nil
+	}
+	if action.Target == "" {
+		return ae.workspaceDir, nil
+	}
+	policy := ae.ensurePolicy()
+	resolved, err := policy.ResolveTarget(ae.workspaceDir, action.Target)
+	if err != nil {
+		return "", err
+	}
+	action.setResolvedTarget(resolved)
+	return resolved, nil
+}
+
 // executeFileAction executes file creation or modification
 func (ae *ActionExecutor) executeFileAction(rc *eos_io.RuntimeContext, action *Action, result *ActionResult) error {
-	targetPath := filepath.Join(ae.workingDir, action.Target)
+	targetPath, err := ae.resolvedPathForAction(action)
+	if err != nil {
+		return err
+	}
 
 	// Create backup if file exists
 	if _, err := os.Stat(targetPath); err == nil {
@@ -218,7 +474,10 @@ func (ae *ActionExecutor) executeFileAction(rc *eos_io.RuntimeContext, action *A
 
 // executeFileDelete executes file deletion
 func (ae *ActionExecutor) executeFileDelete(rc *eos_io.RuntimeContext, action *Action, result *ActionResult) error {
-	targetPath := filepath.Join(ae.workingDir, action.Target)
+	targetPath, err := ae.resolvedPathForAction(action)
+	if err != nil {
+		return err
+	}
 
 	// Create backup before deletion
 	if err := ae.createBackup(targetPath); err != nil {
@@ -433,100 +692,144 @@ func (ae *ActionExecutor) createBackup(filePath string) error {
 	return os.WriteFile(backupPath, content, shared.ConfigFilePerm)
 }
 
+func (ae *ActionExecutor) recordAudit(action *Action, result *ActionResult) {
+	if action == nil || result == nil || ae.auditPath == "" {
+		return
+	}
+	target := action.Target
+	if resolved := action.resolvedTarget(); resolved != "" {
+		if rel, err := filepath.Rel(ae.workspaceDir, resolved); err == nil {
+			target = rel
+		} else {
+			target = resolved
+		}
+	}
+	entry := ActionAuditEntry{
+		Timestamp:   time.Now().UTC(),
+		Type:        action.Type,
+		Description: action.Description,
+		Target:      target,
+		Command:     action.Command,
+		Arguments:   append([]string{}, action.Arguments...),
+		Success:     result.Success,
+		Error:       result.Error,
+		Metadata:    map[string]any{},
+	}
+	if action.Validation != nil {
+		entry.ValidationProfile = action.Validation.ValidationProfile
+	}
+	for key, value := range action.Metadata {
+		if key == metadataResolvedTargetKey {
+			continue
+		}
+		entry.Metadata[key] = value
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	ae.auditMu.Lock()
+	defer ae.auditMu.Unlock()
+	file, err := os.OpenFile(ae.auditPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, shared.SecretFilePerm)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	_, _ = file.Write(append(data, '\n'))
+}
+
 // ParseActionsFromResponse parses actions from AI response text
 func ParseActionsFromResponse(response string) ([]*Action, error) {
 	var actions []*Action
 
-	// Look for action blocks in the response
 	actionRegex := regexp.MustCompile("(?s)```(action|json)\\s*\\n(.*?)\\n```")
 	matches := actionRegex.FindAllStringSubmatch(response, -1)
-
 	for _, match := range matches {
-		if len(match) >= 3 {
-			actionText := strings.TrimSpace(match[2])
+		if len(match) < 3 {
+			continue
+		}
+		chunk := strings.TrimSpace(match[2])
+		parsed, err := parseJSONActions(chunk)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse action block: %w", err)
+		}
+		actions = append(actions, parsed...)
+	}
 
-			// Try to parse as JSON action
-			action, err := parseJSONAction(actionText)
-			if err == nil {
-				actions = append(actions, action)
-				continue
-			}
-
-			// Try to parse as structured text action
-			action, err = parseTextAction(actionText)
-			if err == nil {
-				actions = append(actions, action)
-			}
+	if len(actions) == 0 {
+		if parsed, err := parseJSONActions(strings.TrimSpace(response)); err == nil {
+			actions = append(actions, parsed...)
 		}
 	}
 
-	// If no explicit actions found, try to infer actions from the response
 	if len(actions) == 0 {
-		inferredActions := inferActionsFromText(response)
-		actions = append(actions, inferredActions...)
+		return nil, fmt.Errorf("response missing structured action metadata")
+	}
+
+	for _, action := range actions {
+		if err := ensureValidationMetadata(action); err != nil {
+			return nil, err
+		}
 	}
 
 	return actions, nil
 }
 
-// parseJSONAction parses a JSON-formatted action
-func parseJSONAction(text string) (*Action, error) {
-	// This would use json.Unmarshal to parse JSON actions
-	// For now, return a simple implementation
-	return &Action{
-		Type:        ActionTypeCommand,
-		Description: "Parsed action from JSON",
-		Command:     "echo",
-		Arguments:   []string{"JSON action parsed"},
-	}, nil
-}
-
-// parseTextAction parses a text-formatted action
-func parseTextAction(text string) (*Action, error) {
-	lines := strings.Split(text, "\n")
-	action := &Action{}
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Type:") {
-			action.Type = ActionType(strings.TrimSpace(strings.TrimPrefix(line, "Type:")))
-		} else if strings.HasPrefix(line, "Description:") {
-			action.Description = strings.TrimSpace(strings.TrimPrefix(line, "Description:"))
-		} else if strings.HasPrefix(line, "Target:") {
-			action.Target = strings.TrimSpace(strings.TrimPrefix(line, "Target:"))
-		} else if strings.HasPrefix(line, "Command:") {
-			action.Command = strings.TrimSpace(strings.TrimPrefix(line, "Command:"))
-		}
+func parseJSONActions(text string) ([]*Action, error) {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return nil, fmt.Errorf("empty action payload")
 	}
-
-	if action.Type == "" {
-		return nil, fmt.Errorf("action type not specified")
-	}
-
-	return action, nil
-}
-
-// inferActionsFromText infers actions from natural language text
-func inferActionsFromText(text string) []*Action {
 	var actions []*Action
-
-	// Look for file modification suggestions
-	if strings.Contains(strings.ToLower(text), "modify") && strings.Contains(strings.ToLower(text), "file") {
-		action := &Action{
-			Type:        ActionTypeFileModify,
-			Description: "Inferred file modification from AI response",
+	if strings.HasPrefix(trimmed, "[") {
+		if err := json.Unmarshal([]byte(trimmed), &actions); err != nil {
+			return nil, err
 		}
-		actions = append(actions, action)
-	}
-
-	// Look for command suggestions
-	if strings.Contains(strings.ToLower(text), "run") || strings.Contains(strings.ToLower(text), "execute") {
-		action := &Action{
-			Type:        ActionTypeCommand,
-			Description: "Inferred command execution from AI response",
+	} else {
+		var action Action
+		if err := json.Unmarshal([]byte(trimmed), &action); err != nil {
+			return nil, err
 		}
-		actions = append(actions, action)
+		actions = []*Action{&action}
 	}
+	for _, action := range actions {
+		if action.Metadata == nil {
+			action.Metadata = map[string]any{}
+		}
+	}
+	return actions, nil
+}
 
-	return actions
+func ensureValidationMetadata(action *Action) error {
+	if action.Validation == nil {
+		return fmt.Errorf("action %q missing validation section", action.Description)
+	}
+	if action.Validation.ValidationProfile == "" {
+		if profile, ok := action.Metadata[metadataValidationProfileKey].(string); ok && profile != "" {
+			action.Validation.ValidationProfile = profile
+		}
+	}
+	if action.Validation.ValidationProfile == "" {
+		return fmt.Errorf("action %q missing validation profile metadata", action.Description)
+	}
+	return nil
+}
+
+// InjectValidationProfile enforces a local validation profile before execution
+func InjectValidationProfile(actions []*Action, profileName string, policy *ActionExecutionPolicy) {
+	if policy == nil {
+		return
+	}
+	for _, action := range actions {
+		if action == nil {
+			continue
+		}
+		if action.Validation == nil {
+			action.Validation = &ActionValidation{}
+		}
+		action.Validation.ValidationProfile = profileName
+		action.Validation.AllowedCommands = append([]string{}, policy.AllowedCommands...)
+		action.Validation.MaxArguments = policy.MaxArguments
+		action.Validation.MaxCommandLength = policy.MaxCommandLength
+	}
 }

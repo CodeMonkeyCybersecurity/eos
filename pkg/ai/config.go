@@ -4,6 +4,7 @@ package ai
 
 import (
 	"bufio"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,12 +35,83 @@ type AIConfig struct {
 	AzureEndpoint   string `yaml:"azure_endpoint,omitempty"`
 	AzureAPIVersion string `yaml:"azure_api_version,omitempty"`
 	AzureDeployment string `yaml:"azure_deployment,omitempty"`
+
+	ActionSecurity ActionSecurityConfig `yaml:"action_security,omitempty"`
+	DataSharing    DataSharingConfig    `yaml:"data_sharing,omitempty"`
+	PolicySecrets  []string             `yaml:"policy_secrets,omitempty"`
+}
+
+// ActionSecurityConfig controls AI action execution guardrails
+type ActionSecurityConfig struct {
+	WorkspaceAllowlist []string `yaml:"workspace_allowlist,omitempty"`
+	AllowedCommands    []string `yaml:"allowed_commands,omitempty"`
+	DeniedArguments    []string `yaml:"denied_arguments,omitempty"`
+	MaxArguments       int      `yaml:"max_arguments,omitempty"`
+	MaxCommandLength   int      `yaml:"max_command_length,omitempty"`
+}
+
+// DataSharingConfig controls how much context is shared with AI providers
+type DataSharingConfig struct {
+	IncludeSecretFiles bool  `yaml:"include_secret_files,omitempty"`
+	RedactSensitive    *bool `yaml:"redact_sensitive,omitempty"`
+	RequireConsent     *bool `yaml:"require_consent,omitempty"`
 }
 
 // ConfigManager manages AI configuration
 type ConfigManager struct {
 	configPath string
 	config     *AIConfig
+}
+
+const (
+	defaultMaxArguments     = 12
+	defaultMaxCommandLength = 512
+)
+
+func (cfg *AIConfig) applyDefaults() {
+	if cfg.Provider == "" {
+		cfg.Provider = "anthropic"
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "https://api.anthropic.com/v1"
+	}
+	if cfg.Model == "" {
+		cfg.Model = "claude-3-sonnet-20240229"
+	}
+	if cfg.MaxTokens == 0 {
+		cfg.MaxTokens = 4096
+	}
+	if cfg.Timeout == 0 {
+		cfg.Timeout = 60
+	}
+	cfg.ActionSecurity.applyDefaults()
+	cfg.DataSharing.applyDefaults()
+}
+
+func (cfg *ActionSecurityConfig) applyDefaults() {
+	if cfg.AllowedCommands == nil || len(cfg.AllowedCommands) == 0 {
+		cfg.AllowedCommands = append([]string{}, defaultAllowedCommands...)
+	}
+	if cfg.DeniedArguments == nil || len(cfg.DeniedArguments) == 0 {
+		cfg.DeniedArguments = append([]string{}, defaultDeniedArguments...)
+	}
+	if cfg.MaxArguments == 0 {
+		cfg.MaxArguments = defaultMaxArguments
+	}
+	if cfg.MaxCommandLength == 0 {
+		cfg.MaxCommandLength = defaultMaxCommandLength
+	}
+}
+
+func (cfg *DataSharingConfig) applyDefaults() {
+	if cfg.RedactSensitive == nil {
+		defaultTrue := true
+		cfg.RedactSensitive = &defaultTrue
+	}
+	if cfg.RequireConsent == nil {
+		defaultTrue := true
+		cfg.RequireConsent = &defaultTrue
+	}
 }
 
 // NewConfigManager creates a new configuration manager
@@ -52,10 +124,12 @@ func NewConfigManager() *ConfigManager {
 
 	configPath := filepath.Join(configDir, "eos", "ai-config.yaml")
 
-	return &ConfigManager{
+	cm := &ConfigManager{
 		configPath: configPath,
 		config:     &AIConfig{},
 	}
+	cm.config.applyDefaults()
+	return cm
 }
 
 // LoadConfig loads the AI configuration from file
@@ -68,14 +142,8 @@ func (cm *ConfigManager) LoadConfig() error {
 
 	// Check if config file exists
 	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
-		// Create default config (Anthropic Claude)
-		cm.config = &AIConfig{
-			Provider:  "anthropic",
-			BaseURL:   "https://api.anthropic.com/v1",
-			Model:     "claude-3-sonnet-20240229",
-			MaxTokens: 4096,
-			Timeout:   60,
-		}
+		cm.config = &AIConfig{}
+		cm.config.applyDefaults()
 		return nil
 	}
 
@@ -89,6 +157,7 @@ func (cm *ConfigManager) LoadConfig() error {
 	if err := yaml.Unmarshal(data, cm.config); err != nil {
 		return fmt.Errorf("failed to parse config file: %w", err)
 	}
+	cm.config.applyDefaults()
 
 	return nil
 }
@@ -269,6 +338,158 @@ func (cm *ConfigManager) UpdateConfig(updates map[string]any) error {
 // GetConfigPath returns the configuration file path
 func (cm *ConfigManager) GetConfigPath() string {
 	return cm.configPath
+}
+
+// GetActionPolicy returns the execution policy applied to AI actions
+func (cm *ConfigManager) GetActionPolicy(workingDir string) *ActionExecutionPolicy {
+	policy := &ActionExecutionPolicy{}
+	for _, workspace := range cm.config.ActionSecurity.WorkspaceAllowlist {
+		if workspace == "" {
+			continue
+		}
+		canonical := filepath.Clean(workspace)
+		if abs, err := filepath.Abs(canonical); err == nil {
+			canonical = abs
+		}
+		policy.WorkspaceAllowlist = append(policy.WorkspaceAllowlist, canonical)
+	}
+	policy.AllowedCommands = append(policy.AllowedCommands, cm.config.ActionSecurity.AllowedCommands...)
+	policy.DeniedArguments = append(policy.DeniedArguments, cm.config.ActionSecurity.DeniedArguments...)
+	policy.MaxArguments = cm.config.ActionSecurity.MaxArguments
+	policy.MaxCommandLength = cm.config.ActionSecurity.MaxCommandLength
+	if len(policy.AllowedCommands) == 0 {
+		policy.AllowedCommands = append(policy.AllowedCommands, defaultAllowedCommands...)
+	}
+	if len(policy.DeniedArguments) == 0 {
+		policy.DeniedArguments = append(policy.DeniedArguments, defaultDeniedArguments...)
+	}
+	if policy.MaxArguments == 0 {
+		policy.MaxArguments = defaultMaxArguments
+	}
+	if policy.MaxCommandLength == 0 {
+		policy.MaxCommandLength = defaultMaxCommandLength
+	}
+
+	if len(policy.WorkspaceAllowlist) == 0 {
+		canonical := filepath.Clean(workingDir)
+		if abs, err := filepath.Abs(canonical); err == nil {
+			canonical = abs
+		}
+		policy.WorkspaceAllowlist = append(policy.WorkspaceAllowlist, canonical)
+	} else {
+		seen := false
+		for _, allowed := range policy.WorkspaceAllowlist {
+			if allowed == workingDir {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			canonical := filepath.Clean(workingDir)
+			if abs, err := filepath.Abs(canonical); err == nil {
+				canonical = abs
+			}
+			policy.WorkspaceAllowlist = append(policy.WorkspaceAllowlist, canonical)
+		}
+	}
+
+	return policy
+}
+
+// BuildActionPolicy derives the execution policy from an AIConfig without reloading from disk
+func BuildActionPolicy(cfg *AIConfig, workingDir string) *ActionExecutionPolicy {
+	if cfg == nil {
+		cfg = &AIConfig{}
+	}
+	cfg.applyDefaults()
+	cm := &ConfigManager{configPath: "", config: cfg}
+	return cm.GetActionPolicy(workingDir)
+}
+
+// IncludeSecretFiles returns whether environment scans should read secret-like files
+func (cm *ConfigManager) IncludeSecretFiles() bool {
+	return cm.config.DataSharing.IncludeSecretFiles
+}
+
+// RedactSensitive returns whether sensitive tokens should be redacted from prompts
+func (cm *ConfigManager) RedactSensitive() bool {
+	if cm.config.DataSharing.RedactSensitive == nil {
+		return true
+	}
+	return *cm.config.DataSharing.RedactSensitive
+}
+
+// ConsentRequired returns whether operator consent is required before data sharing
+func (cm *ConfigManager) ConsentRequired() bool {
+	if cm.config.DataSharing.RequireConsent == nil {
+		return true
+	}
+	return *cm.config.DataSharing.RequireConsent
+}
+
+// IncludeSecretFilesEnabled returns whether secret-like files may be analyzed
+func (cfg *AIConfig) IncludeSecretFilesEnabled() bool {
+	if cfg == nil {
+		return false
+	}
+	return cfg.DataSharing.IncludeSecretFiles
+}
+
+// RedactionEnabled reports if sensitive values should be redacted before sharing
+func (cfg *AIConfig) RedactionEnabled() bool {
+	if cfg == nil {
+		return true
+	}
+	if cfg.DataSharing.RedactSensitive == nil {
+		return true
+	}
+	return *cfg.DataSharing.RedactSensitive
+}
+
+// ConsentPromptEnabled determines if the CLI must prompt before sharing context
+func (cfg *AIConfig) ConsentPromptEnabled() bool {
+	if cfg == nil {
+		return true
+	}
+	if cfg.DataSharing.RequireConsent == nil {
+		return true
+	}
+	return *cfg.DataSharing.RequireConsent
+}
+
+// PolicySecrets returns decoded signing keys for automation policy validation
+func (cm *ConfigManager) PolicySecrets() [][]byte {
+	var secrets [][]byte
+	for _, entry := range cm.config.PolicySecrets {
+		if decoded, err := hex.DecodeString(strings.TrimSpace(entry)); err == nil && len(decoded) > 0 {
+			secrets = append(secrets, decoded)
+		}
+	}
+	if env := strings.TrimSpace(os.Getenv("EOS_AUTOFIX_POLICY_SECRET")); env != "" {
+		if decoded, err := hex.DecodeString(env); err == nil && len(decoded) > 0 {
+			secrets = append(secrets, decoded)
+		}
+	}
+	return secrets
+}
+
+// PolicySecretBytes decodes configured signing secrets for auto-fix policies
+func (cfg *AIConfig) PolicySecretBytes() [][]byte {
+	if cfg == nil {
+		return nil
+	}
+	var secrets [][]byte
+	for _, entry := range cfg.PolicySecrets {
+		if decoded, err := hex.DecodeString(strings.TrimSpace(entry)); err == nil && len(decoded) > 0 {
+			secrets = append(secrets, decoded)
+		}
+	}
+	if env := strings.TrimSpace(os.Getenv("EOS_AUTOFIX_POLICY_SECRET")); env != "" {
+		if decoded, err := hex.DecodeString(env); err == nil && len(decoded) > 0 {
+			secrets = append(secrets, decoded)
+		}
+	}
+	return secrets
 }
 
 // ValidateAPIKey performs a simple validation of the API key format
@@ -482,13 +703,13 @@ func StartInteractiveChat(rc *eos_io.RuntimeContext, assistant *AIAssistant, ctx
 	return nil
 }
 
-func ImplementActions(rc *eos_io.RuntimeContext, actions []*Action, workingDir string, dryRun bool) error {
+func ImplementActions(rc *eos_io.RuntimeContext, actions []*Action, workingDir string, dryRun bool, policy *ActionExecutionPolicy) error {
 	if len(actions) == 0 {
 		fmt.Println("No actions to implement.")
 		return nil
 	}
 
-	executor := NewActionExecutor(workingDir, dryRun)
+	executor := NewActionExecutor(workingDir, dryRun, policy)
 
 	fmt.Printf(" Implementing %d action(s)...\n\n", len(actions))
 

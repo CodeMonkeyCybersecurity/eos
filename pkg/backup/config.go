@@ -3,7 +3,6 @@
 package backup
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"time"
@@ -12,6 +11,12 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
+)
+
+var (
+	configReadCandidates = []string{ConfigFile, LegacyConfigFile}
+	configWritePath      = ConfigFile
+	configWriteDir       = ConfigDir
 )
 
 // Config represents the backup configuration
@@ -112,48 +117,62 @@ type Snapshot struct {
 func LoadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	configPath := "/etc/eos/backup.yaml"
-	logger.Info("Loading backup configuration",
-		zap.String("path", configPath))
+	for _, configPath := range configReadPaths() {
+		logger.Info("Loading backup configuration",
+			zap.String("path", configPath))
 
-	// Check if config exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		logger.Info("No configuration file found, using defaults")
-		return defaultConfig(), nil
+		if _, err := os.Stat(configPath); err != nil {
+			if os.IsNotExist(err) || os.IsPermission(err) {
+				continue
+			}
+			recordConfigLoad(configPath, false)
+			return nil, fmt.Errorf("stating config file %q: %w", configPath, err)
+		}
+
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			if os.IsPermission(err) {
+				continue
+			}
+			recordConfigLoad(configPath, false)
+			return nil, fmt.Errorf("reading config file %q: %w", configPath, err)
+		}
+
+		var config Config
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			recordConfigLoad(configPath, false)
+			return nil, fmt.Errorf("parsing config file %q: %w", configPath, err)
+		}
+
+		// Validate configuration
+		if err := config.Validate(); err != nil {
+			recordConfigLoad(configPath, false)
+			return nil, fmt.Errorf("invalid configuration %q: %w", configPath, err)
+		}
+		recordConfigLoad(configPath, true)
+
+		logger.Info("Configuration loaded successfully",
+			zap.String("path", configPath),
+			zap.Int("repositories", len(config.Repositories)),
+			zap.Int("profiles", len(config.Profiles)))
+		return &config, nil
 	}
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading config file: %w", err)
-	}
-
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parsing config file: %w", err)
-	}
-
-	// Validate configuration
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	logger.Info("Configuration loaded successfully",
-		zap.Int("repositories", len(config.Repositories)),
-		zap.Int("profiles", len(config.Profiles)))
-
-	return &config, nil
+	logger.Info("No configuration file found, using defaults",
+		zap.Strings("paths", configReadPaths()))
+	recordConfigLoad("defaults", true)
+	return defaultConfig(), nil
 }
 
 // SaveConfig saves the backup configuration
 func SaveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	configPath := "/etc/eos/backup.yaml"
 	logger.Info("Saving backup configuration",
-		zap.String("path", configPath))
+		zap.String("path", configWritePath))
 
 	// Ensure directory exists
-	if err := os.MkdirAll("/etc/eos", shared.ServiceDirPerm); err != nil {
+	if err := os.MkdirAll(configWriteDir, ConfigDirPerm); err != nil {
 		return fmt.Errorf("creating config directory: %w", err)
 	}
 
@@ -167,12 +186,18 @@ func SaveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, shared.SecureConfigFilePerm); err != nil {
+	if err := os.WriteFile(configWritePath, data, ConfigFilePerm); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
 	}
 
 	logger.Info("Configuration saved successfully")
 	return nil
+}
+
+func configReadPaths() []string {
+	paths := make([]string, len(configReadCandidates))
+	copy(paths, configReadCandidates)
+	return paths
 }
 
 // Validate checks if the configuration is valid

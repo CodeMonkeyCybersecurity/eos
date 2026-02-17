@@ -4,17 +4,31 @@ package ai
 
 import (
 	"bufio"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ai"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+)
+
+const (
+	defaultValidationProfile = "eos-cli-default"
+	maxPreviewBytes          = 128 * 1024
 )
 
 // AICmd is the root command for AI operations
@@ -85,14 +99,20 @@ Examples:
 			return fmt.Errorf("failed to initialize AI assistant: %w", err)
 		}
 
+		cfg := assistant.Config()
 		// Create conversation context
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
+		envOpts := []ai.EnvironmentOption{}
+		if cfg != nil {
+			envOpts = append(envOpts, ai.WithSecretInclusion(cfg.IncludeSecretFilesEnabled()))
+			envOpts = append(envOpts, ai.WithSecretRedaction(cfg.RedactionEnabled()))
+		}
 
 		// Analyze environment if requested or if it's a technical question
 		if analyze || ai.ContainsTechnicalTerms(question) {
 			logger.Info("terminal prompt:  Analyzing current environment...")
 
-			analyzer := ai.NewEnvironmentAnalyzer(workingDir)
+			analyzer := ai.NewEnvironmentAnalyzer(workingDir, envOpts...)
 			env, err := analyzer.AnalyzeEnvironment(rc)
 			if err != nil {
 				logger.Warn("Environment analysis failed", zap.Error(err))
@@ -107,8 +127,14 @@ Examples:
 			}
 		}
 
+		if ctx.Environment != nil && (cfg == nil || cfg.ConsentPromptEnabled()) {
+			if err := requireDataSharingConsent(cfg, assistant.Provider()); err != nil {
+				return err
+			}
+		}
+
 		// Build comprehensive prompt with environment context
-		fullPrompt := ai.BuildEnvironmentPrompt(ctx, question)
+		fullPrompt := ai.BuildEnvironmentPrompt(ctx, assistant.Provider(), question)
 
 		logger.Info("terminal prompt:  Thinking...")
 
@@ -263,16 +289,27 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to initialize AI assistant: %w", err)
 		}
+		cfg := assistant.Config()
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
+		envOpts := []ai.EnvironmentOption{}
+		if cfg != nil {
+			envOpts = append(envOpts, ai.WithSecretInclusion(cfg.IncludeSecretFilesEnabled()))
+			envOpts = append(envOpts, ai.WithSecretRedaction(cfg.RedactionEnabled()))
+		}
 
 		// Always analyze environment for fix requests
 		logger.Info("terminal prompt:  Gathering environment context...")
-		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
+		analyzer := ai.NewEnvironmentAnalyzer(workingDir, envOpts...)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
 			return fmt.Errorf("environment analysis failed: %w", err)
 		}
 		ctx.Environment = env
+		if cfg == nil || cfg.ConsentPromptEnabled() {
+			if err := requireDataSharingConsent(cfg, assistant.Provider()); err != nil {
+				return err
+			}
+		}
 
 		// Build diagnostic prompt
 		diagnosticPrompt := fmt.Sprintf(`I'm experiencing this issue with my infrastructure: %s
@@ -285,7 +322,7 @@ Please help me:
 
 Focus on actionable solutions that I can implement immediately.`, issue)
 
-		fullPrompt := ai.BuildEnvironmentPrompt(ctx, diagnosticPrompt)
+		fullPrompt := ai.BuildEnvironmentPrompt(ctx, assistant.Provider(), diagnosticPrompt)
 
 		logger.Info("terminal prompt:  Diagnosing issue...")
 
@@ -311,17 +348,38 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
 			logger.Info(fmt.Sprintf("terminal prompt:  Found %d suggested fix action(s).", len(actions)))
-
-			if autoFix {
-				logger.Info("terminal prompt:  Auto-fix enabled, implementing suggestions...")
-				return ai.ImplementActions(rc, actions, workingDir, false)
-			} else {
-				logger.Info("terminal prompt:  Would you like me to implement these fixes? [y/N]: ")
-				reader := bufio.NewReader(os.Stdin)
-				if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
-					return ai.ImplementActions(rc, actions, workingDir, false)
+			policy := ai.BuildActionPolicy(cfg, workingDir)
+			reader := bufio.NewReader(os.Stdin)
+			policyPath, _ := cmd.Flags().GetString("auto-fix-policy")
+			var policyDoc *autoFixPolicyDocument
+			if policyPath != "" {
+				secrets := [][]byte{}
+				if cfg != nil {
+					secrets = cfg.PolicySecretBytes()
+				}
+				policyDoc, err = loadAutoFixPolicy(policyPath, secrets)
+				if err != nil {
+					return err
 				}
 			}
+			if autoFix && (policyDoc == nil || !policyDoc.AllowsAutoFix()) {
+				logger.Info("terminal prompt:  Auto-fix requested but no valid signed policy found; prompting for manual approval")
+			}
+			approvalProfile := defaultValidationProfile
+			if policyDoc != nil && policyDoc.ValidationTag != "" {
+				approvalProfile = policyDoc.ValidationTag
+			}
+			autoApproved := autoFix && policyDoc != nil && policyDoc.AllowsAutoFix()
+			approvedActions, err := reviewActionsWithOperator(logger, reader, actions, workingDir, autoApproved)
+			if err != nil {
+				return err
+			}
+			if len(approvedActions) == 0 {
+				logger.Info("terminal prompt:  No actions were approved; exiting without changes.")
+				return nil
+			}
+			ai.InjectValidationProfile(approvedActions, approvalProfile, policy)
+			return ai.ImplementActions(rc, approvedActions, workingDir, false, policy)
 		}
 
 		return nil
@@ -730,6 +788,7 @@ func init() {
 	// AI fix command flags
 	aiFixCmd.Flags().String("directory", "", "Working directory (default: current)")
 	aiFixCmd.Flags().Bool("auto-fix", false, "Automatically implement suggested fixes")
+	aiFixCmd.Flags().String("auto-fix-policy", "", "Path to signed policy that authorizes unattended fixes")
 
 	// AI chat command flags
 	aiChatCmd.Flags().String("directory", "", "Working directory (default: current)")
@@ -758,4 +817,202 @@ func init() {
 	AICmd.AddCommand(aiChatCmd)
 	AICmd.AddCommand(aiImplementCmd)
 	AICmd.AddCommand(aiConfigureCmd)
+}
+
+var (
+	previewKeyValueRegex    = regexp.MustCompile(`(?i)(token|password|secret|apikey|api_key|bearer|session|authorization)[\s:=\"']+([A-Za-z0-9\-_.:/+=]+)`) //nolint:lll
+	previewHighEntropyRegex = regexp.MustCompile(`[A-Za-z0-9+/=_-]{40,}`)
+)
+
+func requireDataSharingConsent(cfg *ai.AIConfig, provider string) error {
+	if cfg != nil && !cfg.ConsentPromptEnabled() {
+		return nil
+	}
+	reader := bufio.NewReader(os.Stdin)
+	return promptDataSharingConsent(reader, provider)
+}
+
+func promptDataSharingConsent(reader *bufio.Reader, provider string) error {
+	if provider == "" {
+		provider = "the configured AI provider"
+	}
+	fmt.Printf("WARNING: Sanitized environment context will be shared with %s. Proceed? [y/N]: ", provider)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return err
+	}
+	answer := strings.ToLower(strings.TrimSpace(response))
+	if answer == "y" || answer == "yes" {
+		return nil
+	}
+	return errors.New("operator declined to share environment context")
+}
+
+func reviewActionsWithOperator(logger otelzap.LoggerWithCtx, reader *bufio.Reader, actions []*ai.Action, workingDir string, autoApprove bool) ([]*ai.Action, error) {
+	var approved []*ai.Action
+	for i, action := range actions {
+		if action == nil {
+			continue
+		}
+		descriptor := fmt.Sprintf("Action %d/%d: %s (%s)", i+1, len(actions), action.Description, action.Type)
+		logger.Info("terminal prompt:", zap.String("output", descriptor))
+		preview := renderActionPreview(action, workingDir)
+		if strings.TrimSpace(preview) != "" {
+			logger.Info("terminal prompt:", zap.String("output", preview))
+		}
+		approve := autoApprove
+		if !approve {
+			var err error
+			approve, err = promptActionApproval(reader)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if approve {
+			approved = append(approved, action)
+			logger.Info("terminal prompt:  Approved action.")
+		} else {
+			logger.Info("terminal prompt:  Skipped action per operator request.")
+		}
+	}
+	return approved, nil
+}
+
+func promptActionApproval(reader *bufio.Reader) (bool, error) {
+	fmt.Print("Apply this action? [y/N]: ")
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false, err
+	}
+	answer := strings.ToLower(strings.TrimSpace(response))
+	return answer == "y" || answer == "yes", nil
+}
+
+func renderActionPreview(action *ai.Action, workingDir string) string {
+	switch action.Type {
+	case ai.ActionTypeFileCreate, ai.ActionTypeFileModify:
+		return buildFileDiff(action, workingDir)
+	case ai.ActionTypeFileDelete:
+		return fmt.Sprintf("File %s will be deleted", filepath.Join(workingDir, action.Target))
+	case ai.ActionTypeCommand:
+		return fmt.Sprintf("Command: %s", formatCommandLine(action))
+	case ai.ActionTypeService, ai.ActionTypeContainer, ai.ActionTypeTerraform, ai.ActionTypeVault, ai.ActionTypeConsul:
+		return fmt.Sprintf("Action details: target=%s, command=%s", action.Target, formatCommandLine(action))
+	default:
+		return ""
+	}
+}
+
+func buildFileDiff(action *ai.Action, workingDir string) string {
+	resolved := filepath.Join(workingDir, filepath.Clean(action.Target))
+	var original string
+	if data, err := os.ReadFile(resolved); err == nil {
+		if len(data) > maxPreviewBytes {
+			data = data[:maxPreviewBytes]
+		}
+		original = sanitizePreviewText(string(data))
+	}
+	proposedContent := action.Content
+	if len(proposedContent) > maxPreviewBytes {
+		proposedContent = proposedContent[:maxPreviewBytes]
+	}
+	proposed := sanitizePreviewText(proposedContent)
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(original),
+		B:        difflib.SplitLines(proposed),
+		FromFile: resolved,
+		ToFile:   resolved + " (proposed)",
+		Context:  3,
+	}
+	result, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return fmt.Sprintf("unable to render diff: %v", err)
+	}
+	if strings.TrimSpace(result) == "" {
+		if original == "" {
+			return fmt.Sprintf("New file will be created at %s", resolved)
+		}
+		return "No textual diff detected"
+	}
+	return result
+}
+
+func formatCommandLine(action *ai.Action) string {
+	parts := append([]string{action.Command}, action.Arguments...)
+	return sanitizePreviewText(strings.Join(parts, " "))
+}
+
+func sanitizePreviewText(text string) string {
+	trimmed := strings.TrimSpace(text)
+	trimmed = previewKeyValueRegex.ReplaceAllString(trimmed, "$1 <redacted>")
+	trimmed = previewHighEntropyRegex.ReplaceAllString(trimmed, "<redacted>")
+	if len(trimmed) > 400 {
+		trimmed = trimmed[:400] + "..."
+	}
+	return trimmed
+}
+
+type autoFixPolicyDocument struct {
+	Name          string `json:"name"`
+	AllowAutoFix  bool   `json:"allow_auto_fix"`
+	Scope         string `json:"scope"`
+	ExpiresAt     string `json:"expires_at"`
+	Signature     string `json:"signature"`
+	ValidationTag string `json:"validation_profile"`
+	parsedExpiry  time.Time
+}
+
+func (doc *autoFixPolicyDocument) AllowsAutoFix() bool {
+	if doc == nil || !doc.AllowAutoFix {
+		return false
+	}
+	if doc.parsedExpiry.IsZero() {
+		return true
+	}
+	return time.Now().Before(doc.parsedExpiry)
+}
+
+func loadAutoFixPolicy(path string, secrets [][]byte) (*autoFixPolicyDocument, error) {
+	if path == "" {
+		return nil, fmt.Errorf("auto-fix policy path not provided")
+	}
+	if len(secrets) == 0 {
+		return nil, fmt.Errorf("no trusted policy secrets configured; cannot verify %s", path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read policy file: %w", err)
+	}
+	var doc autoFixPolicyDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("invalid policy file: %w", err)
+	}
+	if doc.Signature == "" {
+		return nil, fmt.Errorf("policy %s missing signature", path)
+	}
+	payload := doc
+	payload.Signature = ""
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	signatureBytes, err := hex.DecodeString(strings.TrimSpace(doc.Signature))
+	if err != nil {
+		return nil, fmt.Errorf("policy signature decoding failed: %w", err)
+	}
+	for _, secret := range secrets {
+		mac := hmac.New(sha256.New, secret)
+		mac.Write(payloadBytes)
+		if hmac.Equal(mac.Sum(nil), signatureBytes) {
+			if doc.ExpiresAt != "" {
+				parsed, err := time.Parse(time.RFC3339, doc.ExpiresAt)
+				if err != nil {
+					return nil, fmt.Errorf("invalid policy expiry: %w", err)
+				}
+				doc.parsedExpiry = parsed
+			}
+			return &doc, nil
+		}
+	}
+	return nil, fmt.Errorf("policy %s failed signature verification", path)
 }
