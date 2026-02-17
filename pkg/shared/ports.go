@@ -65,7 +65,29 @@ const (
 	PortPenpotBackend  = 8461 // Penpot backend API (not 6060)
 	PortPenpotExporter = 8467 // Penpot exporter (not 6061)
 	PortOpenWebUI      = 8501 // Open WebUI (not 3000)
-	PortBionicGPT      = 8513 // BionicGPT multi-tenant LLM platform (not 3000)
+	PortBionicGPT = 8513 // BionicGPT multi-tenant LLM platform (not 3000)
+
+	// Moni ports (BionicGPT-based multi-tenant LLM platform)
+	// Internal ports are container-internal, external ports are host-exposed primes
+	PortMoniApp      = 8513 // Moni web app (internal 7703)
+	PortMoniMetrics  = 8521 // Moni app metrics (internal 9090)
+	PortMoniPostgres = 8527 // Moni PostgreSQL (internal 5432)
+	PortMoniLiteLLM  = 8537 // Moni LiteLLM proxy (internal 4000)
+	PortMoniLangfuse = 8539 // Moni Langfuse observability (internal 3000)
+	PortMoniMinioAPI = 8543 // Moni MinIO S3 API (internal 9000)
+	PortMoniMinioUI  = 8563 // Moni MinIO Console (internal 9001)
+
+	// Next available prime numbers (placeholder for future services)
+	// PortReserved8573 = 8573 // Next prime after 8563
+	// PortReserved8581 = 8581
+	// PortReserved8597 = 8597
+	// PortReserved8599 = 8599
+	// PortReserved8609 = 8609
+	// PortReserved8623 = 8623
+	// PortReserved8627 = 8627
+	// PortReserved8629 = 8629
+	// PortReserved8641 = 8641
+	// PortReserved8647 = 8647
 
 	// Temporal/Iris ports
 	PortTemporalGRPC    = 7233 // Temporal gRPC frontend (standard)
@@ -84,7 +106,7 @@ const (
 	PortIMAPSSL    = 993 // Standard IMAPS
 	PortPOP3SSL    = 995 // Standard POP3S
 
-	// Next available primes: 8521, 8527, 8537, 8539, 8543, 8563...
+	// Next available primes: 8573, 8581, 8597, 8599, 8609, 8623, 8627, 8629, 8641, 8647...
 
 	// Legacy ports to be migrated
 	PortJenkinsLegacy   = 55000 // Should move to 8291

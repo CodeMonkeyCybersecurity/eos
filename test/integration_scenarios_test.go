@@ -2,9 +2,15 @@
 package test
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate/api"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
@@ -160,4 +166,58 @@ func TestIntegrationPatterns_Concurrency(t *testing.T) {
 	}
 
 	suite.RunScenario(scenario)
+}
+
+// TestIntegrationScenarios_HecateAPIMetricsAndAuth verifies API metrics mutate under load
+// and auth middleware enforces token validation behavior.
+func TestIntegrationScenarios_HecateAPIMetricsAndAuth(t *testing.T) {
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
+	}
+
+	handler := api.NewHandler(rc)
+	router := handler.SetupRoutes()
+
+	// Generate request load for metrics accounting.
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+		resp := httptest.NewRecorder()
+		router.ServeHTTP(resp, req)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected health status 200, got %d", resp.Code)
+		}
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	metricsResp := httptest.NewRecorder()
+	router.ServeHTTP(metricsResp, metricsReq)
+	if metricsResp.Code != http.StatusOK {
+		t.Fatalf("expected metrics status 200, got %d", metricsResp.Code)
+	}
+
+	var metrics api.MetricsResponse
+	if err := json.Unmarshal(metricsResp.Body.Bytes(), &metrics); err != nil {
+		t.Fatalf("failed to decode metrics response: %v", err)
+	}
+	if metrics.API.TotalRequests == 0 {
+		t.Fatalf("expected API total_requests to increase after synthetic load")
+	}
+
+	// Invalid short token should be rejected.
+	badReq := httptest.NewRequest(http.MethodGet, "/api/v1/routes", nil)
+	badReq.Header.Set("Authorization", "Bearer short-token")
+	badResp := httptest.NewRecorder()
+	router.ServeHTTP(badResp, badReq)
+	if badResp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized for bad token, got %d", badResp.Code)
+	}
+
+	// Long token should pass baseline validator and reach route handler.
+	goodReq := httptest.NewRequest(http.MethodGet, "/api/v1/routes", nil)
+	goodReq.Header.Set("Authorization", "Bearer 12345678901234567890123456789012")
+	goodResp := httptest.NewRecorder()
+	router.ServeHTTP(goodResp, goodReq)
+	if goodResp.Code != http.StatusOK {
+		t.Fatalf("expected success for valid token, got %d", goodResp.Code)
+	}
 }

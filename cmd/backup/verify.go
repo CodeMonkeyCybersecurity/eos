@@ -45,17 +45,11 @@ var verifyRepoCmd = &cobra.Command{
 		readData, _ := cmd.Flags().GetBool("read-data")
 		readDataSubset, _ := cmd.Flags().GetString("read-data-subset")
 
-		// Use default repository if not specified
-		if repoName == "" {
-			config, err := backup.LoadConfig(rc)
-			if err != nil {
-				return fmt.Errorf("loading configuration: %w", err)
-			}
-			repoName = config.DefaultRepository
-			if repoName == "" {
-				return fmt.Errorf("no repository specified and no default configured")
-			}
+		resolvedRepoName, err := backup.ResolveRepositoryName(rc, repoName)
+		if err != nil {
+			return err
 		}
+		repoName = resolvedRepoName
 
 		logger.Info("Verifying repository integrity",
 			zap.String("repository", repoName),
@@ -110,17 +104,11 @@ var verifySnapshotCmd = &cobra.Command{
 		repoName, _ := cmd.Flags().GetString("repo")
 		readData, _ := cmd.Flags().GetBool("read-data")
 
-		// Use default repository if not specified
-		if repoName == "" {
-			config, err := backup.LoadConfig(rc)
-			if err != nil {
-				return fmt.Errorf("loading configuration: %w", err)
-			}
-			repoName = config.DefaultRepository
-			if repoName == "" {
-				return fmt.Errorf("no repository specified and no default configured")
-			}
+		resolvedRepoName, err := backup.ResolveRepositoryName(rc, repoName)
+		if err != nil {
+			return err
 		}
+		repoName = resolvedRepoName
 
 		logger.Info("Verifying snapshot integrity",
 			zap.String("snapshot", snapshotID),

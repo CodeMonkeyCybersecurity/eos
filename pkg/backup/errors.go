@@ -7,3 +7,6 @@ var ErrResticNotInstalled = errors.New("restic binary not found in PATH")
 
 // ErrRepositoryNotInitialized indicates that the configured repository has not been initialized yet.
 var ErrRepositoryNotInitialized = errors.New("restic repository not initialized")
+
+// ErrRepositoryNotSpecified indicates that no repository was provided and no default is configured.
+var ErrRepositoryNotSpecified = errors.New("no repository specified and no default configured")

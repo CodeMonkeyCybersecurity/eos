@@ -4,10 +4,15 @@
 package remotecode
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -19,7 +24,7 @@ import (
 
 // VerificationResult contains the results of verification checks
 type VerificationResult struct {
-	Checks   []VerificationCheck
+	Checks    []VerificationCheck
 	AllPassed bool
 }
 
@@ -37,9 +42,20 @@ func Verify(rc *eos_io.RuntimeContext, config *Config) (*VerificationResult, err
 	logger.Info("Verifying remote IDE development configuration")
 
 	result := &VerificationResult{
-		Checks:   []VerificationCheck{},
+		Checks:    []VerificationCheck{},
 		AllPassed: true,
 	}
+
+	// Check architecture (P0 - Windsurf only supports x64)
+	result.Checks = append(result.Checks, checkArchitecture(rc))
+
+	// Check Windsurf connectivity (unless skipped)
+	if !config.SkipConnectivityCheck {
+		result.Checks = append(result.Checks, checkWindsurfConnectivityVerify(rc))
+	}
+
+	// Check disk space for IDE servers
+	result.Checks = append(result.Checks, checkDiskSpace(rc, config.User))
 
 	// Check SSH service status
 	result.Checks = append(result.Checks, checkSSHService(rc))
@@ -70,6 +86,110 @@ func Verify(rc *eos_io.RuntimeContext, config *Config) (*VerificationResult, err
 		zap.Int("total_checks", len(result.Checks)))
 
 	return result, nil
+}
+
+// checkArchitecture verifies the server is running x64 architecture
+func checkArchitecture(rc *eos_io.RuntimeContext) VerificationCheck {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking architecture")
+
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		return VerificationCheck{
+			Name:    "Architecture",
+			Status:  "pass",
+			Message: "Server is running x64 (amd64) architecture",
+			Details: fmt.Sprintf("GOARCH: %s", arch),
+		}
+	}
+
+	return VerificationCheck{
+		Name:    "Architecture",
+		Status:  "fail",
+		Message: fmt.Sprintf("Windsurf requires x64 architecture, but server is %s", arch),
+		Details: "Alternative: Use VS Code Remote SSH or JetBrains Gateway which support ARM64",
+	}
+}
+
+// checkWindsurfConnectivityVerify checks if server can reach Windsurf download domain
+func checkWindsurfConnectivityVerify(rc *eos_io.RuntimeContext) VerificationCheck {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking Windsurf connectivity")
+
+	url := fmt.Sprintf("https://%s", WindsurfREHDomain)
+
+	ctx, cancel := context.WithTimeout(rc.Ctx, ConnectivityCheckTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+	if err != nil {
+		return VerificationCheck{
+			Name:    "Windsurf Connectivity",
+			Status:  "fail",
+			Message: "Failed to create connectivity check request",
+			Details: err.Error(),
+		}
+	}
+
+	client := &http.Client{Timeout: ConnectivityCheckTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return VerificationCheck{
+			Name:    "Windsurf Connectivity",
+			Status:  "fail",
+			Message: fmt.Sprintf("Cannot reach %s", WindsurfREHDomain),
+			Details: fmt.Sprintf("Error: %v\nRemediation: Check firewall/proxy settings", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	return VerificationCheck{
+		Name:    "Windsurf Connectivity",
+		Status:  "pass",
+		Message: fmt.Sprintf("Can reach %s", WindsurfREHDomain),
+		Details: fmt.Sprintf("HTTP status: %d", resp.StatusCode),
+	}
+}
+
+// checkDiskSpace verifies sufficient disk space for IDE servers
+func checkDiskSpace(rc *eos_io.RuntimeContext, username string) VerificationCheck {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Debug("Checking disk space")
+
+	// Determine home directory
+	homeDir := "/root"
+	if username != "" && username != "root" {
+		homeDir = filepath.Join("/home", username)
+	}
+
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(homeDir, &stat); err != nil {
+		return VerificationCheck{
+			Name:    "Disk Space",
+			Status:  "warn",
+			Message: "Could not check disk space",
+			Details: err.Error(),
+		}
+	}
+
+	// Calculate free space in MB
+	freeSpaceMB := (stat.Bavail * uint64(stat.Bsize)) / (1024 * 1024)
+
+	if freeSpaceMB < MinDiskSpaceMB {
+		return VerificationCheck{
+			Name:    "Disk Space",
+			Status:  "warn",
+			Message: fmt.Sprintf("Low disk space: %d MB free (recommended: %d MB)", freeSpaceMB, MinDiskSpaceMB),
+			Details: fmt.Sprintf("Path: %s\nWindsurf-reh is ~500MB plus extensions and cache", homeDir),
+		}
+	}
+
+	return VerificationCheck{
+		Name:    "Disk Space",
+		Status:  "pass",
+		Message: fmt.Sprintf("Sufficient disk space: %d MB free", freeSpaceMB),
+		Details: fmt.Sprintf("Path: %s, Minimum recommended: %d MB", homeDir, MinDiskSpaceMB),
+	}
 }
 
 // checkSSHService verifies SSH daemon is running

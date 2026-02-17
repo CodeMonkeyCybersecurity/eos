@@ -4,6 +4,30 @@ trap 'echo " Installation failed on line $LINENO"; exit 1' ERR
 
 log() { echo "[$1] $2"; }
 
+declare -A GO_CHECKSUMS=(
+  ["linux_amd64"]="f022b6aad78e362bcba9b0b94d09ad58c5a70c6ba3b7582905fababf5fe0181a"
+  ["linux_arm64"]="738ef87d79c34272424ccdf83302b7b0300b8b096ed443896089306117943dd5"
+)
+
+GITHUB_CLI_KEY_SHA256="20e0125d6f6e077a9ad46f03371bc26d90b04939fb95170f5a1905099cc6bcc0"
+
+verify_checksum() {
+  local file="$1"
+  local expected="$2"
+  if [[ -z "$expected" ]]; then
+    log ERR " Missing checksum for $file"
+    exit 1
+  fi
+  local actual
+  actual=$(sha256sum "$file" | awk '{print $1}')
+  if [[ "$actual" != "$expected" ]]; then
+    log ERR " Checksum mismatch for $file"
+    log ERR " Expected: $expected"
+    log ERR " Actual:   $actual"
+    exit 1
+  fi
+}
+
 # --- Platform Detection ---
 PLATFORM=""
 IS_LINUX=false
@@ -39,7 +63,7 @@ Eos_BUILD_PATH="$Eos_SRC_DIR/$Eos_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$Eos_BINARY_NAME"
 
 # Go installation settings
-GO_VERSION="1.25.0"
+GO_VERSION="1.25.6"
 GO_INSTALL_DIR="/usr/local"
 
 # --- Directories ---
@@ -169,12 +193,16 @@ install_go() {
       
       log INFO " Downloading Go ${GO_VERSION} from ${download_url}..."
       cd /tmp
-      curl -LO "$download_url"
+      curl --fail --retry 3 --retry-delay 2 -LO "$download_url"
       
       if [ ! -f "$go_tarball" ]; then
         log ERR " Failed to download Go archive"
         exit 1
       fi
+
+      local checksum_key="${os}_${arch}"
+      local expected_checksum="${GO_CHECKSUMS[$checksum_key]}"
+      verify_checksum "$go_tarball" "$expected_checksum"
       
       # Verify download
       if ! file "$go_tarball" | grep -q "gzip compressed data"; then
@@ -257,8 +285,11 @@ install_github_cli() {
     fi
   elif $IS_DEBIAN; then
     # Install GitHub CLI on Debian-based systems
-    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    tmp_key=$(mktemp)
+    curl --fail --retry 3 --retry-delay 2 -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o "$tmp_key"
+    verify_checksum "$tmp_key" "$GITHUB_CLI_KEY_SHA256"
+    install -m 644 "$tmp_key" /usr/share/keyrings/githubcli-archive-keyring.gpg
+    rm -f "$tmp_key"
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
     apt-get update
     apt-get install -y gh
@@ -550,19 +581,68 @@ update_from_git() {
     log INFO " Pulling latest changes from GitHub..."
     cd "$Eos_SRC_DIR"
 
-    # Save any local changes first
+    # RESILIENCE: Check for and recover from merge conflicts FIRST
+    # This is the most common cause of "needs merge" errors
+    if git status --porcelain | grep -qE '^(U.|.U|AA|DD)'; then
+      log WARN " Repository has unresolved merge conflicts, attempting auto-recovery..."
+
+      # Try to abort any in-progress merge
+      if git merge --abort 2>/dev/null; then
+        log INFO " Successfully aborted in-progress merge"
+      else
+        # If merge --abort didn't work, reset to HEAD
+        log WARN " Merge abort failed, resetting to HEAD..."
+        if git reset --hard HEAD; then
+          log INFO " Repository reset to clean state"
+        else
+          log ERR " Failed to recover from merge conflicts"
+          log ERR " Manual recovery required:"
+          log ERR "   cd $Eos_SRC_DIR"
+          log ERR "   git status"
+          log ERR "   git merge --abort  # or: git reset --hard HEAD"
+          log ERR " Then re-run install.sh"
+          exit 1
+        fi
+      fi
+    fi
+
+    # Save any local changes first (only if not in conflict state)
     if git diff --quiet && git diff --cached --quiet; then
       log INFO " No local changes detected"
     else
       log INFO " Stashing local changes before pull..."
-      git stash push -m "install.sh auto-stash $(date +%Y%m%d-%H%M%S)"
+      if ! git stash push -m "install.sh auto-stash $(date +%Y%m%d-%H%M%S)"; then
+        log WARN " Failed to stash changes, attempting recovery..."
+        # Stash might fail if there are still issues - try reset
+        if git reset --hard HEAD; then
+          log INFO " Repository reset to clean state (local changes discarded)"
+        else
+          log ERR " Failed to prepare repository for update"
+          log ERR " Manual recovery required: git reset --hard HEAD"
+          exit 1
+        fi
+      fi
     fi
 
-    # Pull latest
-    if git pull origin main; then
-      log INFO " Successfully pulled latest changes"
+    # Pull latest with fast-forward only (safer, avoids merge conflicts)
+    if git pull --ff-only origin main 2>/dev/null; then
+      log INFO " Successfully pulled latest changes (fast-forward)"
     else
-      log WARN " Git pull failed, continuing with existing code"
+      # Fast-forward failed, try regular pull
+      log INFO " Fast-forward not possible, attempting regular pull..."
+      if git pull origin main; then
+        log INFO " Successfully pulled latest changes"
+      else
+        log WARN " Git pull failed"
+        # Check if we now have conflicts
+        if git status --porcelain | grep -qE '^(U.|.U|AA|DD)'; then
+          log WARN " Pull created merge conflicts, aborting merge..."
+          git merge --abort 2>/dev/null || git reset --hard HEAD
+          log INFO " Merge aborted, continuing with existing code"
+        else
+          log INFO " Continuing with existing code"
+        fi
+      fi
     fi
   else
     log INFO " Not a git repository, using existing code"

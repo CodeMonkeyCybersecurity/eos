@@ -22,8 +22,9 @@ var CreateCodeCmd = &cobra.Command{
 	Aliases: []string{"remotecode", "remote-code", "ide"},
 	Short:   "Configure SSH for remote IDE development (Windsurf, Claude Code, VS Code)",
 	Long: `Configure your server for remote IDE development with:
-- Windsurf (Codeium's AI IDE)
+- Windsurf (Codeium's AI IDE) - x86_64 only
 - Claude Code (Anthropic's AI coding assistant)
+- OpenAI Codex CLI
 - VS Code Remote SSH
 - Cursor
 - JetBrains Gateway
@@ -37,17 +38,27 @@ This command:
 
 2. Configures firewall rules to allow SSH from trusted networks
 
-3. Installs AI coding tools:
-   - Claude Code (via curl -fsSL https://claude.ai/install.sh | bash)
+3. Installs AI coding tools (idempotent - skips if already installed):
+   - Claude Code (via official installer)
    - OpenAI Codex CLI (via npm install -g @openai/codex)
+   - Windsurf IDE (x86_64 only, via .deb package)
+
+4. Sets up automatic hourly backups of coding sessions:
+   - Claude Code conversations (~/.claude/projects/)
+   - Codex sessions (~/.codex/sessions/)
+   - Backup scripts installed to ~/bin/
+   - Cron job configured for periodic backups
 
 Example:
   sudo eos create code
   sudo eos create code --user henry
   sudo eos create code --max-sessions 30 --dry-run
   sudo eos create code --skip-ai-tools          # Skip AI tools installation
-  sudo eos create code --skip-claude            # Only install Codex
-  sudo eos create code --skip-codex             # Only install Claude Code`,
+  sudo eos create code --skip-claude            # Only install Codex/Windsurf
+  sudo eos create code --skip-codex             # Only install Claude/Windsurf
+  sudo eos create code --skip-windsurf          # Skip Windsurf (or on ARM)
+  sudo eos create code --skip-session-backups   # Skip session backup setup
+  sudo eos create code --backup-interval 30min  # Backup every 30 minutes`,
 	RunE: eos_cli.Wrap(runCreateCode),
 }
 
@@ -69,13 +80,34 @@ func init() {
 	CreateCodeCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 
 	// AI tools flags
-	CreateCodeCmd.Flags().Bool("skip-ai-tools", false, "Skip installation of AI coding tools (Claude Code, Codex)")
+	CreateCodeCmd.Flags().Bool("skip-ai-tools", false, "Skip installation of AI coding tools (Claude Code, Codex, Windsurf)")
 	CreateCodeCmd.Flags().Bool("skip-claude", false, "Skip Claude Code installation")
 	CreateCodeCmd.Flags().Bool("skip-codex", false, "Skip OpenAI Codex CLI installation")
+	CreateCodeCmd.Flags().Bool("skip-windsurf", false, "Skip Windsurf IDE installation (x86_64 only)")
+
+	// Session backup flags
+	CreateCodeCmd.Flags().Bool("skip-session-backups", false, "Skip setting up automatic session backups")
+	CreateCodeCmd.Flags().String("backup-interval", "hourly", "Session backup frequency: 30min, hourly, 6hours, daily")
+
+	// Restic backup flags
+	CreateCodeCmd.Flags().Bool("use-restic", true, "[DEPRECATED] Restic is now mandatory; this flag is ignored")
+	CreateCodeCmd.Flags().String("keep-within", "48h", "Keep all snapshots within this duration")
+	CreateCodeCmd.Flags().Int("keep-hourly", 24, "Number of hourly snapshots to keep after keep-within")
+	CreateCodeCmd.Flags().Int("keep-daily", 7, "Number of daily snapshots to keep")
+	CreateCodeCmd.Flags().Int("keep-weekly", 4, "Number of weekly snapshots to keep")
+	CreateCodeCmd.Flags().Int("keep-monthly", 12, "Number of monthly snapshots to keep")
 
 	// Network flags
 	CreateCodeCmd.Flags().StringSlice("allowed-networks", []string{},
 		"Additional CIDR ranges to allow SSH from (e.g., 203.0.113.0/24)")
+
+	// Windsurf-specific flags
+	CreateCodeCmd.Flags().Bool("skip-connectivity-check", false,
+		"Skip Windsurf domain connectivity check (use if you know connectivity works)")
+	CreateCodeCmd.Flags().Bool("cleanup-ide-servers", false,
+		"Clean up old IDE server versions to recover disk space")
+	CreateCodeCmd.Flags().Bool("no-client-config", false,
+		"Skip generating SSH config for client machine")
 }
 
 func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -134,6 +166,57 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 		config.SkipCodex = skipCodex
 	}
 
+	if skipWindsurf, err := cmd.Flags().GetBool("skip-windsurf"); err == nil {
+		config.SkipWindsurf = skipWindsurf
+	}
+
+	// Session backup flags
+	if skipSessionBackups, err := cmd.Flags().GetBool("skip-session-backups"); err == nil {
+		config.SkipSessionBackups = skipSessionBackups
+	}
+
+	if backupInterval, err := cmd.Flags().GetString("backup-interval"); err == nil {
+		config.SessionBackupInterval = parseBackupInterval(backupInterval)
+	}
+
+	// Restic backup flags
+	if useRestic, err := cmd.Flags().GetBool("use-restic"); err == nil {
+		config.UseRestic = useRestic
+	}
+
+	if keepWithin, err := cmd.Flags().GetString("keep-within"); err == nil {
+		config.ResticKeepWithin = keepWithin
+	}
+
+	if keepHourly, err := cmd.Flags().GetInt("keep-hourly"); err == nil {
+		config.ResticKeepHourly = keepHourly
+	}
+
+	if keepDaily, err := cmd.Flags().GetInt("keep-daily"); err == nil {
+		config.ResticKeepDaily = keepDaily
+	}
+
+	if keepWeekly, err := cmd.Flags().GetInt("keep-weekly"); err == nil {
+		config.ResticKeepWeekly = keepWeekly
+	}
+
+	if keepMonthly, err := cmd.Flags().GetInt("keep-monthly"); err == nil {
+		config.ResticKeepMonthly = keepMonthly
+	}
+
+	// Windsurf-specific flags
+	if skipConnCheck, err := cmd.Flags().GetBool("skip-connectivity-check"); err == nil {
+		config.SkipConnectivityCheck = skipConnCheck
+	}
+
+	if cleanupServers, err := cmd.Flags().GetBool("cleanup-ide-servers"); err == nil {
+		config.CleanupIDEServers = cleanupServers
+	}
+
+	if noClientConfig, err := cmd.Flags().GetBool("no-client-config"); err == nil && noClientConfig {
+		config.GenerateClientConfig = false
+	}
+
 	logger.Info("Starting remote IDE development setup",
 		zap.String("user", config.User),
 		zap.Int("max_sessions", config.MaxSessions),
@@ -142,9 +225,14 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	// Display what will be configured
 	fmt.Println("\nRemote IDE Development Setup")
 	fmt.Println(strings.Repeat("=", 40))
-	fmt.Println("\nThis will configure your server for remote development with:")
-	for _, ide := range remotecode.SupportedIDEs {
-		fmt.Printf("  ✓ %s\n", ide)
+	fmt.Println("\nThis will:")
+	fmt.Println("  1. Optimize SSH settings for remote IDE connections")
+	fmt.Println("  2. Configure firewall rules for SSH access")
+	if config.InstallAITools {
+		fmt.Println("  3. Install AI coding tools (Claude Code, Codex CLI)")
+	}
+	if config.SetupSessionBackups && !config.SkipSessionBackups {
+		fmt.Println("  4. Set up automatic session backups")
 	}
 	fmt.Println()
 
@@ -175,4 +263,25 @@ func runCreateCode(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 	logger.Info("Remote IDE development setup completed")
 	return nil
+}
+
+// parseBackupInterval converts user-friendly interval names to cron expressions
+func parseBackupInterval(interval string) string {
+	switch interval {
+	case "30min", "30m", "30minutes":
+		return "*/30 * * * *"
+	case "hourly", "1h", "hour":
+		return "0 * * * *"
+	case "6hours", "6h":
+		return "0 */6 * * *"
+	case "daily", "1d", "day":
+		return "0 0 * * *"
+	default:
+		// If it looks like a cron expression, use it directly
+		if strings.Contains(interval, "*") || strings.Contains(interval, "/") {
+			return interval
+		}
+		// Default to hourly
+		return "0 * * * *"
+	}
 }

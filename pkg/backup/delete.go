@@ -18,17 +18,11 @@ func DeleteSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	repoName, _ := cmd.Flags().GetString("repo")
 	force, _ := cmd.Flags().GetBool("force")
 
-	// Use default repository if not specified
-	if repoName == "" {
-		config, err := LoadConfig(rc)
-		if err != nil {
-			return fmt.Errorf("loading configuration: %w", err)
-		}
-		repoName = config.DefaultRepository
-		if repoName == "" {
-			return fmt.Errorf("no repository specified and no default configured")
-		}
+	resolvedRepoName, err := ResolveRepositoryName(rc, repoName)
+	if err != nil {
+		return err
 	}
+	repoName = resolvedRepoName
 
 	logger.Info("Deleting snapshot",
 		zap.String("snapshot", snapshotID),
@@ -154,13 +148,11 @@ func PruneSnapshots(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		}
 	}
 
-	// Use default repository if not specified
-	if repoName == "" {
-		repoName = config.DefaultRepository
-		if repoName == "" {
-			return fmt.Errorf("no repository specified and no default configured")
-		}
+	resolvedRepoName, err := ResolveRepositoryNameFromConfig(config, repoName)
+	if err != nil {
+		return err
 	}
+	repoName = resolvedRepoName
 
 	// Create backup client
 	client, err := NewClient(rc, repoName)

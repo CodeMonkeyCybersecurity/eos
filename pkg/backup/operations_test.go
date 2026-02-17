@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
@@ -18,13 +19,22 @@ import (
 
 // MockClient implements backup.BackupClient for testing
 type MockClient struct {
-	BackupError error
-	BackupCalls []string
+	BackupError      error
+	BackupCalls      []string
+	Snapshots        []backup.Snapshot
+	ListSnapshotsErr error
 }
 
 func (m *MockClient) Backup(profileName string) error {
 	m.BackupCalls = append(m.BackupCalls, profileName)
 	return m.BackupError
+}
+
+func (m *MockClient) ListSnapshots() ([]backup.Snapshot, error) {
+	if m.ListSnapshotsErr != nil {
+		return nil, m.ListSnapshotsErr
+	}
+	return m.Snapshots, nil
 }
 
 func createTestLogger(t *testing.T) otelzap.LoggerWithCtx {
@@ -81,7 +91,7 @@ func TestHookOperation_Assess_AbsolutePathNotFound(t *testing.T) {
 func TestHookOperation_Intervene_Success(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "echo 'test output'",
+		Hook:   "/usr/bin/tar --version",
 		Logger: logger,
 	}
 
@@ -100,7 +110,7 @@ func TestHookOperation_Intervene_Success(t *testing.T) {
 func TestHookOperation_Intervene_CommandFails(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "false", // Command that always fails
+		Hook:   "/bin/false", // Not whitelisted
 		Logger: logger,
 	}
 
@@ -111,7 +121,7 @@ func TestHookOperation_Intervene_CommandFails(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.False(t, result.Success)
-	assert.Contains(t, result.Message, "hook execution failed")
+	assert.Contains(t, result.Message, "not whitelisted")
 }
 
 func TestHookOperation_Evaluate_Success(t *testing.T) {
@@ -161,11 +171,11 @@ func TestRunHook_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Test successful hook
-	err := backup.RunHook(ctx, logger, "echo 'integration test'")
+	err := backup.RunHook(ctx, logger, "/usr/bin/tar --version")
 	assert.NoError(t, err)
 
 	// Test failing hook
-	err = backup.RunHook(ctx, logger, "false")
+	err = backup.RunHook(ctx, logger, "/bin/false")
 	assert.Error(t, err)
 }
 
@@ -256,7 +266,7 @@ func TestBackupOperation_Intervene_DryRun(t *testing.T) {
 	assert.True(t, result.Success)
 	assert.Equal(t, "dry run completed", result.Message)
 	assert.Len(t, result.Changes, 1)
-	assert.Equal(t, "dry_run", result.Changes[0].Type)
+	assert.Equal(t, "dry_run_path", result.Changes[0].Type)
 	assert.Empty(t, client.BackupCalls) // No actual backup should be called
 }
 
@@ -324,7 +334,13 @@ func TestBackupOperation_Intervene_BackupFails(t *testing.T) {
 
 func TestBackupOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
+	client := &MockClient{
+		Snapshots: []backup.Snapshot{
+			{ID: "snap-1", Time: time.Now()},
+		},
+	}
 	operation := &backup.BackupOperation{
+		Client: client,
 		Logger: logger,
 	}
 
@@ -345,14 +361,18 @@ func TestBackupOperation_Evaluate_Success(t *testing.T) {
 
 func TestBackupOperation_Evaluate_Failure(t *testing.T) {
 	logger := createTestLogger(t)
+	client := &MockClient{
+		ListSnapshotsErr: errors.New("list snapshots failed"),
+	}
 	operation := &backup.BackupOperation{
+		Client: client,
 		Logger: logger,
 	}
 
 	ctx := context.Background()
 	intervention := &patterns.InterventionResult{
-		Success: false,
-		Message: "backup failed",
+		Success: true,
+		Message: "backup completed",
 	}
 
 	result, err := operation.Evaluate(ctx, intervention)
@@ -360,7 +380,7 @@ func TestBackupOperation_Evaluate_Failure(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, result.Success)
 	assert.Equal(t, "backup validation failed", result.Message)
-	assert.False(t, result.NeedsRollback)
+	assert.False(t, result.Validations["backup_exists"].Passed)
 }
 
 func TestNotificationOperation_Assess_ValidMethod(t *testing.T) {
@@ -483,7 +503,7 @@ func TestNotificationOperation_Intervene_Slack(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.True(t, result.Success)
-	assert.Contains(t, result.Changes[0].Description, "Slack")
+	assert.Contains(t, result.Changes[0].Description, "slack")
 }
 
 func TestNotificationOperation_Intervene_Webhook(t *testing.T) {
