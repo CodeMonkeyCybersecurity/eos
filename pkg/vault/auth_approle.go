@@ -3,6 +3,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,7 +89,7 @@ func readAppRoleCreds(rc *eos_io.RuntimeContext, paths appRoleCredPaths, client 
 		zap.String("path", paths.RoleIDPath))
 	roleIDRaw, err := SecureReadCredential(rc, paths.RoleIDPath, paths.Label+"_role_id")
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			log.Debug(paths.Label+" role_id file not found",
 				zap.String("path", paths.RoleIDPath))
 			return "", "", cerr.Wrap(err, paths.Label+" not configured")
@@ -124,7 +125,7 @@ func readAppRoleCreds(rc *eos_io.RuntimeContext, paths appRoleCredPaths, client 
 		zap.String("path", paths.SecretIDPath))
 	secretIDRaw, err := SecureReadCredential(rc, paths.SecretIDPath, paths.Label+"_secret_id")
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			log.Debug(paths.Label+" secret_id file not found",
 				zap.String("path", paths.SecretIDPath))
 			return "", "", cerr.Wrap(err, paths.Label+" secret_id not found")

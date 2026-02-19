@@ -214,6 +214,90 @@ func TestWriteAppRoleFiles_LoggingBehavior(t *testing.T) {
 	t.Log("Function executed logging code paths as expected (verified by code execution)")
 }
 
+// TestReadAppRoleCreds_GenericFunction tests the unified readAppRoleCreds function
+// that both regular and admin AppRole credential reading delegate to.
+// This verifies DRY consolidation correctness.
+func TestReadAppRoleCreds_GenericFunction(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testSecretID := "f0e1d2c3-b4a5-9876-5432-10fedcba9876"
+
+	require.NoError(t, os.WriteFile(roleIDPath, []byte(testRoleID), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte(testSecretID), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test AppRole",
+	}
+
+	roleID, secretID, err := readAppRoleCreds(rc, paths, nil)
+	require.NoError(t, err)
+	assert.Equal(t, testRoleID, roleID)
+	assert.Equal(t, testSecretID, secretID)
+}
+
+// TestReadAppRoleCreds_EmptyFile tests validation catches empty files
+func TestReadAppRoleCreds_EmptyFile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	// Write empty role_id
+	require.NoError(t, os.WriteFile(roleIDPath, []byte(""), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte("valid-secret-id-xxxxxxxxxxxxxxxx"), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test",
+	}
+
+	_, _, err := readAppRoleCreds(rc, paths, nil)
+	require.Error(t, err)
+	// SecureReadCredential catches empty files first with: "test_role_id credential file is empty"
+	assert.Contains(t, err.Error(), "credential file is empty")
+}
+
+// TestReadAppRoleCreds_ShortCredential tests validation catches too-short credentials
+func TestReadAppRoleCreds_ShortCredential(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	// Write short role_id (< 36 chars)
+	require.NoError(t, os.WriteFile(roleIDPath, []byte("too-short"), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte("valid-secret-id-xxxxxxxxxxxxxxxx"), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test",
+	}
+
+	_, _, err := readAppRoleCreds(rc, paths, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "appears invalid: length")
+}
+
 func TestDefaultAppRoleOptions(t *testing.T) {
 	opts := shared.DefaultAppRoleOptions()
 
