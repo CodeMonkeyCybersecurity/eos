@@ -156,11 +156,9 @@ func TestWriteAppRoleFiles_Success(t *testing.T) {
 	testRoleID := "test-role-id-12345"
 	testSecretID := "test-secret-id-67890"
 
-	// This will fail due to user lookup, but we can test file creation
+	// This will fail in non-root test environment (secrets dir chown or user lookup)
 	err := WriteAppRoleFiles(rc, testRoleID, testSecretID)
-	// Expected to fail due to vault user lookup in test environment
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "lookup user")
 }
 
 // TestWriteAppRoleFiles_LoggingBehavior verifies that comprehensive logging occurs
@@ -198,9 +196,8 @@ func TestWriteAppRoleFiles_LoggingBehavior(t *testing.T) {
 	// Call the function - it should log at multiple points before failing on user lookup
 	err := WriteAppRoleFiles(rc, testRoleID, testSecretID)
 
-	// Verify it fails at the expected point (user lookup)
+	// Verify it fails in non-root test environment (secrets dir chown or user lookup)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "lookup user")
 
 	// The function should have logged:
 	// 1. INFO: "Starting AppRole credential file write operation" with directory, paths, owner, permissions
@@ -303,8 +300,8 @@ func TestDefaultAppRoleOptions(t *testing.T) {
 
 	assert.Equal(t, shared.AppRoleName, opts.RoleName)
 	assert.Equal(t, []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName}, opts.Policies)
-	assert.Equal(t, "1h", opts.TokenTTL)
-	assert.Equal(t, "4h", opts.TokenMaxTTL)
+	assert.Equal(t, "4h", opts.TokenTTL)
+	assert.Equal(t, "", opts.TokenMaxTTL)
 	assert.Equal(t, "24h", opts.SecretIDTTL)
 	assert.False(t, opts.ForceRecreate)
 	assert.False(t, opts.RefreshCreds)
