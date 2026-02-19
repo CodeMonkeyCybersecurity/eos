@@ -51,16 +51,16 @@ func PhaseEnsureVaultHealthy(rc *eos_io.RuntimeContext) error {
 }
 
 func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) error {
-	for attempt := 1; attempt <= shared.VaultRetryCount; attempt++ {
+	for attempt := 1; attempt <= VaultRetryCount; attempt++ {
 		otelzap.Ctx(rc.Ctx).Info(" Vault health probe attempt", zap.Int("attempt", attempt))
 
 		status, err := client.Sys().Health()
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Warn(" Vault health API error", zap.Int("attempt", attempt), zap.Error(err))
 			// SECURITY P2 #7: Use context-aware sleep to respect cancellation
-			if attempt < shared.VaultRetryCount {
+			if attempt < VaultRetryCount {
 				select {
-				case <-time.After(shared.VaultRetryDelay):
+				case <-time.After(VaultRetryDelay):
 					continue
 				case <-rc.Ctx.Done():
 					return fmt.Errorf("vault health check cancelled: %w", rc.Ctx.Err())
@@ -95,9 +95,9 @@ func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) e
 
 		otelzap.Ctx(rc.Ctx).Warn("Unexpected Vault health state", zap.Any("response", status))
 		// SECURITY P2 #7: Use context-aware sleep to respect cancellation
-		if attempt < shared.VaultRetryCount {
+		if attempt < VaultRetryCount {
 			select {
-			case <-time.After(shared.VaultRetryDelay):
+			case <-time.After(VaultRetryDelay):
 				// Continue to next health check
 			case <-rc.Ctx.Done():
 				return fmt.Errorf("vault health check cancelled: %w", rc.Ctx.Err())
@@ -105,8 +105,8 @@ func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) e
 		}
 	}
 	otelzap.Ctx(rc.Ctx).Error(" Vault not healthy after maximum retry attempts",
-		zap.Int("retries", shared.VaultRetryCount))
-	return fmt.Errorf("vault not healthy after %d attempts", shared.VaultRetryCount)
+		zap.Int("retries", VaultRetryCount))
+	return fmt.Errorf("vault not healthy after %d attempts", VaultRetryCount)
 }
 
 func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {

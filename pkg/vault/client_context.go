@@ -21,42 +21,25 @@ const vaultClientKey contextKey = "vault-client"
 // This prevents duplicate client initializations during setup
 const privilegedClientKey contextKey = "privileged-vault-client"
 
-// GetVaultClient retrieves the vault client from context or creates a new one
-// This function properly reads environment variables including VAULT_SKIP_VERIFY
-// for self-signed certificate support during installation.
-// CRITICAL P0: Uses centralized SecureAuthenticationOrchestrator for automatic token loading
-// This ensures consistent authentication across ALL Vault operations.
-func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if client exists in context and is authenticated
-	if client, ok := rc.Ctx.Value(vaultClientKey).(*api.Client); ok && client != nil {
-		// Verify the client still has a token
-		if client.Token() != "" {
-			logger.Debug(" Using cached Vault client from RuntimeContext",
-				zap.String("vault_addr", client.Address()),
-				zap.String("source", "context cache"),
-				zap.Bool("has_token", true))
-			return client, nil
-		}
-		logger.Debug(" Cached client has no token, creating new authenticated client",
-			zap.String("vault_addr", client.Address()))
-	} else {
-		logger.Debug(" No cached Vault client in context, creating new client")
-	}
-
-	// Create new client with default config
+// newBaseVaultClient creates a Vault API client with environment-aware config.
+// This is the single point of client creation, eliminating duplicated boilerplate
+// across GetVaultClient, GetUnauthenticatedVaultClient, and GetAdminClient.
+//
+// DRY RATIONALE: Previously, identical config setup (DefaultConfig → ReadEnvironment →
+// address fallback → NewClient) was duplicated in 3 functions.
+//
+// Parameters:
+//   - defaultAddr: fallback address if VAULT_ADDR is not set in environment
+func newBaseVaultClient(defaultAddr string) (*api.Client, error) {
 	config := api.DefaultConfig()
 
-	// CRITICAL: Read environment variables including VAULT_SKIP_VERIFY
-	// This is necessary for self-signed certificates during installation
+	// Read environment variables including VAULT_ADDR, VAULT_SKIP_VERIFY, VAULT_CACERT
 	if err := config.ReadEnvironment(); err != nil {
 		return nil, fmt.Errorf("reading vault environment config: %w", err)
 	}
 
-	// Check for VAULT_ADDR environment variable or use default
 	if config.Address == "" {
-		config.Address = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+		config.Address = defaultAddr
 	}
 
 	client, err := api.NewClient(config)
@@ -64,25 +47,72 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		return nil, fmt.Errorf("creating vault client: %w", err)
 	}
 
-	// CRITICAL P0: Use centralized authentication orchestrator
-	// This tries (in order):
-	//   1. Vault Agent token (/run/eos/vault_agent_eos.token) - PRIMARY METHOD
-	//   2. AppRole authentication (if credentials available)
-	//   3. Interactive userpass (only if user confirms)
-	// This ensures ALL eos commands automatically authenticate without VAULT_TOKEN
+	return client, nil
+}
+
+// defaultVaultAddr returns the default Vault address for authenticated clients.
+// Uses HTTP on localhost (pre-TLS setup, e.g. initial install).
+func defaultVaultAddr() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
+}
+
+// defaultVaultTLSAddr returns the default Vault address using TLS.
+// Used for post-installation operations where TLS is expected.
+func defaultVaultTLSAddr() string {
+	return fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault)
+}
+
+// GetVaultClient retrieves the vault client from context or creates a new one.
+// Uses centralized SecureAuthenticationOrchestrator for automatic token loading.
+func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Check if client exists in context and is authenticated
+	if client, ok := rc.Ctx.Value(vaultClientKey).(*api.Client); ok && client != nil {
+		if client.Token() != "" {
+			logger.Debug("Using cached Vault client from RuntimeContext",
+				zap.String("vault_addr", client.Address()),
+				zap.String("source", "context cache"))
+			return client, nil
+		}
+		logger.Debug("Cached client has no token, creating new authenticated client")
+	}
+
+	client, err := newBaseVaultClient(defaultVaultAddr())
+	if err != nil {
+		return nil, err
+	}
+
+	// Use centralized authentication orchestrator: Agent token → AppRole → userpass
 	if client.Token() == "" {
 		logger.Debug("No token set, attempting centralized authentication")
 		if err := SecureAuthenticationOrchestrator(rc, client); err != nil {
-			logger.Warn("Centralized authentication failed, returning unauthenticated client",
+			logger.Warn("Centralized authentication failed",
 				zap.Error(err),
-				zap.String("note", "Some operations may fail with 403 permission denied"))
-			// Don't fail here - return the client anyway for operations that don't need auth
-			// (like checking seal status, health endpoints, etc.)
-			return client, nil
+				zap.String("remediation", "Check vault-agent-eos service or use 'sudo eos update vault --unseal'"))
+			return client, fmt.Errorf("vault authentication failed (all methods exhausted): %w", err)
 		}
 		logger.Info("Centralized authentication succeeded",
 			zap.String("address", client.Address()))
 	}
+
+	return client, nil
+}
+
+// GetUnauthenticatedVaultClient creates a Vault client without authentication.
+// Use this for operations that don't require auth: seal status, health checks.
+// SECURITY: This client cannot access secrets or perform admin operations.
+func GetUnauthenticatedVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	client, err := newBaseVaultClient(defaultVaultTLSAddr())
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("Created unauthenticated Vault client",
+		zap.String("vault_addr", client.Address()),
+		zap.String("purpose", "seal status / health checks only"))
 
 	return client, nil
 }

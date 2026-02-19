@@ -30,9 +30,9 @@ func TestReadAppRoleCredsFromDisk_Success(t *testing.T) {
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
 
-	// Create test credentials
-	testRoleID := "test-role-id-12345"
-	testSecretID := "test-secret-id-67890"
+	// Create test credentials (must be >= 36 chars to pass UUID length validation)
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testSecretID := "f0e1d2c3-b4a5-9876-5432-10fedcba9876"
 
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID+"\n"), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testSecretID+"\n"), 0600))
@@ -80,15 +80,15 @@ func TestReadAppRoleCredsFromDisk_MissingFiles(t *testing.T) {
 	// Test reading missing role_id file
 	_, _, err := readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read credential from disk")
+	assert.Contains(t, err.Error(), "not configured")
 
-	// Create only role_id file
-	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte("test-role-id"), 0600))
+	// Create only role_id file (valid UUID format, >= 36 chars)
+	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte("a1b2c3d4-e5f6-7890-abcd-ef1234567890"), 0600))
 
 	// Test reading missing secret_id file
 	_, _, err = readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read credential from disk")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
@@ -107,9 +107,9 @@ func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
 
-	// Create test credentials with wrapped token
-	testRoleID := "test-role-id-12345"
-	testWrappedToken := "s.1234567890abcdef"
+	// Create test credentials with wrapped token (role_id must be >= 36 chars)
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testWrappedToken := "s.1234567890abcdefghijklmnopqrstuvwxyz"
 
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testWrappedToken), 0600))

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -11,8 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// SecureFilePermissions defines the secure permissions for token files
-const SecureFilePermissions = 0600 // Owner read/write only
+// NOTE: VaultTokenFilePerm (0600) is defined in constants.go (Single Source of Truth)
 
 // ValidateTokenFilePermissions checks if a token file has secure permissions
 func ValidateTokenFilePermissions(rc *eos_io.RuntimeContext, filePath string) error {
@@ -30,14 +30,14 @@ func ValidateTokenFilePermissions(rc *eos_io.RuntimeContext, filePath string) er
 
 	// Check permissions
 	perms := info.Mode().Perm()
-	if perms != SecureFilePermissions {
+	if perms != VaultTokenFilePerm {
 		log.Warn(" Token file has insecure permissions",
 			zap.String("file", filePath),
 			zap.String("current_perms", fmt.Sprintf("%o", perms)),
-			zap.String("required_perms", fmt.Sprintf("%o", SecureFilePermissions)),
+			zap.String("required_perms", fmt.Sprintf("%o", VaultTokenFilePerm)),
 		)
 		return fmt.Errorf("token file %s has insecure permissions %o, should be %o",
-			filePath, perms, SecureFilePermissions)
+			filePath, perms, VaultTokenFilePerm)
 	}
 
 	// Check for setuid/setgid bits (security risk)
@@ -62,7 +62,7 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 
 	// SECURITY: Use OpenFile with O_EXCL to prevent TOCTOU race
 	// File is created with correct permissions atomically - no window for race condition
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, SecureFilePermissions)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, VaultTokenFilePerm)
 	if err != nil {
 		if os.IsExist(err) {
 			return fmt.Errorf("token file already exists: %s (refusing to overwrite for security)", filePath)
@@ -100,7 +100,7 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 
 	log.Info(" Token file written securely",
 		zap.String("file", filePath),
-		zap.String("permissions", fmt.Sprintf("%o", SecureFilePermissions)),
+		zap.String("permissions", fmt.Sprintf("%o", VaultTokenFilePerm)),
 	)
 	return nil
 }
@@ -157,7 +157,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 		return "", fmt.Errorf("failed to read token file %s: %w", filePath, err)
 	}
 
-	token := trimWhitespace(string(data))
+	token := strings.TrimSpace(string(data))
 
 	// Basic token format validation (Vault tokens start with hvs. or s.)
 	if token != "" && !isValidVaultTokenFormat(token) {
@@ -171,7 +171,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 
 // isValidVaultTokenFormat performs basic validation of vault token format
 func isValidVaultTokenFormat(token string) bool {
-	token = trimWhitespace(token)
+	token = strings.TrimSpace(token)
 
 	// Vault tokens typically start with hvs. (new format) or s. (legacy)
 	// or are UUIDs for older versions
@@ -205,16 +205,4 @@ func isValidVaultTokenFormat(token string) bool {
 	}
 
 	return len(token) >= 8
-}
-
-// trimWhitespace removes leading/trailing whitespace and newlines
-func trimWhitespace(s string) string {
-	// Remove common whitespace characters
-	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t' || s[0] == '\n' || s[0] == '\r') {
-		s = s[1:]
-	}
-	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t' || s[len(s)-1] == '\n' || s[len(s)-1] == '\r') {
-		s = s[:len(s)-1]
-	}
-	return s
 }

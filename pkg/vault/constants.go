@@ -57,14 +57,15 @@ const (
 		"where <address> is replaced by the actual address to the server."
 )
 
-const (
-	EnvVaultAgentAddress = "VAULT_AGENT_ADDR"
-	EnvVaultInsecure     = "VAULT_SKIP_VERIFY"
-)
+// NOTE: EnvVaultAgentAddress and EnvVaultInsecure were removed as duplicates.
+// Use EnvVaultAgentAddr and EnvVaultSkipVerify (defined above) instead.
 
-var (
-	DefaultAddress = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
-)
+// DefaultVaultAddress returns the default Vault address using dynamic hostname discovery.
+// SECURITY: Uses shared.GetInternalHostname() function call (NOT string literal).
+// Previously this was a string literal "shared.GetInternalHostname" which caused DNS resolution failures.
+func DefaultVaultAddress() string {
+	return fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), shared.PortVault)
+}
 
 // ============================================================================
 // SINGLE SOURCE OF TRUTH: Vault File System Paths
@@ -227,17 +228,6 @@ const (
 )
 
 // ============================================================================
-// Environment Variables
-// ============================================================================
-
-const (
-	VaultAddrEnvVar       = "VAULT_ADDR"
-	VaultCACertEnvVar     = "VAULT_CACERT"
-	VaultTokenEnvVar      = "VAULT_TOKEN"
-	VaultSkipVerifyEnvVar = "VAULT_SKIP_VERIFY"
-)
-
-// ============================================================================
 // Runtime Configuration (Timeouts, Retries, TTLs)
 // ============================================================================
 
@@ -254,10 +244,10 @@ const (
 	VaultDefaultSecretIDTTL = "24h"
 
 	// === Network Constants ===
-	LocalhostIP       = "shared.GetInternalHostname" // Localhost IPv4 address
-	LocalhostIPv6     = "::1"                        // Localhost IPv6 address
-	LocalhostHostname = "localhost"                  // Localhost hostname
-	AllInterfacesIP   = "0.0.0.0"                    // Bind to all network interfaces
+	LocalhostIP       = "127.0.0.1" // Localhost IPv4 address
+	LocalhostIPv6     = "::1"       // Localhost IPv6 address
+	LocalhostHostname = "localhost" // Localhost hostname
+	AllInterfacesIP   = "0.0.0.0"   // Bind to all network interfaces
 
 	// === Common Timeouts ===
 	ServiceStartTimeout = 10 * time.Second // systemctl start timeout

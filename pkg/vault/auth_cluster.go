@@ -104,13 +104,15 @@ func GetVaultClientWithToken(rc *eos_io.RuntimeContext, token string) (*api.Clie
 
 	logger.Debug("Creating Vault client with provided token")
 
-	// INTERVENE: Create Vault client
-	client, err := GetVaultClient(rc)
+	// INTERVENE: Create unauthenticated client (caller provides explicit token)
+	// We use GetUnauthenticatedVaultClient because the caller already has a token
+	// and we don't want to trigger the auth orchestrator.
+	client, err := GetUnauthenticatedVaultClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	// INTERVENE: Set token on client
+	// INTERVENE: Set the caller-provided token on client
 	client.SetToken(token)
 
 	// EVALUATE: Verify token is valid and has sufficient capabilities

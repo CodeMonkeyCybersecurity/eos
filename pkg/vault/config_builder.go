@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -67,7 +68,7 @@ func NewConfigBuilder(rc *eos_io.RuntimeContext) (*VaultConfigBuilder, error) {
 		TLSCertFile:    VaultTLSCert,
 		TLSKeyFile:     VaultTLSKey,
 		StorageBackend: "raft", // Default to Raft (recommended)
-		ConsulAddress:  "shared.GetInternalHostname:8500",
+		ConsulAddress:  fmt.Sprintf("%s:8500", shared.GetInternalHostname()),
 		LogLevel:       "info",
 		LogFormat:      "json",
 	}, nil
@@ -115,9 +116,9 @@ func (vcb *VaultConfigBuilder) GetClusterAddr() string {
 	return fmt.Sprintf("https://%s:%d", vcb.hostname, vcb.ClusterPort)
 }
 
-// GetAPIAddrLocal returns the local API address for internal use (https://shared.GetInternalHostname:8200)
+// GetAPIAddrLocal returns the local API address for internal use (https://127.0.0.1:port)
 func (vcb *VaultConfigBuilder) GetAPIAddrLocal() string {
-	return fmt.Sprintf("https://shared.GetInternalHostname:%d", vcb.APIPort)
+	return fmt.Sprintf("https://%s:%d", shared.GetInternalHostname(), vcb.APIPort)
 }
 
 // BuildServerConfig generates the vault.hcl configuration file content
