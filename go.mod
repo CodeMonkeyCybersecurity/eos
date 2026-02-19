@@ -1,13 +1,11 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.24.6
-
-toolchain go1.24.7
+go 1.25.0
 
 require (
 	code.gitea.io/sdk/gitea v0.22.1
 	cuelang.org/go v0.14.2
-	filippo.io/mlkem768 v0.0.0-20250818110517-29047ffe79fb
+	filippo.io/mlkem768 v0.0.0-20260214141301-2e7bebc7d88d
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/bradleyjkemp/cupaloy/v2 v2.8.0
 	github.com/ceph/go-ceph v0.36.0
@@ -41,6 +39,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/olekukonko/tablewriter v1.1.0
 	github.com/open-policy-agent/opa v1.10.1
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/shirou/gopsutil/v4 v4.25.10
@@ -209,7 +208,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pjbgf/sha1cd v0.5.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
