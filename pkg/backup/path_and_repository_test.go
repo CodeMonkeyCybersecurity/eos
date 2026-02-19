@@ -291,6 +291,51 @@ func TestEnsureSecretsDirSecure_RejectsWrongOwner(t *testing.T) {
 	}
 }
 
+func TestEnsureSecretsDirSecure_RejectsSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	realSecrets := filepath.Join(tmpDir, "real-secrets")
+	linkSecrets := filepath.Join(tmpDir, "secrets-link")
+	if err := os.MkdirAll(realSecrets, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.Symlink(realSecrets, linkSecrets); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+
+	if err := ensureSecretsDirSecure(linkSecrets); err == nil {
+		t.Fatal("expected symlink rejection for secrets directory")
+	}
+}
+
+func TestSecureWriteSecretFile_RejectsSymlinkTarget(t *testing.T) {
+	tmpDir := t.TempDir()
+	secretsPath := filepath.Join(tmpDir, "secrets")
+	targetPath := filepath.Join(tmpDir, "target")
+	if err := os.MkdirAll(secretsPath, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(targetPath, []byte("old"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	passwordPath := filepath.Join(secretsPath, "repo.password")
+	if err := os.Symlink(targetPath, passwordPath); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+
+	if err := secureWriteSecretFile(passwordPath, []byte("new"), PasswordFilePerm); err == nil {
+		t.Fatal("expected secure write to fail for symlink target")
+	}
+
+	content, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(content) != "old" {
+		t.Fatalf("target content mutated through symlink: got %q", string(content))
+	}
+}
+
 func TestGetRepositoryPassword_VaultFirstFallback(t *testing.T) {
 	rc := testRuntimeContext()
 	tmpDir := t.TempDir()
@@ -359,5 +404,21 @@ func TestGetRepositoryPassword_VaultFirstFallback(t *testing.T) {
 	}
 	if afterLocalSuccess <= beforeLocalSuccess {
 		t.Fatalf("expected secrets_password_file_success to increase, before=%d after=%d", beforeLocalSuccess, afterLocalSuccess)
+	}
+}
+
+func TestPasswordSourceStructuredTelemetry(t *testing.T) {
+	beforeSource := readExpvarInt(t, backupPasswordSourceBySourceTotal, "telemetry_test_source")
+	beforeOutcome := readExpvarInt(t, backupPasswordSourceByOutcomeTotal, "success")
+
+	recordPasswordSource("telemetry_test_source", true)
+
+	afterSource := readExpvarInt(t, backupPasswordSourceBySourceTotal, "telemetry_test_source")
+	afterOutcome := readExpvarInt(t, backupPasswordSourceByOutcomeTotal, "success")
+	if afterSource <= beforeSource {
+		t.Fatalf("expected source counter to increase, before=%d after=%d", beforeSource, afterSource)
+	}
+	if afterOutcome <= beforeOutcome {
+		t.Fatalf("expected outcome counter to increase, before=%d after=%d", beforeOutcome, afterOutcome)
 	}
 }

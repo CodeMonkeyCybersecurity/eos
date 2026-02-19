@@ -245,10 +245,8 @@ func classifyConfigPath(path string) string {
 }
 
 func (c *Config) applyDefaults() {
-	if c.Settings.HooksPolicy.Enabled == nil {
-		enabled := true
-		c.Settings.HooksPolicy.Enabled = &enabled
-	}
+	// Keep as an extension point for non-persisted defaults.
+	// Avoid mutating pointer-backed fields to prevent config drift on save.
 }
 
 // Validate checks if the configuration is valid

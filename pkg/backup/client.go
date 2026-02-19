@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -361,6 +362,12 @@ func (c *Client) getRepositoryPassword() (string, error) {
 	missingErr := fmt.Errorf("restic repository password not found; expected password file at %s, secrets fallback at %s, or RESTIC_PASSWORD in %s",
 		localPasswordPath, secretsPasswordPath, envPath)
 
+	if reason := skipWizardReason(); reason != "" {
+		recordPasswordSource("wizard", false)
+		logger.Debug("Skipping password wizard", zap.String("reason", reason))
+		return "", missingErr
+	}
+
 	// 8. Interactive wizard fallback
 	password, wizardErr := c.runPasswordWizard(localPasswordPath, secretsPasswordPath, []string{envPath, secretsEnvPath})
 	if wizardErr == nil {
@@ -400,6 +407,34 @@ func (c *Client) readPasswordFromVault() (string, error) {
 
 func isVaultConfigured() bool {
 	return strings.TrimSpace(os.Getenv("VAULT_ADDR")) != ""
+}
+
+// skipWizardReason returns a non-empty string explaining why the password
+// wizard should be skipped, or "" if the wizard should run.
+func skipWizardReason() string {
+	if !interaction.IsTTY() {
+		return "non-interactive (no TTY)"
+	}
+
+	raw := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD_SKIP_WIZARD"))
+	if raw == "" {
+		return ""
+	}
+
+	parsed, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fmt.Sprintf("RESTIC_PASSWORD_SKIP_WIZARD=%q is not a valid boolean; treating as skip", raw)
+	}
+	if parsed {
+		return "RESTIC_PASSWORD_SKIP_WIZARD=true"
+	}
+	return ""
+}
+
+// shouldSkipPasswordWizard is the predicate wrapper used by callers
+// that only need a bool.
+func shouldSkipPasswordWizard() bool {
+	return skipWizardReason() != ""
 }
 
 // InitRepository initializes a new restic repository

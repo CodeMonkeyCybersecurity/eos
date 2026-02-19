@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -506,23 +507,75 @@ func TestPasswordRetrieval(t *testing.T) {
 		},
 	}
 
-	t.Run("password retrieval logic", func(t *testing.T) {
-		// This will likely fail since Vault won't be available in test
+	t.Run("password retrieval does not block in non-interactive mode", func(t *testing.T) {
+		prev := os.Getenv("RESTIC_PASSWORD_SKIP_WIZARD")
+		if err := os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", "1"); err != nil {
+			t.Fatalf("Setenv() error = %v", err)
+		}
+		t.Cleanup(func() {
+			_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", prev)
+		})
+
 		password, err := client.getRepositoryPassword()
+		if err == nil {
+			t.Fatalf("expected missing password error, got password length=%d", len(password))
+		}
+		if password != "" {
+			t.Fatalf("expected empty password on failure, got %q", password)
+		}
+	})
+}
 
-		if err != nil {
-			t.Logf("Password retrieval failed (expected in test): %v", err)
+func TestShouldSkipPasswordWizard(t *testing.T) {
+	save := func() (string, bool) {
+		v, ok := os.LookupEnv("RESTIC_PASSWORD_SKIP_WIZARD")
+		return v, ok
+	}
+	restore := func(v string, ok bool) {
+		if ok {
+			_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", v)
 		} else {
-			// Validate password doesn't contain dangerous characters
-			if containsAnyDangerousBackup(password) {
-				t.Error("Retrieved password contains dangerous characters")
-			}
+			_ = os.Unsetenv("RESTIC_PASSWORD_SKIP_WIZARD")
+		}
+	}
 
-			if password == "" {
-				t.Error("Password should not be empty")
-			}
+	t.Run("returns true when env var is 1", func(t *testing.T) {
+		v, ok := save()
+		t.Cleanup(func() { restore(v, ok) })
 
-			t.Logf("Successfully retrieved password (length: %d)", len(password))
+		_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", "1")
+		if !shouldSkipPasswordWizard() {
+			t.Fatal("expected wizard skip when RESTIC_PASSWORD_SKIP_WIZARD=1")
+		}
+	})
+
+	t.Run("returns false when env var is 0", func(t *testing.T) {
+		v, ok := save()
+		t.Cleanup(func() { restore(v, ok) })
+
+		_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", "0")
+		// Should not skip when explicitly disabled (assuming TTY present in test).
+		// If TTY detection returns false, the function still returns true.
+		// We test the env-var branch specifically.
+		reason := skipWizardReason()
+		if reason == "RESTIC_PASSWORD_SKIP_WIZARD=true" {
+			t.Fatalf("env var set to 0 should not produce skip-true reason, got %q", reason)
+		}
+	})
+
+	t.Run("returns true with reason for malformed env var", func(t *testing.T) {
+		v, ok := save()
+		t.Cleanup(func() { restore(v, ok) })
+
+		_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", "maybe")
+		if !shouldSkipPasswordWizard() {
+			t.Fatal("expected wizard skip for unparseable env var")
+		}
+		reason := skipWizardReason()
+		// In non-TTY environments (CI) the TTY check fires first;
+		// the parse-error branch is only reachable when a TTY exists.
+		if reason != "non-interactive (no TTY)" && !strings.Contains(reason, "not a valid boolean") {
+			t.Fatalf("unexpected reason: %q", reason)
 		}
 	})
 }
