@@ -1,13 +1,11 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.24.6
-
-toolchain go1.24.7
+go 1.25.0
 
 require (
 	code.gitea.io/sdk/gitea v0.22.1
 	cuelang.org/go v0.14.2
-	filippo.io/mlkem768 v0.0.0-20250818110517-29047ffe79fb
+	filippo.io/mlkem768 v0.0.0-20260214141301-2e7bebc7d88d
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/bradleyjkemp/cupaloy/v2 v2.8.0
 	github.com/ceph/go-ceph v0.36.0
