@@ -45,8 +45,10 @@ func createTestLogger(t *testing.T) otelzap.LoggerWithCtx {
 func TestHookOperation_Assess_ValidCommand(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "echo 'test hook'",
-		Logger: logger,
+		Hook:            "echo 'test hook'",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -61,8 +63,10 @@ func TestHookOperation_Assess_ValidCommand(t *testing.T) {
 func TestHookOperation_Assess_EmptyCommand(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "",
-		Logger: logger,
+		Hook:            "",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -76,8 +80,10 @@ func TestHookOperation_Assess_EmptyCommand(t *testing.T) {
 func TestHookOperation_Assess_AbsolutePathNotFound(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "/nonexistent/command arg1 arg2",
-		Logger: logger,
+		Hook:            "/nonexistent/command arg1 arg2",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -91,8 +97,10 @@ func TestHookOperation_Assess_AbsolutePathNotFound(t *testing.T) {
 func TestHookOperation_Intervene_Success(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "/usr/bin/tar --version",
-		Logger: logger,
+		Hook:            "/usr/bin/tar --version",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -110,8 +118,10 @@ func TestHookOperation_Intervene_Success(t *testing.T) {
 func TestHookOperation_Intervene_CommandFails(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "/bin/false", // Not whitelisted
-		Logger: logger,
+		Hook:            "/bin/false", // Not whitelisted
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -127,8 +137,10 @@ func TestHookOperation_Intervene_CommandFails(t *testing.T) {
 func TestHookOperation_Evaluate_Success(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "echo test",
-		Logger: logger,
+		Hook:            "echo test",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()
@@ -148,8 +160,10 @@ func TestHookOperation_Evaluate_Success(t *testing.T) {
 func TestHookOperation_Evaluate_Failure(t *testing.T) {
 	logger := createTestLogger(t)
 	hook := &backup.HookOperation{
-		Hook:   "echo test",
-		Logger: logger,
+		Hook:            "echo test",
+		Logger:          logger,
+		HooksEnabled:    true,
+		AllowedCommands: map[string]struct{}{"/usr/bin/tar": {}},
 	}
 
 	ctx := context.Background()

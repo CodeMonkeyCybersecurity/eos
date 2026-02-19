@@ -160,6 +160,15 @@ func TestLoadConfig(t *testing.T) {
 	}
 
 	t.Run("default config when file not found", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		canonicalPath := filepath.Join(tmpDir, "backup.yaml")
+		legacyPath := filepath.Join(tmpDir, "backup", "config.yaml")
+		origRead := configReadCandidates
+		t.Cleanup(func() {
+			configReadCandidates = origRead
+		})
+		configReadCandidates = []string{canonicalPath, legacyPath}
+
 		// This should return default config when no file exists
 		config, err := LoadConfig(rc)
 		if err != nil {
@@ -214,11 +223,19 @@ settings:
 			t.Fatalf("Failed to write config file: %v", err)
 		}
 
-		// Temporarily override config path (this would normally be done via environment)
-		originalConfigPath := "/etc/eos/backup.yaml"
-		// Note: In a real implementation, we'd need a way to override the config path
-		// For now, this test documents the expected behavior
-		t.Logf("Config would be loaded from %s", originalConfigPath)
+		origRead := configReadCandidates
+		t.Cleanup(func() {
+			configReadCandidates = origRead
+		})
+		configReadCandidates = []string{configFile}
+
+		config, err := LoadConfig(rc)
+		if err != nil {
+			t.Fatalf("LoadConfig() error = %v", err)
+		}
+		if config.DefaultRepository != "local" {
+			t.Fatalf("DefaultRepository = %q, want local", config.DefaultRepository)
+		}
 	})
 }
 
@@ -248,12 +265,23 @@ func TestSaveConfig(t *testing.T) {
 	}
 
 	t.Run("save valid config", func(t *testing.T) {
-		// This will likely fail in test environment due to permissions
+		tmpDir := t.TempDir()
+		savePath := filepath.Join(tmpDir, "backup.yaml")
+		origWritePath := configWritePath
+		origWriteDir := configWriteDir
+		t.Cleanup(func() {
+			configWritePath = origWritePath
+			configWriteDir = origWriteDir
+		})
+		configWritePath = savePath
+		configWriteDir = tmpDir
+
 		err := SaveConfig(rc, config)
 		if err != nil {
-			t.Logf("SaveConfig failed (expected in test environment): %v", err)
-		} else {
-			t.Log("SaveConfig succeeded")
+			t.Fatalf("SaveConfig() error = %v", err)
+		}
+		if _, err := os.Stat(savePath); err != nil {
+			t.Fatalf("saved config missing at %s: %v", savePath, err)
 		}
 	})
 

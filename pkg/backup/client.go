@@ -18,6 +18,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -270,81 +271,135 @@ func (c *Client) handleRepositoryNotInitialized(resticOutput string) error {
 func (c *Client) getRepositoryPassword() (string, error) {
 	logger := otelzap.Ctx(c.rc.Ctx)
 
-	// 1. Repository-local password file (created by quick backup generator)
+	// 1. Vault-managed secret (preferred when Vault is configured)
+	if isVaultConfigured() {
+		if password, err := c.readPasswordFromVault(); err == nil {
+			recordPasswordSource("vault", true)
+			return password, nil
+		} else {
+			recordPasswordSource("vault", false)
+			logger.Warn("Failed to read repository password from Vault",
+				zap.String("repository", c.repository.Name),
+				zap.Error(err))
+		}
+	}
+
+	// 2. Repository-local password file (created by quick backup generator)
 	localPasswordPath := filepath.Join(c.repository.URL, ".password")
 	if password, err := readPasswordFile(localPasswordPath); err == nil {
+		recordPasswordSource("repo_password_file", true)
 		logger.Debug("Using repository-local password file",
 			zap.String("path", localPasswordPath))
 		return password, nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		recordPasswordSource("repo_password_file", false)
 		logger.Warn("Failed to read repository-local password file",
 			zap.String("path", localPasswordPath),
 			zap.Error(err))
 	}
 
-	// 2. Global secrets directory fallback (used by managed repositories)
+	// 3. Global secrets directory fallback (used by managed repositories)
 	secretsPasswordPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.password", c.repository.Name))
 	if password, err := readPasswordFile(secretsPasswordPath); err == nil {
+		recordPasswordSource("secrets_password_file", true)
 		logger.Debug("Using secrets directory password file",
 			zap.String("path", secretsPasswordPath))
 		return password, nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		recordPasswordSource("secrets_password_file", false)
 		logger.Warn("Failed to read secrets directory password file",
 			zap.String("path", secretsPasswordPath),
 			zap.Error(err))
 	}
 
-	// 3. Repository `.env` file (temporary secret storage during Vault testing)
+	// 4. Repository `.env` file (compatibility fallback)
 	envPath := filepath.Join(c.repository.URL, ".env")
 	if password, err := readPasswordFromEnvFile(envPath); err == nil {
+		recordPasswordSource("repo_env", true)
 		logger.Debug("Using repository .env file for restic password",
 			zap.String("path", envPath))
 		return password, nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		recordPasswordSource("repo_env", false)
 		logger.Warn("Failed to read repository .env file",
 			zap.String("path", envPath),
 			zap.Error(err))
 	}
 
-	// 4a. Secrets directory .env file (fallback for non-local repositories)
+	// 5. Secrets directory .env file (fallback for non-local repositories)
 	secretsEnvPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.env", c.repository.Name))
 	if password, err := readPasswordFromEnvFile(secretsEnvPath); err == nil {
+		recordPasswordSource("secrets_env", true)
 		logger.Debug("Using secrets .env file for restic password",
 			zap.String("path", secretsEnvPath))
 		return password, nil
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		recordPasswordSource("secrets_env", false)
 		logger.Warn("Failed to read secrets .env file",
 			zap.String("path", secretsEnvPath),
 			zap.Error(err))
 	}
 
-	// 4. Environment variable overrides (least preferred, but supported for manual ops)
-	if password := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD")); password != "" {
-		logger.Warn("Using RESTIC_PASSWORD environment variable; prefer password files for security")
-		return password, nil
-	}
-
+	// 6. Environment variable overrides (least preferred)
 	if passwordFile := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD_FILE")); passwordFile != "" {
 		if password, err := readPasswordFile(passwordFile); err == nil {
+			recordPasswordSource("env_var", true)
 			logger.Warn("Using RESTIC_PASSWORD_FILE override; prefer managed password files",
 				zap.String("path", passwordFile))
 			return password, nil
 		}
+		recordPasswordSource("env_var", false)
+	}
+
+	// 7. Raw environment variable override
+	if password := strings.TrimSpace(os.Getenv("RESTIC_PASSWORD")); password != "" {
+		recordPasswordSource("env_var", true)
+		logger.Warn("Using RESTIC_PASSWORD environment variable; prefer password files for security")
+		return password, nil
 	}
 
 	missingErr := fmt.Errorf("restic repository password not found; expected password file at %s, secrets fallback at %s, or RESTIC_PASSWORD in %s",
 		localPasswordPath, secretsPasswordPath, envPath)
 
+	// 8. Interactive wizard fallback
 	password, wizardErr := c.runPasswordWizard(localPasswordPath, secretsPasswordPath, []string{envPath, secretsEnvPath})
 	if wizardErr == nil {
+		recordPasswordSource("wizard", true)
 		return password, nil
 	}
 	if wizardErr != nil && !errors.Is(wizardErr, errPasswordWizardSkipped) {
+		recordPasswordSource("wizard", false)
 		logger.Warn("Password setup wizard failed",
 			zap.Error(wizardErr))
 	}
 
 	return "", missingErr
+}
+
+func (c *Client) readPasswordFromVault() (string, error) {
+	var secret map[string]interface{}
+	vaultPath := fmt.Sprintf("%s/%s", VaultPasswordPathPrefix, c.repository.Name)
+	if err := vault.ReadFromVault(c.rc, vaultPath, &secret); err != nil {
+		return "", err
+	}
+
+	raw, ok := secret[VaultPasswordKey]
+	if !ok {
+		return "", fmt.Errorf("vault secret %q missing key %q", vaultPath, VaultPasswordKey)
+	}
+	password, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("vault secret %q contains non-string password", vaultPath)
+	}
+	password = strings.TrimSpace(password)
+	if password == "" {
+		return "", fmt.Errorf("vault secret %q contains empty password", vaultPath)
+	}
+	return password, nil
+}
+
+func isVaultConfigured() bool {
+	return strings.TrimSpace(os.Getenv("VAULT_ADDR")) != ""
 }
 
 // InitRepository initializes a new restic repository
@@ -839,16 +894,9 @@ func (c *Client) executeHooks(hooks []string, hookType string) error {
 		ctx, cancel := context.WithTimeout(c.rc.Ctx, HookTimeout)
 		defer cancel()
 
-		cmd := exec.CommandContext(ctx, "sh", "-c", hookCmd)
-
-		// Capture output
-		var stdout, stderr bytes.Buffer
-		cmd.Stdout = &stdout
-		cmd.Stderr = &stderr
-
 		// Execute hook
 		start := time.Now()
-		err := cmd.Run()
+		err := RunHookWithSettings(ctx, logger, hookCmd, c.config.Settings)
 		duration := time.Since(start)
 
 		// Check for timeout
@@ -866,27 +914,14 @@ func (c *Client) executeHooks(hooks []string, hookType string) error {
 				zap.String("type", hookType),
 				zap.String("command", hookCmd),
 				zap.Duration("duration", duration),
-				zap.String("stdout", stdout.String()),
-				zap.String("stderr", stderr.String()),
 				zap.Error(err))
-			return fmt.Errorf("hook failed: %w\nstdout: %s\nstderr: %s",
-				err, stdout.String(), stderr.String())
+			return fmt.Errorf("hook failed: %w", err)
 		}
 
 		logger.Info("Hook completed successfully",
 			zap.String("type", hookType),
 			zap.String("command", hookCmd),
-			zap.Duration("duration", duration),
-			zap.Int("stdout_bytes", stdout.Len()),
-			zap.Int("stderr_bytes", stderr.Len()))
-
-		// Log output if present (for debugging)
-		if stdout.Len() > 0 {
-			logger.Debug("Hook stdout", zap.String("output", stdout.String()))
-		}
-		if stderr.Len() > 0 {
-			logger.Debug("Hook stderr", zap.String("output", stderr.String()))
-		}
+			zap.Duration("duration", duration))
 	}
 
 	logger.Info("All hooks completed successfully",

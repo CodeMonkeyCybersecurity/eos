@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -274,8 +275,8 @@ func storeLocalPassword(repoName, password string) error {
 		return fmt.Errorf("invalid repository name %q", repoName)
 	}
 
-	if err := os.MkdirAll(secretsDirPath, PasswordDirPerm); err != nil {
-		return fmt.Errorf("creating secrets directory: %w", err)
+	if err := ensureSecretsDirSecure(secretsDirPath); err != nil {
+		return err
 	}
 
 	passwordPath := filepath.Join(secretsDirPath, fmt.Sprintf("%s.password", repoName))
@@ -285,6 +286,37 @@ func storeLocalPassword(repoName, password string) error {
 
 	if err := os.Chmod(passwordPath, PasswordFilePerm); err != nil {
 		return fmt.Errorf("setting password file permissions: %w", err)
+	}
+
+	return nil
+}
+
+func ensureSecretsDirSecure(path string) error {
+	if err := os.MkdirAll(path, PasswordDirPerm); err != nil {
+		return fmt.Errorf("creating secrets directory: %w", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stating secrets directory: %w", err)
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("secrets path is not a directory: %s", path)
+	}
+
+	if info.Mode().Perm() != PasswordDirPerm {
+		if err := os.Chmod(path, PasswordDirPerm); err != nil {
+			return fmt.Errorf("enforcing secrets directory permissions: %w", err)
+		}
+	}
+
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil
+	}
+	if int(stat.Uid) != os.Geteuid() {
+		return fmt.Errorf("secrets directory %s must be owned by uid %d (found %d)", path, os.Geteuid(), stat.Uid)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,6 +16,33 @@ func TestNewClient(t *testing.T) {
 	rc := &eos_io.RuntimeContext{
 		Ctx: context.Background(),
 		Log: logger,
+	}
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "backup.yaml")
+	origRead := configReadCandidates
+	origWritePath := configWritePath
+	origWriteDir := configWriteDir
+	t.Cleanup(func() {
+		configReadCandidates = origRead
+		configWritePath = origWritePath
+		configWriteDir = origWriteDir
+	})
+	configReadCandidates = []string{configPath}
+	configWritePath = configPath
+	configWriteDir = tmpDir
+
+	cfg := &Config{
+		DefaultRepository: "local",
+		Repositories: map[string]Repository{
+			"local": {Name: "local", Backend: "local", URL: filepath.Join(tmpDir, "repo")},
+		},
+		Profiles: map[string]Profile{
+			"system": {Name: "system", Repository: "local", Paths: []string{tmpDir}},
+		},
+	}
+	if err := SaveConfig(rc, cfg); err != nil {
+		t.Fatalf("SaveConfig() error = %v", err)
 	}
 
 	t.Run("create client with default config", func(t *testing.T) {

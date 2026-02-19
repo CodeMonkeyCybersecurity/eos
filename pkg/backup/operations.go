@@ -18,8 +18,10 @@ import (
 
 // HookOperation implements AIE pattern for running backup hooks
 type HookOperation struct {
-	Hook   string
-	Logger otelzap.LoggerWithCtx
+	Hook            string
+	Logger          otelzap.LoggerWithCtx
+	AllowedCommands map[string]struct{}
+	HooksEnabled    bool
 }
 
 // Assess checks if the hook can be executed
@@ -63,31 +65,28 @@ func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.Asse
 	h.Logger.Info("Executing hook",
 		zap.String("command", h.Hook))
 
+	if !h.HooksEnabled {
+		recordHookDecision("disabled", false)
+		return &patterns.InterventionResult{
+			Success: false,
+			Message: "hooks are disabled by policy",
+		}, fmt.Errorf("hooks are disabled by policy")
+	}
+
 	parts := strings.Fields(h.Hook)
 	if len(parts) == 0 {
+		recordHookDecision("empty_command", false)
 		return &patterns.InterventionResult{
 			Success: false,
 			Message: "hook command is empty",
 		}, fmt.Errorf("empty hook command")
 	}
 
-	// CRITICAL: Validate hook command to prevent RCE
-	// WHITELIST only specific allowed commands
-	allowedCommands := map[string]bool{
-		"/usr/bin/restic": true,
-		"/usr/bin/rsync":  true,
-		"/usr/bin/tar":    true,
-		"/usr/bin/gzip":   true,
-		"/bin/sh":         false, // BLOCKED - shell injection risk
-		"/bin/bash":       false, // BLOCKED - shell injection risk
-		"/usr/bin/curl":   false, // BLOCKED - exfiltration risk
-		"/usr/bin/wget":   false, // BLOCKED - exfiltration risk
-	}
-
 	cmd := parts[0]
 
 	// Command must be absolute path
 	if !filepath.IsAbs(cmd) {
+		recordHookDecision("non_absolute_command", false)
 		return &patterns.InterventionResult{
 			Success: false,
 			Message: "hook command must be absolute path",
@@ -97,32 +96,21 @@ func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.Asse
 	// Clean path to prevent traversal
 	cleanCmd := filepath.Clean(cmd)
 
-	// Check whitelist
-	allowed, exists := allowedCommands[cleanCmd]
-	if !exists || !allowed {
+	// Check allowlist
+	if _, exists := h.AllowedCommands[cleanCmd]; !exists {
+		recordHookDecision("deny_not_allowlisted", false)
 		return &patterns.InterventionResult{
 			Success: false,
 			Message: fmt.Sprintf("command not whitelisted: %s", cleanCmd),
-		}, fmt.Errorf("command not whitelisted: %s (add to allowedCommands if legitimate)", cleanCmd)
+		}, fmt.Errorf("command not whitelisted: %s", cleanCmd)
 	}
 
-	// Validate arguments don't contain shell metacharacters or dangerous patterns
-	for i, arg := range parts[1:] {
-		// Block shell metacharacters that could enable command injection
-		if strings.ContainsAny(arg, ";|&$`<>(){}[]'\"\\") {
-			return &patterns.InterventionResult{
-				Success: false,
-				Message: fmt.Sprintf("invalid characters in hook argument %d", i+1),
-			}, fmt.Errorf("hook argument %d contains shell metacharacters: %s", i+1, arg)
-		}
-
-		// Block path traversal in arguments
-		if strings.Contains(arg, "..") {
-			return &patterns.InterventionResult{
-				Success: false,
-				Message: fmt.Sprintf("path traversal detected in argument %d", i+1),
-			}, fmt.Errorf("path traversal in hook argument %d: %s", i+1, arg)
-		}
+	if err := validateHookArgs(parts[1:]); err != nil {
+		recordHookDecision("deny_bad_arguments", false)
+		return &patterns.InterventionResult{
+			Success: false,
+			Message: err.Error(),
+		}, err
 	}
 
 	output, err := execute.Run(ctx, execute.Options{
@@ -132,11 +120,13 @@ func (h *HookOperation) Intervene(ctx context.Context, assessment *patterns.Asse
 	})
 
 	if err != nil {
+		recordHookDecision("execution_error", false)
 		return &patterns.InterventionResult{
 			Success: false,
 			Message: fmt.Sprintf("hook execution failed: %v", err),
 		}, err
 	}
+	recordHookDecision("allowlist_execute", true)
 
 	return &patterns.InterventionResult{
 		Success: true,
@@ -180,13 +170,62 @@ func (h *HookOperation) Evaluate(ctx context.Context, intervention *patterns.Int
 
 // RunHook executes a backup hook using AIE pattern
 func RunHook(ctx context.Context, logger otelzap.LoggerWithCtx, hook string) error {
+	return RunHookWithSettings(ctx, logger, hook, Settings{})
+}
+
+// RunHookWithSettings executes a backup hook using settings-based policy.
+func RunHookWithSettings(ctx context.Context, logger otelzap.LoggerWithCtx, hook string, settings Settings) error {
 	operation := &HookOperation{
-		Hook:   hook,
-		Logger: logger,
+		Hook:            hook,
+		Logger:          logger,
+		AllowedCommands: buildAllowedHookCommands(settings),
+		HooksEnabled:    hooksEnabled(settings),
 	}
 
 	executor := patterns.NewExecutor(logger)
 	return executor.Execute(ctx, operation, fmt.Sprintf("backup_hook_%s", hook))
+}
+
+func hooksEnabled(settings Settings) bool {
+	if settings.HooksPolicy.Enabled == nil {
+		return true
+	}
+	return *settings.HooksPolicy.Enabled
+}
+
+func buildAllowedHookCommands(settings Settings) map[string]struct{} {
+	allowed := make(map[string]struct{}, len(DefaultAllowedHookCommands)+len(settings.HooksPolicy.AllowedCommands))
+	for _, cmd := range DefaultAllowedHookCommands {
+		clean := strings.TrimSpace(cmd)
+		if clean == "" || !filepath.IsAbs(clean) {
+			continue
+		}
+		allowed[filepath.Clean(clean)] = struct{}{}
+	}
+
+	for _, cmd := range settings.HooksPolicy.AllowedCommands {
+		clean := strings.TrimSpace(cmd)
+		if clean == "" || !filepath.IsAbs(clean) {
+			continue
+		}
+		allowed[filepath.Clean(clean)] = struct{}{}
+	}
+
+	return allowed
+}
+
+func validateHookArgs(args []string) error {
+	for i, arg := range args {
+		if strings.ContainsAny(arg, ";|&$`<>(){}[]'\"\\") {
+			return fmt.Errorf("invalid characters in hook argument %d", i+1)
+		}
+
+		if strings.Contains(arg, "..") {
+			return fmt.Errorf("path traversal detected in argument %d", i+1)
+		}
+	}
+
+	return nil
 }
 
 // BackupOperation implements AIE pattern for backup operations

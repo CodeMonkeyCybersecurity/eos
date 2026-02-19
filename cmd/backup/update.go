@@ -93,13 +93,13 @@ Examples:
 		if profile.Hooks != nil && len(profile.Hooks.PreBackup) > 0 {
 			logger.Info("Running pre-backup hooks")
 			for _, hook := range profile.Hooks.PreBackup {
-				if err := backup.RunHook(rc.Ctx, logger, hook); err != nil {
+				if err := backup.RunHookWithSettings(rc.Ctx, logger, hook, config.Settings); err != nil {
 					logger.Error("Pre-backup hook failed",
 						zap.String("hook", hook),
 						zap.Error(err))
 					if profile.Hooks.OnError != nil {
 						for _, errorHook := range profile.Hooks.OnError {
-							_ = backup.RunHook(rc.Ctx, logger, errorHook)
+							_ = backup.RunHookWithSettings(rc.Ctx, logger, errorHook, config.Settings)
 						}
 					}
 					return fmt.Errorf("pre-backup hook failed: %w", err)
@@ -122,7 +122,7 @@ Examples:
 			// Run error hooks
 			if profile.Hooks != nil && profile.Hooks.OnError != nil {
 				for _, hook := range profile.Hooks.OnError {
-					_ = backup.RunHook(rc.Ctx, logger, hook)
+					_ = backup.RunHookWithSettings(rc.Ctx, logger, hook, config.Settings)
 				}
 			}
 			return err
@@ -132,7 +132,7 @@ Examples:
 		if profile.Hooks != nil && len(profile.Hooks.PostBackup) > 0 {
 			logger.Info("Running post-backup hooks")
 			for _, hook := range profile.Hooks.PostBackup {
-				if err := backup.RunHook(rc.Ctx, logger, hook); err != nil {
+				if err := backup.RunHookWithSettings(rc.Ctx, logger, hook, config.Settings); err != nil {
 					logger.Warn("Post-backup hook failed",
 						zap.String("hook", hook),
 						zap.Error(err))
