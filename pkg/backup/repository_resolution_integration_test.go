@@ -131,3 +131,56 @@ profiles:
 		t.Fatalf("expected permission denied error, got %v", err)
 	}
 }
+
+func TestIntegrationPasswordLookup_SkipWizardWhenConfigured(t *testing.T) {
+	rc := &eos_io.RuntimeContext{Ctx: context.Background(), Log: zap.NewNop()}
+	tmpDir := t.TempDir()
+
+	origRead := configReadCandidates
+	origWritePath := configWritePath
+	origWriteDir := configWriteDir
+	origSecretsDir := secretsDirPath
+	origSkip := os.Getenv("RESTIC_PASSWORD_SKIP_WIZARD")
+	t.Cleanup(func() {
+		configReadCandidates = origRead
+		configWritePath = origWritePath
+		configWriteDir = origWriteDir
+		secretsDirPath = origSecretsDir
+		_ = os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", origSkip)
+	})
+
+	configPath := filepath.Join(tmpDir, "backup.yaml")
+	configReadCandidates = []string{configPath}
+	configWritePath = configPath
+	configWriteDir = tmpDir
+	secretsDirPath = filepath.Join(tmpDir, "secrets")
+
+	cfg := &Config{
+		DefaultRepository: "repo-a",
+		Repositories: map[string]Repository{
+			"repo-a": {Name: "repo-a", Backend: "local", URL: filepath.Join(tmpDir, "repo-a")},
+		},
+		Profiles: map[string]Profile{
+			"system": {Name: "system", Repository: "repo-a", Paths: []string{tmpDir}},
+		},
+	}
+	if err := SaveConfig(rc, cfg); err != nil {
+		t.Fatalf("SaveConfig() error = %v", err)
+	}
+	if err := os.Setenv("RESTIC_PASSWORD_SKIP_WIZARD", "1"); err != nil {
+		t.Fatalf("Setenv() error = %v", err)
+	}
+
+	client, err := NewClient(rc, "repo-a")
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+
+	password, err := client.getRepositoryPassword()
+	if err == nil {
+		t.Fatalf("expected missing password error, got password=%q", password)
+	}
+	if password != "" {
+		t.Fatalf("expected empty password result, got %q", password)
+	}
+}

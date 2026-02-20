@@ -8,15 +8,42 @@ var (
 	backupConfigSourceTotal         = expvar.NewMap("backup_config_source_total")
 	backupPasswordSourceTotal       = expvar.NewMap("backup_password_source_total")
 	backupHookDecisionTotal         = expvar.NewMap("backup_hook_decision_total")
+
+	backupRepositoryResolutionBySourceTotal  = expvar.NewMap("backup_repository_resolution_by_source_total")
+	backupRepositoryResolutionByOutcomeTotal = expvar.NewMap("backup_repository_resolution_by_outcome_total")
+	backupConfigLoadBySourceTotal            = expvar.NewMap("backup_config_load_by_source_total")
+	backupConfigLoadByOutcomeTotal           = expvar.NewMap("backup_config_load_by_outcome_total")
+	backupConfigSourceBySourceTotal          = expvar.NewMap("backup_config_source_by_source_total")
+	backupConfigSourceByOutcomeTotal         = expvar.NewMap("backup_config_source_by_outcome_total")
+	backupPasswordSourceBySourceTotal        = expvar.NewMap("backup_password_source_by_source_total")
+	backupPasswordSourceByOutcomeTotal       = expvar.NewMap("backup_password_source_by_outcome_total")
+	backupHookDecisionBySourceTotal          = expvar.NewMap("backup_hook_decision_by_source_total")
+	backupHookDecisionByOutcomeTotal         = expvar.NewMap("backup_hook_decision_by_outcome_total")
 )
 
-func recordRepositoryResolution(source string, success bool) {
-	backupRepositoryResolutionTotal.Add(source+"_total", 1)
+func recordLegacyAndStructured(legacy, bySource, byOutcome *expvar.Map, source string, success bool) {
+	outcome := "failure"
 	if success {
-		backupRepositoryResolutionTotal.Add(source+"_success", 1)
-		return
+		outcome = "success"
 	}
-	backupRepositoryResolutionTotal.Add(source+"_failure", 1)
+
+	// Keep legacy keys for compatibility with existing dashboards and tests.
+	legacy.Add(source+"_total", 1)
+	legacy.Add(source+"_"+outcome, 1)
+
+	// Structured counters keep source and outcome dimensions separate.
+	bySource.Add(source, 1)
+	byOutcome.Add(outcome, 1)
+}
+
+func recordRepositoryResolution(source string, success bool) {
+	recordLegacyAndStructured(
+		backupRepositoryResolutionTotal,
+		backupRepositoryResolutionBySourceTotal,
+		backupRepositoryResolutionByOutcomeTotal,
+		source,
+		success,
+	)
 }
 
 // RecordRepositoryResolution allows external packages (for example cmd/backup)
@@ -26,37 +53,41 @@ func RecordRepositoryResolution(source string, success bool) {
 }
 
 func recordConfigLoad(source string, success bool) {
-	backupConfigLoadTotal.Add(source+"_total", 1)
-	if success {
-		backupConfigLoadTotal.Add(source+"_success", 1)
-		return
-	}
-	backupConfigLoadTotal.Add(source+"_failure", 1)
+	recordLegacyAndStructured(
+		backupConfigLoadTotal,
+		backupConfigLoadBySourceTotal,
+		backupConfigLoadByOutcomeTotal,
+		source,
+		success,
+	)
 }
 
 func recordConfigSource(source string, success bool) {
-	backupConfigSourceTotal.Add(source+"_total", 1)
-	if success {
-		backupConfigSourceTotal.Add(source+"_success", 1)
-		return
-	}
-	backupConfigSourceTotal.Add(source+"_failure", 1)
+	recordLegacyAndStructured(
+		backupConfigSourceTotal,
+		backupConfigSourceBySourceTotal,
+		backupConfigSourceByOutcomeTotal,
+		source,
+		success,
+	)
 }
 
 func recordPasswordSource(source string, success bool) {
-	backupPasswordSourceTotal.Add(source+"_total", 1)
-	if success {
-		backupPasswordSourceTotal.Add(source+"_success", 1)
-		return
-	}
-	backupPasswordSourceTotal.Add(source+"_failure", 1)
+	recordLegacyAndStructured(
+		backupPasswordSourceTotal,
+		backupPasswordSourceBySourceTotal,
+		backupPasswordSourceByOutcomeTotal,
+		source,
+		success,
+	)
 }
 
 func recordHookDecision(decision string, success bool) {
-	backupHookDecisionTotal.Add(decision+"_total", 1)
-	if success {
-		backupHookDecisionTotal.Add(decision+"_success", 1)
-		return
-	}
-	backupHookDecisionTotal.Add(decision+"_failure", 1)
+	recordLegacyAndStructured(
+		backupHookDecisionTotal,
+		backupHookDecisionBySourceTotal,
+		backupHookDecisionByOutcomeTotal,
+		decision,
+		success,
+	)
 }
