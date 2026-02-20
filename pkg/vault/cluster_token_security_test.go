@@ -213,7 +213,7 @@ func TestSanitizeTokenForLogging_Basic(t *testing.T) {
 		{
 			name:     "Legacy Vault token",
 			token:    "s.1234567890ABCDEF",
-			expected: "s.12***",
+			expected: "s.***", // SECURITY: Only show prefix type, never token data (prevents entropy leakage)
 		},
 		{
 			name:     "Short token",

@@ -84,7 +84,7 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" Vault systemd service started, checking health...")
-	if err := waitForVaultHealth(rc, shared.VaultMaxHealthWait); err != nil {
+	if err := waitForVaultHealth(rc, VaultMaxHealthWait); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error 
 			captureVaultLogsOnFailure(rc)
 			return fmt.Errorf("vault did not become healthy within %s", maxWait)
 		}
-		conn, err := net.DialTimeout("tcp", shared.GetVaultHostPort(), shared.VaultRetryDelay)
+		conn, err := net.DialTimeout("tcp", shared.GetVaultHostPort(), VaultRetryDelay)
 		if err == nil {
 			defer shared.SafeClose(rc.Ctx, conn)
 			otelzap.Ctx(rc.Ctx).Info(" Vault is now listening", zap.Duration("waited", time.Since(start)))
@@ -236,7 +236,7 @@ func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error 
 		otelzap.Ctx(rc.Ctx).Debug(" Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
 		// SECURITY P2 #7: Use context-aware sleep to respect cancellation
 		select {
-		case <-time.After(shared.VaultRetryDelay):
+		case <-time.After(VaultRetryDelay):
 			// Continue waiting
 		case <-rc.Ctx.Done():
 			return fmt.Errorf("vault listener check cancelled after %s: %w", time.Since(start), rc.Ctx.Err())

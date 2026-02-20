@@ -421,7 +421,7 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 		SecretFile:    AppRolePaths.SecretID,
 		SinkType:      "file",                            // set explicitly
 		SinkPath:      AgentToken,                        // fix: use AgentToken, not undefined VaultAgentTokenPath
-		ListenerAddr:  "shared.GetInternalHostname:8180", // fix: use different port from Vault server (8179)
+		ListenerAddr:  fmt.Sprintf("%s:8180", GetInternalHostname()), // fix: use different port from Vault server (8179)
 		EnableCache:   false,                             // fix: disable cache to avoid listener requirement
 		TLSSkipVerify: true,                              // HISTORICAL FIX: Skip TLS verification for self-signed certs (development)
 	}

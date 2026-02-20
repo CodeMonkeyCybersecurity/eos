@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 func TestVaultAgentConfigStructure(t *testing.T) {
 	// Test that we can create basic config structure
+	expectedAddr := fmt.Sprintf("%s:8100", shared.GetInternalHostname())
 	config := struct {
 		EnableCache     bool
 		ListenerAddress string
@@ -23,7 +25,7 @@ func TestVaultAgentConfigStructure(t *testing.T) {
 		RetryDelay      string
 	}{
 		EnableCache:     true,
-		ListenerAddress: "shared.GetInternalHostname:8100",
+		ListenerAddress: expectedAddr,
 		EnableAutoAuth:  true,
 		CacheTemplates:  true,
 		LogLevel:        "info",
@@ -32,7 +34,7 @@ func TestVaultAgentConfigStructure(t *testing.T) {
 	}
 
 	assert.True(t, config.EnableCache)
-	assert.Equal(t, "shared.GetInternalHostname:8100", config.ListenerAddress)
+	assert.Equal(t, expectedAddr, config.ListenerAddress)
 	assert.True(t, config.EnableAutoAuth)
 	assert.True(t, config.CacheTemplates)
 	assert.Equal(t, "info", config.LogLevel)
@@ -102,7 +104,7 @@ func TestAgentTemplateData(t *testing.T) {
 	assert.Equal(t, shared.AppRolePaths.SecretID, data.SecretFile)
 	assert.Equal(t, "file", data.SinkType)
 	assert.Equal(t, shared.AgentToken, data.SinkPath)
-	assert.Equal(t, "shared.GetInternalHostname:8180", data.ListenerAddr)
+	assert.Equal(t, fmt.Sprintf("%s:8180", shared.GetInternalHostname()), data.ListenerAddr)
 	assert.False(t, data.EnableCache) // Should be false to avoid listener requirement
 }
 

@@ -3,6 +3,7 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,87 +62,136 @@ func LoginAppRole(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	return client, nil
 }
 
-func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
+// appRoleCredPaths holds the file paths for an AppRole's credentials.
+// Used by readAppRoleCreds to parameterize credential reading for both
+// regular and admin AppRole without duplicating validation logic.
+type appRoleCredPaths struct {
+	RoleIDPath   string
+	SecretIDPath string
+	Label        string // human-readable label for logging (e.g. "AppRole", "admin AppRole")
+}
+
+// readAppRoleCreds reads and validates AppRole credentials from disk.
+// This is the single implementation for both regular and admin AppRole credential reading.
+//
+// DRY RATIONALE: Previously duplicated across readAppRoleCredsFromDisk and
+// readAdminAppRoleCredsFromDisk with identical validation logic (~95 lines each).
+// Only the paths and log labels differed.
+//
+// If client is non-nil and the secret_id is a wrapped token (prefix "s."),
+// it will be unwrapped via the Vault API. Pass nil to skip unwrapping.
+func readAppRoleCreds(rc *eos_io.RuntimeContext, paths appRoleCredPaths, client *api.Client) (string, string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
-	// SECURITY FIX (Phase 2): Use SecureReadCredential to prevent TOCTOU
-	// OLD VULNERABILITY: os.Stat() then os.ReadFile() - attacker could swap file between checks
-	// NEW: Single open + flock + read from FD - no race window
-	log.Info(" Reading RoleID from disk (secure FD-based)", zap.String("path", shared.AppRolePaths.RoleID))
-	roleIDRaw, err := SecureReadCredential(rc, shared.AppRolePaths.RoleID, "role_id")
+	// Read role_id securely (FD-based, TOCTOU-hardened)
+	log.Debug("Reading role_id from disk (secure FD-based)",
+		zap.String("label", paths.Label),
+		zap.String("path", paths.RoleIDPath))
+	roleIDRaw, err := SecureReadCredential(rc, paths.RoleIDPath, paths.Label+"_role_id")
 	if err != nil {
-		log.Error(" Failed to securely read role_id credential",
-			zap.String("path", shared.AppRolePaths.RoleID),
+		if errors.Is(err, os.ErrNotExist) {
+			log.Debug(paths.Label+" role_id file not found",
+				zap.String("path", paths.RoleIDPath))
+			return "", "", cerr.Wrap(err, paths.Label+" not configured")
+		}
+		log.Error("Failed to securely read "+paths.Label+" role_id",
+			zap.String("path", paths.RoleIDPath),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "secure read role_id credential")
+		return "", "", cerr.Wrap(err, "secure read "+paths.Label+" role_id")
 	}
 	roleID := strings.TrimSpace(roleIDRaw)
 
-	// VALIDATE: Ensure role_id is not empty and has valid format
 	if roleID == "" {
-		log.Error(" RoleID file is empty",
-			zap.String("path", shared.AppRolePaths.RoleID))
-		return "", "", cerr.New("role_id file is empty")
+		log.Error(paths.Label+" role_id file is empty",
+			zap.String("path", paths.RoleIDPath))
+		return "", "", cerr.Newf("%s role_id file is empty", paths.Label)
 	}
 
-	if len(roleID) < 36 { // UUIDs are at least 36 chars (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-		log.Error(" RoleID appears invalid (too short)",
-			zap.String("path", shared.AppRolePaths.RoleID),
+	// UUIDs are at least 36 chars (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+	if len(roleID) < 36 {
+		log.Error(paths.Label+" role_id appears invalid (too short)",
+			zap.String("path", paths.RoleIDPath),
 			zap.Int("length", len(roleID)),
 			zap.Int("min_expected", 36))
-		return "", "", cerr.Newf("role_id appears invalid: length %d < 36", len(roleID))
+		return "", "", cerr.Newf("%s role_id appears invalid: length %d < 36", paths.Label, len(roleID))
 	}
 
-	log.Info(" RoleID read and validated successfully",
+	log.Debug(paths.Label+" role_id read and validated",
 		zap.Int("length", len(roleID)))
 
-	log.Info(" Reading SecretID from disk (secure FD-based)", zap.String("path", shared.AppRolePaths.SecretID))
-	secretIDRaw, err := SecureReadCredential(rc, shared.AppRolePaths.SecretID, "secret_id")
+	// Read secret_id securely
+	log.Debug("Reading secret_id from disk (secure FD-based)",
+		zap.String("label", paths.Label),
+		zap.String("path", paths.SecretIDPath))
+	secretIDRaw, err := SecureReadCredential(rc, paths.SecretIDPath, paths.Label+"_secret_id")
 	if err != nil {
-		log.Error(" Failed to securely read secret_id credential",
-			zap.String("path", shared.AppRolePaths.SecretID),
+		if errors.Is(err, os.ErrNotExist) {
+			log.Debug(paths.Label+" secret_id file not found",
+				zap.String("path", paths.SecretIDPath))
+			return "", "", cerr.Wrap(err, paths.Label+" secret_id not found")
+		}
+		log.Error("Failed to securely read "+paths.Label+" secret_id",
+			zap.String("path", paths.SecretIDPath),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "secure read secret_id credential")
+		return "", "", cerr.Wrap(err, "secure read "+paths.Label+" secret_id")
 	}
-	secretIDRaw = strings.TrimSpace(secretIDRaw)
+	secretID := strings.TrimSpace(secretIDRaw)
 
-	// VALIDATE: Ensure secret_id is not empty
-	if secretIDRaw == "" {
-		log.Error(" SecretID file is empty",
-			zap.String("path", shared.AppRolePaths.SecretID))
-		return "", "", cerr.New("secret_id file is empty")
+	if secretID == "" {
+		log.Error(paths.Label+" secret_id file is empty",
+			zap.String("path", paths.SecretIDPath))
+		return "", "", cerr.Newf("%s secret_id file is empty", paths.Label)
 	}
 
-	log.Debug(" SecretID read from disk",
-		zap.Int("length", len(secretIDRaw)),
-		zap.Bool("is_wrapped", strings.HasPrefix(secretIDRaw, "s.")))
+	if len(secretID) < 36 {
+		log.Error(paths.Label+" secret_id appears invalid (too short)",
+			zap.String("path", paths.SecretIDPath),
+			zap.Int("length", len(secretID)),
+			zap.Int("min_expected", 36))
+		return "", "", cerr.Newf("%s secret_id appears invalid: length %d < 36", paths.Label, len(secretID))
+	}
 
-	if strings.HasPrefix(secretIDRaw, "s.") {
+	log.Debug(paths.Label+" secret_id read and validated",
+		zap.Int("length", len(secretID)))
+
+	// Handle wrapped tokens (prefix "s.") if client is available
+	if strings.HasPrefix(secretID, "s.") {
 		if client == nil {
-			log.Error(" Cannot unwrap token: Vault client is nil")
+			log.Error("Cannot unwrap token: Vault client is nil")
 			return "", "", cerr.New("failed to unwrap credential: Vault client is nil")
 		}
-		log.Info(" Detected wrapped SecretID token — unwrapping")
-		secret, err := client.Logical().Unwrap(secretIDRaw)
+		log.Info("Detected wrapped SecretID token — unwrapping",
+			zap.String("label", paths.Label))
+		secret, err := client.Logical().Unwrap(secretID)
 		if err != nil {
-			log.Error(" Failed to unwrap secret_id", zap.Error(err))
+			log.Error("Failed to unwrap secret_id", zap.Error(err))
 			return "", "", cerr.Wrap(err, "failed to unwrap credential")
 		}
 		if secret == nil || secret.Data == nil {
-			log.Error(" Unwrapped SecretID is empty")
+			log.Error("Unwrapped SecretID is empty")
 			return "", "", cerr.New("unwrapped credential is empty")
 		}
 		sid, ok := secret.Data["secret_id"].(string)
 		if !ok {
-			log.Error(" Unwrapped SecretID is malformed", zap.Any("data", secret.Data))
+			log.Error("Unwrapped SecretID is malformed", zap.Any("data", secret.Data))
 			return "", "", cerr.New("unwrapped credential is malformed")
 		}
-		log.Info(" SecretID unwrapped successfully")
+		log.Info("SecretID unwrapped successfully", zap.String("label", paths.Label))
 		return roleID, sid, nil
 	}
 
-	log.Warn("SecretID is stored in plaintext. Consider using response wrapping.")
-	return roleID, secretIDRaw, nil
+	log.Warn("SecretID is stored in plaintext. Consider using response wrapping.",
+		zap.String("label", paths.Label))
+	return roleID, secretID, nil
+}
+
+// readAppRoleCredsFromDisk reads regular AppRole credentials from standard paths.
+func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
+	return readAppRoleCreds(rc, appRoleCredPaths{
+		RoleIDPath:   shared.AppRolePaths.RoleID,
+		SecretIDPath: shared.AppRolePaths.SecretID,
+		Label:        "AppRole",
+	}, client)
 }
 
 // PhaseCreateAppRole provisions (or reuses) an AppRole and writes its creds to disk.
