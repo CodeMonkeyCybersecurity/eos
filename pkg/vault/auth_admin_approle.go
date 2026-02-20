@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -33,83 +32,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// readAdminAppRoleCredsFromDisk reads admin AppRole credentials from disk
-// Returns: roleID, secretID, error
+// readAdminAppRoleCredsFromDisk reads admin AppRole credentials from disk.
+// Delegates to the shared readAppRoleCreds function with admin-specific paths.
 func readAdminAppRoleCredsFromDisk(rc *eos_io.RuntimeContext) (string, string, error) {
-	log := otelzap.Ctx(rc.Ctx)
-
-	// SECURITY FIX (Phase 2): Use SecureReadCredential for admin credentials
-	log.Debug("Reading admin AppRole credentials from disk (secure FD-based)",
-		zap.String("role_id_path", shared.AdminAppRolePaths.RoleID),
-		zap.String("secret_id_path", shared.AdminAppRolePaths.SecretID))
-
-	// Read role_id securely
-	roleIDRaw, err := SecureReadCredential(rc, shared.AdminAppRolePaths.RoleID, "admin_role_id")
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debug("Admin AppRole role_id file not found (admin AppRole not configured)",
-				zap.String("path", shared.AdminAppRolePaths.RoleID))
-			return "", "", cerr.Wrap(err, "admin AppRole not configured")
-		}
-		log.Error("Failed to securely read admin AppRole role_id from disk",
-			zap.String("path", shared.AdminAppRolePaths.RoleID),
-			zap.Error(err))
-		return "", "", cerr.Wrap(err, "securely read admin role_id from disk")
-	}
-	roleID := strings.TrimSpace(roleIDRaw)
-
-	// Validate role_id
-	if roleID == "" {
-		log.Error("Admin AppRole role_id file is empty",
-			zap.String("path", shared.AdminAppRolePaths.RoleID))
-		return "", "", cerr.New("admin role_id file is empty")
-	}
-
-	if len(roleID) < 36 { // UUIDs are at least 36 chars
-		log.Error("Admin AppRole role_id appears invalid (too short)",
-			zap.String("path", shared.AdminAppRolePaths.RoleID),
-			zap.Int("length", len(roleID)),
-			zap.Int("min_expected", 36))
-		return "", "", cerr.Newf("admin role_id appears invalid: length %d < 36", len(roleID))
-	}
-
-	log.Debug("Admin AppRole role_id read and validated successfully",
-		zap.Int("length", len(roleID)))
-
-	// Read secret_id securely
-	secretIDRaw, err := SecureReadCredential(rc, shared.AdminAppRolePaths.SecretID, "admin_secret_id")
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Debug("Admin AppRole secret_id file not found",
-				zap.String("path", shared.AdminAppRolePaths.SecretID))
-			return "", "", cerr.Wrap(err, "admin AppRole secret_id not found")
-		}
-		log.Error("Failed to securely read admin AppRole secret_id from disk",
-			zap.String("path", shared.AdminAppRolePaths.SecretID),
-			zap.Error(err))
-		return "", "", cerr.Wrap(err, "securely read admin secret_id from disk")
-	}
-	secretID := strings.TrimSpace(secretIDRaw)
-
-	// Validate secret_id
-	if secretID == "" {
-		log.Error("Admin AppRole secret_id file is empty",
-			zap.String("path", shared.AdminAppRolePaths.SecretID))
-		return "", "", cerr.New("admin secret_id file is empty")
-	}
-
-	if len(secretID) < 36 { // UUIDs are at least 36 chars
-		log.Error("Admin AppRole secret_id appears invalid (too short)",
-			zap.String("path", shared.AdminAppRolePaths.SecretID),
-			zap.Int("length", len(secretID)),
-			zap.Int("min_expected", 36))
-		return "", "", cerr.Newf("admin secret_id appears invalid: length %d < 36", len(secretID))
-	}
-
-	log.Debug("Admin AppRole secret_id read and validated successfully",
-		zap.Int("length", len(secretID)))
-
-	return roleID, secretID, nil
+	return readAppRoleCreds(rc, appRoleCredPaths{
+		RoleIDPath:   shared.AdminAppRolePaths.RoleID,
+		SecretIDPath: shared.AdminAppRolePaths.SecretID,
+		Label:        "admin AppRole",
+	}, nil) // nil client: admin creds are never wrapped tokens
 }
 
 // tryAdminAppRole attempts authentication using admin AppRole credentials
@@ -219,9 +149,9 @@ func EnsureAdminAppRole(rc *eos_io.RuntimeContext, client *api.Client) (string, 
 	// Admin AppRole has elevated privileges but is still policy-bound
 	adminRoleData := map[string]interface{}{
 		"policies":      []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName},
-		"token_ttl":     shared.VaultDefaultTokenTTL,    // 4h
-		"token_period":  shared.VaultDefaultTokenTTL,    // 4h - infinitely renewable
-		"secret_id_ttl": shared.VaultDefaultSecretIDTTL, // 24h
+		"token_ttl":     VaultDefaultTokenTTL,    // 4h
+		"token_period":  VaultDefaultTokenTTL,    // 4h - infinitely renewable
+		"secret_id_ttl": VaultDefaultSecretIDTTL, // 24h
 	}
 
 	// Write admin AppRole to Vault

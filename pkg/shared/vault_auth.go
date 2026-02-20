@@ -88,10 +88,10 @@ var AdminAppRolePaths = AppRolePathsStruct{
 // Admin policy is still bounded (not unlimited like root) and all operations are audited.
 var DefaultAppRoleData = map[string]interface{}{
 	"policies":     []string{EosDefaultPolicyName, EosAdminPolicyName}, // Default + Admin for operational commands
-	"token_ttl":    VaultDefaultTokenTTL,                               // 4h - Initial TTL after authentication
-	"token_period": VaultDefaultTokenTTL,                               // 4h - ENABLES INFINITE RENEWAL (resets TTL on each renewal)
+	"token_ttl":    "4h",                                               // NOTE: Duplicates vault.VaultDefaultTokenTTL to avoid circular import
+	"token_period": "4h",                                               // NOTE: Duplicates vault.VaultDefaultTokenTTL to avoid circular import
 	// token_max_ttl REMOVED - conflicts with token_period (would limit periodic tokens to max_ttl)
-	"secret_id_ttl": VaultDefaultSecretIDTTL, // 24h - SecretID expires (requires new authentication)
+	"secret_id_ttl": "24h", // NOTE: Duplicates vault.VaultDefaultSecretIDTTL to avoid circular import
 }
 
 //

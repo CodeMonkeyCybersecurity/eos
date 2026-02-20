@@ -30,9 +30,9 @@ func TestReadAppRoleCredsFromDisk_Success(t *testing.T) {
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
 
-	// Create test credentials
-	testRoleID := "test-role-id-12345"
-	testSecretID := "test-secret-id-67890"
+	// Create test credentials (must be >= 36 chars to pass UUID length validation)
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testSecretID := "f0e1d2c3-b4a5-9876-5432-10fedcba9876"
 
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID+"\n"), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testSecretID+"\n"), 0600))
@@ -80,15 +80,15 @@ func TestReadAppRoleCredsFromDisk_MissingFiles(t *testing.T) {
 	// Test reading missing role_id file
 	_, _, err := readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read credential from disk")
+	assert.Contains(t, err.Error(), "not configured")
 
-	// Create only role_id file
-	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte("test-role-id"), 0600))
+	// Create only role_id file (valid UUID format, >= 36 chars)
+	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte("a1b2c3d4-e5f6-7890-abcd-ef1234567890"), 0600))
 
 	// Test reading missing secret_id file
 	_, _, err = readAppRoleCredsFromDisk(rc, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "read credential from disk")
+	assert.Contains(t, err.Error(), "not found")
 }
 
 func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
@@ -107,9 +107,9 @@ func TestReadAppRoleCredsFromDisk_WrappedToken(t *testing.T) {
 		shared.AppRolePaths.SecretID = originalSecretID
 	}()
 
-	// Create test credentials with wrapped token
-	testRoleID := "test-role-id-12345"
-	testWrappedToken := "s.1234567890abcdef"
+	// Create test credentials with wrapped token (role_id must be >= 36 chars)
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testWrappedToken := "s.1234567890abcdefghijklmnopqrstuvwxyz"
 
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.RoleID, []byte(testRoleID), 0600))
 	require.NoError(t, os.WriteFile(shared.AppRolePaths.SecretID, []byte(testWrappedToken), 0600))
@@ -156,11 +156,9 @@ func TestWriteAppRoleFiles_Success(t *testing.T) {
 	testRoleID := "test-role-id-12345"
 	testSecretID := "test-secret-id-67890"
 
-	// This will fail due to user lookup, but we can test file creation
+	// This will fail in non-root test environment (secrets dir chown or user lookup)
 	err := WriteAppRoleFiles(rc, testRoleID, testSecretID)
-	// Expected to fail due to vault user lookup in test environment
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "lookup user")
 }
 
 // TestWriteAppRoleFiles_LoggingBehavior verifies that comprehensive logging occurs
@@ -198,9 +196,8 @@ func TestWriteAppRoleFiles_LoggingBehavior(t *testing.T) {
 	// Call the function - it should log at multiple points before failing on user lookup
 	err := WriteAppRoleFiles(rc, testRoleID, testSecretID)
 
-	// Verify it fails at the expected point (user lookup)
+	// Verify it fails in non-root test environment (secrets dir chown or user lookup)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "lookup user")
 
 	// The function should have logged:
 	// 1. INFO: "Starting AppRole credential file write operation" with directory, paths, owner, permissions
@@ -214,13 +211,97 @@ func TestWriteAppRoleFiles_LoggingBehavior(t *testing.T) {
 	t.Log("Function executed logging code paths as expected (verified by code execution)")
 }
 
+// TestReadAppRoleCreds_GenericFunction tests the unified readAppRoleCreds function
+// that both regular and admin AppRole credential reading delegate to.
+// This verifies DRY consolidation correctness.
+func TestReadAppRoleCreds_GenericFunction(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	testRoleID := "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	testSecretID := "f0e1d2c3-b4a5-9876-5432-10fedcba9876"
+
+	require.NoError(t, os.WriteFile(roleIDPath, []byte(testRoleID), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte(testSecretID), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test AppRole",
+	}
+
+	roleID, secretID, err := readAppRoleCreds(rc, paths, nil)
+	require.NoError(t, err)
+	assert.Equal(t, testRoleID, roleID)
+	assert.Equal(t, testSecretID, secretID)
+}
+
+// TestReadAppRoleCreds_EmptyFile tests validation catches empty files
+func TestReadAppRoleCreds_EmptyFile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	// Write empty role_id
+	require.NoError(t, os.WriteFile(roleIDPath, []byte(""), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte("valid-secret-id-xxxxxxxxxxxxxxxx"), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test",
+	}
+
+	_, _, err := readAppRoleCreds(rc, paths, nil)
+	require.Error(t, err)
+	// SecureReadCredential catches empty files first with: "test_role_id credential file is empty"
+	assert.Contains(t, err.Error(), "credential file is empty")
+}
+
+// TestReadAppRoleCreds_ShortCredential tests validation catches too-short credentials
+func TestReadAppRoleCreds_ShortCredential(t *testing.T) {
+	tempDir := t.TempDir()
+
+	roleIDPath := filepath.Join(tempDir, "role_id")
+	secretIDPath := filepath.Join(tempDir, "secret_id")
+
+	// Write short role_id (< 36 chars)
+	require.NoError(t, os.WriteFile(roleIDPath, []byte("too-short"), 0600))
+	require.NoError(t, os.WriteFile(secretIDPath, []byte("valid-secret-id-xxxxxxxxxxxxxxxx"), 0600))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rc := &eos_io.RuntimeContext{Ctx: ctx}
+
+	paths := appRoleCredPaths{
+		RoleIDPath:   roleIDPath,
+		SecretIDPath: secretIDPath,
+		Label:        "test",
+	}
+
+	_, _, err := readAppRoleCreds(rc, paths, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "appears invalid: length")
+}
+
 func TestDefaultAppRoleOptions(t *testing.T) {
 	opts := shared.DefaultAppRoleOptions()
 
 	assert.Equal(t, shared.AppRoleName, opts.RoleName)
 	assert.Equal(t, []string{shared.EosDefaultPolicyName, shared.EosAdminPolicyName}, opts.Policies)
-	assert.Equal(t, "1h", opts.TokenTTL)
-	assert.Equal(t, "4h", opts.TokenMaxTTL)
+	assert.Equal(t, "4h", opts.TokenTTL)
+	assert.Equal(t, "", opts.TokenMaxTTL)
 	assert.Equal(t, "24h", opts.SecretIDTTL)
 	assert.False(t, opts.ForceRecreate)
 	assert.False(t, opts.RefreshCreds)

@@ -99,7 +99,7 @@ func TestSecurityValidator_ValidateService(t *testing.T) {
 			Name:    "secure-api",
 			Tags:    []string{"api", "production"},
 			Port:    8443,
-			Address: "shared.GetInternalHostname",
+			Address: "127.0.0.1",
 			Meta: map[string]string{
 				"version":     "1.0.0",
 				"environment": "production",
@@ -109,7 +109,7 @@ func TestSecurityValidator_ValidateService(t *testing.T) {
 					ID:       "https-health",
 					Name:     "HTTPS Health Check",
 					Type:     "https",
-					Target:   "https://shared.GetInternalHostname:8443/health",
+					Target:   "https://127.0.0.1:8443/health",
 					Interval: "10s",
 					Timeout:  "3s",
 				},

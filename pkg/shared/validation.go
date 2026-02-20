@@ -59,17 +59,10 @@ func ValidateRequiredStringWithLength(fieldName, value string, minLen, maxLen in
 	return nil
 }
 
-// ValidateEmail validates an email address format
+// ValidateEmail validates an email address format.
+// Delegates to SecurityValidators for comprehensive validation including injection protection.
 func ValidateEmail(email string) error {
-	if email == "" {
-		return fmt.Errorf("email cannot be empty")
-	}
-
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
-	if !emailRegex.MatchString(email) {
-		return fmt.Errorf("invalid email format")
-	}
-	return nil
+	return DefaultValidators.ValidateEmail(email, "email")
 }
 
 // SanitizeURL normalizes user-provided URLs by handling common input issues
@@ -128,7 +121,7 @@ func ValidateURL(urlStr string) error {
 	hostname := parsedURL.Hostname()
 
 	// Check for localhost aliases
-	if hostname == "localhost" || hostname == "shared.GetInternalHostname" || hostname == "::1" || hostname == "0.0.0.0" {
+	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" || hostname == "0.0.0.0" {
 		return fmt.Errorf("URL hostname cannot be localhost (SSRF protection)")
 	}
 
@@ -190,23 +183,10 @@ func ValidateIPAddress(ip string) error {
 	return nil
 }
 
-// ValidateHostname validates a hostname format
+// ValidateHostname validates a hostname format.
+// Delegates to SecurityValidators for comprehensive label and length validation.
 func ValidateHostname(hostname string) error {
-	if hostname == "" {
-		return fmt.Errorf("hostname cannot be empty")
-	}
-
-	// Basic hostname validation
-	hostnameRegex := regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$`)
-	if !hostnameRegex.MatchString(hostname) {
-		return fmt.Errorf("invalid hostname format: %s", hostname)
-	}
-
-	if len(hostname) > 253 {
-		return fmt.Errorf("hostname too long (max 253 characters)")
-	}
-
-	return nil
+	return DefaultValidators.ValidateHostname(hostname, "hostname")
 }
 
 // ValidatePathExists validates that a file or directory path exists
@@ -274,45 +254,25 @@ func ValidateFileExtension(filename string, allowedExts []string) error {
 	return fmt.Errorf("file extension '%s' not allowed. Allowed extensions: %v", ext, allowedExts)
 }
 
-// ValidateUsername validates a username according to common standards
+// ValidateUsername validates a username according to common standards.
+// Delegates to SecurityValidators for comprehensive validation including reserved name checks.
 func ValidateUsername(username string) error {
-	if err := ValidateRequiredString("username", username); err != nil {
-		return err
-	}
-
-	// Username validation: alphanumeric, underscore, hyphen, 1-32 chars, start with letter or underscore
-	usernameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
-	if !usernameRegex.MatchString(username) {
-		return fmt.Errorf("username must start with a letter or underscore and contain only alphanumeric characters, underscores, and hyphens")
-	}
-
-	if len(username) > 32 {
-		return fmt.Errorf("username must be 32 characters or less")
-	}
-
-	return nil
+	return DefaultValidators.ValidateUsername(username, "username")
 }
 
-// ValidatePassword validates password strength
+// ValidatePassword validates password strength.
+// Delegates to SecurityValidators for comprehensive validation including
+// character diversity checks and common weak password detection.
+// The minLength parameter is used for validation (SecurityValidators uses 8 default).
 func ValidatePassword(password string, minLength int) error {
 	if password == "" {
 		return fmt.Errorf("password cannot be empty")
 	}
-
 	if len(password) < minLength {
 		return fmt.Errorf("password must be at least %d characters long", minLength)
 	}
-
-	// Check for at least one uppercase, one lowercase, one digit
-	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
-	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
-	hasDigit := regexp.MustCompile(`[0-9]`).MatchString(password)
-
-	if !hasUpper || !hasLower || !hasDigit {
-		return fmt.Errorf("password must contain at least one uppercase letter, one lowercase letter, and one digit")
-	}
-
-	return nil
+	// Delegate remaining validation (diversity, weak patterns) to SecurityValidators
+	return DefaultValidators.ValidatePassword(password, "password")
 }
 
 // Validator interface for objects that can validate themselves

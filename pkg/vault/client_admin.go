@@ -84,19 +84,10 @@ func GetAdminClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		}
 	}
 
-	// Create new Vault client
-	config := api.DefaultConfig()
-	if err := config.ReadEnvironment(); err != nil {
-		return nil, fmt.Errorf("reading vault environment config: %w", err)
-	}
-
-	if config.Address == "" {
-		config.Address = fmt.Sprintf("https://shared.GetInternalHostname:%d", shared.PortVault)
-	}
-
-	client, err := api.NewClient(config)
+	// Create new Vault client using shared factory
+	client, err := newBaseVaultClient(defaultVaultTLSAddr())
 	if err != nil {
-		return nil, fmt.Errorf("creating vault client: %w", err)
+		return nil, err
 	}
 
 	// Define admin authentication methods in priority order

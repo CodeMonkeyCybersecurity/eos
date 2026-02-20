@@ -80,7 +80,7 @@ func DefaultCertificateConfig() *CertificateConfig {
 		CertPath:     shared.TLSCrt,
 		KeyPath:      shared.TLSKey,
 		DNSNames:     []string{"localhost"},
-		IPAddresses:  []net.IP{net.ParseIP("shared.GetInternalHostname")},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 		Owner:        "vault",
 		Group:        "vault",
 	}

@@ -60,7 +60,7 @@ func TestAdvancedService_Creation(t *testing.T) {
 		Name:    "test-service",
 		Tags:    []string{"test", "api"},
 		Port:    8080,
-		Address: "shared.GetInternalHostname",
+		Address: "127.0.0.1",
 		Meta: map[string]string{
 			"version": "1.0.0",
 			"env":     "test",
@@ -70,7 +70,7 @@ func TestAdvancedService_Creation(t *testing.T) {
 				ID:                     "test-health-1",
 				Name:                   "HTTP Health Check",
 				Type:                   "http",
-				Target:                 "http://shared.GetInternalHostname:8080/health",
+				Target:                 "http://127.0.0.1:8080/health",
 				Interval:               "10s",
 				Timeout:                "3s",
 				SuccessBeforePassing:   2,
