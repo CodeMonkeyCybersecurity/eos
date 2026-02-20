@@ -297,6 +297,57 @@ func TestSaveConfig(t *testing.T) {
 			t.Errorf("SaveConfig should fail with validation error, got: %v", err)
 		}
 	})
+
+	t.Run("does not persist implicit hooks enabled default", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		savePath := filepath.Join(tmpDir, "backup.yaml")
+		origWritePath := configWritePath
+		origWriteDir := configWriteDir
+		origRead := configReadCandidates
+		t.Cleanup(func() {
+			configWritePath = origWritePath
+			configWriteDir = origWriteDir
+			configReadCandidates = origRead
+		})
+		configWritePath = savePath
+		configWriteDir = tmpDir
+		configReadCandidates = []string{savePath}
+
+		cfg := &Config{
+			DefaultRepository: "local",
+			Repositories: map[string]Repository{
+				"local": {
+					Name:    "local",
+					Backend: "local",
+					URL:     "/var/lib/eos/backups",
+				},
+			},
+			Profiles: map[string]Profile{
+				"test": {
+					Name:       "test",
+					Repository: "local",
+					Paths:      []string{"/tmp/test"},
+				},
+			},
+			Settings: Settings{
+				HooksPolicy: HooksPolicy{
+					Enabled: nil,
+				},
+			},
+		}
+
+		if err := SaveConfig(rc, cfg); err != nil {
+			t.Fatalf("SaveConfig() error = %v", err)
+		}
+
+		data, err := os.ReadFile(savePath)
+		if err != nil {
+			t.Fatalf("ReadFile() error = %v", err)
+		}
+		if strings.Contains(string(data), "enabled: true") {
+			t.Fatalf("unexpected persisted hooks default in config:\n%s", string(data))
+		}
+	})
 }
 
 func TestDefaultConfig(t *testing.T) {

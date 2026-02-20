@@ -1,10 +1,13 @@
 package testutil
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // =====================================
@@ -119,7 +122,7 @@ func SetupTestEnvironment(t *testing.T) func() {
 	// Set test environment variables
 	testVars := map[string]string{
 		"Eos_TEST_MODE":     "true",
-		"VAULT_ADDR":        "http://shared.GetInternalHostname:8200",
+		"VAULT_ADDR":        fmt.Sprintf("http://%s:8200", shared.GetInternalHostname()),
 		"VAULT_SKIP_VERIFY": "true",
 	}
 

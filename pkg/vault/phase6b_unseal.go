@@ -5,10 +5,8 @@ package vault
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
@@ -21,59 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// createUnauthenticatedVaultClient creates a Vault client without authentication
-// Used to check Vault status (init/seal) before authentication is available
-func createUnauthenticatedVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug(" Creating unauthenticated Vault client for status checks")
-
-	vaultAddr := os.Getenv("VAULT_ADDR")
-	if vaultAddr == "" {
-		vaultAddr = "https://shared.GetInternalHostname:8200"
-		logger.Debug(" VAULT_ADDR not set, using default",
-			zap.String("default_addr", vaultAddr))
-	} else {
-		logger.Debug(" Using VAULT_ADDR from environment",
-			zap.String("vault_addr", vaultAddr))
-	}
-
-	config := api.DefaultConfig()
-	config.Address = vaultAddr
-	logger.Debug(" Vault client config created",
-		zap.String("address", config.Address))
-
-	// Handle self-signed certificates (common for new Vault installations)
-	skipVerify := os.Getenv("VAULT_SKIP_VERIFY")
-	if skipVerify == "1" {
-		logger.Debug(" VAULT_SKIP_VERIFY enabled - configuring TLS to skip verification",
-			zap.String("reason", "self-signed certificates during initial setup"))
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: true, // #nosec G402 - intentional for self-signed certs
-		}
-		config.HttpClient.Transport = &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-		logger.Debug(" TLS skip verification configured successfully")
-	} else {
-		logger.Debug(" VAULT_SKIP_VERIFY not set - using standard TLS verification",
-			zap.String("skip_verify_value", skipVerify))
-	}
-
-	client, err := api.NewClient(config)
-	if err != nil {
-		logger.Error(" Failed to create unauthenticated Vault client",
-			zap.Error(err),
-			zap.String("vault_addr", vaultAddr),
-			zap.String("skip_verify", skipVerify))
-		return nil, fmt.Errorf("create vault API client: %w", err)
-	}
-
-	logger.Info(" Unauthenticated Vault client created successfully",
-		zap.String("vault_addr", config.Address),
-		zap.Bool("skip_verify", skipVerify == "1"))
-	return client, nil
-}
-
 func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Entering UnsealVault")
@@ -81,7 +26,7 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	// CRITICAL P0: Check init status BEFORE attempting authentication
 	// Unauthenticated client is sufficient to check Vault status
 	logger.Debug(" Step 1: Creating unauthenticated client to check Vault init status")
-	unauthClient, err := createUnauthenticatedVaultClient(rc)
+	unauthClient, err := GetUnauthenticatedVaultClient(rc)
 	if err != nil {
 		logger.Error(" Failed to create unauthenticated Vault client",
 			zap.Error(err),

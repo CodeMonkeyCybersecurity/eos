@@ -88,7 +88,7 @@ func TestSecureTokenFileOperations(t *testing.T) {
 		// Verify file has correct permissions
 		info, err := os.Stat(tokenFile)
 		testutil.AssertNoError(t, err)
-		testutil.AssertEqual(t, SecureFilePermissions, info.Mode().Perm())
+		testutil.AssertEqual(t, VaultTokenFilePerm, info.Mode().Perm())
 
 		// Read token securely
 		readToken, err := SecureReadTokenFile(rc, tokenFile)

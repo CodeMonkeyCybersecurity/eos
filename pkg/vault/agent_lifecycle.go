@@ -32,7 +32,7 @@ type VaultAgentConfig struct {
 func DefaultVaultAgentConfig() *VaultAgentConfig {
 	return &VaultAgentConfig{
 		EnableCache:     true,
-		ListenerAddress: "shared.GetInternalHostname:8100",
+		ListenerAddress: fmt.Sprintf("%s:8100", shared.GetInternalHostname()),
 		EnableAutoAuth:  true,
 		CacheTemplates:  true,
 		LogLevel:        "info",

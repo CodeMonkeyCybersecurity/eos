@@ -11,6 +11,7 @@ on:
 
 env:
   GO_VERSION: "1.25.x"
+  RESTIC_PASSWORD_SKIP_WIZARD: "1"
 
 jobs:
   ci-unit:
