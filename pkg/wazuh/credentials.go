@@ -91,7 +91,7 @@ func RerunPasswordTool(adminUser, newPass string) error {
 
 func FindUserID(jwtToken, username string) (string, error) {
 	cmd := exec.Command("curl", "-k", "-X", "GET",
-		"https://shared.GetInternalHostname:55000/security/users?pretty=true",
+		fmt.Sprintf("https://%s:%d/security/users?pretty=true", shared.GetInternalHostname(), shared.PortWazuh55000),
 		"-H", "Authorization: Bearer "+jwtToken)
 
 	out, err := cmd.Output()
