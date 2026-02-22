@@ -123,12 +123,14 @@ jobs:
           done
           exit $FAIL
 
-      - name: Upload coverage
+      - name: Save coverage report
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage.out
+        shell: bash
+        run: |
+          if [ -f coverage.out ]; then
+            echo "Coverage report saved at coverage.out"
+            go tool cover -func=coverage.out | tail -5
+          fi
 
   ci-fuzz:
     name: ci-fuzz

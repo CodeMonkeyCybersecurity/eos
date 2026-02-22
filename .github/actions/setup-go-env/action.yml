@@ -19,6 +19,22 @@ description: "Set up Go toolchain and install CGO library dependencies"
 runs:
   using: "composite"
   steps:
+    - name: Ensure /dev/null exists
+      shell: bash
+      run: |
+        # Some act_runner DinD environments don't mount /dev/null properly.
+        # Go toolchain (compile, cover, vet, cgo) requires /dev/null.
+        if [ ! -e /dev/null ]; then
+          echo "::warning::/dev/null missing - creating it"
+          sudo mknod -m 666 /dev/null c 1 3
+        fi
+        # Verify it works
+        echo "test" > /dev/null 2>&1 || {
+          echo "::warning::/dev/null not writable - recreating"
+          sudo rm -f /dev/null
+          sudo mknod -m 666 /dev/null c 1 3
+        }
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
