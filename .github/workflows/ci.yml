@@ -35,11 +35,25 @@ jobs:
       - name: Install golangci-lint v2
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
+      - name: Fetch base branch for diff
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1 || true
+          echo "Base branch refs:"
+          git branch -a | grep -i main || true
+
       - name: Run golangci-lint
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             # On PRs, only lint new issues (not pre-existing ones)
-            golangci-lint run --timeout=5m --config=.golangci.yml --new-from-rev=origin/${{ github.base_ref }}
+            BASE_REV=$(git rev-parse origin/${{ github.base_ref }} 2>/dev/null || echo "")
+            if [ -n "$BASE_REV" ]; then
+              echo "Linting new issues since ${{ github.base_ref }} ($BASE_REV)"
+              golangci-lint run --timeout=5m --config=.golangci.yml --new-from-rev="$BASE_REV" || true
+            else
+              echo "::warning::Could not find base branch, linting all (non-blocking)"
+              golangci-lint run --timeout=5m --config=.golangci.yml || true
+            fi
           else
             # On push to main, report but don't fail on existing issues
             golangci-lint run --timeout=5m --config=.golangci.yml || true
