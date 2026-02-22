@@ -1,0 +1,48 @@
+version: 3
+policy:
+  description: "Executable CI policy for lane gating and test-pyramid weighting"
+  weights:
+    unit: 70
+    integration: 20
+    e2e: 10
+  required_lanes:
+    - unit
+    - integration
+    - e2e-smoke
+  defaults:
+    required_on_pr: true
+
+suites:
+  - name: unit
+    weight: 70
+    owner: "platform-core"
+    gate:
+      required_on_pr: true
+      coverage_threshold: 70
+
+  - name: integration
+    weight: 20
+    owner: "platform-integration"
+    gate:
+      required_on_pr: true
+
+  - name: e2e-smoke
+    weight: 10
+    owner: "platform-e2e"
+    gate:
+      required_on_pr: true
+
+  - name: e2e-full
+    weight: 0
+    owner: "platform-e2e"
+    gate:
+      required_on_pr: false
+      scheduled_or_manual_only: true
+
+  - name: fuzz
+    weight: 0
+    owner: "platform-security"
+    gate:
+      required_on_pr: false
+      informational_on_pr: true
+      required_on_schedule: true

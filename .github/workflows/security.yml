@@ -1,3 +1,6 @@
+# security.yml - Consolidated security scanning
+# Last Updated: 2026-02-22
+
 name: Security Validation
 
 on:
@@ -6,95 +9,103 @@ on:
   push:
     branches: [main]
   schedule:
-    # Run weekly security scan (Sundays at 2 AM UTC)
-    - cron: '0 2 * * 0'
+    - cron: "0 2 * * 0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-
+    timeout-minutes: 35
+    permissions:
+      contents: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.3'
-          cache: true
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
       - name: Install security tools
         run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          echo "✓ Security tools installed"
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
-      - name: Run gosec
-        run: |
-          echo "🔍 Running gosec security scanner..."
-          gosec -fmt=sarif -out=gosec-results.sarif -severity=medium -confidence=medium ./...
+      - name: Run gosec (emit JSON for allowlist gate)
         continue-on-error: true
+        run: |
+          mkdir -p outputs/ci/security-audit
+          GOSEC_BIN="$(go env GOPATH)/bin/gosec"
+          "${GOSEC_BIN}" -fmt=json -severity=medium -confidence=medium ./... > outputs/ci/security-audit/gosec.json
 
       - name: Run govulncheck
-        run: |
-          echo "🔍 Scanning for known vulnerabilities..."
-          govulncheck ./...
+        run: govulncheck ./...
 
-      - name: Custom Security Checks
-        run: |
-          echo "🔍 Running custom security checks..."
-          ERRORS=0
+      - name: Run custom security checks
+        env:
+          CI_SECURITY_DIR: outputs/ci/security-audit
+          CI_SECURITY_ALLOWLIST_FILE: test/ci/security-allowlist.yaml
+        run: scripts/ci/security-checks.sh
 
-          echo "  ├─ Checking VAULT_SKIP_VERIFY..."
-          if grep -r "VAULT_SKIP_VERIFY.*1" --include="*.go" --exclude-dir=vendor . | grep -v "handleTLSValidationFailure\|Eos_ALLOW_INSECURE_VAULT\|# P0-2"; then
-            echo "  │  ❌ VAULT_SKIP_VERIFY found"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  │  ✓ PASS"
-          fi
-
-          echo "  ├─ Checking InsecureSkipVerify..."
-          if grep -r "InsecureSkipVerify.*true" --include="*.go" --exclude="*_test.go" --exclude-dir=vendor . | grep -v "TestConfig"; then
-            echo "  │  ❌ InsecureSkipVerify found"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  │  ✓ PASS"
-          fi
-
-          echo "  ├─ Checking VAULT_TOKEN env var..."
-          if grep -r 'fmt\.Sprintf.*VAULT_TOKEN.*%s' --include="*.go" --exclude-dir=vendor . | grep -v "VAULT_TOKEN_FILE\|# P0-1"; then
-            echo "  │  ❌ VAULT_TOKEN env var found"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  │  ✓ PASS"
-          fi
-
-          echo "  └─ Custom checks complete"
-
-          if [ $ERRORS -gt 0 ]; then
-            echo "❌ Security validation FAILED"
-            exit 1
-          fi
-          echo "✓ All checks passed"
-
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Summarize security lane
         if: always()
-        with:
-          sarif_file: gosec-results.sarif
+        env:
+          CI_LANE: security-audit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/security-audit
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/security-audit/report.json
+          CI_SUMMARY_FILE: outputs/ci/security-audit/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle security artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/security-audit-artifacts.tgz -C outputs/ci security-audit || true
+          ls -lh outputs/ci/security-audit-artifacts.tgz || true
+
+      - name: Print security report
+        if: always()
+        run: |
+          test -f outputs/ci/security-audit/report.json && cat outputs/ci/security-audit/report.json || true
+          test -f outputs/ci/security-audit/gosec.json && head -200 outputs/ci/security-audit/gosec.json || true
 
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
-      - uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
+
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION="8.24.3"
+          GITLEAKS_SHA256="9991e0b2903da4c8f6122b5c3186448b927a5da4deef1fe45271c3793f4ee29c"
+          ARCHIVE="/tmp/gitleaks.tar.gz"
+          curl -sSfL -o "${ARCHIVE}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          sudo tar -xzf "${ARCHIVE}" -C /usr/local/bin gitleaks
+          rm -f "${ARCHIVE}"
+
+      - name: Run gitleaks (PR diff only)
+        if: github.event_name == 'pull_request'
+        run: gitleaks detect --source=. --redact --log-opts="origin/${{ github.base_ref }}..HEAD"
+
+      - name: Run gitleaks (full scan on push/schedule)
+        if: github.event_name != 'pull_request'
+        run: gitleaks detect --source=. --redact --no-git

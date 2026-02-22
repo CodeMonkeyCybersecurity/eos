@@ -1,0 +1,79 @@
+version: 1
+entries:
+  - rule_id: "G402"
+    file_regex: "^pkg/httpclient/tls_helper\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Temporary TLS migration debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/httpclient/migration\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Temporary TLS migration debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/httpclient/config\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Temporary TLS migration debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/vault/cert_renewal\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Vault cert renewal transition debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/vault/phase8_health_check\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Vault health-check transition debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/vault/phase2_env_setup\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Vault bootstrap transition debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/ldap/handler\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "LDAP TLS compatibility debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/wazuh/http_tls\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Wazuh TLS compatibility debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/wazuh/agents/agent\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Wazuh agent TLS compatibility debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/hecate/debug_bionicgpt\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Debug path TLS compatibility debt tracked in issue #24"
+  - rule_id: "G402"
+    file_regex: "^pkg/hecate/add/wazuh\\.go$"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Wazuh bootstrap TLS compatibility debt tracked in issue #24"
