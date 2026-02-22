@@ -50,18 +50,19 @@ jobs:
       - name: Check composite action references
         run: |
           # Verify that referenced composite actions exist
-          ERRORS=0
+          rm -f /tmp/validate-action-fail
           for file in .github/workflows/*.yml; do
-            grep -o 'uses: \.\/\.github\/actions\/[^/]*' "$file" 2>/dev/null \
-              | sed 's|uses: \./\.github/actions/||' \
-              | sort -u \
-              | while read -r action; do
-                if [ -n "$action" ] && [ ! -f ".github/actions/$action/action.yml" ]; then
-                  echo "::error file=$file::References nonexistent action: .github/actions/$action"
-                  # Write to a temp file since we're in a subshell
-                  echo "FAIL" > /tmp/validate-action-fail
-                fi
-              done
+            # grep returns exit 1 on no-match; || true prevents pipefail
+            ACTIONS=$(grep -o 'uses: \.\/\.github\/actions\/[^/]*' "$file" 2>/dev/null || true)
+            if [ -z "$ACTIONS" ]; then
+              continue
+            fi
+            echo "$ACTIONS" | sed 's|uses: \./\.github/actions/||' | sort -u | while read -r action; do
+              if [ -n "$action" ] && [ ! -f ".github/actions/$action/action.yml" ]; then
+                echo "::error file=$file::References nonexistent action: .github/actions/$action"
+                echo "FAIL" > /tmp/validate-action-fail
+              fi
+            done
           done
           if [ -f /tmp/validate-action-fail ]; then
             rm -f /tmp/validate-action-fail

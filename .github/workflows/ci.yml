@@ -141,38 +141,82 @@ jobs:
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Cleanup stale containers
-        run: docker rm -f vault-ci postgres-ci 2>/dev/null || true
+      - name: Cleanup stale containers and networks
+        run: |
+          docker rm -f vault-ci postgres-ci 2>/dev/null || true
+          docker network rm eos-ci-net 2>/dev/null || true
+
+      - name: Detect container networking
+        id: netinfo
+        run: |
+          # Detect how the job container can reach sibling containers.
+          # In act_runner (DinD), job runs inside a container with Docker
+          # socket mounted. Sibling containers are on the default bridge.
+          # We try container IP first (works when job is on same bridge),
+          # then fall back to gateway IP (172.17.0.1).
+          echo "Docker info:"
+          docker info --format '{{.Name}}' 2>/dev/null || true
 
       - name: Start Vault container
         run: |
           docker run -d --name vault-ci \
+            -p 18200:8200 \
             -e VAULT_DEV_ROOT_TOKEN_ID=test-token \
             -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-            -p 18200:8200 \
             --cap-add=IPC_LOCK \
             hashicorp/vault:1.16
 
       - name: Start PostgreSQL container
         run: |
           docker run -d --name postgres-ci \
+            -p 15432:5432 \
             -e POSTGRES_PASSWORD=testpass \
             -e POSTGRES_DB=testdb \
-            -p 15432:5432 \
             postgres:15
 
-      - name: Wait for services
+      - name: Wait for services and detect reachable addresses
+        id: svc-ips
         run: |
-          echo "Waiting for Vault..."
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:18200/v1/sys/health >/dev/null; then
-              echo "Vault is ready"
+          # Get container IPs on the default bridge network
+          VAULT_CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vault-ci)
+          PG_CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-ci)
+          # Gateway IP (Docker daemon host from inside containers)
+          GW_IP=$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
+          echo "Container IPs: vault=$VAULT_CIP postgres=$PG_CIP gateway=$GW_IP"
+
+          # Try to reach Vault - first via container IP, then gateway, then localhost
+          VAULT_ADDR=""
+          for addr in "$VAULT_CIP:8200" "$GW_IP:18200" "127.0.0.1:18200" "localhost:18200"; do
+            echo "Trying Vault at http://$addr ..."
+            if curl -sf --connect-timeout 3 "http://$addr/v1/sys/health" >/dev/null 2>&1; then
+              VAULT_ADDR="http://$addr"
+              echo "Vault reachable at $VAULT_ADDR"
               break
             fi
-            sleep 2
           done
-          curl -sf http://127.0.0.1:18200/v1/sys/health >/dev/null || { echo "::error::Vault failed to start"; exit 1; }
 
+          # Wait for Vault with retry
+          if [ -z "$VAULT_ADDR" ]; then
+            echo "Vault not immediately reachable, waiting..."
+            for i in $(seq 1 30); do
+              for addr in "$VAULT_CIP:8200" "$GW_IP:18200" "127.0.0.1:18200"; do
+                if curl -sf --connect-timeout 3 "http://$addr/v1/sys/health" >/dev/null 2>&1; then
+                  VAULT_ADDR="http://$addr"
+                  echo "Vault ready at $VAULT_ADDR (attempt $i)"
+                  break 2
+                fi
+              done
+              sleep 2
+            done
+          fi
+
+          if [ -z "$VAULT_ADDR" ]; then
+            echo "::error::Vault failed to become reachable"
+            docker logs vault-ci
+            exit 1
+          fi
+
+          # Wait for PostgreSQL
           echo "Waiting for PostgreSQL..."
           for i in $(seq 1 30); do
             if docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1; then
@@ -181,14 +225,36 @@ jobs:
             fi
             sleep 2
           done
-          docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1 || { echo "::error::PostgreSQL failed to start"; exit 1; }
+          docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1 || { echo "::error::PostgreSQL failed to start"; docker logs postgres-ci; exit 1; }
+
+          # Determine PostgreSQL address reachable from this job container
+          # Use the same address family that worked for Vault
+          PG_ADDR=""
+          # Extract the IP that worked for Vault to infer which network path works
+          VAULT_HOST=$(echo "$VAULT_ADDR" | sed 's|http://||' | cut -d: -f1)
+          if [ "$VAULT_HOST" = "$VAULT_CIP" ]; then
+            # Container IPs work - use PostgreSQL container IP directly
+            PG_ADDR="$PG_CIP:5432"
+          elif [ "$VAULT_HOST" = "$GW_IP" ]; then
+            # Gateway works - use mapped port via gateway
+            PG_ADDR="$GW_IP:15432"
+          else
+            # Localhost/other - use mapped port via localhost
+            PG_ADDR="127.0.0.1:15432"
+          fi
+          echo "PostgreSQL address: $PG_ADDR (same network path as Vault)"
+
+          echo "vault_addr=$VAULT_ADDR" >> "$GITHUB_OUTPUT"
+          echo "pg_addr=$PG_ADDR" >> "$GITHUB_OUTPUT"
 
       - name: Run integration tests
         env:
-          VAULT_ADDR: http://127.0.0.1:18200
+          VAULT_ADDR: ${{ steps.svc-ips.outputs.vault_addr }}
           VAULT_TOKEN: test-token
-          POSTGRES_URL: postgres://postgres:testpass@localhost:15432/testdb?sslmode=disable
+          POSTGRES_URL: postgres://postgres:testpass@${{ steps.svc-ips.outputs.pg_addr }}/testdb?sslmode=disable
         run: |
+          echo "VAULT_ADDR=$VAULT_ADDR"
+          echo "POSTGRES_URL=$POSTGRES_URL"
           go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
           go test -v -timeout=15m -run Integration ./pkg/backup/...
           go test -v -timeout=15m -tags=integration ./pkg/vault/...

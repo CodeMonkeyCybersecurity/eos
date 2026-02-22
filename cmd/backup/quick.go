@@ -122,14 +122,13 @@ Restore:
 			if errors.Is(err, backup.ErrResticNotInstalled) {
 				logger.Info("terminal prompt:", zap.String("output",
 					"Restic is not installed. Install restic (e.g., sudo apt-get install restic) and rerun eos backup ."))
-				userErr := eos_err.DependencyError("restic", "run quick backup", err)
-				return eos_err.NewExpectedError(rc.Ctx, userErr)
+				return eos_err.DependencyError("restic", "run quick backup", err)
 			}
 
 			if errors.Is(err, backup.ErrRepositoryNotInitialized) {
 				logger.Info("terminal prompt:", zap.String("output",
 					"Restic repository is not initialized. Initialize it (e.g., eos backup create repository local --path /var/lib/eos/backups) and rerun the command."))
-				return eos_err.NewExpectedError(rc.Ctx, err)
+				return fmt.Errorf("restic repository not initialized: %w", err)
 			}
 
 			logger.Error("Backup failed", zap.Error(err), zap.String("output", string(output)))
