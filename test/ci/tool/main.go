@@ -56,6 +56,7 @@ type gateConfig struct {
 }
 
 type goTestEvent struct {
+	Time    string  `json:"Time"`
 	Action  string  `json:"Action"`
 	Package string  `json:"Package"`
 	Test    string  `json:"Test"`
@@ -63,16 +64,24 @@ type goTestEvent struct {
 }
 
 type report struct {
-	Lane         string             `json:"lane"`
-	Status       string             `json:"status"`
-	Pass         int                `json:"pass"`
-	Fail         int                `json:"fail"`
-	Skip         int                `json:"skip"`
-	Coverage     string             `json:"coverage"`
-	FlakeCount   int                `json:"flake_count"`
-	Packages     map[string]float64 `json:"packages"`
-	TopFailures  []string           `json:"top_failures"`
-	GeneratedUTC string             `json:"generated_utc"`
+	Lane                  string             `json:"lane"`
+	Status                string             `json:"status"`
+	Pass                  int                `json:"pass"`
+	Fail                  int                `json:"fail"`
+	Skip                  int                `json:"skip"`
+	Coverage              string             `json:"coverage"`
+	FlakeCount            int                `json:"flake_count"`
+	Packages              map[string]float64 `json:"packages"`
+	TopFailures           []string           `json:"top_failures"`
+	FailedPackagesTopN    []string           `json:"failed_packages_top_n"`
+	LaneDurationSeconds   float64            `json:"lane_duration_seconds"`
+	DependencyChange      bool               `json:"dependency_change_detected"`
+	ChangedFilesCount     int                `json:"changed_files_count"`
+	PolicyWeights         map[string]int     `json:"policy_weights,omitempty"`
+	RequiredLaneStatus    map[string]string  `json:"required_lane_status,omitempty"`
+	RequiredLanes         []string           `json:"required_lanes,omitempty"`
+	TestPyramidCompliance string             `json:"test_pyramid_compliance,omitempty"`
+	GeneratedUTC          string             `json:"generated_utc"`
 }
 
 type gosecResult struct {
@@ -254,8 +263,10 @@ func cmdSummary(args []string) {
 
 	jsonlFiles, _ := filepath.Glob(filepath.Join(logDir, "*.jsonl"))
 	failureSet := map[string]struct{}{}
+	failedPackages := map[string]int{}
+	window := &timeWindow{}
 	for _, file := range jsonlFiles {
-		_ = parseJSONL(file, &r, failureSet)
+		_ = parseJSONL(file, &r, failureSet, failedPackages, window)
 	}
 	for f := range failureSet {
 		r.TopFailures = append(r.TopFailures, f)
@@ -264,7 +275,27 @@ func cmdSummary(args []string) {
 	if len(r.TopFailures) > 10 {
 		r.TopFailures = r.TopFailures[:10]
 	}
+	r.FailedPackagesTopN = topFailedPackages(failedPackages, 5)
 	r.FlakeCount = countFlakes(logDir)
+	r.LaneDurationSeconds = window.DurationSeconds()
+
+	changedFilesPath := filepath.Join(logDir, "changed-files.txt")
+	changedFiles := readChangedFiles(changedFilesPath)
+	r.ChangedFilesCount = len(changedFiles)
+	r.DependencyChange = hasDependencyFileChange(changedFiles)
+
+	if cfg := loadSuitesForSummary(); cfg != nil {
+		r.PolicyWeights = map[string]int{
+			"unit":        cfg.Policy.Weights.Unit,
+			"integration": cfg.Policy.Weights.Integration,
+			"e2e":         cfg.Policy.Weights.E2E,
+		}
+		r.RequiredLanes = append([]string(nil), cfg.Policy.RequiredLanes...)
+		r.RequiredLaneStatus = collectRequiredLaneStatus(*cfg, r.Lane, r.Status, logDir)
+		r.TestPyramidCompliance = fmt.Sprintf("unit %d / integration %d / e2e %d",
+			cfg.Policy.Weights.Unit, cfg.Policy.Weights.Integration, cfg.Policy.Weights.E2E)
+	}
+
 	if coverageFile != "-" {
 		if cov, err := parseCoverage(coverageFile); err == nil {
 			r.Coverage = cov
@@ -389,7 +420,31 @@ func matchesPattern(path, pattern string) bool {
 	return path == pattern
 }
 
-func parseJSONL(path string, out *report, failureSet map[string]struct{}) error {
+type timeWindow struct {
+	Start time.Time
+	End   time.Time
+}
+
+func (w *timeWindow) Add(ts time.Time) {
+	if ts.IsZero() {
+		return
+	}
+	if w.Start.IsZero() || ts.Before(w.Start) {
+		w.Start = ts
+	}
+	if w.End.IsZero() || ts.After(w.End) {
+		w.End = ts
+	}
+}
+
+func (w *timeWindow) DurationSeconds() float64 {
+	if w.Start.IsZero() || w.End.IsZero() || w.End.Before(w.Start) {
+		return 0
+	}
+	return w.End.Sub(w.Start).Seconds()
+}
+
+func parseJSONL(path string, out *report, failureSet map[string]struct{}, failedPackages map[string]int, window *timeWindow) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -405,11 +460,19 @@ func parseJSONL(path string, out *report, failureSet map[string]struct{}) error 
 		if err := json.Unmarshal([]byte(line), &e); err != nil {
 			continue
 		}
+		if e.Time != "" {
+			if ts, err := time.Parse(time.RFC3339Nano, e.Time); err == nil {
+				window.Add(ts)
+			}
+		}
 		switch e.Action {
 		case "pass":
 			out.Pass++
 		case "fail":
 			out.Fail++
+			if e.Package != "" {
+				failedPackages[e.Package]++
+			}
 			name := strings.TrimSpace(e.Package)
 			if e.Test != "" {
 				name = fmt.Sprintf("%s::%s", e.Package, e.Test)
@@ -506,7 +569,28 @@ func renderSummaryMarkdown(r report) string {
 	fmt.Fprintf(b, "- Status: %s\n", r.Status)
 	fmt.Fprintf(b, "- Test events: pass=%d, fail=%d, skip=%d\n", r.Pass, r.Fail, r.Skip)
 	fmt.Fprintf(b, "- Coverage: %s\n", r.Coverage)
+	fmt.Fprintf(b, "- Lane duration (seconds): %.2f\n", r.LaneDurationSeconds)
+	fmt.Fprintf(b, "- Dependency change detected: %t\n", r.DependencyChange)
+	fmt.Fprintf(b, "- Changed files counted: %d\n", r.ChangedFilesCount)
 	fmt.Fprintf(b, "- Flake signatures: %d\n", r.FlakeCount)
+	if len(r.FailedPackagesTopN) > 0 {
+		fmt.Fprintf(b, "- Failed packages (top): %s\n", strings.Join(r.FailedPackagesTopN, ", "))
+	}
+	if len(r.PolicyWeights) > 0 {
+		fmt.Fprintf(b, "- Test Pyramid Compliance: unit %d / integration %d / e2e %d\n",
+			r.PolicyWeights["unit"], r.PolicyWeights["integration"], r.PolicyWeights["e2e"])
+	}
+	if len(r.RequiredLaneStatus) > 0 {
+		fmt.Fprintf(b, "- Required lane status:\n")
+		lanes := make([]string, 0, len(r.RequiredLaneStatus))
+		for lane := range r.RequiredLaneStatus {
+			lanes = append(lanes, lane)
+		}
+		sort.Strings(lanes)
+		for _, lane := range lanes {
+			fmt.Fprintf(b, "  - `%s`: %s\n", lane, r.RequiredLaneStatus[lane])
+		}
+	}
 	if len(r.TopFailures) > 0 {
 		fmt.Fprintf(b, "- Top failures:\n")
 		for _, f := range r.TopFailures {
@@ -524,6 +608,99 @@ func parseDefault(v string) string {
 		return "true"
 	}
 	return "false"
+}
+
+func topFailedPackages(counts map[string]int, limit int) []string {
+	type item struct {
+		name  string
+		count int
+	}
+
+	items := make([]item, 0, len(counts))
+	for name, count := range counts {
+		items = append(items, item{name: name, count: count})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].count == items[j].count {
+			return items[i].name < items[j].name
+		}
+		return items[i].count > items[j].count
+	})
+
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		out = append(out, fmt.Sprintf("%s (%d fails)", it.name, it.count))
+	}
+	return out
+}
+
+func hasDependencyFileChange(files []string) bool {
+	for _, file := range files {
+		base := filepath.Base(file)
+		if base == "go.mod" || base == "go.sum" {
+			return true
+		}
+	}
+	return false
+}
+
+func loadSuitesForSummary() *suitesConfig {
+	candidates := []string{
+		os.Getenv("CI_SUITE_FILE"),
+		"test/ci/suites.yaml",
+	}
+	for _, path := range candidates {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var cfg suitesConfig
+		if err := yaml.Unmarshal(b, &cfg); err != nil {
+			continue
+		}
+		return &cfg
+	}
+	return nil
+}
+
+func collectRequiredLaneStatus(cfg suitesConfig, currentLane, currentStatus, logDir string) map[string]string {
+	status := map[string]string{}
+	outputsDir := filepath.Dir(logDir)
+
+	for _, lane := range cfg.Policy.RequiredLanes {
+		laneStatus := "unknown"
+		if lane == currentLane {
+			laneStatus = currentStatus
+		}
+
+		reportPath := filepath.Join(outputsDir, lane, "report.json")
+		if b, err := os.ReadFile(reportPath); err == nil {
+			var laneReport report
+			if err := json.Unmarshal(b, &laneReport); err == nil && laneReport.Status != "" {
+				laneStatus = laneReport.Status
+			}
+		}
+
+		statusPath := filepath.Join(outputsDir, lane, lane+".status")
+		if b, err := os.ReadFile(statusPath); err == nil {
+			trimmed := strings.TrimSpace(string(b))
+			if strings.HasPrefix(trimmed, "skipped:") {
+				laneStatus = trimmed
+			}
+		}
+
+		status[lane] = laneStatus
+	}
+
+	return status
 }
 
 func oneLine(s string) string {
