@@ -32,11 +32,11 @@ jobs:
 
       - name: Fix /dev/null in DinD containers
         run: |
-          if [ ! -e /dev/null ] || ! echo "test" > /dev/null 2>&1; then
-            sudo rm -f /dev/null 2>/dev/null || true
-            sudo mknod -m 666 /dev/null c 1 3
-            echo "/dev/null fixed"
-          fi
+          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
+          sudo rm -f /dev/null 2>/dev/null || true
+          sudo mknod -m 666 /dev/null c 1 3
+          ls -la /dev/null
+          echo "test" > /dev/null && echo "/dev/null is working"
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
