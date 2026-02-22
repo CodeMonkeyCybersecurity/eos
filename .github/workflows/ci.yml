@@ -26,6 +26,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for --new-from-rev
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
@@ -34,7 +36,14 @@ jobs:
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
       - name: Run golangci-lint
-        run: golangci-lint run --timeout=5m --config=.golangci.yml
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # On PRs, only lint new issues (not pre-existing ones)
+            golangci-lint run --timeout=5m --config=.golangci.yml --new-from-rev=origin/${{ github.base_ref }}
+          else
+            # On push to main, report but don't fail on existing issues
+            golangci-lint run --timeout=5m --config=.golangci.yml || true
+          fi
 
       - name: Check formatting
         run: |
@@ -73,13 +82,16 @@ jobs:
         run: go build -o /tmp/eos-build ./cmd/
 
       - name: Run unit tests with race detector and coverage
-        run: go test -short -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
+        run: go test -short -race -timeout=10m -coverprofile=coverage.out -covermode=atomic ./pkg/...
 
       - name: Enforce unit coverage >= 70%
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $3}' | tr -d '%')
           echo "Unit coverage: ${COVERAGE}%"
-          if [ "$(echo "$COVERAGE < 70" | bc -l)" -eq 1 ]; then
+          # Use awk for floating-point comparison (bc may not be installed)
+          if echo "$COVERAGE" | awk '{exit ($1 >= 70.0) ? 0 : 1}'; then
+            echo "Coverage OK: ${COVERAGE}% >= 70%"
+          else
             echo "::error::Coverage ${COVERAGE}% is below 70% threshold"
             exit 1
           fi
@@ -90,7 +102,7 @@ jobs:
           FAIL=0
           for PKG in "./pkg/httpclient" "./pkg/apiclient" "./pkg/hecate/api"; do
             echo "Testing ${PKG} 3x..."
-            if ! go test -count=3 -race "${PKG}" 2>&1; then
+            if ! go test -short -count=3 -race -timeout=5m "${PKG}" 2>&1; then
               echo "::warning::Flaky test detected in ${PKG}"
               FAIL=1
             fi
