@@ -1,45 +1,61 @@
+# validate.yml - Workflow YAML validation
+# Last Updated: 2026-02-20
+
 name: Validate Workflows
+
 on:
   pull_request:
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 5
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Validate YAML syntax
         run: |
-          echo "Validating workflow YAML files..."
-          # Install yq for YAML validation
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          
+          # python3 + pyyaml are pre-installed on ubuntu runners
           for file in .github/workflows/*.yml; do
             echo "Checking $file"
-            yq eval '.' "$file" > /dev/null || exit 1
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
           done
           echo "All workflow files are valid YAML"
 
       - name: Check workflow structure
         run: |
-          echo "Checking basic workflow structure..."
           for file in .github/workflows/*.yml; do
             if ! grep -q "^name:" "$file"; then
-              echo "Error: $file missing 'name' field"
+              echo "::error file=$file::Missing 'name' field"
               exit 1
             fi
             if ! grep -q "^on:" "$file"; then
-              echo "Error: $file missing 'on' field"
+              echo "::error file=$file::Missing 'on' field"
               exit 1
             fi
             if ! grep -q "^jobs:" "$file"; then
-              echo "Error: $file missing 'jobs' field"
+              echo "::error file=$file::Missing 'jobs' field"
               exit 1
             fi
           done
           echo "All workflow files have required structure"
+
+      - name: Check composite action references
+        run: |
+          # Verify that referenced composite actions exist
+          for file in .github/workflows/*.yml; do
+            grep -oP 'uses: \./\.github/actions/\K[^/]+' "$file" 2>/dev/null | sort -u | while read -r action; do
+              if [ ! -f ".github/actions/$action/action.yml" ]; then
+                echo "::error file=$file::References nonexistent action: .github/actions/$action"
+                exit 1
+              fi
+            done
+          done
+          echo "All composite action references are valid"
