@@ -99,6 +99,7 @@ run_integration() {
   }
   trap cleanup EXIT
 
+  # Remove any leftover containers from a previous aborted run with the same run_id.
   cleanup
   docker network create "${network_name}" >/dev/null
 
@@ -118,8 +119,19 @@ run_integration() {
     postgres:15@sha256:dafc4d8e8369da730a5ee9a320a0f0b3c6aa516f41244689c4493a27dc84472d >/dev/null
 
   local vault_port pg_port vault_addr
-  vault_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "8200/tcp") 0).HostPort}}' "${vault_container}")"
-  pg_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "${pg_container}")"
+  vault_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "8200/tcp") 0).HostPort}}' "${vault_container}")" || true
+  pg_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "${pg_container}")" || true
+
+  if [[ -z "${vault_port}" || ! "${vault_port}" =~ ^[0-9]+$ ]]; then
+    echo "::error::Failed to extract valid Vault port (got '${vault_port}')"
+    docker logs "${vault_container}" 2>&1 || true
+    exit 1
+  fi
+  if [[ -z "${pg_port}" || ! "${pg_port}" =~ ^[0-9]+$ ]]; then
+    echo "::error::Failed to extract valid PostgreSQL port (got '${pg_port}')"
+    docker logs "${pg_container}" 2>&1 || true
+    exit 1
+  fi
 
   vault_addr=""
   for _ in $(seq 1 30); do
@@ -177,11 +189,11 @@ run_fuzz() {
   echo "Running bounded fuzz lane"
 
   for func_name in FuzzValidateStrongPassword FuzzHashString FuzzHashStrings FuzzAllUnique FuzzAllHashesPresent FuzzRedact FuzzInjectSecretsFromPlaceholders FuzzSecureZero; do
-    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/crypto | tee -a '${lane_dir}/fuzz-crypto.jsonl'; test \\${PIPESTATUS[0]} -eq 0"
+    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/crypto | tee -a '${lane_dir}/fuzz-crypto.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   done
 
   for func_name in FuzzValidateNonEmpty FuzzValidateUsername FuzzValidateEmail FuzzValidateURL FuzzValidateIP FuzzValidateNoShellMeta; do
-    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/interaction | tee -a '${lane_dir}/fuzz-interaction.jsonl'; test \\${PIPESTATUS[0]} -eq 0"
+    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/interaction | tee -a '${lane_dir}/fuzz-interaction.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   done
 
   run_with_timeout 3m bash -c \
