@@ -343,6 +343,8 @@ github.com/hashicorp/nomad/api v0.0.0-20251105172100-f20a01eda06e h1:CmXFaY0DMPa
 github.com/hashicorp/nomad/api v0.0.0-20251105172100-f20a01eda06e/go.mod h1:sldFTIgs+FsUeKU3LwVjviAIuksxD8TzDOn02MYwslE=
 github.com/hashicorp/nomad/api v0.0.0-20260219180716-229c5d79b55d h1:ydBZXOYNu1BmaV9ZB343AEmnNQ1yX6+6mFl95CXb8KE=
 github.com/hashicorp/nomad/api v0.0.0-20260219180716-229c5d79b55d/go.mod h1:KkLNLU0Nyfh5jWsFoF/PsmMbKpRIAoIV4lmQoJWgKCk=
+github.com/hashicorp/nomad/api v0.0.0-20260220212019-daca79db0bd6 h1:QN/GwpGyiW8RdNcHGMA1xVnM8tJkAGNDR/BZ47XR+OU=
+github.com/hashicorp/nomad/api v0.0.0-20260220212019-daca79db0bd6/go.mod h1:KkLNLU0Nyfh5jWsFoF/PsmMbKpRIAoIV4lmQoJWgKCk=
 github.com/hashicorp/serf v0.10.2 h1:m5IORhuNSjaxeljg5DeQVDlQyVkhRIjJDimbkCa8aAc=
 github.com/hashicorp/serf v0.10.2/go.mod h1:T1CmSGfSeGfnfNy/w0odXQUR1rfECGd2Qdsp84DjOiY=
 github.com/hashicorp/terraform-exec v0.24.0 h1:mL0xlk9H5g2bn0pPF6JQZk5YlByqSqrO5VoaNtAf8OE=
