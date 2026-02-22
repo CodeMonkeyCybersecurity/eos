@@ -22,7 +22,7 @@ jobs:
 
       - name: Validate YAML syntax
         run: |
-          pip install pyyaml -q 2>/dev/null || pip3 install pyyaml -q 2>/dev/null || true
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
           for file in .github/workflows/*.yml; do
             echo "Checking $file"
             python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
