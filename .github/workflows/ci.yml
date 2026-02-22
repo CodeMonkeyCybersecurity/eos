@@ -87,7 +87,7 @@ jobs:
     timeout-minutes: 45
     services:
       vault:
-        image: hashicorp/vault:1.16@sha256:c5e04689611cb864b8b6247a6a845e0bdc059998f39b5c8a659562287379525c
+        image: hashicorp/vault:1.21@sha256:5f244d447c6f90107149c9565da5ffedf847cec673ba0062a82fc3dd83c89e65
         env:
           VAULT_DEV_ROOT_TOKEN_ID: test-token
           VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
