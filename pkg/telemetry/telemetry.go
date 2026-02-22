@@ -2,12 +2,14 @@
 package telemetry
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -21,6 +23,8 @@ import (
 )
 
 var tracer trace.Tracer
+
+var sensitiveAssignmentPattern = regexp.MustCompile(`(?i)(token|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|cookie)=([^&\s]+)`)
 
 // Init configures OpenTelemetry; call this early in main().
 func Init(service string) error {
@@ -126,6 +130,7 @@ func TrackCommand(ctx context.Context, name string, success bool, durationMs int
 	}
 
 	for k, v := range tags {
+		v = sanitizeTagValue(k, v)
 		if k == "args" && len(v) > 256 {
 			v = v[:256] + "..."
 		}
@@ -149,11 +154,79 @@ func hostname() string {
 }
 
 func TruncateOrHashArgs(args []string) string {
-	full := strings.Join(args, " ")
+	full := sanitizeRawSecrets(strings.Join(args, " "))
 	if len(full) > 256 {
 		return full[:256] + "..."
 	}
 	return full
+}
+
+func sanitizeTagValue(key, value string) string {
+	if value == "" {
+		return value
+	}
+
+	if isSensitiveKey(key) {
+		return "[REDACTED]"
+	}
+
+	if sanitizedURL, ok := sanitizeURLString(value); ok {
+		value = sanitizedURL
+	}
+
+	return sanitizeRawSecrets(value)
+}
+
+func isSensitiveKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	if k == "" {
+		return false
+	}
+
+	sensitiveParts := []string{
+		"token",
+		"secret",
+		"password",
+		"passwd",
+		"apikey",
+		"api_key",
+		"authorization",
+		"cookie",
+		"private_key",
+		"client_secret",
+	}
+
+	for _, part := range sensitiveParts {
+		if strings.Contains(k, part) {
+			return true
+		}
+	}
+	return false
+}
+
+func sanitizeURLString(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", false
+	}
+
+	if u.User != nil {
+		u.User = url.User("REDACTED")
+	}
+
+	q := u.Query()
+	for k := range q {
+		if isSensitiveKey(k) {
+			q.Set(k, "[REDACTED]")
+		}
+	}
+	u.RawQuery = q.Encode()
+
+	return u.String(), true
+}
+
+func sanitizeRawSecrets(raw string) string {
+	return sensitiveAssignmentPattern.ReplaceAllString(raw, "$1=[REDACTED]")
 }
 
 func CommandCategory(cmd string) string {

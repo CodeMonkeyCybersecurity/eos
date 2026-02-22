@@ -1,17 +1,5 @@
 # Reusable composite action: Set up Go + CGO dependencies
 # Last Updated: 2026-02-22
-#
-# Consolidates Go setup and C library installation into a single
-# reusable step. All CI workflows should use this instead of
-# duplicating apt-get commands.
-#
-# Usage:
-#   - uses: ./.github/actions/setup-go-env
-#
-# Installs: librados-dev, librbd-dev, libcephfs-dev, libvirt-dev
-# These are required by:
-#   - github.com/ceph/go-ceph (rados, rbd, cephfs)
-#   - libvirt.org/go/libvirt
 
 name: "Setup Go Environment"
 description: "Set up Go toolchain and install CGO library dependencies"
@@ -34,21 +22,6 @@ runs:
           librbd-dev \
           libcephfs-dev \
           libvirt-dev
-
-    - name: Ensure /dev/null is a character device
-      shell: bash
-      run: |
-        # act_runner DinD: /dev/null can be a regular file or missing
-        # after apt-get operations. Go toolchain needs a real char device.
-        echo "Before fix:"
-        ls -la /dev/null 2>&1 || echo "/dev/null does not exist"
-        file /dev/null 2>&1 || true
-        # Always recreate as proper character device
-        sudo rm -f /dev/null
-        sudo mknod -m 666 /dev/null c 1 3
-        echo "After fix:"
-        ls -la /dev/null
-        echo "test" > /dev/null && echo "/dev/null verified working"
 
     - name: Download Go module dependencies
       shell: bash

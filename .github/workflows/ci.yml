@@ -1,8 +1,5 @@
 # ci.yml - Consolidated CI pipeline
 # Last Updated: 2026-02-22
-#
-# Replaces: ci.yml, lint.yml, fuzz.yml, flakiness-detection.yml, emoji-check.yml
-# Design: parallel jobs for fast feedback, single pipeline for simplicity
 
 name: CI
 
@@ -27,374 +24,89 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for --new-from-rev
-
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers may not have /dev/null properly mounted
-          if [ ! -e /dev/null ] || ! echo "test" > /dev/null 2>&1; then
-            sudo rm -f /dev/null 2>/dev/null || true
-            sudo mknod -m 666 /dev/null c 1 3
-            echo "/dev/null fixed"
-          fi
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Install golangci-lint v2
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
-      - name: Fetch base branch for diff
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin ${{ github.base_ref }} --depth=1 || true
-          echo "Base branch refs:"
-          git branch -a | grep -i main || true
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.0
 
-      - name: Run golangci-lint
+      - name: Run lint lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # On PRs, only lint new issues (not pre-existing ones)
-            BASE_REV=$(git rev-parse origin/${{ github.base_ref }} 2>/dev/null || echo "")
-            if [ -n "$BASE_REV" ]; then
-              echo "Linting new issues since ${{ github.base_ref }} ($BASE_REV)"
-              golangci-lint run --timeout=5m --config=.golangci.yml --new-from-rev="$BASE_REV" || true
-            else
-              echo "::warning::Could not find base branch, linting all (non-blocking)"
-              golangci-lint run --timeout=5m --config=.golangci.yml || true
-            fi
+          if [ "${CI_EVENT_NAME}" = "pull_request" ]; then
+            scripts/ci/lint.sh changed
           else
-            # On push to main, report but don't fail on existing issues
-            golangci-lint run --timeout=5m --config=.golangci.yml || true
+            scripts/ci/lint.sh all
           fi
 
-      - name: Check formatting
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # On PRs, only check formatting of changed Go files
-            BASE_REV=$(git rev-parse origin/${{ github.base_ref }} 2>/dev/null || echo "")
-            if [ -n "$BASE_REV" ]; then
-              CHANGED_GO=$(git diff --name-only "$BASE_REV"...HEAD -- '*.go' | grep -v vendor/ || true)
-              if [ -n "$CHANGED_GO" ]; then
-                UNFORMATTED=$(echo "$CHANGED_GO" | xargs gofmt -s -l 2>/dev/null || true)
-                if [ -n "$UNFORMATTED" ]; then
-                  echo "::error::Unformatted files found:"
-                  echo "$UNFORMATTED"
-                  exit 1
-                fi
-              fi
-              echo "Formatting check passed (changed files only)"
-            else
-              echo "::warning::Could not find base branch, skipping formatting check"
-            fi
-          else
-            # On push to main, report but don't block
-            UNFORMATTED=$(gofmt -s -l . | grep -v vendor/ || true)
-            if [ -n "$UNFORMATTED" ]; then
-              echo "::warning::Unformatted files found:"
-              echo "$UNFORMATTED" | head -20
-            fi
-          fi
-
-      - name: Run go vet
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # On PRs, only vet packages with changed files
-            BASE_REV=$(git rev-parse origin/${{ github.base_ref }} 2>/dev/null || echo "")
-            if [ -n "$BASE_REV" ]; then
-              CHANGED_PKGS=$(git diff --name-only "$BASE_REV"...HEAD -- '*.go' | xargs -I{} dirname {} | sort -u | sed 's|^|./|' || true)
-              if [ -n "$CHANGED_PKGS" ]; then
-                echo "Vetting changed packages:"
-                echo "$CHANGED_PKGS"
-                echo "$CHANGED_PKGS" | xargs go vet 2>&1 || true
-              fi
-            else
-              echo "::warning::Could not find base branch, running go vet on all (non-blocking)"
-              go vet ./... || true
-            fi
-          else
-            go vet ./... || true
-          fi
-
-      - name: Check for emojis in non-test files
-        run: |
-          if [ -x .github/hooks/remove-emojis.sh ]; then
-            ./.github/hooks/remove-emojis.sh --dry-run > /tmp/emoji-check.log 2>&1 || true
-            if grep -q "Files with emojis found: [1-9]" /tmp/emoji-check.log; then
-              echo "::error::Emojis found in non-test files. Run: .github/hooks/remove-emojis.sh"
-              cat /tmp/emoji-check.log
-              exit 1
-            fi
-          fi
+      - name: Summarize lint lane
+        if: always()
+        env:
+          CI_LANE: lint
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh
 
   ci-unit:
     name: ci-unit
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers often have /dev/null as a regular file
-          # (from Docker volume mounts) instead of a character device.
-          # Go toolchain requires a real /dev/null character device.
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Build
-        run: go build -o /tmp/eos-build ./cmd/
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
-      - name: Ensure /dev devices exist
-        run: |
-          # act_runner DinD containers may lose /dev/null during apt-get
-          # or have it as a regular file instead of a character device.
-          echo "Checking /dev devices:"
-          ls -la /dev/null /dev/zero /dev/urandom 2>&1 || true
-          # Recreate critical device nodes
-          for dev in "null 1 3" "zero 1 5"; do
-            set -- $dev
-            if [ ! -c "/dev/$1" ]; then
-              sudo rm -f "/dev/$1" 2>/dev/null || true
-              sudo mknod -m 666 "/dev/$1" c $2 $3
-              echo "Recreated /dev/$1"
-            fi
-          done
-          ls -la /dev/null /dev/zero
+      - name: Run unit lane
+        run: scripts/ci/test.sh unit
 
-      - name: Run unit tests with coverage
-        run: |
-          ls -la /dev/null
-          go test -short -timeout=10m -coverprofile=coverage.out -covermode=atomic ./pkg/...
-
-      - name: Run race detector on critical packages
-        run: |
-          ls -la /dev/null
-          go test -short -race -timeout=10m ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... 2>&1 || {
-            echo "::warning::Race detector failed (may be DinD /dev/null issue)"
-            true
-          }
-
-      - name: Enforce unit coverage >= 70%
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $3}' | tr -d '%')
-          echo "Unit coverage: ${COVERAGE}%"
-          # Use awk for floating-point comparison (bc may not be installed)
-          if echo "$COVERAGE" | awk '{exit ($1 >= 70.0) ? 0 : 1}'; then
-            echo "Coverage OK: ${COVERAGE}% >= 70%"
-          else
-            echo "::error::Coverage ${COVERAGE}% is below 70% threshold"
-            exit 1
-          fi
-
-      - name: Flaky test check (known-flaky packages)
-        run: |
-          set +e
-          FAIL=0
-          for PKG in "./pkg/httpclient" "./pkg/apiclient" "./pkg/hecate/api"; do
-            echo "Testing ${PKG} 3x..."
-            if ! go test -short -count=3 -race -timeout=5m "${PKG}" 2>&1; then
-              echo "::warning::Flaky test detected in ${PKG}"
-              FAIL=1
-            fi
-          done
-          exit $FAIL
-
-      - name: Save coverage report
+      - name: Summarize unit lane
         if: always()
-        shell: bash
-        run: |
-          if [ -f coverage.out ]; then
-            echo "Coverage report saved at coverage.out"
-            go tool cover -func=coverage.out | tail -5
-          fi
-
-  ci-fuzz:
-    name: ci-fuzz
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers often have /dev/null as a regular file
-          # (from Docker volume mounts) instead of a character device.
-          # Go toolchain requires a real /dev/null character device.
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
-
-      - name: Setup Go environment
-        uses: ./.github/actions/setup-go-env
-
-      - name: Fuzz crypto package
-        run: |
-          for FUNC in FuzzValidateStrongPassword FuzzHashString FuzzHashStrings FuzzAllUnique FuzzAllHashesPresent FuzzRedact FuzzInjectSecretsFromPlaceholders FuzzSecureZero; do
-            go test -run="^${FUNC}$" -fuzz="^${FUNC}$" -fuzztime=5s ./pkg/crypto
-          done
-
-      - name: Fuzz interaction package
-        run: |
-          for FUNC in FuzzValidateNonEmpty FuzzValidateUsername FuzzValidateEmail FuzzValidateURL FuzzValidateIP FuzzValidateNoShellMeta; do
-            go test -run="^${FUNC}$" -fuzz="^${FUNC}$" -fuzztime=5s ./pkg/interaction
-          done
-
-      - name: Fuzz parse package
-        run: go test -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime=5s ./pkg/parse
+        env:
+          CI_LANE: unit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+          CI_COVERAGE_FILE: coverage.out
+        run: scripts/ci/summary.sh
 
   ci-integration:
     name: ci-integration
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # NOTE: services: block not used - broken in nektos/act (#173, #944, #247)
-    # which act_runner is based on. Using docker run instead.
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers often have /dev/null as a regular file
-          # (from Docker volume mounts) instead of a character device.
-          # Go toolchain requires a real /dev/null character device.
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
+        with:
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Cleanup stale containers and networks
-        run: |
-          docker rm -f vault-ci postgres-ci 2>/dev/null || true
-          docker network rm eos-ci-net 2>/dev/null || true
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
-      - name: Detect container networking
-        id: netinfo
-        run: |
-          # Detect how the job container can reach sibling containers.
-          # In act_runner (DinD), job runs inside a container with Docker
-          # socket mounted. Sibling containers are on the default bridge.
-          # We try container IP first (works when job is on same bridge),
-          # then fall back to gateway IP (172.17.0.1).
-          echo "Docker info:"
-          docker info --format '{{.Name}}' 2>/dev/null || true
-
-      - name: Start Vault container
-        run: |
-          docker run -d --name vault-ci \
-            -p 18200:8200 \
-            -e VAULT_DEV_ROOT_TOKEN_ID=test-token \
-            -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-            --cap-add=IPC_LOCK \
-            hashicorp/vault:1.16
-
-      - name: Start PostgreSQL container
-        run: |
-          docker run -d --name postgres-ci \
-            -p 15432:5432 \
-            -e POSTGRES_PASSWORD=testpass \
-            -e POSTGRES_DB=testdb \
-            postgres:15
-
-      - name: Wait for services and detect reachable addresses
-        id: svc-ips
-        run: |
-          # Get container IPs on the default bridge network
-          VAULT_CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vault-ci)
-          PG_CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-ci)
-          # Gateway IP (Docker daemon host from inside containers)
-          GW_IP=$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
-          echo "Container IPs: vault=$VAULT_CIP postgres=$PG_CIP gateway=$GW_IP"
-
-          # Try to reach Vault - first via container IP, then gateway, then localhost
-          VAULT_ADDR=""
-          for addr in "$VAULT_CIP:8200" "$GW_IP:18200" "127.0.0.1:18200" "localhost:18200"; do
-            echo "Trying Vault at http://$addr ..."
-            if curl -sf --connect-timeout 3 "http://$addr/v1/sys/health" >/dev/null 2>&1; then
-              VAULT_ADDR="http://$addr"
-              echo "Vault reachable at $VAULT_ADDR"
-              break
-            fi
-          done
-
-          # Wait for Vault with retry
-          if [ -z "$VAULT_ADDR" ]; then
-            echo "Vault not immediately reachable, waiting..."
-            for i in $(seq 1 30); do
-              for addr in "$VAULT_CIP:8200" "$GW_IP:18200" "127.0.0.1:18200"; do
-                if curl -sf --connect-timeout 3 "http://$addr/v1/sys/health" >/dev/null 2>&1; then
-                  VAULT_ADDR="http://$addr"
-                  echo "Vault ready at $VAULT_ADDR (attempt $i)"
-                  break 2
-                fi
-              done
-              sleep 2
-            done
-          fi
-
-          if [ -z "$VAULT_ADDR" ]; then
-            echo "::error::Vault failed to become reachable"
-            docker logs vault-ci
-            exit 1
-          fi
-
-          # Wait for PostgreSQL
-          echo "Waiting for PostgreSQL..."
-          for i in $(seq 1 30); do
-            if docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1; then
-              echo "PostgreSQL is ready"
-              break
-            fi
-            sleep 2
-          done
-          docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1 || { echo "::error::PostgreSQL failed to start"; docker logs postgres-ci; exit 1; }
-
-          # Determine PostgreSQL address reachable from this job container
-          # Use the same address family that worked for Vault
-          PG_ADDR=""
-          # Extract the IP that worked for Vault to infer which network path works
-          VAULT_HOST=$(echo "$VAULT_ADDR" | sed 's|http://||' | cut -d: -f1)
-          if [ "$VAULT_HOST" = "$VAULT_CIP" ]; then
-            # Container IPs work - use PostgreSQL container IP directly
-            PG_ADDR="$PG_CIP:5432"
-          elif [ "$VAULT_HOST" = "$GW_IP" ]; then
-            # Gateway works - use mapped port via gateway
-            PG_ADDR="$GW_IP:15432"
-          else
-            # Localhost/other - use mapped port via localhost
-            PG_ADDR="127.0.0.1:15432"
-          fi
-          echo "PostgreSQL address: $PG_ADDR (same network path as Vault)"
-
-          echo "vault_addr=$VAULT_ADDR" >> "$GITHUB_OUTPUT"
-          echo "pg_addr=$PG_ADDR" >> "$GITHUB_OUTPUT"
-
-      - name: Run integration tests
+      - name: Run integration lane
         env:
-          VAULT_ADDR: ${{ steps.svc-ips.outputs.vault_addr }}
-          VAULT_TOKEN: test-token
-          POSTGRES_URL: postgres://postgres:testpass@${{ steps.svc-ips.outputs.pg_addr }}/testdb?sslmode=disable
-        run: |
-          echo "VAULT_ADDR=$VAULT_ADDR"
-          echo "POSTGRES_URL=$POSTGRES_URL"
-          go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
-          go test -v -timeout=15m -run Integration ./pkg/backup/...
-          go test -v -timeout=15m -tags=integration ./pkg/vault/...
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+        run: scripts/ci/test.sh integration
 
-      - name: Cleanup containers
+      - name: Summarize integration lane
         if: always()
-        run: docker rm -f vault-ci postgres-ci 2>/dev/null || true
+        env:
+          CI_LANE: integration
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh
 
   ci-e2e-smoke:
     name: ci-e2e-smoke
@@ -403,22 +115,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers often have /dev/null as a regular file
-          # (from Docker volume mounts) instead of a character device.
-          # Go toolchain requires a real /dev/null character device.
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run e2e smoke lane
+        run: scripts/ci/test.sh e2e-smoke
+
+      - name: Summarize e2e smoke lane
+        if: always()
+        env:
+          CI_LANE: e2e-smoke
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh
+
+  ci-fuzz:
+    name: ci-fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Run smoke e2e tests
-        run: go test -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/...
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run fuzz lane
+        run: scripts/ci/test.sh fuzz
+
+      - name: Summarize fuzz lane
+        if: always()
+        env:
+          CI_LANE: fuzz
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh
 
   ci-e2e-full:
     name: ci-e2e-full
@@ -428,21 +164,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix /dev/null in DinD containers
-        run: |
-          # act_runner DinD containers often have /dev/null as a regular file
-          # (from Docker volume mounts) instead of a character device.
-          # Go toolchain requires a real /dev/null character device.
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
-
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Run full e2e tests (guarded)
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run e2e full lane
+        run: scripts/ci/test.sh e2e-full
+
+      - name: Summarize e2e full lane
+        if: always()
         env:
-          EOS_E2E_FULL_APPROVED: "true"
-        run: go test -v -tags=e2e_full -timeout=60m ./test/e2e/full/...
+          CI_LANE: e2e-full
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh

@@ -1,10 +1,5 @@
 # security.yml - Consolidated security scanning
 # Last Updated: 2026-02-22
-#
-# Replaces: security.yml, codeql.yml
-# Runs: gosec, govulncheck, gitleaks, custom checks
-# NOTE: CodeQL removed (requires GitHub infrastructure, not available on self-hosted Gitea)
-# NOTE: SARIF upload removed (not supported on Gitea)
 
 name: Security Validation
 
@@ -30,62 +25,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fix /dev/null in DinD containers
-        run: |
-          ls -la /dev/null 2>/dev/null || echo "/dev/null missing"
-          sudo rm -f /dev/null 2>/dev/null || true
-          sudo mknod -m 666 /dev/null c 1 3
-          ls -la /dev/null
-          echo "test" > /dev/null && echo "/dev/null is working"
-
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
       - name: Install security tools
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
       - name: Run gosec
         run: gosec -fmt=text -severity=medium -confidence=medium ./...
-        continue-on-error: true
+        continue-on-error: true  # Known findings exist; tracked separately
 
       - name: Run govulncheck
         run: govulncheck ./...
 
-      - name: Custom security checks
-        run: |
-          ERRORS=0
+      - name: Run custom security checks
+        run: scripts/ci/security-checks.sh
 
-          echo "Checking VAULT_SKIP_VERIFY..."
-          if grep -r "VAULT_SKIP_VERIFY.*1" --include="*.go" --exclude-dir=vendor . | grep -v "handleTLSValidationFailure\|Eos_ALLOW_INSECURE_VAULT\|# P0-2"; then
-            echo "  FAIL: VAULT_SKIP_VERIFY=1 found in production code"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  PASS"
-          fi
-
-          echo "Checking InsecureSkipVerify..."
-          if grep -r "InsecureSkipVerify.*true" --include="*.go" --exclude="*_test.go" --exclude-dir=vendor . | grep -v "TestConfig"; then
-            echo "  FAIL: InsecureSkipVerify=true found in production code"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  PASS"
-          fi
-
-          echo "Checking VAULT_TOKEN env var exposure..."
-          if grep -r 'fmt\.Sprintf.*VAULT_TOKEN.*%s' --include="*.go" --exclude-dir=vendor . | grep -v "VAULT_TOKEN_FILE\|# P0-1"; then
-            echo "  FAIL: VAULT_TOKEN env var interpolation found"
-            ERRORS=$((ERRORS + 1))
-          else
-            echo "  PASS"
-          fi
-
-          if [ $ERRORS -gt 0 ]; then
-            echo "::error::Security validation failed with $ERRORS issue(s)"
-            exit 1
-          fi
-          echo "All custom security checks passed"
+      - name: Summarize security lane
+        if: always()
+        env:
+          CI_LANE: security-audit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci
+        run: scripts/ci/summary.sh
 
   secret-scanning:
     name: Secret Scanning
@@ -104,9 +71,7 @@ jobs:
 
       - name: Run gitleaks (PR diff only)
         if: github.event_name == 'pull_request'
-        run: |
-          gitleaks detect --source=. --redact \
-            --log-opts="origin/${{ github.base_ref }}..HEAD"
+        run: gitleaks detect --source=. --redact --log-opts="origin/${{ github.base_ref }}..HEAD"
 
       - name: Run gitleaks (full scan on push/schedule)
         if: github.event_name != 'pull_request'

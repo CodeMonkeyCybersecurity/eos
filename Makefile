@@ -1,7 +1,8 @@
 # Eos Makefile
 # Last Updated: 2025-10-23
 
-.PHONY: all build test lint lint-fix clean install help
+.PHONY: all build test lint lint-fix clean install help \
+	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz
 
 # Build configuration
 BINARY_NAME := eos
@@ -194,6 +195,30 @@ ci: deps fmt-check vet lint test build ## CI pipeline (no auto-fix)
 
 ci-cgo: deps fmt-check vet-cgo lint-cgo test-cgo build ## CI pipeline for CGO packages
 	@echo "[INFO] CGO CI pipeline complete"
+
+ci-preflight: ## Run CI preflight checks
+	@echo "[INFO] Running CI preflight..."
+	@scripts/ci/preflight.sh
+
+ci-lint: ## Run CI lint lane entrypoint
+	@echo "[INFO] Running CI lint lane..."
+	@scripts/ci/lint.sh all
+
+ci-unit: ## Run CI unit lane entrypoint
+	@echo "[INFO] Running CI unit lane..."
+	@scripts/ci/test.sh unit
+
+ci-integration: ## Run CI integration lane entrypoint
+	@echo "[INFO] Running CI integration lane..."
+	@scripts/ci/test.sh integration
+
+ci-e2e-smoke: ## Run CI smoke E2E lane entrypoint
+	@echo "[INFO] Running CI e2e smoke lane..."
+	@scripts/ci/test.sh e2e-smoke
+
+ci-fuzz: ## Run CI fuzz lane entrypoint
+	@echo "[INFO] Running CI fuzz lane..."
+	@scripts/ci/test.sh fuzz
 
 ##@ Deployment
 
