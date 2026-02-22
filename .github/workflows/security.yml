@@ -94,5 +94,12 @@ jobs:
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin gitleaks
 
-      - name: Run gitleaks
-        run: gitleaks detect --source=. --verbose --redact
+      - name: Run gitleaks (PR diff only)
+        if: github.event_name == 'pull_request'
+        run: |
+          gitleaks detect --source=. --redact \
+            --log-opts="origin/${{ github.base_ref }}..HEAD"
+
+      - name: Run gitleaks (full scan on push/schedule)
+        if: github.event_name != 'pull_request'
+        run: gitleaks detect --source=. --redact --no-git

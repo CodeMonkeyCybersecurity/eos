@@ -59,10 +59,23 @@ func ValidateIP(input string) error {
 	return shared.ValidateIPAddress(input)
 }
 
-// ValidateNoShellMeta blocks shell metacharacters.
+// ValidateNoShellMeta blocks shell metacharacters and control characters
+// that could enable command injection via shell interpretation.
+// SECURITY: Covers OWASP OS Command Injection (CWE-78).
+// Blocks: metacharacters (`$&|;<>(){}), control chars (\n\r\t\x00),
+// and backslash (escape sequences).
 func ValidateNoShellMeta(input string) error {
-	if strings.ContainsAny(input, "`$&|;<>(){}") {
+	// Shell metacharacters that enable command substitution, piping,
+	// redirection, chaining, and expansion
+	if strings.ContainsAny(input, "`$&|;<>(){}\\") {
 		return errors.New("input contains unsafe shell characters")
+	}
+	// Control characters that enable newline injection, null byte
+	// injection, and other shell interpretation tricks
+	for _, r := range input {
+		if r == '\n' || r == '\r' || r == '\t' || r == 0x00 {
+			return errors.New("input contains unsafe control characters")
+		}
 	}
 	return nil
 }

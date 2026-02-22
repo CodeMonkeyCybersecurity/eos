@@ -30,8 +30,8 @@ jobs:
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - name: Install golangci-lint v2
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
       - name: Run golangci-lint
         run: golangci-lint run --timeout=5m --config=.golangci.yml
@@ -141,12 +141,15 @@ jobs:
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
 
+      - name: Cleanup stale containers
+        run: docker rm -f vault-ci postgres-ci 2>/dev/null || true
+
       - name: Start Vault container
         run: |
           docker run -d --name vault-ci \
             -e VAULT_DEV_ROOT_TOKEN_ID=test-token \
             -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-            -p 8200:8200 \
+            -p 18200:8200 \
             --cap-add=IPC_LOCK \
             hashicorp/vault:1.16
 
@@ -155,20 +158,20 @@ jobs:
           docker run -d --name postgres-ci \
             -e POSTGRES_PASSWORD=testpass \
             -e POSTGRES_DB=testdb \
-            -p 5432:5432 \
+            -p 15432:5432 \
             postgres:15
 
       - name: Wait for services
         run: |
           echo "Waiting for Vault..."
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8200/v1/sys/health >/dev/null; then
+            if curl -sf http://127.0.0.1:18200/v1/sys/health >/dev/null; then
               echo "Vault is ready"
               break
             fi
             sleep 2
           done
-          curl -sf http://127.0.0.1:8200/v1/sys/health >/dev/null || { echo "::error::Vault failed to start"; exit 1; }
+          curl -sf http://127.0.0.1:18200/v1/sys/health >/dev/null || { echo "::error::Vault failed to start"; exit 1; }
 
           echo "Waiting for PostgreSQL..."
           for i in $(seq 1 30); do
@@ -182,9 +185,9 @@ jobs:
 
       - name: Run integration tests
         env:
-          VAULT_ADDR: http://127.0.0.1:8200
+          VAULT_ADDR: http://127.0.0.1:18200
           VAULT_TOKEN: test-token
-          POSTGRES_URL: postgres://postgres:testpass@localhost:5432/testdb?sslmode=disable
+          POSTGRES_URL: postgres://postgres:testpass@localhost:15432/testdb?sslmode=disable
         run: |
           go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
           go test -v -timeout=15m -run Integration ./pkg/backup/...
@@ -192,8 +195,7 @@ jobs:
 
       - name: Cleanup containers
         if: always()
-        run: |
-          docker rm -f vault-ci postgres-ci 2>/dev/null || true
+        run: docker rm -f vault-ci postgres-ci 2>/dev/null || true
 
   ci-e2e-smoke:
     name: ci-e2e-smoke

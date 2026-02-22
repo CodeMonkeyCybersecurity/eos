@@ -1,5 +1,5 @@
 # validate.yml - Workflow YAML validation
-# Last Updated: 2026-02-20
+# Last Updated: 2026-02-22
 
 name: Validate Workflows
 
@@ -22,7 +22,7 @@ jobs:
 
       - name: Validate YAML syntax
         run: |
-          # python3 + pyyaml are pre-installed on ubuntu runners
+          pip install pyyaml -q 2>/dev/null || pip3 install pyyaml -q 2>/dev/null || true
           for file in .github/workflows/*.yml; do
             echo "Checking $file"
             python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1

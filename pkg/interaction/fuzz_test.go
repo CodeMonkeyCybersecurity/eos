@@ -5,23 +5,6 @@ import (
 	"testing"
 )
 
-func FuzzNormalizeYesNoInput(f *testing.F) {
-	// Seed with a few common answers
-	f.Add("yes")
-	f.Add("no")
-	f.Add("Y")
-	f.Add("n")
-	f.Add("  yEs ")
-	f.Add("  ")
-	f.Add("not-a-valid-answer")
-
-	f.Fuzz(func(t *testing.T, input string) {
-		// NormalizeYesNoInput function doesn't exist - this test is disabled
-		// TODO: Implement NormalizeYesNoInput or remove this test
-		_ = input
-	})
-}
-
 func FuzzValidateNonEmpty(f *testing.F) {
 	f.Add("")
 	f.Add("   ")
@@ -116,18 +99,17 @@ func FuzzValidateNoShellMeta(f *testing.F) {
 	})
 }
 
-// Helper function to detect shell metacharacters more comprehensively
+// containsShellMetacharacters mirrors the logic in ValidateNoShellMeta
+// exactly - any divergence between this helper and the implementation
+// causes false positive fuzz failures.
 func containsShellMetacharacters(input string) bool {
-	// The current ValidateNoShellMeta checks for: `$&|;<>(){}
-	// But there are more dangerous patterns
-	dangerousPatterns := []string{
-		"`", "$", "&", "|", ";", "<", ">", "(", ")", "{", "}",
-		"\n", "\r", "\t", "\x00", // Control characters
-		"$(", "${", "||", "&&", ">>", "<<", // Compound operators
+	// Must match ValidateNoShellMeta: metacharacters + backslash
+	if strings.ContainsAny(input, "`$&|;<>(){}\\") {
+		return true
 	}
-
-	for _, pattern := range dangerousPatterns {
-		if strings.Contains(input, pattern) {
+	// Must match ValidateNoShellMeta: control characters
+	for _, r := range input {
+		if r == '\n' || r == '\r' || r == '\t' || r == 0x00 {
 			return true
 		}
 	}
