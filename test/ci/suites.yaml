@@ -1,17 +1,17 @@
-version: 1
+version: 2
 policy:
-  description: "Test pyramid lane weighting for CI decisioning"
+  description: "Executable CI policy for lane gating and test-pyramid weighting"
   weights:
     unit: 70
     integration: 20
     e2e: 10
+  defaults:
+    required_on_pr: true
 
 suites:
   - name: unit
     weight: 70
     owner: "platform-core"
-    scope:
-      - "./pkg/..."
     gate:
       required_on_pr: true
       coverage_threshold: 70
@@ -19,12 +19,8 @@ suites:
   - name: integration
     weight: 20
     owner: "platform-integration"
-    scope:
-      - "./test/integration_test.go"
-      - "./test/integration_scenarios_test.go"
-      - "./pkg/backup/..."
-      - "./pkg/vault/..."
     gate:
+      required_on_pr: false
       required_on_pr_when_changed:
         - "test/integration*"
         - "pkg/vault/**"
@@ -35,26 +31,20 @@ suites:
   - name: e2e-smoke
     weight: 10
     owner: "platform-e2e"
-    scope:
-      - "./test/e2e/smoke/..."
     gate:
       required_on_pr: true
 
   - name: e2e-full
     weight: 0
     owner: "platform-e2e"
-    scope:
-      - "./test/e2e/full/..."
     gate:
+      required_on_pr: false
       scheduled_or_manual_only: true
 
   - name: fuzz
     weight: 0
     owner: "platform-security"
-    scope:
-      - "./pkg/crypto"
-      - "./pkg/interaction"
-      - "./pkg/parse"
     gate:
+      required_on_pr: false
       informational_on_pr: true
       required_on_schedule: true

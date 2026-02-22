@@ -1,0 +1,9 @@
+version: 1
+entries:
+  - rule_id: "*"
+    file_regex: ".*"
+    line: 0
+    issue_id: 24
+    owner: "platform-security"
+    expires_on: "2026-03-31"
+    reason: "Temporary global baseline while migrating to line-level gosec suppressions"

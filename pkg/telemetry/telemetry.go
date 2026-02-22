@@ -25,6 +25,8 @@ import (
 var tracer trace.Tracer
 
 var sensitiveAssignmentPattern = regexp.MustCompile(`(?i)(token|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|cookie)=([^&\s]+)`)
+var sensitiveBearerPattern = regexp.MustCompile(`(?i)(authorization\s*[:=]\s*bearer\s+)[^\s"']+`)
+var sensitiveJSONPattern = regexp.MustCompile(`(?i)"(token|password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|cookie)"\s*:\s*"[^"]*"`)
 
 // Init configures OpenTelemetry; call this early in main().
 func Init(service string) error {
@@ -226,7 +228,16 @@ func sanitizeURLString(raw string) (string, bool) {
 }
 
 func sanitizeRawSecrets(raw string) string {
-	return sensitiveAssignmentPattern.ReplaceAllString(raw, "$1=[REDACTED]")
+	raw = sensitiveAssignmentPattern.ReplaceAllString(raw, "$1=[REDACTED]")
+	raw = sensitiveBearerPattern.ReplaceAllString(raw, "${1}[REDACTED]")
+	raw = sensitiveJSONPattern.ReplaceAllStringFunc(raw, func(m string) string {
+		parts := strings.SplitN(m, ":", 2)
+		if len(parts) != 2 {
+			return m
+		}
+		return strings.TrimSpace(parts[0]) + `:"[REDACTED]"`
+	})
+	return raw
 }
 
 func CommandCategory(cmd string) string {

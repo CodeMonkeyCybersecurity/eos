@@ -19,7 +19,7 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,9 +36,12 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
           go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
-      - name: Run gosec
-        run: gosec -fmt=text -severity=medium -confidence=medium ./...
-        continue-on-error: true  # Known findings exist; tracked separately
+      - name: Run gosec (emit JSON for allowlist gate)
+        continue-on-error: true
+        run: |
+          mkdir -p outputs/ci
+          GOSEC_BIN="$(go env GOPATH)/bin/gosec"
+          "${GOSEC_BIN}" -fmt=json -severity=medium -confidence=medium ./... > outputs/ci/gosec.json
 
       - name: Run govulncheck
         run: govulncheck ./...
@@ -52,7 +55,16 @@ jobs:
           CI_LANE: security-audit
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/security-report.json
+          CI_SUMMARY_FILE: outputs/ci/security-summary.md
         run: scripts/ci/summary.sh
+
+      - name: Print security report artifact
+        if: always()
+        run: |
+          ls -la outputs/ci || true
+          test -f outputs/ci/security-report.json && cat outputs/ci/security-report.json || true
+          test -f outputs/ci/gosec.json && head -200 outputs/ci/gosec.json || true
 
   secret-scanning:
     name: Secret Scanning

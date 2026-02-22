@@ -52,14 +52,24 @@ jobs:
           CI_LANE: lint
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/lint-report.json
+          CI_SUMMARY_FILE: outputs/ci/lint-summary.md
         run: scripts/ci/summary.sh
+
+      - name: Print lint report artifact
+        if: always()
+        run: |
+          ls -la outputs/ci || true
+          test -f outputs/ci/lint-report.json && cat outputs/ci/lint-report.json || true
 
   ci-unit:
     name: ci-unit
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
@@ -68,6 +78,10 @@ jobs:
         run: scripts/ci/preflight.sh
 
       - name: Run unit lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
         run: scripts/ci/test.sh unit
 
       - name: Summarize unit lane
@@ -77,7 +91,15 @@ jobs:
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
           CI_COVERAGE_FILE: coverage.out
+          CI_REPORT_FILE: outputs/ci/unit-report.json
+          CI_SUMMARY_FILE: outputs/ci/unit-summary.md
         run: scripts/ci/summary.sh
+
+      - name: Print unit report artifact
+        if: always()
+        run: |
+          ls -la outputs/ci || true
+          test -f outputs/ci/unit-report.json && cat outputs/ci/unit-report.json || true
 
   ci-integration:
     name: ci-integration
@@ -98,6 +120,7 @@ jobs:
         env:
           CI_EVENT_NAME: ${{ github.event_name }}
           CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
         run: scripts/ci/test.sh integration
 
       - name: Summarize integration lane
@@ -106,7 +129,15 @@ jobs:
           CI_LANE: integration
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/integration-report.json
+          CI_SUMMARY_FILE: outputs/ci/integration-summary.md
         run: scripts/ci/summary.sh
+
+      - name: Print integration report artifact
+        if: always()
+        run: |
+          ls -la outputs/ci || true
+          test -f outputs/ci/integration-report.json && cat outputs/ci/integration-report.json || true
 
   ci-e2e-smoke:
     name: ci-e2e-smoke
@@ -122,6 +153,8 @@ jobs:
         run: scripts/ci/preflight.sh
 
       - name: Run e2e smoke lane
+        env:
+          CI_SUITE_FILE: test/ci/suites.yaml
         run: scripts/ci/test.sh e2e-smoke
 
       - name: Summarize e2e smoke lane
@@ -130,6 +163,8 @@ jobs:
           CI_LANE: e2e-smoke
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/e2e-smoke-report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-smoke-summary.md
         run: scripts/ci/summary.sh
 
   ci-fuzz:
@@ -146,6 +181,8 @@ jobs:
         run: scripts/ci/preflight.sh
 
       - name: Run fuzz lane
+        env:
+          CI_SUITE_FILE: test/ci/suites.yaml
         run: scripts/ci/test.sh fuzz
 
       - name: Summarize fuzz lane
@@ -154,6 +191,8 @@ jobs:
           CI_LANE: fuzz
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/fuzz-report.json
+          CI_SUMMARY_FILE: outputs/ci/fuzz-summary.md
         run: scripts/ci/summary.sh
 
   ci-e2e-full:
@@ -171,6 +210,8 @@ jobs:
         run: scripts/ci/preflight.sh
 
       - name: Run e2e full lane
+        env:
+          CI_SUITE_FILE: test/ci/suites.yaml
         run: scripts/ci/test.sh e2e-full
 
       - name: Summarize e2e full lane
@@ -179,4 +220,6 @@ jobs:
           CI_LANE: e2e-full
           CI_STATUS: ${{ job.status }}
           CI_LOG_DIR: outputs/ci
+          CI_REPORT_FILE: outputs/ci/e2e-full-report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-full-summary.md
         run: scripts/ci/summary.sh

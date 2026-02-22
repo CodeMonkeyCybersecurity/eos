@@ -20,34 +20,19 @@ if [[ -n "${GITHUB_ENV:-}" ]]; then
   } >> "${GITHUB_ENV}"
 fi
 
-# Repair /dev/null and /dev/zero if broken (common in DinD / act_runner).
-# apt-get can replace character devices with regular files; Go toolchain
-# requires real character devices.
-ensure_char_device() {
-  local path="$1" major="$2" minor="$3"
-  if [[ -c "${path}" ]] && echo "check" > "${path}" 2>/dev/null; then
-    return 0
-  fi
-  echo "Repairing ${path} (was: $(ls -la "${path}" 2>&1 || echo 'missing'))"
-  sudo rm -f "${path}" 2>/dev/null || true
-  sudo mknod -m 666 "${path}" c "${major}" "${minor}"
-  if [[ ! -c "${path}" ]]; then
-    echo "::error::Failed to repair ${path}"
-    return 1
-  fi
-}
+if [[ ! -c /dev/null ]] || ! echo "preflight" > /dev/null 2>/dev/null; then
+  echo "::error::/dev/null is not a healthy character device"
+  exit 10
+fi
 
-ensure_char_device /dev/null 1 3 || exit 10
-ensure_char_device /dev/zero 1 5 || exit 11
-
-if ! (echo "preflight" > /dev/null); then
-  echo "::error::Cannot write to /dev/null after repair"
-  exit 12
+if [[ ! -c /dev/zero ]]; then
+  echo "::error::/dev/zero is not a character device"
+  exit 11
 fi
 
 if [[ ! -w /tmp ]]; then
   echo "::error::/tmp is not writable"
-  exit 13
+  exit 12
 fi
 
 echo "CI preflight diagnostics"

@@ -58,3 +58,29 @@ func TestTruncateOrHashArgsRedactsSecretsAndTruncates(t *testing.T) {
 		t.Fatalf("expected truncated output length <= 259, got %d", len(got))
 	}
 }
+
+func TestSanitizeRawSecretsBearerToken(t *testing.T) {
+	t.Parallel()
+
+	in := "Authorization: Bearer super-secret-token"
+	got := sanitizeRawSecrets(in)
+	if strings.Contains(got, "super-secret-token") {
+		t.Fatalf("expected bearer token to be redacted, got %q", got)
+	}
+	if !strings.Contains(strings.ToLower(got), "authorization: bearer [redacted]") {
+		t.Fatalf("expected bearer redaction marker, got %q", got)
+	}
+}
+
+func TestSanitizeRawSecretsJSONSecrets(t *testing.T) {
+	t.Parallel()
+
+	in := `{"token":"abc","safe":"ok","password":"p@ss"}`
+	got := sanitizeRawSecrets(in)
+	if strings.Contains(got, `"abc"`) || strings.Contains(got, `"p@ss"`) {
+		t.Fatalf("expected JSON secret values to be redacted, got %q", got)
+	}
+	if !strings.Contains(got, `"safe":"ok"`) {
+		t.Fatalf("expected non-secret JSON value to remain, got %q", got)
+	}
+}

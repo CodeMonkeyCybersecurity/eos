@@ -8,11 +8,15 @@ Script-based CI entrypoints for Gitea Actions (self-hosted, DinD runners).
 
 ```
 scripts/ci/
-  preflight.sh       # Runner health: /dev/null repair, Go cache setup
+  preflight.sh       # Runner health verification + Go cache setup
+  coverage-delta.sh  # PR coverage regression gate vs base branch
   lint.sh            # Lint lane: golangci-lint, gofmt, go vet, emoji check
-  test.sh            # Test lanes: unit, integration, e2e-smoke, e2e-full, fuzz
-  summary.sh         # Aggregates test JSONL output into GitHub Step Summary
-  security-checks.sh # Custom security pattern checks (TLS bypass, token exposure)
+  test.sh            # Policy-driven test lanes: unit/integration/e2e-smoke/e2e-full/fuzz
+  summary.sh         # Structured JSONL parser -> report.json + Step Summary markdown
+  security-checks.sh # Custom security checks + gosec allowlist validation
+
+test/ci/tool/
+  main.go            # YAML policy parser, JSONL summarizer, gosec allowlist checker
 ```
 
 ## Usage
@@ -26,17 +30,20 @@ make ci-unit          # Unit tests + coverage enforcement (>= 70%)
 make ci-integration   # Integration tests (Vault + PostgreSQL containers)
 make ci-e2e-smoke     # E2E smoke tests
 make ci-fuzz          # Bounded fuzz tests
+make ci-coverage-delta
 ```
 
 ## Design decisions
 
-- **DinD /dev/null repair**: `preflight.sh` repairs broken character devices (common in act_runner DinD containers where apt-get replaces them with regular files).
-- **grep over rg**: `security-checks.sh` uses POSIX `grep` for portability across runner images.
+- **Bootstrap repair in setup action**: `.github/actions/setup-go-env/action.yml` repairs `/dev/null` before apt installs.
+- **Policy-as-code**: `test.sh` reads lane gating and coverage thresholds from `test/ci/suites.yaml` via `test/ci/tool`.
+- **Port collision avoidance**: integration lane uses ephemeral host ports (`127.0.0.1::PORT`) and isolated docker network names.
 - **Fail-fast**: Scripts use `set -euo pipefail` and explicit exit codes. No `|| true` on critical paths.
-- **JSONL output**: Test lanes pipe `go test -json` to JSONL files for structured summary.
+- **Structured observability**: summary produces machine-readable `outputs/ci/report.json` and concise markdown.
 
 ## Related
 
 - Issue: #24
 - Workflow: `.github/workflows/ci.yml`
-- Suite definitions: `test/ci/suites.yaml` (policy documentation, not yet machine-consumed - see #32)
+- Suite definitions: `test/ci/suites.yaml` (machine-consumed)
+- Security allowlist: `test/ci/security-allowlist.yaml`

@@ -7,6 +7,7 @@ if [[ -z "${mode}" ]]; then
   exit 2
 fi
 
+SUITE_FILE="${CI_SUITE_FILE:-test/ci/suites.yaml}"
 mkdir -p outputs/ci
 
 run_with_timeout() {
@@ -19,9 +20,12 @@ run_with_timeout() {
   fi
 }
 
-is_integration_relevant_pr() {
+changed_files_path="outputs/ci/changed-files.txt"
+write_changed_files() {
+  : > "${changed_files_path}"
   local ci_event="${CI_EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
   local base_ref="${CI_BASE_REF:-${GITHUB_BASE_REF:-}}"
+
   if [[ "${ci_event}" != "pull_request" || -z "${base_ref}" ]]; then
     return 0
   fi
@@ -33,19 +37,7 @@ is_integration_relevant_pr() {
     return 0
   fi
 
-  local changed
-  changed="$(git diff --name-only "${base_rev}"...HEAD || true)"
-
-  while IFS= read -r path; do
-    [[ -z "${path}" ]] && continue
-    case "${path}" in
-      test/integration*|pkg/vault/*|pkg/backup/*|scripts/ci/*|.github/workflows/ci.yml)
-        return 0
-        ;;
-    esac
-  done <<< "${changed}"
-
-  return 1
+  git diff --name-only "${base_rev}"...HEAD > "${changed_files_path}" || true
 }
 
 run_unit() {
@@ -58,103 +50,101 @@ run_unit() {
   run_with_timeout 15m bash -c \
     'set -euo pipefail; go test -json -short -count=1 -race -vet=off ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... | tee outputs/ci/unit-race.jsonl; test ${PIPESTATUS[0]} -eq 0'
 
-  local coverage
+  local coverage threshold
   coverage="$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')"
+  threshold="$(go run ./test/ci/tool policy-threshold "${SUITE_FILE}" unit 70)"
   if [[ -z "${coverage}" ]]; then
     echo "::error::Unable to parse coverage from coverage.out"
     exit 1
   fi
-  echo "Unit coverage: ${coverage}%"
-  awk -v cov="${coverage}" 'BEGIN { if (cov < 70.0) exit 1 }' || {
-    echo "::error::Coverage ${coverage}% is below 70%"
+
+  echo "Unit coverage: ${coverage}% (threshold: ${threshold}%)"
+  awk -v cov="${coverage}" -v min="${threshold}" 'BEGIN { if (cov < min) exit 1 }' || {
+    echo "::error::Coverage ${coverage}% is below ${threshold}%"
     exit 1
   }
+
+  scripts/ci/coverage-delta.sh coverage.out
 }
 
 run_integration() {
   echo "Running integration lane"
-  if ! is_integration_relevant_pr; then
-    echo "Integration lane skipped: no integration-owned file changes on PR"
-    echo "skipped" > outputs/ci/integration.status
+
+  write_changed_files
+
+  local ci_event should_run
+  ci_event="${CI_EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
+  should_run="$(go run ./test/ci/tool policy-should-run "${SUITE_FILE}" integration "${ci_event}" "${changed_files_path}" default-true)"
+  if [[ "${should_run}" != "true" ]]; then
+    echo "Integration lane skipped by policy with reason: optional for this change set"
+    echo "skipped:optional_by_policy" > outputs/ci/integration.status
     return 0
   fi
 
+  local run_id network_name vault_container pg_container
+  run_id="${GITHUB_RUN_ID:-local}-$$"
+  network_name="eos-ci-net-${run_id}"
+  vault_container="vault-ci-${run_id}"
+  pg_container="postgres-ci-${run_id}"
+
   cleanup() {
-    docker rm -f vault-ci postgres-ci >/dev/null 2>&1 || true
-    docker network rm eos-ci-net >/dev/null 2>&1 || true
+    docker rm -f "${vault_container}" "${pg_container}" >/dev/null 2>&1 || true
+    docker network rm "${network_name}" >/dev/null 2>&1 || true
   }
   trap cleanup EXIT
 
   cleanup
+  docker network create "${network_name}" >/dev/null
 
-  docker run -d --name vault-ci \
-    -p 18200:8200 \
+  docker run -d --name "${vault_container}" \
+    --network "${network_name}" \
+    -p 127.0.0.1::8200 \
     -e VAULT_DEV_ROOT_TOKEN_ID=test-token \
     -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
     --cap-add=IPC_LOCK \
     hashicorp/vault:1.16 >/dev/null
 
-  docker run -d --name postgres-ci \
-    -p 15432:5432 \
+  docker run -d --name "${pg_container}" \
+    --network "${network_name}" \
+    -p 127.0.0.1::5432 \
     -e POSTGRES_PASSWORD=testpass \
     -e POSTGRES_DB=testdb \
     postgres:15 >/dev/null
 
-  local vault_cip pg_cip gw_ip vault_addr pg_addr vault_host
-  vault_cip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' vault-ci)"
-  pg_cip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' postgres-ci)"
-  gw_ip="$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo 172.17.0.1)"
+  local vault_port pg_port vault_addr
+  vault_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "8200/tcp") 0).HostPort}}' "${vault_container}")"
+  pg_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "${pg_container}")"
 
   vault_addr=""
-  for addr in "${vault_cip}:8200" "${gw_ip}:18200" "127.0.0.1:18200" "localhost:18200"; do
-    if curl -sf --connect-timeout 3 "http://${addr}/v1/sys/health" >/dev/null 2>&1; then
-      vault_addr="http://${addr}"
-      break
-    fi
-  done
-
-  if [[ -z "${vault_addr}" ]]; then
-    for _ in $(seq 1 30); do
-      for addr in "${vault_cip}:8200" "${gw_ip}:18200" "127.0.0.1:18200"; do
-        if curl -sf --connect-timeout 3 "http://${addr}/v1/sys/health" >/dev/null 2>&1; then
-          vault_addr="http://${addr}"
-          break 2
-        fi
-      done
-      sleep 2
-    done
-  fi
-
-  if [[ -z "${vault_addr}" ]]; then
-    echo "::error::Vault failed to become reachable"
-    docker logs vault-ci || true
-    exit 1
-  fi
-
   for _ in $(seq 1 30); do
-    if docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1; then
+    if curl -sf --connect-timeout 3 "http://127.0.0.1:${vault_port}/v1/sys/health" >/dev/null 2>&1; then
+      vault_addr="http://127.0.0.1:${vault_port}"
       break
     fi
     sleep 2
   done
-  docker exec postgres-ci pg_isready -U postgres >/dev/null 2>&1 || {
+
+  if [[ -z "${vault_addr}" ]]; then
+    echo "::error::Vault failed to become reachable"
+    docker logs "${vault_container}" || true
+    exit 1
+  fi
+
+  for _ in $(seq 1 30); do
+    if docker exec "${pg_container}" pg_isready -U postgres >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  docker exec "${pg_container}" pg_isready -U postgres >/dev/null 2>&1 || {
     echo "::error::PostgreSQL failed to become ready"
-    docker logs postgres-ci || true
+    docker logs "${pg_container}" || true
     exit 1
   }
 
-  vault_host="$(echo "${vault_addr}" | sed 's|http://||' | cut -d: -f1)"
-  if [[ "${vault_host}" == "${vault_cip}" ]]; then
-    pg_addr="${pg_cip}:5432"
-  elif [[ "${vault_host}" == "${gw_ip}" ]]; then
-    pg_addr="${gw_ip}:15432"
-  else
-    pg_addr="127.0.0.1:15432"
-  fi
-
   export VAULT_ADDR="${vault_addr}"
   export VAULT_TOKEN="test-token"
-  export POSTGRES_URL="postgres://postgres:testpass@${pg_addr}/testdb?sslmode=disable"
+  export POSTGRES_URL="postgres://postgres:testpass@127.0.0.1:${pg_port}/testdb?sslmode=disable"
 
   run_with_timeout 20m bash -c \
     'set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee outputs/ci/integration-suite.jsonl; test ${PIPESTATUS[0]} -eq 0'

@@ -2,7 +2,7 @@
 # Last Updated: 2025-10-23
 
 .PHONY: all build test lint lint-fix clean install help \
-	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz
+	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz ci-coverage-delta
 
 # Build configuration
 BINARY_NAME := eos
@@ -219,6 +219,10 @@ ci-e2e-smoke: ## Run CI smoke E2E lane entrypoint
 ci-fuzz: ## Run CI fuzz lane entrypoint
 	@echo "[INFO] Running CI fuzz lane..."
 	@scripts/ci/test.sh fuzz
+
+ci-coverage-delta: ## Run CI coverage delta check (PR context)
+	@echo "[INFO] Running CI coverage delta..."
+	@scripts/ci/coverage-delta.sh coverage.out
 
 ##@ Deployment
 

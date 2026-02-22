@@ -7,6 +7,22 @@ description: "Set up Go toolchain and install CGO library dependencies"
 runs:
   using: "composite"
   steps:
+    - name: Ensure /dev character devices before apt
+      shell: bash
+      run: |
+        set -euo pipefail
+        ensure_char_device() {
+          local path="$1" major="$2" minor="$3"
+          if [[ -c "${path}" ]] && echo "probe" > "${path}" 2>/dev/null; then
+            return 0
+          fi
+          echo "Repairing ${path} before dependency install"
+          sudo rm -f "${path}" 2>/dev/null || true
+          sudo mknod -m 666 "${path}" c "${major}" "${minor}"
+        }
+        ensure_char_device /dev/null 1 3
+        ensure_char_device /dev/zero 1 5
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:

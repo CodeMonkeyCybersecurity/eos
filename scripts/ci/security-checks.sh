@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Custom security checks for patterns that static analysis tools miss.
-# Uses grep (POSIX portable) instead of rg for runner compatibility.
-# Lines containing "# nosec", "#nosec", or "// nosec" are excluded.
+# Custom security checks for patterns static analysis can miss.
+# Exclusions must be explicit and issue-tracked; avoid package-wide suppressions.
 
 errors=0
 
@@ -17,7 +16,6 @@ check_violation() {
 
   grep -rn --include='*.go' --exclude-dir=vendor "${pattern}" . > "${tmp}" 2>/dev/null || true
 
-  # Always exclude test files, nosec annotations, and comment-only lines
   local base_exclude='_test\.go|# nosec|#nosec|// nosec|^\s*//'
   if [[ -n "${exclude_pattern}" ]]; then
     exclude_pattern="${base_exclude}|${exclude_pattern}"
@@ -37,18 +35,17 @@ check_violation() {
   fi
 }
 
-# Check 1: VAULT_SKIP_VERIFY=1 outside of vault infrastructure and known helpers
+# Check 1: VAULT_SKIP_VERIFY=1 should stay in vault lifecycle/setup-only code.
 check_violation \
   "VAULT_SKIP_VERIFY=1 in non-vault production code" \
   "VAULT_SKIP_VERIFY.*1" \
   "handleTLSValidationFailure|Eos_ALLOW_INSECURE_VAULT|# P0-2|pkg/vault/|zap\.String"
 
-# Check 2: InsecureSkipVerify=true outside of known internal-service packages.
-# Excluded: vault, httpclient (TLS helper), wazuh/ldap/hecate (internal comms, tracked as tech debt)
+# Check 2: InsecureSkipVerify=true with file-level temporary debt exceptions.
 check_violation \
-  "InsecureSkipVerify=true in non-infrastructure code" \
+  "InsecureSkipVerify=true without explicit suppression" \
   'InsecureSkipVerify.*true' \
-  "pkg/httpclient/|pkg/vault/|pkg/wazuh/|pkg/ldap/|pkg/hecate/|# INSECURE|#nosec G402|SECURITY:"
+  "pkg/httpclient/tls_helper\.go|pkg/httpclient/migration\.go|pkg/httpclient/config\.go|pkg/vault/cert_renewal\.go|pkg/vault/phase8_health_check\.go|pkg/vault/phase2_env_setup\.go|pkg/ldap/handler\.go|pkg/wazuh/http_tls\.go|pkg/wazuh/agents/agent\.go|pkg/hecate/debug_bionicgpt\.go|pkg/hecate/add/wazuh\.go|# INSECURE|#nosec G402|SECURITY:"
 
 # Check 3: VAULT_TOKEN string interpolation (token exposure)
 check_violation \
@@ -56,10 +53,18 @@ check_violation \
   'fmt\.Sprintf.*VAULT_TOKEN.*%s' \
   "VAULT_TOKEN_FILE|# P0-1|pkg/debug/"
 
+# Check gosec output against explicit allowlist (new findings fail).
+if [[ -f outputs/ci/gosec.json ]]; then
+  echo "Validating gosec findings against allowlist"
+  if ! go run ./test/ci/tool gosec-check outputs/ci/gosec.json test/ci/security-allowlist.yaml; then
+    errors=$((errors + 1))
+  fi
+fi
+
 if [[ "${errors}" -gt 0 ]]; then
   echo ""
   echo "::error::Security validation failed with ${errors} issue(s)"
-  echo "To suppress a known-safe finding, add '// nosec' or '#nosec' comment on the line."
+  echo "To suppress a known-safe finding, add '// nosec' or '#nosec' and link an issue."
   exit 1
 fi
 
