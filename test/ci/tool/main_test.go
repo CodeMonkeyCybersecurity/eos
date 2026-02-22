@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -63,5 +64,64 @@ func TestApprovedAllowlist(t *testing.T) {
 	}}
 	if !approved(issue, entries, time.Now().UTC()) {
 		t.Fatalf("expected allowlist approval")
+	}
+}
+
+func TestPolicyValidateRules(t *testing.T) {
+	t.Parallel()
+
+	valid := suitesConfig{
+		Version: 3,
+		Policy: policyConfig{
+			Weights:       policyWeights{Unit: 70, Integration: 20, E2E: 10},
+			RequiredLanes: []string{"unit", "integration", "e2e-smoke"},
+		},
+		Suites: []suiteConfig{
+			{Name: "unit", Weight: 70, Gate: gateConfig{RequiredOnPR: true, CoverageThreshold: 70}},
+			{Name: "integration", Weight: 20, Gate: gateConfig{RequiredOnPR: true}},
+			{Name: "e2e-smoke", Weight: 10, Gate: gateConfig{RequiredOnPR: true}},
+		},
+	}
+	if valid.Policy.Weights.Unit+valid.Policy.Weights.Integration+valid.Policy.Weights.E2E != 100 {
+		t.Fatalf("weights should sum to 100")
+	}
+	unit := findLane(valid, "unit")
+	if unit == nil || !unit.Gate.RequiredOnPR || unit.Gate.CoverageThreshold <= 0 {
+		t.Fatalf("unit lane policy invariant broken")
+	}
+	integ := findLane(valid, "integration")
+	if integ == nil || !integ.Gate.RequiredOnPR {
+		t.Fatalf("integration lane policy invariant broken")
+	}
+	e2e := findLane(valid, "e2e-smoke")
+	if e2e == nil || !e2e.Gate.RequiredOnPR {
+		t.Fatalf("e2e-smoke lane policy invariant broken")
+	}
+}
+
+func TestSummaryDoesNotUseCoverageWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	jsonl := filepath.Join(dir, "lane.jsonl")
+	reportPath := filepath.Join(dir, "report.json")
+	mdPath := filepath.Join(dir, "summary.md")
+	content := `{"Action":"pass","Package":"p/a","Test":"T1","Elapsed":0.1}` + "\n"
+	if err := os.WriteFile(jsonl, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmdSummary([]string{"unit", "success", dir, "-", reportPath, mdPath})
+
+	b, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r report
+	if err := json.Unmarshal(b, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.Coverage != "N/A" {
+		t.Fatalf("expected coverage to remain N/A when disabled, got %q", r.Coverage)
 	}
 }

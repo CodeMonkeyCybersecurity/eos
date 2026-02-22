@@ -18,12 +18,31 @@ import (
 
 type suitesConfig struct {
 	Version int           `yaml:"version"`
+	Policy  policyConfig  `yaml:"policy"`
 	Suites  []suiteConfig `yaml:"suites"`
+}
+
+type policyConfig struct {
+	Description   string         `yaml:"description"`
+	Weights       policyWeights  `yaml:"weights"`
+	RequiredLanes []string       `yaml:"required_lanes"`
+	Defaults      policyDefaults `yaml:"defaults"`
+}
+
+type policyWeights struct {
+	Unit        int `yaml:"unit"`
+	Integration int `yaml:"integration"`
+	E2E         int `yaml:"e2e"`
+}
+
+type policyDefaults struct {
+	RequiredOnPR bool `yaml:"required_on_pr"`
 }
 
 type suiteConfig struct {
 	Name   string     `yaml:"name"`
 	Weight int        `yaml:"weight"`
+	Owner  string     `yaml:"owner"`
 	Gate   gateConfig `yaml:"gate"`
 }
 
@@ -31,6 +50,9 @@ type gateConfig struct {
 	RequiredOnPR            bool     `yaml:"required_on_pr"`
 	RequiredOnPRWhenChanged []string `yaml:"required_on_pr_when_changed"`
 	CoverageThreshold       float64  `yaml:"coverage_threshold"`
+	RequiredOnSchedule      bool     `yaml:"required_on_schedule"`
+	InformationalOnPR       bool     `yaml:"informational_on_pr"`
+	ScheduledOrManualOnly   bool     `yaml:"scheduled_or_manual_only"`
 }
 
 type goTestEvent struct {
@@ -81,9 +103,11 @@ type gosecAllowlistItem struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		die("usage: go run ./test/ci/tool <policy-threshold|policy-should-run|summary|gosec-check> ...")
+		die("usage: go run ./test/ci/tool <policy-validate|policy-threshold|policy-should-run|summary|gosec-check> ...")
 	}
 	switch os.Args[1] {
+	case "policy-validate":
+		cmdPolicyValidate(os.Args[2:])
 	case "policy-threshold":
 		cmdPolicyThreshold(os.Args[2:])
 	case "policy-should-run":
@@ -95,6 +119,79 @@ func main() {
 	default:
 		die("unknown command: %s", os.Args[1])
 	}
+}
+
+func cmdPolicyValidate(args []string) {
+	if len(args) != 1 {
+		die("usage: ... policy-validate <suite.yaml>")
+	}
+	cfg := mustLoadSuites(args[0])
+
+	if cfg.Version <= 0 {
+		die("policy validation failed: version must be > 0")
+	}
+
+	total := cfg.Policy.Weights.Unit + cfg.Policy.Weights.Integration + cfg.Policy.Weights.E2E
+	if total != 100 {
+		die("policy validation failed: policy.weights must sum to 100 (got %d)", total)
+	}
+
+	if cfg.Policy.Weights.Unit != 70 || cfg.Policy.Weights.Integration != 20 || cfg.Policy.Weights.E2E != 10 {
+		die("policy validation failed: policy.weights must be unit=70 integration=20 e2e=10")
+	}
+
+	if len(cfg.Policy.RequiredLanes) == 0 {
+		die("policy validation failed: policy.required_lanes must not be empty")
+	}
+
+	suitesByName := map[string]suiteConfig{}
+	for _, s := range cfg.Suites {
+		suitesByName[s.Name] = s
+	}
+
+	for _, lane := range cfg.Policy.RequiredLanes {
+		if _, ok := suitesByName[lane]; !ok {
+			die("policy validation failed: required lane %q is missing in suites", lane)
+		}
+	}
+
+	unit := findLane(cfg, "unit")
+	if unit == nil {
+		die("policy validation failed: missing suite unit")
+	}
+	if unit.Weight != cfg.Policy.Weights.Unit {
+		die("policy validation failed: unit suite weight=%d does not match policy weight=%d", unit.Weight, cfg.Policy.Weights.Unit)
+	}
+	if !unit.Gate.RequiredOnPR {
+		die("policy validation failed: unit.gate.required_on_pr must be true")
+	}
+	if unit.Gate.CoverageThreshold <= 0 {
+		die("policy validation failed: unit.gate.coverage_threshold must be > 0")
+	}
+
+	integration := findLane(cfg, "integration")
+	if integration == nil {
+		die("policy validation failed: missing suite integration")
+	}
+	if integration.Weight != cfg.Policy.Weights.Integration {
+		die("policy validation failed: integration suite weight=%d does not match policy weight=%d", integration.Weight, cfg.Policy.Weights.Integration)
+	}
+	if !integration.Gate.RequiredOnPR {
+		die("policy validation failed: integration.gate.required_on_pr must be true")
+	}
+
+	e2eSmoke := findLane(cfg, "e2e-smoke")
+	if e2eSmoke == nil {
+		die("policy validation failed: missing suite e2e-smoke")
+	}
+	if e2eSmoke.Weight != cfg.Policy.Weights.E2E {
+		die("policy validation failed: e2e-smoke suite weight=%d does not match policy weight=%d", e2eSmoke.Weight, cfg.Policy.Weights.E2E)
+	}
+	if !e2eSmoke.Gate.RequiredOnPR {
+		die("policy validation failed: e2e-smoke.gate.required_on_pr must be true")
+	}
+
+	fmt.Println("policy valid")
 }
 
 func cmdPolicyThreshold(args []string) {
@@ -147,7 +244,7 @@ func cmdPolicyShouldRun(args []string) {
 
 func cmdSummary(args []string) {
 	if len(args) != 6 {
-		die("usage: ... summary <lane> <status> <log-dir> <coverage-file> <report-out> <md-out|- for stdout>")
+		die("usage: ... summary <lane> <status> <lane-log-dir> <coverage-file|-> <report-out> <md-out|- for stdout>")
 	}
 	r := report{Lane: args[0], Status: args[1], Coverage: "N/A", Packages: map[string]float64{}, GeneratedUTC: time.Now().UTC().Format(time.RFC3339)}
 	logDir := args[2]
@@ -168,8 +265,10 @@ func cmdSummary(args []string) {
 		r.TopFailures = r.TopFailures[:10]
 	}
 	r.FlakeCount = countFlakes(logDir)
-	if cov, err := parseCoverage(coverageFile); err == nil {
-		r.Coverage = cov
+	if coverageFile != "-" {
+		if cov, err := parseCoverage(coverageFile); err == nil {
+			r.Coverage = cov
+		}
 	}
 	writeJSON(reportOut, r)
 	md := renderSummaryMarkdown(r)
@@ -413,6 +512,9 @@ func renderSummaryMarkdown(r report) string {
 		for _, f := range r.TopFailures {
 			fmt.Fprintf(b, "  - `%s`\n", f)
 		}
+		fmt.Fprintf(b, "- Next action: re-run the lane locally and start with the first failing test above.\n")
+	} else if r.Status == "success" {
+		fmt.Fprintf(b, "- Next action: no action required.\n")
 	}
 	return b.String()
 }

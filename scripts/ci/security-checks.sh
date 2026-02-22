@@ -5,6 +5,8 @@ set -euo pipefail
 # Exclusions must be explicit and issue-tracked; avoid package-wide suppressions.
 
 errors=0
+allowlist_file="${CI_SECURITY_ALLOWLIST_FILE:-test/ci/security-allowlist.yaml}"
+security_dir="${CI_SECURITY_DIR:-outputs/ci/security-audit}"
 
 check_violation() {
   local label="$1"
@@ -35,6 +37,13 @@ check_violation() {
   fi
 }
 
+# Wildcard allowlists defeat the security gate; fail fast when present.
+if grep -Eq '^\s*rule_id:\s*"?\*"?\s*$' "${allowlist_file}" \
+  && grep -Eq '^\s*file_regex:\s*"?\.\*"?\s*$' "${allowlist_file}"; then
+  echo "::error::security allowlist contains a global wildcard entry; replace with explicit rule/file entries"
+  exit 1
+fi
+
 # Check 1: VAULT_SKIP_VERIFY=1 should stay in vault lifecycle/setup-only code.
 check_violation \
   "VAULT_SKIP_VERIFY=1 in non-vault production code" \
@@ -54,9 +63,9 @@ check_violation \
   "VAULT_TOKEN_FILE|# P0-1|pkg/debug/"
 
 # Check gosec output against explicit allowlist (new findings fail).
-if [[ -f outputs/ci/gosec.json ]]; then
+if [[ -f "${security_dir}/gosec.json" ]]; then
   echo "Validating gosec findings against allowlist"
-  if ! go run ./test/ci/tool gosec-check outputs/ci/gosec.json test/ci/security-allowlist.yaml; then
+  if ! go run ./test/ci/tool gosec-check "${security_dir}/gosec.json" "${allowlist_file}"; then
     errors=$((errors + 1))
   fi
 fi

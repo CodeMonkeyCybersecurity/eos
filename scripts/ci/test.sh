@@ -8,7 +8,8 @@ if [[ -z "${mode}" ]]; then
 fi
 
 SUITE_FILE="${CI_SUITE_FILE:-test/ci/suites.yaml}"
-mkdir -p outputs/ci
+lane_dir="outputs/ci/${mode}"
+mkdir -p "${lane_dir}"
 
 run_with_timeout() {
   local limit="$1"
@@ -20,7 +21,7 @@ run_with_timeout() {
   fi
 }
 
-changed_files_path="outputs/ci/changed-files.txt"
+changed_files_path="${lane_dir}/changed-files.txt"
 write_changed_files() {
   : > "${changed_files_path}"
   local ci_event="${CI_EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
@@ -42,19 +43,24 @@ write_changed_files() {
 
 run_unit() {
   echo "Running unit lane"
+  local unit_jsonl race_jsonl coverage_file
+  unit_jsonl="${lane_dir}/unit-test.jsonl"
+  race_jsonl="${lane_dir}/unit-race.jsonl"
+  coverage_file="${lane_dir}/coverage.out"
+
   run_with_timeout 8m go build -o /tmp/eos-build ./cmd/
 
   run_with_timeout 20m bash -c \
-    'set -euo pipefail; go test -json -short -count=1 -vet=off -coverprofile=coverage.out -covermode=atomic -p 4 ./pkg/... | tee outputs/ci/unit-test.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -short -count=1 -vet=off -coverprofile='${coverage_file}' -covermode=atomic -p 4 ./pkg/... | tee '${unit_jsonl}'; test \${PIPESTATUS[0]} -eq 0"
 
   run_with_timeout 15m bash -c \
-    'set -euo pipefail; go test -json -short -count=1 -race -vet=off ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... | tee outputs/ci/unit-race.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -short -count=1 -race -vet=off ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... | tee '${race_jsonl}'; test \${PIPESTATUS[0]} -eq 0"
 
   local coverage threshold
-  coverage="$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')"
+  coverage="$(go tool cover -func="${coverage_file}" | awk '/^total:/ {gsub("%","",$3); print $3}')"
   threshold="$(go run ./test/ci/tool policy-threshold "${SUITE_FILE}" unit 70)"
   if [[ -z "${coverage}" ]]; then
-    echo "::error::Unable to parse coverage from coverage.out"
+    echo "::error::Unable to parse coverage from ${coverage_file}"
     exit 1
   fi
 
@@ -64,7 +70,7 @@ run_unit() {
     exit 1
   }
 
-  scripts/ci/coverage-delta.sh coverage.out
+  scripts/ci/coverage-delta.sh "${coverage_file}"
 }
 
 run_integration() {
@@ -77,7 +83,7 @@ run_integration() {
   should_run="$(go run ./test/ci/tool policy-should-run "${SUITE_FILE}" integration "${ci_event}" "${changed_files_path}" default-true)"
   if [[ "${should_run}" != "true" ]]; then
     echo "Integration lane skipped by policy with reason: optional for this change set"
-    echo "skipped:optional_by_policy" > outputs/ci/integration.status
+    echo "skipped:optional_by_policy" > "${lane_dir}/integration.status"
     return 0
   fi
 
@@ -102,14 +108,14 @@ run_integration() {
     -e VAULT_DEV_ROOT_TOKEN_ID=test-token \
     -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
     --cap-add=IPC_LOCK \
-    hashicorp/vault:1.16 >/dev/null
+    hashicorp/vault:1.16@sha256:c5e04689611cb864b8b6247a6a845e0bdc059998f39b5c8a659562287379525c >/dev/null
 
   docker run -d --name "${pg_container}" \
     --network "${network_name}" \
     -p 127.0.0.1::5432 \
     -e POSTGRES_PASSWORD=testpass \
     -e POSTGRES_DB=testdb \
-    postgres:15 >/dev/null
+    postgres:15@sha256:dafc4d8e8369da730a5ee9a320a0f0b3c6aa516f41244689c4493a27dc84472d >/dev/null
 
   local vault_port pg_port vault_addr
   vault_port="$(docker inspect -f '{{(index (index .NetworkSettings.Ports "8200/tcp") 0).HostPort}}' "${vault_container}")"
@@ -147,39 +153,39 @@ run_integration() {
   export POSTGRES_URL="postgres://postgres:testpass@127.0.0.1:${pg_port}/testdb?sslmode=disable"
 
   run_with_timeout 20m bash -c \
-    'set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee outputs/ci/integration-suite.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee '${lane_dir}/integration-suite.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
-    'set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee outputs/ci/integration-backup.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
-    'set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/vault/... | tee outputs/ci/integration-vault.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/vault/... | tee '${lane_dir}/integration-vault.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 }
 
 run_e2e_smoke() {
   echo "Running e2e smoke lane"
   run_with_timeout 15m bash -c \
-    'set -euo pipefail; go test -json -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/... | tee outputs/ci/e2e-smoke.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/... | tee '${lane_dir}/e2e-smoke.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 }
 
 run_e2e_full() {
   echo "Running e2e full lane"
   export EOS_E2E_FULL_APPROVED="true"
   run_with_timeout 75m bash -c \
-    'set -euo pipefail; go test -json -v -tags=e2e_full -timeout=60m ./test/e2e/full/... | tee outputs/ci/e2e-full.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -v -tags=e2e_full -timeout=60m ./test/e2e/full/... | tee '${lane_dir}/e2e-full.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 }
 
 run_fuzz() {
   echo "Running bounded fuzz lane"
 
   for func_name in FuzzValidateStrongPassword FuzzHashString FuzzHashStrings FuzzAllUnique FuzzAllHashesPresent FuzzRedact FuzzInjectSecretsFromPlaceholders FuzzSecureZero; do
-    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/crypto | tee -a outputs/ci/fuzz-crypto.jsonl; test \\${PIPESTATUS[0]} -eq 0"
+    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/crypto | tee -a '${lane_dir}/fuzz-crypto.jsonl'; test \\${PIPESTATUS[0]} -eq 0"
   done
 
   for func_name in FuzzValidateNonEmpty FuzzValidateUsername FuzzValidateEmail FuzzValidateURL FuzzValidateIP FuzzValidateNoShellMeta; do
-    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/interaction | tee -a outputs/ci/fuzz-interaction.jsonl; test \\${PIPESTATUS[0]} -eq 0"
+    run_with_timeout 3m bash -c "set -euo pipefail; go test -json -run=^${func_name}$ -fuzz=^${func_name}$ -fuzztime=5s ./pkg/interaction | tee -a '${lane_dir}/fuzz-interaction.jsonl'; test \\${PIPESTATUS[0]} -eq 0"
   done
 
   run_with_timeout 3m bash -c \
-    'set -euo pipefail; go test -json -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime=5s ./pkg/parse | tee outputs/ci/fuzz-parse.jsonl; test ${PIPESTATUS[0]} -eq 0'
+    "set -euo pipefail; go test -json -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime=5s ./pkg/parse | tee '${lane_dir}/fuzz-parse.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 }
 
 case "${mode}" in

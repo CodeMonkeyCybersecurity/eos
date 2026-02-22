@@ -24,7 +24,7 @@ runs:
         ensure_char_device /dev/zero 1 5
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
         go-version-file: go.mod
         cache: true

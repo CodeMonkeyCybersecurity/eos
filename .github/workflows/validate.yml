@@ -16,9 +16,17 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go for actionlint
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Validate YAML syntax
         run: |
@@ -47,17 +55,24 @@ jobs:
           done
           echo "All workflow files have required structure"
 
+      - name: Run actionlint
+        run: |
+          if command -v go >/dev/null 2>&1; then
+            go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.11 -color
+          else
+            echo "::warning::go runtime is unavailable; skipping actionlint"
+          fi
+
       - name: Check composite action references
         run: |
-          # Verify that referenced composite actions exist
           rm -f /tmp/validate-action-fail
           for file in .github/workflows/*.yml; do
-            # grep returns exit 1 on no-match; || true prevents pipefail
-            ACTIONS=$(grep -o 'uses: \.\/\.github\/actions\/[^/]*' "$file" 2>/dev/null || true)
+            ACTIONS=$(grep -o 'uses: \.\/\.github\/actions\/[^[:space:]]*' "$file" 2>/dev/null || true)
             if [ -z "$ACTIONS" ]; then
               continue
             fi
             echo "$ACTIONS" | sed 's|uses: \./\.github/actions/||' | sort -u | while read -r action; do
+              action="${action%/}"
               if [ -n "$action" ] && [ ! -f ".github/actions/$action/action.yml" ]; then
                 echo "::error file=$file::References nonexistent action: .github/actions/$action"
                 echo "FAIL" > /tmp/validate-action-fail

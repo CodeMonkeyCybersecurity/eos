@@ -21,13 +21,18 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -51,28 +56,39 @@ jobs:
         env:
           CI_LANE: lint
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/lint-report.json
-          CI_SUMMARY_FILE: outputs/ci/lint-summary.md
+          CI_LOG_DIR: outputs/ci/lint
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/lint/report.json
+          CI_SUMMARY_FILE: outputs/ci/lint/summary.md
         run: scripts/ci/summary.sh
 
-      - name: Print lint report artifact
+      - name: Bundle lint artifacts
         if: always()
         run: |
-          ls -la outputs/ci || true
-          test -f outputs/ci/lint-report.json && cat outputs/ci/lint-report.json || true
+          tar -czf outputs/ci/lint-artifacts.tgz -C outputs/ci lint || true
+          ls -lh outputs/ci/lint-artifacts.tgz || true
+
+      - name: Print lint report
+        if: always()
+        run: |
+          test -f outputs/ci/lint/report.json && cat outputs/ci/lint/report.json || true
 
   ci-unit:
     name: ci-unit
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -89,29 +105,39 @@ jobs:
         env:
           CI_LANE: unit
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_COVERAGE_FILE: coverage.out
-          CI_REPORT_FILE: outputs/ci/unit-report.json
-          CI_SUMMARY_FILE: outputs/ci/unit-summary.md
+          CI_LOG_DIR: outputs/ci/unit
+          CI_COVERAGE_FILE: outputs/ci/unit/coverage.out
+          CI_REPORT_FILE: outputs/ci/unit/report.json
+          CI_SUMMARY_FILE: outputs/ci/unit/summary.md
         run: scripts/ci/summary.sh
 
-      - name: Print unit report artifact
+      - name: Bundle unit artifacts
         if: always()
         run: |
-          ls -la outputs/ci || true
-          test -f outputs/ci/unit-report.json && cat outputs/ci/unit-report.json || true
+          tar -czf outputs/ci/unit-artifacts.tgz -C outputs/ci unit || true
+          ls -lh outputs/ci/unit-artifacts.tgz || true
+
+      - name: Print unit report
+        if: always()
+        run: |
+          test -f outputs/ci/unit/report.json && cat outputs/ci/unit/report.json || true
 
   ci-integration:
     name: ci-integration
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -128,26 +154,39 @@ jobs:
         env:
           CI_LANE: integration
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/integration-report.json
-          CI_SUMMARY_FILE: outputs/ci/integration-summary.md
+          CI_LOG_DIR: outputs/ci/integration
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/integration/report.json
+          CI_SUMMARY_FILE: outputs/ci/integration/summary.md
         run: scripts/ci/summary.sh
 
-      - name: Print integration report artifact
+      - name: Bundle integration artifacts
         if: always()
         run: |
-          ls -la outputs/ci || true
-          test -f outputs/ci/integration-report.json && cat outputs/ci/integration-report.json || true
+          tar -czf outputs/ci/integration-artifacts.tgz -C outputs/ci integration || true
+          ls -lh outputs/ci/integration-artifacts.tgz || true
+
+      - name: Print integration report
+        if: always()
+        run: |
+          test -f outputs/ci/integration/report.json && cat outputs/ci/integration/report.json || true
 
   ci-e2e-smoke:
     name: ci-e2e-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -162,20 +201,39 @@ jobs:
         env:
           CI_LANE: e2e-smoke
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/e2e-smoke-report.json
-          CI_SUMMARY_FILE: outputs/ci/e2e-smoke-summary.md
+          CI_LOG_DIR: outputs/ci/e2e-smoke
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/e2e-smoke/report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-smoke/summary.md
         run: scripts/ci/summary.sh
+
+      - name: Bundle e2e smoke artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/e2e-smoke-artifacts.tgz -C outputs/ci e2e-smoke || true
+          ls -lh outputs/ci/e2e-smoke-artifacts.tgz || true
+
+      - name: Print e2e smoke report
+        if: always()
+        run: |
+          test -f outputs/ci/e2e-smoke/report.json && cat outputs/ci/e2e-smoke/report.json || true
 
   ci-fuzz:
     name: ci-fuzz
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -190,21 +248,40 @@ jobs:
         env:
           CI_LANE: fuzz
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/fuzz-report.json
-          CI_SUMMARY_FILE: outputs/ci/fuzz-summary.md
+          CI_LOG_DIR: outputs/ci/fuzz
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/fuzz/report.json
+          CI_SUMMARY_FILE: outputs/ci/fuzz/summary.md
         run: scripts/ci/summary.sh
+
+      - name: Bundle fuzz artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/fuzz-artifacts.tgz -C outputs/ci fuzz || true
+          ls -lh outputs/ci/fuzz-artifacts.tgz || true
+
+      - name: Print fuzz report
+        if: always()
+        run: |
+          test -f outputs/ci/fuzz/report.json && cat outputs/ci/fuzz/report.json || true
 
   ci-e2e-full:
     name: ci-e2e-full
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -219,7 +296,19 @@ jobs:
         env:
           CI_LANE: e2e-full
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/e2e-full-report.json
-          CI_SUMMARY_FILE: outputs/ci/e2e-full-summary.md
+          CI_LOG_DIR: outputs/ci/e2e-full
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/e2e-full/report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-full/summary.md
         run: scripts/ci/summary.sh
+
+      - name: Bundle e2e full artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/e2e-full-artifacts.tgz -C outputs/ci e2e-full || true
+          ls -lh outputs/ci/e2e-full-artifacts.tgz || true
+
+      - name: Print e2e full report
+        if: always()
+        run: |
+          test -f outputs/ci/e2e-full/report.json && cat outputs/ci/e2e-full/report.json || true

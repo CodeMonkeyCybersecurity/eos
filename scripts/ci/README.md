@@ -16,7 +16,7 @@ scripts/ci/
   security-checks.sh # Custom security checks + gosec allowlist validation
 
 test/ci/tool/
-  main.go            # YAML policy parser, JSONL summarizer, gosec allowlist checker
+  main.go            # Policy validator, JSONL summarizer, gosec allowlist checker
 ```
 
 ## Usage
@@ -37,9 +37,10 @@ make ci-coverage-delta
 
 - **Bootstrap repair in setup action**: `.github/actions/setup-go-env/action.yml` repairs `/dev/null` before apt installs.
 - **Policy-as-code**: `test.sh` reads lane gating and coverage thresholds from `test/ci/suites.yaml` via `test/ci/tool`.
+- **Policy guardrail**: every lane runs `policy-validate` before execution (enforces 70/20/10 and required PR lanes).
 - **Port collision avoidance**: integration lane uses ephemeral host ports (`127.0.0.1::PORT`) and isolated docker network names.
-- **Fail-fast**: Scripts use `set -euo pipefail` and explicit exit codes. No `|| true` on critical paths.
-- **Structured observability**: summary produces machine-readable `outputs/ci/report.json` and concise markdown.
+- **Fail-fast**: Scripts use `set -euo pipefail` and explicit exit codes.
+- **Structured observability**: lane-scoped outputs at `outputs/ci/<lane>/` with machine-readable report + concise markdown.
 
 ## Related
 

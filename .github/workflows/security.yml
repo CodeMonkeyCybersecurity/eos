@@ -20,13 +20,18 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Setup Go environment
         uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
       - name: CI preflight
         run: scripts/ci/preflight.sh
@@ -39,14 +44,17 @@ jobs:
       - name: Run gosec (emit JSON for allowlist gate)
         continue-on-error: true
         run: |
-          mkdir -p outputs/ci
+          mkdir -p outputs/ci/security-audit
           GOSEC_BIN="$(go env GOPATH)/bin/gosec"
-          "${GOSEC_BIN}" -fmt=json -severity=medium -confidence=medium ./... > outputs/ci/gosec.json
+          "${GOSEC_BIN}" -fmt=json -severity=medium -confidence=medium ./... > outputs/ci/security-audit/gosec.json
 
       - name: Run govulncheck
         run: govulncheck ./...
 
       - name: Run custom security checks
+        env:
+          CI_SECURITY_DIR: outputs/ci/security-audit
+          CI_SECURITY_ALLOWLIST_FILE: test/ci/security-allowlist.yaml
         run: scripts/ci/security-checks.sh
 
       - name: Summarize security lane
@@ -54,24 +62,32 @@ jobs:
         env:
           CI_LANE: security-audit
           CI_STATUS: ${{ job.status }}
-          CI_LOG_DIR: outputs/ci
-          CI_REPORT_FILE: outputs/ci/security-report.json
-          CI_SUMMARY_FILE: outputs/ci/security-summary.md
+          CI_LOG_DIR: outputs/ci/security-audit
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/security-audit/report.json
+          CI_SUMMARY_FILE: outputs/ci/security-audit/summary.md
         run: scripts/ci/summary.sh
 
-      - name: Print security report artifact
+      - name: Bundle security artifacts
         if: always()
         run: |
-          ls -la outputs/ci || true
-          test -f outputs/ci/security-report.json && cat outputs/ci/security-report.json || true
-          test -f outputs/ci/gosec.json && head -200 outputs/ci/gosec.json || true
+          tar -czf outputs/ci/security-audit-artifacts.tgz -C outputs/ci security-audit || true
+          ls -lh outputs/ci/security-audit-artifacts.tgz || true
+
+      - name: Print security report
+        if: always()
+        run: |
+          test -f outputs/ci/security-audit/report.json && cat outputs/ci/security-audit/report.json || true
+          test -f outputs/ci/security-audit/gosec.json && head -200 outputs/ci/security-audit/gosec.json || true
 
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 

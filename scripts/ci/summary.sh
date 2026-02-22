@@ -3,8 +3,8 @@ set -euo pipefail
 
 lane="${1:-${CI_LANE:-unknown}}"
 status="${2:-${CI_STATUS:-unknown}}"
-coverage_file="${CI_COVERAGE_FILE:-coverage.out}"
-log_dir="${CI_LOG_DIR:-outputs/ci}"
+coverage_file="${CI_COVERAGE_FILE:--}"
+log_dir="${CI_LOG_DIR:-outputs/ci/${lane}}"
 report_file="${CI_REPORT_FILE:-${log_dir}/report.json}"
 md_file="${CI_SUMMARY_FILE:-${log_dir}/summary.md}"
 
