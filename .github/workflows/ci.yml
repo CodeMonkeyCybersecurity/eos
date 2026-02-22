@@ -151,8 +151,28 @@ jobs:
       - name: Build
         run: go build -o /tmp/eos-build ./cmd/
 
+      - name: Verify /dev/null before tests
+        run: |
+          echo "Pre-test /dev/null status:"
+          ls -la /dev/null
+          file /dev/null
+          stat /dev/null
+          # Force recreate right before tests
+          sudo rm -f /dev/null 2>/dev/null || true
+          sudo mknod -m 666 /dev/null c 1 3
+          echo "Recreated. Verify:"
+          ls -la /dev/null
+          # Also check /dev/zero which Go might need
+          ls -la /dev/zero 2>/dev/null || { sudo mknod -m 666 /dev/zero c 1 5; echo "Created /dev/zero"; }
+          # Check if we're in a PID/mount namespace
+          cat /proc/1/cgroup 2>/dev/null | head -5 || true
+          ls -la /proc/self/ns/ 2>/dev/null | head -5 || true
+
       - name: Run unit tests with race detector and coverage
-        run: go test -short -race -timeout=10m -coverprofile=coverage.out -covermode=atomic ./pkg/...
+        run: |
+          # Verify /dev/null one final time
+          ls -la /dev/null || { echo "CRITICAL: /dev/null disappeared!"; sudo mknod -m 666 /dev/null c 1 3; }
+          go test -short -race -timeout=10m -coverprofile=coverage.out -covermode=atomic ./pkg/...
 
       - name: Enforce unit coverage >= 70%
         run: |
