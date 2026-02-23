@@ -122,6 +122,56 @@ jobs:
         run: |
           test -f outputs/ci/unit/report.json && cat outputs/ci/unit/report.json || true
 
+  ci-deps-unit:
+    name: ci-deps-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run dependency-focused unit lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh deps-unit
+
+      - name: Summarize dependency-focused unit lane
+        if: always()
+        env:
+          CI_LANE: deps-unit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/deps-unit
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/deps-unit/report.json
+          CI_SUMMARY_FILE: outputs/ci/deps-unit/summary.md
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/summary.sh
+
+      - name: Bundle dependency-focused unit artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/deps-unit-artifacts.tgz -C outputs/ci deps-unit || true
+          ls -lh outputs/ci/deps-unit-artifacts.tgz || true
+
+      - name: Print dependency-focused unit report
+        if: always()
+        run: |
+          test -f outputs/ci/deps-unit/report.json && cat outputs/ci/deps-unit/report.json || true
+
   ci-integration:
     name: ci-integration
     runs-on: ubuntu-latest
