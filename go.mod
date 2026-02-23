@@ -1,6 +1,6 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.25.0
+go 1.25.5
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -25,7 +25,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.1-0.20230522191255-76236955d466
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/hashicorp/consul/api v1.20.0
+	github.com/hashicorp/consul/api v1.33.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/hcl/v2 v2.24.0
