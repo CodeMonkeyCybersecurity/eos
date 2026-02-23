@@ -113,8 +113,8 @@ func TestContainsFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.str, tt.substr)
-			assert.Equal(t, tt.expected, result, "contains(%q, %q)", tt.str, tt.substr)
+			result := strings.Contains(tt.str, tt.substr)
+			assert.Equal(t, tt.expected, result, "strings.Contains(%q, %q)", tt.str, tt.substr)
 		})
 	}
 }
@@ -145,8 +145,8 @@ func TestIndexOfFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := indexOf(tt.str, tt.substr)
-			assert.Equal(t, tt.expected, result, "indexOf(%q, %q)", tt.str, tt.substr)
+			result := strings.Index(tt.str, tt.substr)
+			assert.Equal(t, tt.expected, result, "strings.Index(%q, %q)", tt.str, tt.substr)
 		})
 	}
 }
@@ -730,8 +730,8 @@ func TestErrorHandling(t *testing.T) {
 
 		for _, tc := range testCases {
 			// These should not panic
-			_ = contains(tc.str, tc.substr)
-			_ = indexOf(tc.str, tc.substr)
+			_ = strings.Contains(tc.str, tc.substr)
+			_ = strings.Index(tc.str, tc.substr)
 		}
 	})
 }

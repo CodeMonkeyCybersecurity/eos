@@ -26,6 +26,15 @@ suites:
     gate:
       required_on_pr: true
 
+  - name: deps-unit
+    weight: 0
+    owner: "platform-core"
+    gate:
+      required_on_pr: false
+      required_on_pr_when_changed:
+        - go.mod
+        - go.sum
+
   - name: e2e-smoke
     weight: 10
     owner: "platform-e2e"
