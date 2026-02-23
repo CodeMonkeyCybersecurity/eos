@@ -41,7 +41,9 @@ func TestParseJSONL(t *testing.T) {
 
 	r := report{Packages: map[string]float64{}}
 	failures := map[string]struct{}{}
-	if err := parseJSONL(file, &r, failures); err != nil {
+	failedPackages := map[string]int{}
+	window := &timeWindow{}
+	if err := parseJSONL(file, &r, failures, failedPackages, window); err != nil {
 		t.Fatal(err)
 	}
 	if r.Pass != 1 || r.Fail != 1 || r.Skip != 1 {
@@ -49,6 +51,9 @@ func TestParseJSONL(t *testing.T) {
 	}
 	if _, ok := failures["p/a::T2"]; !ok {
 		t.Fatalf("expected failed test key")
+	}
+	if got := failedPackages["p/a"]; got != 1 {
+		t.Fatalf("expected failed package count to be 1, got %d", got)
 	}
 }
 
@@ -123,5 +128,19 @@ func TestSummaryDoesNotUseCoverageWhenDisabled(t *testing.T) {
 	}
 	if r.Coverage != "N/A" {
 		t.Fatalf("expected coverage to remain N/A when disabled, got %q", r.Coverage)
+	}
+}
+
+func TestHasDependencyFileChange(t *testing.T) {
+	t.Parallel()
+
+	if !hasDependencyFileChange([]string{"go.mod", "pkg/x.go"}) {
+		t.Fatalf("expected go.mod change to be detected")
+	}
+	if !hasDependencyFileChange([]string{"cmd/a/main.go", "internal/go.sum"}) {
+		t.Fatalf("expected go.sum change to be detected")
+	}
+	if hasDependencyFileChange([]string{"README.md", "pkg/x.go"}) {
+		t.Fatalf("did not expect non-dependency file changes to be detected")
 	}
 }

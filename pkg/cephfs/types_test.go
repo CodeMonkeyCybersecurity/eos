@@ -74,6 +74,11 @@ func TestConfig_GetMONCount(t *testing.T) {
 			config:   &Config{MONCount: 5},
 			expected: 5,
 		},
+		{
+			name:     "negative MON count falls back to default",
+			config:   &Config{MONCount: -1},
+			expected: DefaultMONCount,
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,6 +105,11 @@ func TestConfig_GetMGRCount(t *testing.T) {
 			name:     "custom MGR count",
 			config:   &Config{MGRCount: 3},
 			expected: 3,
+		},
+		{
+			name:     "negative MGR count falls back to default",
+			config:   &Config{MGRCount: -1},
+			expected: DefaultMGRCount,
 		},
 	}
 

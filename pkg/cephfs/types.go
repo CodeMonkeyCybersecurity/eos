@@ -1,9 +1,8 @@
 package cephfs
 
 import (
+	"strings"
 	"time"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Config represents the configuration options for CephFS deployment
@@ -63,7 +62,7 @@ func (c *Config) GetOSDMemoryTarget() string {
 
 // GetMONCount returns the MON count with fallback to default
 func (c *Config) GetMONCount() int {
-	if c.MONCount == 0 {
+	if c.MONCount <= 0 {
 		return DefaultMONCount
 	}
 	return c.MONCount
@@ -71,7 +70,7 @@ func (c *Config) GetMONCount() int {
 
 // GetMGRCount returns the MGR count with fallback to default
 func (c *Config) GetMGRCount() int {
-	if c.MGRCount == 0 {
+	if c.MGRCount <= 0 {
 		return DefaultMGRCount
 	}
 	return c.MGRCount
@@ -155,11 +154,17 @@ const (
 	DefaultMGRCount        = 2
 	DefaultSSHUser         = "root"
 
-	// CephFS specific ports from shared/ports.go
-	CephMONPort = 6789
-	CephMGRPort = shared.PortConsul // Use next available port: 8161
-	CephOSDPort = 6800              // Base port, OSDs use 6800-6900 range
-	CephFSPort  = 6810              // CephFS metadata server port
+	// CephFS specific ports
+	CephMONPort = 6789 // Standard Ceph monitor port
+	CephMGRPort = 8263 // Ceph manager dashboard (next available prime after shared ports)
+	CephOSDPort = 6800 // Base port, OSDs use 6800-6900 range
+	CephFSPort  = 6810 // CephFS metadata server port
+
+	// Client defaults
+	DefaultClusterName    = "ceph"
+	DefaultCephUser       = "admin"
+	DefaultConnectTimeout = 30 * time.Second
+	DefaultOpTimeout      = 60 * time.Second
 
 	// Health check timeouts
 	DefaultHealthCheckTimeout  = 5 * time.Minute
@@ -212,10 +217,9 @@ type CephDeviceSpec struct {
 	Rotational *bool    `yaml:"rotational,omitempty"`
 }
 
-// GetCephMGRPort returns the next available port for CephFS MGR
+// GetCephMGRPort returns the Ceph manager dashboard port
 func GetCephMGRPort() int {
-	// Use the next available port from shared/ports.go
-	return 8263 // Next available prime after shared ports
+	return CephMGRPort
 }
 
 // GetTerraformCephConfigPath returns the path to the Terraform configuration
@@ -232,7 +236,7 @@ func IsValidCephImage(image string) bool {
 	}
 
 	// Must contain a colon for tag
-	if !contains(image, ":") {
+	if !strings.Contains(image, ":") {
 		return false
 	}
 
@@ -244,35 +248,12 @@ func IsValidCephImage(image string) bool {
 	}
 
 	for _, registry := range validRegistries {
-		if len(image) >= len(registry) && image[:len(registry)] == registry {
+		if strings.HasPrefix(image, registry) {
 			return true
 		}
 	}
 
 	return false
-}
-
-// contains checks if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr ||
-			(len(s) > len(substr) &&
-				(s[:len(substr)] == substr ||
-					s[len(s)-len(substr):] == substr ||
-					indexOf(s, substr) >= 0)))
-}
-
-// indexOf returns the index of the first occurrence of substr in s
-func indexOf(s, substr string) int {
-	if len(substr) == 0 {
-		return 0
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
 }
 
 // VolumeInfo represents CephFS volume information

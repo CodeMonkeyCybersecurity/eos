@@ -3,7 +3,7 @@ set -euo pipefail
 
 mode="${1:-}"
 if [[ -z "${mode}" ]]; then
-  echo "Usage: $0 <unit|integration|e2e-smoke|e2e-full|fuzz>"
+  echo "Usage: $0 <unit|deps-unit|integration|e2e-smoke|e2e-full|fuzz>"
   exit 2
 fi
 
@@ -71,6 +71,31 @@ run_unit() {
   }
 
   scripts/ci/coverage-delta.sh "${coverage_file}"
+}
+
+run_deps_unit() {
+  echo "Running dependency-focused unit lane"
+
+  write_changed_files
+
+  local ci_event should_run
+  ci_event="${CI_EVENT_NAME:-${GITHUB_EVENT_NAME:-}}"
+  should_run="$(go run ./test/ci/tool policy-should-run "${SUITE_FILE}" deps-unit "${ci_event}" "${changed_files_path}" default-false)"
+  if [[ "${should_run}" != "true" ]]; then
+    echo "Dependency-focused unit lane skipped by policy: no dependency file changes detected"
+    echo "skipped:optional_by_policy" > "${lane_dir}/deps-unit.status"
+    return 0
+  fi
+
+  # CGO-dependent packages that are most likely to break on dependency changes
+  run_with_timeout 10m bash -c \
+    "set -euo pipefail; go test -json -short -count=1 -vet=off ./pkg/cephfs/... | tee '${lane_dir}/deps-unit-cephfs.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  # Compile-smoke all commands to detect dependency-induced build breakage
+  run_with_timeout 8m bash -c \
+    "set -euo pipefail; go test -json -run '^$' -count=1 -vet=off ./cmd/... | tee '${lane_dir}/deps-unit-cmd.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  # Compile-smoke all packages to catch type-mismatch or interface breakage
+  run_with_timeout 8m bash -c \
+    "set -euo pipefail; go test -json -run '^$' -count=1 -vet=off ./pkg/... | tee '${lane_dir}/deps-unit-pkg.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 }
 
 run_integration() {
@@ -170,6 +195,9 @@ run_integration() {
     "set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/vault/... | tee '${lane_dir}/integration-vault.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+
+  # NOTE: CephFS dependency smoke tests are handled by the deps-unit lane
+  # (triggered on go.mod/go.sum changes). Do not duplicate here.
 }
 
 run_e2e_smoke() {
@@ -203,6 +231,9 @@ run_fuzz() {
 case "${mode}" in
   unit)
     run_unit
+    ;;
+  deps-unit)
+    run_deps_unit
     ;;
   integration)
     run_integration
