@@ -17,8 +17,9 @@
         "deps:ceph"
       ],
       "schedule": [
-        "after 6pm and before 6am every weekday",
-        "every weekend"
+        "after 6pm every weekday",
+        "every weekend",
+        "before 6am every weekday"
       ]
     }
   ]
