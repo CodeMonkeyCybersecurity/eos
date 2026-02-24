@@ -36,7 +36,7 @@ require (
 	github.com/hashicorp/vault/api/auth/userpass v0.11.0
 	github.com/hetznercloud/hcloud-go/v2 v2.29.0
 	github.com/joho/godotenv v1.5.1
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.2
 	github.com/olekukonko/tablewriter v1.1.3
 	github.com/open-policy-agent/opa v1.10.1
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
