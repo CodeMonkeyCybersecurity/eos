@@ -2,7 +2,8 @@
 # Last Updated: 2025-10-23
 
 .PHONY: all build test lint lint-fix clean install help \
-	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz ci-coverage-delta
+	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz ci-coverage-delta \
+	governance-check submodule-freshness
 
 # Build configuration
 BINARY_NAME := eos
@@ -223,6 +224,14 @@ ci-fuzz: ## Run CI fuzz lane entrypoint
 ci-coverage-delta: ## Run CI coverage delta check (PR context)
 	@echo "[INFO] Running CI coverage delta..."
 	@scripts/ci/coverage-delta.sh coverage.out
+
+governance-check: ## Run governance wiring checks from prompts submodule
+	@echo "[INFO] Running governance checks..."
+	@scripts/check-governance.sh
+
+submodule-freshness: ## Verify prompts submodule is current with upstream main
+	@echo "[INFO] Checking prompts submodule freshness..."
+	@scripts/prompts-submodule-freshness.sh
 
 ##@ Deployment
 

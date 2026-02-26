@@ -1,0 +1,31 @@
+name: Submodule Freshness Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_update:
+        description: "Automatically bump stale prompts submodule in workflow workspace"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "17 */6 * * *"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  submodule-freshness:
+    runs-on: [self-hosted, general]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: recursive
+
+      - name: Verify prompts freshness
+        env:
+          AUTO_UPDATE: ${{ inputs.auto_update || 'false' }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/prompts-submodule-freshness.sh
+          ./scripts/prompts-submodule-freshness.sh
