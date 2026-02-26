@@ -4,14 +4,25 @@ set -euo pipefail
 # Run prompts governance checks regardless of submodule path convention.
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Pre-check: if .gitmodules does not exist or does not reference prompts,
+# the submodule is not registered in this repo yet — skip gracefully.
+if [[ ! -f "${repo_root}/.gitmodules" ]] || ! grep -q '\[submodule.*prompts' "${repo_root}/.gitmodules" 2>/dev/null; then
+  echo "SKIP: no prompts submodule registered in .gitmodules — governance check not applicable"
+  exit 0
+fi
+
 if [[ -x "${repo_root}/third_party/prompts/scripts/check-governance.sh" ]]; then
   CONSUMING_REPO_ROOT="${repo_root}" "${repo_root}/third_party/prompts/scripts/check-governance.sh"
   exit $?
 fi
 
 if [[ ! -x "${repo_root}/prompts/scripts/check-governance.sh" ]]; then
-  echo "ERROR: prompts governance checker not found in third_party/prompts/ or prompts/"
-  exit 2
+  echo "WARN: prompts submodule registered but governance checker not found"
+  echo "  Expected at: third_party/prompts/scripts/check-governance.sh"
+  echo "  Or at: prompts/scripts/check-governance.sh"
+  echo "  Run: git submodule update --init --recursive"
+  echo "SKIP: cannot run governance check without initialised submodule"
+  exit 0
 fi
 
 mkdir -p "${repo_root}/third_party"

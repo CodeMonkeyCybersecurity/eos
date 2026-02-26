@@ -1,0 +1,3 @@
+[submodule "prompts"]
+	path = prompts
+	url = ssh://git@vhost7:9001/cybermonkey/prompts.git
