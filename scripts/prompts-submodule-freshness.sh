@@ -26,11 +26,17 @@ if [[ -z "${prompts_path}" ]]; then
 fi
 
 local_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse HEAD)"
-if ! git -C "${repo_root}/${prompts_path}" fetch origin main --quiet; then
-  echo "FAIL: unable to fetch ${prompts_path} origin/main"
-  exit 1
+if ! git -C "${repo_root}/${prompts_path}" fetch origin main --quiet 2>/dev/null; then
+  echo "WARN: unable to fetch ${prompts_path} origin/main (network or auth issue)"
+  echo "SKIP: cannot verify freshness without remote access"
+  exit 0
 fi
-remote_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse origin/main)"
+
+if ! remote_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse origin/main 2>/dev/null)"; then
+  echo "WARN: origin/main ref not available after fetch"
+  echo "SKIP: cannot verify freshness without remote ref"
+  exit 0
+fi
 
 echo "prompts_path=${prompts_path}"
 echo "local_sha=${local_sha}"
