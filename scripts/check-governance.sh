@@ -36,6 +36,8 @@ cleanup() {
   if [[ "${created_link}" == "true" ]]; then
     rm -f "${repo_root}/third_party/prompts"
   fi
+  # Remove helper directory only if it is empty.
+  rmdir "${repo_root}/third_party" 2>/dev/null || true
 }
 trap cleanup EXIT
 
