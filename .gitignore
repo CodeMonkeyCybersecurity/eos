@@ -58,6 +58,7 @@ apps/mattermost/docker*
 # Logs and output
 *.log
 *.out
+outputs/
 
 # Other 
 *.deb

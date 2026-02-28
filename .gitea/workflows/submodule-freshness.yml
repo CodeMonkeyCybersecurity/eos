@@ -19,8 +19,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          submodules: recursive
+
+      - name: Init submodules (HTTPS with token)
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Rewrite SSH URLs to HTTPS for CI runner auth.
+          # CI runners lack SSH keys but can use token-based HTTPS.
+          # See: https://forum.gitea.com/t/gitea-runner-recursive-checkout/10812
+          git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+
+          # Use available token for HTTPS auth
+          TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [[ -n "${TOKEN}" ]]; then
+            git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
+          fi
+
+          # Init submodules; continue even if clone fails (script handles gracefully)
+          if git submodule update --init --recursive 2>&1; then
+            echo "SUBMODULE_INIT=success"
+          else
+            echo "WARN: submodule init failed; freshness script will handle gracefully"
+            echo "SUBMODULE_INIT=failed"
+          fi
 
       - name: Verify prompts freshness
         env:

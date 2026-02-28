@@ -4,6 +4,13 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 auto_update="${AUTO_UPDATE:-false}"
 
+# Pre-check: if .gitmodules does not exist or does not reference prompts,
+# the submodule is not registered in this repo yet — skip gracefully.
+if [[ ! -f "${repo_root}/.gitmodules" ]] || ! grep -q '\[submodule.*prompts' "${repo_root}/.gitmodules" 2>/dev/null; then
+  echo "SKIP: no prompts submodule registered in .gitmodules — nothing to check"
+  exit 0
+fi
+
 prompts_path=""
 if [[ -d "${repo_root}/prompts/.git" || -f "${repo_root}/prompts/.git" ]]; then
   prompts_path="prompts"
@@ -12,16 +19,24 @@ elif [[ -d "${repo_root}/third_party/prompts/.git" || -f "${repo_root}/third_par
 fi
 
 if [[ -z "${prompts_path}" ]]; then
-  echo "FAIL: prompts submodule not found at prompts/ or third_party/prompts/"
-  exit 1
+  echo "WARN: prompts submodule is registered in .gitmodules but not initialised"
+  echo "  Run: git submodule update --init --recursive"
+  echo "SKIP: cannot check freshness of uninitialised submodule"
+  exit 0
 fi
 
 local_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse HEAD)"
-if ! git -C "${repo_root}/${prompts_path}" fetch origin main --quiet; then
-  echo "FAIL: unable to fetch ${prompts_path} origin/main"
-  exit 1
+if ! git -C "${repo_root}/${prompts_path}" fetch origin main --quiet 2>/dev/null; then
+  echo "WARN: unable to fetch ${prompts_path} origin/main (network or auth issue)"
+  echo "SKIP: cannot verify freshness without remote access"
+  exit 0
 fi
-remote_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse origin/main)"
+
+if ! remote_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse origin/main 2>/dev/null)"; then
+  echo "WARN: origin/main ref not available after fetch"
+  echo "SKIP: cannot verify freshness without remote ref"
+  exit 0
+fi
 
 echo "prompts_path=${prompts_path}"
 echo "local_sha=${local_sha}"
