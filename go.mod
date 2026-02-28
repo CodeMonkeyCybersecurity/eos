@@ -1,6 +1,6 @@
 module github.com/CodeMonkeyCybersecurity/eos
 
-go 1.25.5
+go 1.25.7
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -25,11 +25,11 @@ require (
 	github.com/godbus/dbus/v5 v5.1.1-0.20230522191255-76236955d466
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/hashicorp/consul/api v1.33.2
+	github.com/hashicorp/consul/api v1.33.4
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hcl/v2 v2.24.0
-	github.com/hashicorp/nomad/api v0.0.0-20260223190949-50097c261ad7
+	github.com/hashicorp/nomad/api v0.0.0-20260226211936-d304b7de5d67
 	github.com/hashicorp/terraform-exec v0.24.0
 	github.com/hashicorp/vault/api v1.22.0
 	github.com/hashicorp/vault/api/auth/approle v0.11.0
