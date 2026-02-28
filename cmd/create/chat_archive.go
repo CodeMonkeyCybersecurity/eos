@@ -71,7 +71,7 @@ func runCreateChatArchive(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		}
 	}
 
-	files, err := discoverTranscriptFiles(expandedSources)
+	files, err := discoverTranscriptFiles(expandedSources, dest)
 	if err != nil {
 		return err
 	}
@@ -91,6 +91,9 @@ func runCreateChatArchive(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		if err != nil {
 			continue
 		}
+		if size == 0 {
+			continue // skip empty transcript artifacts
+		}
 
 		conversation := strings.TrimSuffix(filepath.Base(src), filepath.Ext(src))
 		entry := chatArchiveEntry{SourcePath: src, SHA256: hash, SizeBytes: size, Conversation: conversation}
@@ -108,7 +111,11 @@ func runCreateChatArchive(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 		if ext == "" {
 			ext = ".bin"
 		}
-		destFile := filepath.Join(dest, fmt.Sprintf("%s%s", hash[:16], ext))
+		slug := sanitizeName(strings.TrimSuffix(filepath.Base(src), filepath.Ext(src)))
+		if slug == "" {
+			slug = "chat"
+		}
+		destFile := filepath.Join(dest, fmt.Sprintf("%s-%s%s", hash[:12], slug, ext))
 		entry.DestPath = destFile
 		entry.Copied = true
 
@@ -142,21 +149,29 @@ func runCreateChatArchive(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	return nil
 }
 
-func discoverTranscriptFiles(roots []string) ([]string, error) {
+func discoverTranscriptFiles(roots []string, dest string) ([]string, error) {
 	out := make([]string, 0)
 	seen := map[string]struct{}{}
+	destAbs := strings.ToLower(filepath.Clean(dest))
 
 	isCandidate := func(path string) bool {
 		lp := strings.ToLower(path)
-		if strings.HasSuffix(lp, ".jsonl") || strings.HasSuffix(lp, ".chat") {
+		base := strings.ToLower(filepath.Base(path))
+
+		// Strong path clues first
+		hasPathClue := strings.Contains(lp, "/.openclaw/") || strings.Contains(lp, "/sessions/") || strings.Contains(lp, "/transcripts/") || strings.Contains(lp, "/chats/") || strings.Contains(lp, "conversation")
+
+		if strings.HasSuffix(lp, ".jsonl") {
+			return hasPathClue || strings.Contains(base, "chat") || strings.Contains(base, "session") || strings.Contains(base, "conversation") || strings.Contains(base, "transcript")
+		}
+		if strings.HasSuffix(lp, ".chat") {
 			return true
 		}
-		if strings.HasSuffix(lp, ".html") && strings.Contains(lp, "chat") {
-			return true
+		if strings.HasSuffix(lp, ".html") {
+			return strings.Contains(base, "chat") || strings.Contains(base, "conversation") || strings.Contains(base, "transcript")
 		}
 		if strings.HasSuffix(lp, ".json") {
-			base := strings.ToLower(filepath.Base(path))
-			if !strings.Contains(base, "chat") && !strings.Contains(base, "conversation") && !strings.Contains(base, "session") && !strings.Contains(base, "transcript") {
+			if !hasPathClue && !strings.Contains(base, "chat") && !strings.Contains(base, "conversation") && !strings.Contains(base, "session") && !strings.Contains(base, "transcript") {
 				return false
 			}
 			b, err := os.ReadFile(path)
@@ -182,9 +197,22 @@ func discoverTranscriptFiles(roots []string) ([]string, error) {
 			if err != nil {
 				return nil
 			}
+			lpath := strings.ToLower(filepath.Clean(path))
+			if lpath == destAbs || strings.HasPrefix(lpath, destAbs+"/") {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if strings.Contains(lpath, "/dev/eos/outputs/chat-archive") || strings.Contains(lpath, "/desktop/conversationarchive") {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 			if d.IsDir() {
 				name := strings.ToLower(d.Name())
-				if name == ".git" || name == "node_modules" || name == "target" || name == "vendor" {
+				if name == ".git" || name == "node_modules" || name == "target" || name == "vendor" || name == ".cache" {
 					return filepath.SkipDir
 				}
 				return nil
@@ -238,6 +266,32 @@ func copyArchiveFile(src, dst string) error {
 		return err
 	}
 	return out.Sync()
+}
+
+func sanitizeName(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+		case r == '-' || r == '_':
+			b.WriteRune('-')
+		case r == ' ':
+			b.WriteRune('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	for strings.Contains(out, "--") {
+		out = strings.ReplaceAll(out, "--", "-")
+	}
+	if len(out) > 40 {
+		out = out[:40]
+	}
+	return out
 }
 
 func expandHome(path string) string {
