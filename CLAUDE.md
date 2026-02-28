@@ -1,14 +1,34 @@
 # CLAUDE.md
 
-*Last Updated: 2025-11-07*
+*Last Updated: 2026-02-28*
 
 AI assistant guidance for Eos - A Go-based CLI for Ubuntu server administration by Code Monkey Cybersecurity (ABN 77 177 673 061).
 
 **IMPORTANT**: For roadmap, technical debt tracking, and future work planning, see [ROADMAP.md](ROADMAP.md). This file focuses on immediate development standards and patterns.
 
-**RECENT ADDITIONS** (2025-10-28):
-- ✅ Caddy Admin API infrastructure completed - see [ROADMAP.md](ROADMAP.md#-technical-debt---caddy-configuration-management-future-direction)
-- ✅ QUIC/HTTP3 firewall support (UDP/443) - see [ROADMAP.md](ROADMAP.md#-quichttp3-support---firewall-configuration-2025-10-28)
+## Governance Contracts
+
+Governance contracts live in the `prompts/` submodule (also accessible via `third_party/prompts/` symlink). All 6 contracts are read-before-starting requirements for every session.
+
+| Contract | Governs | File |
+|----------|---------|------|
+| **Documentation** | What/how/where to document | [DOCUMENTATION.md](third_party/prompts/DOCUMENTATION.md) |
+| **Testing** | Test standards, coverage, evidence | [TESTING.md](third_party/prompts/TESTING.md) |
+| **Workflow** | CI checks, PR requirements, branch lifecycle | [WORKFLOW.md](third_party/prompts/WORKFLOW.md) |
+| **Git Rules** | Signing, linear history, branch invariants | [GIT-RULES.md](third_party/prompts/GIT-RULES.md) |
+| **Security** | Secrets, scanning, supply chain, OWASP | [SECURITY.md](third_party/prompts/SECURITY.md) |
+| **Coordination** | Multi-agent isolation, scope, conflicts | [COORDINATION.md](third_party/prompts/COORDINATION.md) |
+
+Supporting runbooks:
+- **Session workflow**: [SOAPIER.md](third_party/prompts/SOAPIER.md) — 14-step session process
+- **Git Hygiene**: [GIT-HYGIENE.md](third_party/prompts/GIT-HYGIENE.md) — compliance procedures (Phases A-G)
+- **Adversarial review**: [ADVERSARIAL.md](third_party/prompts/ADVERSARIAL.md) — gap analysis and review techniques
+
+Available skills:
+- `/soapier` — start SOAPIER session (runs git hygiene, checks issue/branch)
+- `/git-hygiene` — run git hygiene checks (Phase A + F)
+- `/pr-ready` — verify PR readiness (all step 13 checks)
+- `/isobar-handover` — generate ISoBAR handover when blocked
 
 ## Mission & Values
 
