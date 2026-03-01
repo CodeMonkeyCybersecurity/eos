@@ -64,7 +64,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
-	libvirt.org/go/libvirt v1.11006.0
+	libvirt.org/go/libvirt v1.11010.0
 	mvdan.cc/sh/v3 v3.12.0
 )
 
