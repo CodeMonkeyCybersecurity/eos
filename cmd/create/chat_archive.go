@@ -49,7 +49,7 @@ Examples:
 
 func init() {
 	CreateCmd.AddCommand(CreateChatArchiveCmd)
-	CreateChatArchiveCmd.Flags().StringSlice("source", []string{"~/.openclaw/agents/main/sessions", "~/dev"}, "Source directories to scan")
+	CreateChatArchiveCmd.Flags().StringSlice("source", []string{"~/.openclaw/agents/main/sessions", "~/.codex/sessions", "~/Dev", "~/dev"}, "Source directories to scan")
 	CreateChatArchiveCmd.Flags().String("dest", "~/Dev/eos/outputs/chat-archive", "Destination archive directory")
 	CreateChatArchiveCmd.Flags().Bool("dry-run", false, "Show what would be archived without copying files")
 }
@@ -161,7 +161,14 @@ func discoverTranscriptFiles(roots []string, dest string) ([]string, error) {
 		// Strong path clues first
 		hasPathClue := strings.Contains(lp, "/.openclaw/") || strings.Contains(lp, "/sessions/") || strings.Contains(lp, "/transcripts/") || strings.Contains(lp, "/chats/") || strings.Contains(lp, "conversation")
 
+		if base == "memory.md" {
+			return true
+		}
 		if strings.HasSuffix(lp, ".jsonl") {
+			// User requirement: archive all JSONL under ~/Dev recursively.
+			if strings.Contains(lp, "/dev/") {
+				return true
+			}
 			return hasPathClue || strings.Contains(base, "chat") || strings.Contains(base, "session") || strings.Contains(base, "conversation") || strings.Contains(base, "transcript")
 		}
 		if strings.HasSuffix(lp, ".chat") {
@@ -212,7 +219,7 @@ func discoverTranscriptFiles(roots []string, dest string) ([]string, error) {
 			}
 			if d.IsDir() {
 				name := strings.ToLower(d.Name())
-				if name == ".git" || name == "node_modules" || name == "target" || name == "vendor" || name == ".cache" {
+				if name == ".git" || name == "node_modules" || name == "target" || name == "vendor" || name == ".cache" || name == "outputs" || name == "dist" || name == "build" {
 					return filepath.SkipDir
 				}
 				return nil
