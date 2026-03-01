@@ -50,13 +50,15 @@ func VerifyTrustedRemote(rc *eos_io.RuntimeContext, repoDir string) error {
 	if !constants.IsTrustedRemote(remoteURL) {
 		logger.Error("SECURITY: Untrusted git remote detected",
 			zap.String("remote", remoteURL),
-			zap.Strings("trusted_remotes", constants.TrustedRemotes))
+			zap.Strings("trusted_hosts", constants.TrustedHosts),
+			zap.Strings("trusted_paths", constants.TrustedRepoPaths))
+
+		trustedList := strings.Join(constants.TrustedRemotes, "\n  - ")
 
 		return fmt.Errorf("SECURITY VIOLATION: Git remote is not in trusted whitelist\n"+
 			"Current remote: %s\n"+
-			"Trusted remotes:\n"+
-			"  - %s\n"+
-			"  - %s\n\n"+
+			"Trusted hosts: %v\n"+
+			"Trusted remotes:\n  - %s\n\n"+
 			"DANGER: An attacker may have modified your git configuration!\n\n"+
 			"Fix (if you trust this is safe):\n"+
 			"  cd %s\n"+
@@ -64,8 +66,8 @@ func VerifyTrustedRemote(rc *eos_io.RuntimeContext, repoDir string) error {
 			"If you did not make this change, your system may be compromised.\n"+
 			"Report to: security@cybermonkey.net.au",
 			remoteURL,
-			constants.PrimaryRemoteHTTPS,
-			constants.PrimaryRemoteSSH,
+			constants.TrustedHosts,
+			trustedList,
 			repoDir,
 			constants.PrimaryRemoteHTTPS)
 	}

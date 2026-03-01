@@ -1,28 +1,48 @@
-// pkg/constants/security.go
-//
-// Security constants for Eos - trusted sources and verification settings
-// CRITICAL: These constants protect against supply chain attacks
-
+// Package constants provides security-critical constants for Eos, including
+// trusted git remote definitions, GPG verification settings, and URL parsing.
+// CRITICAL: These constants protect against supply chain attacks.
 package constants
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // TrustedGitRemotes defines the only acceptable git remote URLs for eos updates
 // SECURITY: Only these remotes are trusted for self-update operations
 // Any other remote will be REJECTED to prevent malicious code injection
-const (
-	// PrimaryRemoteHTTPS is the primary HTTPS remote
-	PrimaryRemoteHTTPS = "https://github.com/CodeMonkeyCybersecurity/eos.git"
 
-	// PrimaryRemoteSSH is the primary SSH remote
-	PrimaryRemoteSSH = "git@github.com:CodeMonkeyCybersecurity/eos.git"
-)
+// TrustedHosts lists the hostnames trusted to serve Eos source code.
+// SECURITY CRITICAL: Only modify this list after security review.
+// Matching is case-insensitive and ignores port numbers so that
+// ssh://git@gitea.cybermonkey.sh:9001/... and https://gitea.cybermonkey.sh/...
+// both resolve to the same trusted host.
+var TrustedHosts = []string{
+	"github.com",
+	"gitea.cybermonkey.sh",
+}
 
-// TrustedRemotes is the whitelist of acceptable git remotes
-// SECURITY CRITICAL: Only modify this list after security review
+// TrustedRepoPaths lists the allowed org/repo path suffixes.
+// The comparison strips a trailing ".git" and is case-insensitive.
+var TrustedRepoPaths = []string{
+	"codemonkeycybersecurity/eos",
+	"cybermonkey/eos",
+}
+
+// PrimaryRemoteHTTPS is the canonical Gitea HTTPS remote.
+const PrimaryRemoteHTTPS = "https://gitea.cybermonkey.sh/cybermonkey/eos.git"
+
+// PrimaryRemoteSSH is the canonical Gitea SSH remote.
+const PrimaryRemoteSSH = "ssh://git@gitea.cybermonkey.sh:9001/cybermonkey/eos.git"
+
+// TrustedRemotes is the explicit whitelist of acceptable git remotes for
+// display in error messages. IsTrustedRemote uses host+path matching, so
+// this slice is only used for human-readable output.
 var TrustedRemotes = []string{
 	PrimaryRemoteHTTPS,
 	PrimaryRemoteSSH,
+	"https://github.com/CodeMonkeyCybersecurity/eos.git",
+	"git@github.com:CodeMonkeyCybersecurity/eos.git",
 }
 
 // GPGVerificationSettings controls GPG signature verification
@@ -48,12 +68,75 @@ var DefaultGPGSettings = GPGVerificationSettings{
 	WarnIfNotSigned:   true,       // Warn users about unsigned commits
 }
 
-// IsTrustedRemote checks if a remote URL is in the trusted whitelist
-// NOTE: GitHub URLs are case-insensitive for org/repo names, so we compare
-// case-insensitively to accept both "Eos" and "eos" as valid
+// NormalizeRemoteURL strips a trailing ".git" suffix and lowercases the
+// string so that equivalent remote URLs compare equal.
+func NormalizeRemoteURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.TrimSuffix(s, ".git")
+	return strings.ToLower(s)
+}
+
+// ParseRemoteHostPath extracts the host (without port) and the repo path
+// from a git remote URL. Supports HTTPS, SSH (ssh://...) and SCP-style
+// (git@host:path) formats.
+//
+// Returns (host, path, ok). path is returned without a leading "/" and
+// without a trailing ".git".
+func ParseRemoteHostPath(raw string) (host string, repoPath string, ok bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", "", false
+	}
+
+	// SCP-style: git@host:org/repo.git
+	if idx := strings.Index(raw, "@"); idx >= 0 && !strings.Contains(raw, "://") {
+		afterAt := raw[idx+1:]
+		colonIdx := strings.Index(afterAt, ":")
+		if colonIdx < 0 {
+			return "", "", false
+		}
+		host = strings.ToLower(afterAt[:colonIdx])
+		repoPath = strings.TrimPrefix(afterAt[colonIdx+1:], "/")
+		repoPath = strings.TrimSuffix(repoPath, ".git")
+		repoPath = strings.ToLower(repoPath)
+		return host, repoPath, true
+	}
+
+	// URL-style: https://host/org/repo.git or ssh://git@host:port/org/repo.git
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "", "", false
+	}
+
+	host = strings.ToLower(u.Hostname()) // strips port
+	repoPath = strings.TrimPrefix(u.Path, "/")
+	repoPath = strings.TrimSuffix(repoPath, ".git")
+	repoPath = strings.ToLower(repoPath)
+	return host, repoPath, true
+}
+
+// IsTrustedRemote checks if a remote URL resolves to a trusted host
+// serving the Eos repository. It matches on host (case-insensitive,
+// port-stripped) and repo path (case-insensitive, .git-stripped).
 func IsTrustedRemote(remoteURL string) bool {
-	for _, trusted := range TrustedRemotes {
-		if strings.EqualFold(remoteURL, trusted) {
+	host, repoPath, ok := ParseRemoteHostPath(remoteURL)
+	if !ok {
+		return false
+	}
+
+	hostTrusted := false
+	for _, h := range TrustedHosts {
+		if host == strings.ToLower(h) {
+			hostTrusted = true
+			break
+		}
+	}
+	if !hostTrusted {
+		return false
+	}
+
+	for _, p := range TrustedRepoPaths {
+		if repoPath == strings.ToLower(p) {
 			return true
 		}
 	}
