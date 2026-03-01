@@ -17,6 +17,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci-debug-parity:
+    name: ci-debug-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Run mage ci:debug
+        env:
+          CI: "true"
+        run: ./magew ci:debug
+
+      - name: Print ci:debug report
+        if: always()
+        run: |
+          test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
+
   lint:
     name: lint
     runs-on: ubuntu-latest

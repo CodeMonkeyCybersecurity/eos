@@ -8,6 +8,7 @@ Script-based CI entrypoints for Gitea Actions (self-hosted, DinD runners).
 
 ```
 scripts/ci/
+  debug.sh           # Local/CI parity lane used by mage ci:debug + pre-commit
   preflight.sh       # Runner health verification + Go cache setup
   coverage-delta.sh  # PR coverage regression gate vs base branch
   lint.sh            # Lint lane: golangci-lint, gofmt, go vet, emoji check
@@ -31,6 +32,7 @@ make ci-integration   # Integration tests (Vault + PostgreSQL containers)
 make ci-e2e-smoke     # E2E smoke tests
 make ci-fuzz          # Bounded fuzz tests
 make ci-coverage-delta
+make ci-debug         # Parity lane (what pre-commit and CI debug both execute)
 ```
 
 ## Design decisions

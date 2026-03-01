@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v mage >/dev/null 2>&1; then
+  exec mage "$@"
+fi
+
+exec go run github.com/magefile/mage@v1.15.0 "$@"

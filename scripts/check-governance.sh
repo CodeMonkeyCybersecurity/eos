@@ -14,19 +14,7 @@ created_dir=false
 checker_path=""
 
 finish() {
-  local outcome="${1:?outcome required}"
-  local message="${2:?message required}"
-  local exit_code="${3:?exit code required}"
-
-  if ! ps_outcome_known "governance" "${outcome}"; then
-    outcome="fail_checker_error"
-    message="FAIL: internal error - unknown outcome emitted"
-    exit_code=1
-  fi
-
-  ps_log_json "INFO" "governance_check.finish" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "unknown" "unknown" "unknown" "auto" "false"
-  ps_write_json_report "${report_path}" "governance" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "unknown" "unknown" "unknown" "auto" "false" "${exit_code}"
-  exit "${exit_code}"
+  ps_finish_and_exit "governance" "$1" "$2" "$3" "${report_path}" "" "${repo_root}" "${prompts_path}" "unknown" "unknown" "unknown" "auto" "false"
 }
 
 cleanup() {
@@ -38,6 +26,7 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+trap 'finish "fail_checker_error" "FAIL: unexpected governance wrapper error at line ${LINENO}" 1' ERR
 
 prompts_path="$(ps_prompts_submodule_path "${repo_root}" || true)"
 if [[ -z "${prompts_path}" ]]; then

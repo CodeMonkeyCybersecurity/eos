@@ -1,0 +1,36 @@
+name: CI Debug Parity
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  ci-debug:
+    runs-on: [self-hosted, general]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v5.0.2
+        with:
+          go-version-file: go.mod
+
+      - name: Run mage ci:debug
+        env:
+          CI: "true"
+          GITEA_ACTIONS: "true"
+        run: |
+          set -euo pipefail
+          ./magew ci:debug
+
+      - name: Print ci:debug report
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true

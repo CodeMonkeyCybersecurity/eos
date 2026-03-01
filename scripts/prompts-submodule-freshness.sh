@@ -7,7 +7,8 @@ source "${script_dir}/lib/prompts-submodule.sh"
 
 repo_root="$(ps_repo_root "${BASH_SOURCE[0]}")"
 auto_update="$(ps_normalize_bool "${AUTO_UPDATE:-false}")"
-strict_remote="$(printf '%s' "${STRICT_REMOTE:-auto}" | tr '[:upper:]' '[:lower:]')"
+strict_remote="$(ps_normalize_strict_remote "${STRICT_REMOTE:-auto}")"
+fetch_timeout_sec="${SUBMODULE_FETCH_TIMEOUT_SEC:-20}"
 report_path="${SUBMODULE_REPORT_JSON:-${repo_root}/outputs/ci/submodule-freshness/report.json}"
 metrics_path="${SUBMODULE_METRICS_TEXTFILE:-}"
 
@@ -17,21 +18,10 @@ remote_branch="unknown"
 prompts_path=""
 
 finish() {
-  local outcome="${1:?outcome required}"
-  local message="${2:?message required}"
-  local exit_code="${3:?exit code required}"
-
-  if ! ps_outcome_known "freshness" "${outcome}"; then
-    outcome="fail_corrupt_submodule"
-    message="FAIL: internal error - unknown outcome emitted"
-    exit_code=1
-  fi
-
-  ps_log_json "INFO" "submodule_freshness.finish" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}"
-  ps_write_json_report "${report_path}" "freshness" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}" "${exit_code}"
-  ps_emit_prom_metrics "${metrics_path}" "${outcome}" "${strict_remote}"
-  exit "${exit_code}"
+  ps_finish_and_exit "freshness" "$1" "$2" "$3" "${report_path}" "${metrics_path}" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}"
 }
+
+trap 'finish "fail_internal" "FAIL: unexpected script error at line ${LINENO}" 1' ERR
 
 ps_log_json "INFO" "submodule_freshness.start" "skip_not_registered" "Starting prompts submodule freshness check" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}"
 
@@ -49,7 +39,7 @@ if ! local_sha="$(git -C "${repo_root}/${prompts_path}" rev-parse HEAD 2>/dev/nu
 fi
 
 remote_branch="$(ps_tracking_branch "${repo_root}" "${prompts_path}")"
-if ! git -C "${repo_root}/${prompts_path}" fetch origin "${remote_branch}" --quiet --no-tags 2>/dev/null; then
+if ! ps_git_fetch_remote_branch "${repo_root}/${prompts_path}" "${remote_branch}" "${fetch_timeout_sec}" 2>/dev/null; then
   if ps_should_strict_fail_remote "${strict_remote}"; then
     finish "fail_remote_unreachable" "FAIL: cannot fetch origin/${remote_branch} for ${prompts_path} while STRICT_REMOTE=${strict_remote}" 2
   fi
@@ -71,6 +61,10 @@ fi
 
 if [[ "${auto_update}" != "true" ]]; then
   finish "fail_stale" "FAIL: prompts submodule is stale (${local_sha:0:7} != ${remote_sha:0:7}). Run: git submodule update --remote -- ${prompts_path}" 1
+fi
+
+if ps_submodule_has_local_changes "${repo_root}" "${prompts_path}"; then
+  finish "fail_dirty_worktree" "FAIL: ${prompts_path} has local changes; refusing auto-update. Commit/stash/reset submodule changes first." 1
 fi
 
 previous_sha="${local_sha}"

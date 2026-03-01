@@ -11,6 +11,24 @@ HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
 
 th_assert_run "freshness-script-syntax" 0 "" bash -n "${FRESHNESS_SCRIPT}"
 th_assert_run "helper-script-syntax" 0 "" bash -n "${HELPER_SCRIPT}"
+th_assert_run "normalize-bool-true-values" 0 "true true true true true false" bash -c '
+  source "$1"
+  printf "%s %s %s %s %s %s\n" \
+    "$(ps_normalize_bool true)" \
+    "$(ps_normalize_bool 1)" \
+    "$(ps_normalize_bool yes)" \
+    "$(ps_normalize_bool y)" \
+    "$(ps_normalize_bool on)" \
+    "$(ps_normalize_bool no)"
+' _ "${HELPER_SCRIPT}"
+th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c '
+  source "$1"
+  printf "%s %s %s %s\n" \
+    "$(ps_normalize_strict_remote true)" \
+    "$(ps_normalize_strict_remote false)" \
+    "$(ps_normalize_strict_remote auto)" \
+    "$(ps_normalize_strict_remote garbage)"
+' _ "${HELPER_SCRIPT}"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
@@ -32,5 +50,6 @@ EOF
 th_assert_run "skip-uninitialized" 0 '"outcome":"skip_uninitialized"' \
   env SUBMODULE_REPORT_JSON="${tmpdir}/report2.json" bash "${tmpdir}/scripts/prompts-submodule-freshness.sh"
 th_assert_json_field "report-outcome-uninitialized" "${tmpdir}/report2.json" "outcome" "skip_uninitialized"
+th_assert_json_field "report-status-uninitialized" "${tmpdir}/report2.json" "status" "skip"
 
 th_summary "unit"

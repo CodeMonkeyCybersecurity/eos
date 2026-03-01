@@ -49,6 +49,12 @@ th_assert_run "stale-fail-without-auto-update" 1 '"outcome":"fail_stale"' \
   env STRICT_REMOTE=false AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-stale.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
 th_assert_json_field "report-outcome-stale" "${repo}/report-stale.json" "outcome" "fail_stale"
 
+echo "local-only-change" > "${repo}/prompts/LOCAL_ONLY.txt"
+th_assert_run "auto-update-refuses-dirty-submodule" 1 '"outcome":"fail_dirty_worktree"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-dirty.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-dirty" "${repo}/report-dirty.json" "outcome" "fail_dirty_worktree"
+rm -f "${repo}/prompts/LOCAL_ONLY.txt"
+
 th_assert_run "auto-update-converges" 0 '"outcome":"pass_auto_updated"' \
   env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-update.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
 th_assert_json_field "report-outcome-updated" "${repo}/report-update.json" "outcome" "pass_auto_updated"
