@@ -233,6 +233,14 @@ submodule-freshness: ## Verify prompts submodule is current with upstream main
 	@echo "[INFO] Checking prompts submodule freshness..."
 	@scripts/prompts-submodule-freshness.sh
 
+test-submodule-freshness: ## Run submodule freshness test pyramid (unit/integration/e2e)
+	@echo "[INFO] Running submodule freshness test pyramid..."
+	@bash test/ci/test-submodule-freshness.sh
+
+test-governance-check: ## Run governance wrapper tests
+	@echo "[INFO] Running governance wrapper tests..."
+	@bash test/ci/test-governance-check.sh
+
 ##@ Deployment
 
 DEPLOY_SERVERS ?= vhost2

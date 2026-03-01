@@ -45,10 +45,55 @@ jobs:
             echo "SUBMODULE_INIT=failed"
           fi
 
+      - name: Run submodule freshness unit tests (70%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-unit.sh
+
+      - name: Run submodule freshness integration tests (20%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-integration.sh
+
+      - name: Run submodule freshness e2e tests (10%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-e2e.sh
+
       - name: Verify prompts freshness
         env:
           AUTO_UPDATE: ${{ inputs.auto_update || 'false' }}
+          STRICT_REMOTE: auto
+          SUBMODULE_REPORT_JSON: outputs/ci/submodule-freshness/report.json
+          SUBMODULE_METRICS_TEXTFILE: outputs/ci/submodule-freshness/metrics.prom
         run: |
           set -euo pipefail
           chmod +x scripts/prompts-submodule-freshness.sh
           ./scripts/prompts-submodule-freshness.sh
+
+      - name: Print freshness report and metrics
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f outputs/ci/submodule-freshness/report.json && cat outputs/ci/submodule-freshness/report.json || true
+          test -f outputs/ci/submodule-freshness/metrics.prom && cat outputs/ci/submodule-freshness/metrics.prom || true
+
+      - name: Alert on stale or failed freshness outcomes
+        if: always()
+        run: |
+          set -euo pipefail
+          report="outputs/ci/submodule-freshness/report.json"
+          if [[ ! -f "${report}" ]]; then
+            echo "::warning::submodule freshness report missing"
+            exit 0
+          fi
+          outcome="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("outcome","unknown"))' "${report}")"
+          status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("status","unknown"))' "${report}")"
+          echo "freshness_outcome=${outcome}"
+          if [[ "${status}" == "fail" ]]; then
+            echo "::error::submodule freshness failed with outcome=${outcome}"
+            exit 1
+          fi
+          if [[ "${status}" == "skip" ]]; then
+            echo "::warning::submodule freshness skipped with outcome=${outcome}"
+          fi

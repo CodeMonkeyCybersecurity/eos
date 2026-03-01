@@ -1,44 +1,74 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run prompts governance checks regardless of submodule path convention.
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./lib/prompts-submodule.sh
+source "${script_dir}/lib/prompts-submodule.sh"
 
-# Pre-check: if .gitmodules does not exist or does not reference prompts,
-# the submodule is not registered in this repo yet — skip gracefully.
-if [[ ! -f "${repo_root}/.gitmodules" ]] || ! grep -q '\[submodule.*prompts' "${repo_root}/.gitmodules" 2>/dev/null; then
-  echo "SKIP: no prompts submodule registered in .gitmodules — governance check not applicable"
-  exit 0
-fi
+repo_root="$(ps_repo_root "${BASH_SOURCE[0]}")"
+report_path="${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}"
 
-if [[ -x "${repo_root}/third_party/prompts/scripts/check-governance.sh" ]]; then
-  CONSUMING_REPO_ROOT="${repo_root}" "${repo_root}/third_party/prompts/scripts/check-governance.sh"
-  exit $?
-fi
-
-if [[ ! -x "${repo_root}/prompts/scripts/check-governance.sh" ]]; then
-  echo "WARN: prompts submodule registered but governance checker not found"
-  echo "  Expected at: third_party/prompts/scripts/check-governance.sh"
-  echo "  Or at: prompts/scripts/check-governance.sh"
-  echo "  Run: git submodule update --init --recursive"
-  echo "SKIP: cannot run governance check without initialised submodule"
-  exit 0
-fi
-
-mkdir -p "${repo_root}/third_party"
+prompts_path=""
 created_link=false
-if [[ ! -e "${repo_root}/third_party/prompts" ]]; then
-  ln -s ../prompts "${repo_root}/third_party/prompts"
-  created_link=true
-fi
+created_dir=false
+checker_path=""
+
+finish() {
+  local outcome="${1:?outcome required}"
+  local message="${2:?message required}"
+  local exit_code="${3:?exit code required}"
+
+  if ! ps_outcome_known "governance" "${outcome}"; then
+    outcome="fail_checker_error"
+    message="FAIL: internal error - unknown outcome emitted"
+    exit_code=1
+  fi
+
+  ps_log_json "INFO" "governance_check.finish" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "unknown" "unknown" "unknown" "auto" "false"
+  ps_write_json_report "${report_path}" "governance" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "unknown" "unknown" "unknown" "auto" "false" "${exit_code}"
+  exit "${exit_code}"
+}
 
 cleanup() {
   if [[ "${created_link}" == "true" ]]; then
     rm -f "${repo_root}/third_party/prompts"
   fi
-  # Remove helper directory only if it is empty.
-  rmdir "${repo_root}/third_party" 2>/dev/null || true
+  if [[ "${created_dir}" == "true" ]]; then
+    rmdir "${repo_root}/third_party" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
-CONSUMING_REPO_ROOT="${repo_root}" "${repo_root}/prompts/scripts/check-governance.sh"
+prompts_path="$(ps_prompts_submodule_path "${repo_root}" || true)"
+if [[ -z "${prompts_path}" ]]; then
+  finish "skip_not_registered" "SKIP: no prompts submodule registered in .gitmodules — governance check not applicable" 0
+fi
+
+if [[ -x "${repo_root}/third_party/prompts/scripts/check-governance.sh" ]]; then
+  checker_path="${repo_root}/third_party/prompts/scripts/check-governance.sh"
+  if CONSUMING_REPO_ROOT="${repo_root}" "${checker_path}"; then
+    finish "pass_checked_direct" "PASS: governance check completed via third_party/prompts path" 0
+  fi
+  rc=$?
+  finish "fail_checker_error" "FAIL: governance checker failed with exit code ${rc}" "${rc}"
+fi
+
+if [[ ! -x "${repo_root}/prompts/scripts/check-governance.sh" ]]; then
+  finish "skip_uninitialized" "SKIP: prompts submodule registered but governance checker not found; run: git submodule update --init --recursive -- ${prompts_path}" 0
+fi
+
+if [[ ! -d "${repo_root}/third_party" ]]; then
+  mkdir -p "${repo_root}/third_party"
+  created_dir=true
+fi
+if [[ ! -e "${repo_root}/third_party/prompts" ]]; then
+  ln -s ../prompts "${repo_root}/third_party/prompts"
+  created_link=true
+fi
+
+checker_path="${repo_root}/prompts/scripts/check-governance.sh"
+if CONSUMING_REPO_ROOT="${repo_root}" "${checker_path}"; then
+  finish "pass_checked_via_symlink" "PASS: governance check completed via prompts path with temporary symlink" 0
+fi
+rc=$?
+finish "fail_checker_error" "FAIL: governance checker failed with exit code ${rc}" "${rc}"
