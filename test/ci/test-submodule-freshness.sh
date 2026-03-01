@@ -3,6 +3,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# shellcheck source=../../scripts/lib/git-env.sh
+source "${REPO_ROOT}/scripts/lib/git-env.sh"
+
+# Hooks may export Git-local env vars that break foreign-repo git operations.
+ge_unset_git_local_env
 
 echo "[submodule-freshness] unit (70%)"
 bash "${SCRIPT_DIR}/test-submodule-freshness-unit.sh"

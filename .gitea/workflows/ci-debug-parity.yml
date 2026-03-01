@@ -21,6 +21,11 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify ci:debug parity contract
+        run: |
+          set -euo pipefail
+          make ci-verify-parity
+
       - name: Run mage ci:debug
         env:
           CI: "true"
@@ -29,8 +34,30 @@ jobs:
           set -euo pipefail
           ./magew ci:debug
 
-      - name: Print ci:debug report
+      - name: Print ci:debug artifacts
         if: always()
         run: |
           set -euo pipefail
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
+          test -f outputs/ci/debug/metrics.prom && cat outputs/ci/debug/metrics.prom || true
+
+      - name: Alert on ci:debug failure details
+        if: always()
+        run: |
+          set -euo pipefail
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::warning::python3 unavailable; skipping ci:debug alert extraction"
+            exit 0
+          fi
+          report="outputs/ci/debug/report.json"
+          if [[ ! -f "${report}" ]]; then
+            echo "::warning::ci:debug report missing"
+            exit 0
+          fi
+          status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("status","unknown"))' "${report}")"
+          if [[ "${status}" != "pass" ]]; then
+            stage="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("stage","unknown"))' "${report}")"
+            failed_cmd="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("failed_command","unknown"))' "${report}")"
+            message="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("message","unknown"))' "${report}")"
+            echo "::error::ci:debug failed stage=${stage} command=${failed_cmd} message=${message}"
+          fi

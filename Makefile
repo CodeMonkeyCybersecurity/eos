@@ -3,7 +3,7 @@
 
 .PHONY: all build test lint lint-fix clean install help \
 	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz ci-coverage-delta \
-	ci-debug governance-check submodule-freshness
+	ci-debug ci-verify-parity governance-check submodule-freshness
 
 # Build configuration
 BINARY_NAME := eos
@@ -228,6 +228,10 @@ ci-coverage-delta: ## Run CI coverage delta check (PR context)
 ci-debug: ## Run local CI parity lane (same command as pre-commit and CI debug job)
 	@echo "[INFO] Running CI debug parity lane..."
 	@./magew ci:debug
+
+ci-verify-parity: ## Verify pre-commit, mage, and workflow ci:debug parity contract
+	@echo "[INFO] Verifying ci:debug parity contract..."
+	@bash scripts/ci/verify-parity.sh
 
 governance-check: ## Run governance wiring checks from prompts submodule
 	@echo "[INFO] Running governance checks..."

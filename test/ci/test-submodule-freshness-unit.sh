@@ -8,9 +8,11 @@ source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
+GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 
 th_assert_run "freshness-script-syntax" 0 "" bash -n "${FRESHNESS_SCRIPT}"
 th_assert_run "helper-script-syntax" 0 "" bash -n "${HELPER_SCRIPT}"
+th_assert_run "git-env-script-syntax" 0 "" bash -n "${GIT_ENV_SCRIPT}"
 th_assert_run "normalize-bool-true-values" 0 "true true true true true false" bash -c '
   source "$1"
   printf "%s %s %s %s %s %s\n" \
@@ -29,6 +31,21 @@ th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c 
     "$(ps_normalize_strict_remote auto)" \
     "$(ps_normalize_strict_remote garbage)"
 ' _ "${HELPER_SCRIPT}"
+th_assert_run "git-env-unset-local-vars" 0 "ok" bash -c '
+  source "$1"
+  export GIT_DIR=/tmp/fake-git
+  export GIT_WORK_TREE=/tmp/fake-worktree
+  export GIT_INDEX_FILE=/tmp/fake-index
+  export GIT_NOT_LOCAL=keep-me
+  ge_unset_git_local_env
+  ge_unset_git_local_env
+
+  [[ -z "${GIT_DIR:-}" ]] || exit 1
+  [[ -z "${GIT_WORK_TREE:-}" ]] || exit 1
+  [[ -z "${GIT_INDEX_FILE:-}" ]] || exit 1
+  [[ "${GIT_NOT_LOCAL:-}" == "keep-me" ]] || exit 1
+  echo ok
+' _ "${GIT_ENV_SCRIPT}"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
