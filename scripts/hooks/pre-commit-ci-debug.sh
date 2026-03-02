@@ -22,13 +22,11 @@ bash "${repo_root}/scripts/ci/verify-parity.sh"
 echo "pre-commit: running ci:debug"
 if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
   npm run ci:debug --silent
-elif [[ -x "${repo_root}/magew" ]]; then
-  "${repo_root}/magew" ci:debug
 else
-  mage ci:debug
+  bash "${repo_root}/scripts/ci/debug.sh"
 fi
 
-if echo "${staged_files}" | grep -Eq '^(pkg/self/|pkg/git/|pkg/vault/phase2_env_setup\.go|cmd/self/|scripts/ci/self-update-quality\.sh|test/e2e/smoke/self/|package\.json|magefile\.go)'; then
+if echo "${staged_files}" | grep -Eq '^(pkg/self/|pkg/git/|pkg/vault/phase2_env_setup\.go|cmd/self/|scripts/ci/self-update-quality\.sh|test/e2e/smoke/self/|package\.json)'; then
   echo "pre-commit: running self-update quality lane"
   if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
     npm run ci:self-update-quality --silent

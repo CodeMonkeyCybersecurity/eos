@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# verify-parity.sh - Verify ci:debug parity contract
+#
+# Ensures the same ci:debug entry point is wired across:
+#   1. Pre-commit hook (npm run ci:debug -> scripts/ci/debug.sh)
+#   2. package.json     ("ci:debug": "bash scripts/ci/debug.sh")
+#   3. CI workflow       (npm run ci:debug --silent)
+#
+# All layers must resolve to scripts/ci/debug.sh as the single source of truth.
+
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "${repo_root}"
 
 hook_file="scripts/hooks/pre-commit-ci-debug.sh"
 package_json="package.json"
-magefile_file="magefile.go"
 workflow_candidates=(
   ".gitea/workflows/ci-debug-parity.yml"
   ".github/workflows/ci.yml"
@@ -35,34 +43,19 @@ assert_regex() {
 # --- Hook file checks ---
 assert_file "${hook_file}"
 assert_regex "${hook_file}" 'npm run ci:debug' "hook uses npm run ci:debug"
-assert_regex "${hook_file}" '"\$\{repo_root\}/magew"[[:space:]]+ci:debug' "hook fallback uses magew ci:debug"
-assert_regex "${hook_file}" '(^|[[:space:]])mage[[:space:]]+ci:debug($|[[:space:]])' "hook fallback uses mage ci:debug"
+assert_regex "${hook_file}" 'scripts/ci/debug\.sh' "hook fallback uses scripts/ci/debug.sh"
 
 # --- package.json checks ---
 assert_file "${package_json}"
 assert_regex "${package_json}" '"ci:debug"[[:space:]]*:[[:space:]]*"bash scripts/ci/debug\.sh"' "package.json ci:debug maps to debug script"
-
-# --- Magefile checks (kept for backward compatibility) ---
-assert_file "${magefile_file}"
-if grep -Eq 'runNpmScript\("ci:debug",[[:space:]]*"bash",[[:space:]]*"scripts/ci/debug\.sh"\)' "${magefile_file}"; then
-  echo "PASS: mage target maps ci:debug via runNpmScript wrapper"
-elif grep -Eq 'run\("bash",[[:space:]]*"scripts/ci/debug\.sh"\)' "${magefile_file}"; then
-  echo "PASS: mage target maps ci:debug directly to debug script"
-else
-  echo "FAIL: mage target missing ci:debug mapping in ${magefile_file}"
-  exit 1
-fi
 
 # --- Workflow checks ---
 found_workflow=0
 for workflow_file in "${workflow_candidates[@]}"; do
   if [[ -f "${workflow_file}" ]]; then
     found_workflow=1
-    # Workflows may use npm run or magew - either is valid
     if grep -Eq 'npm run ci:debug' "${workflow_file}"; then
       echo "PASS: workflow ${workflow_file} uses npm run ci:debug"
-    elif grep -Eq '\./magew[[:space:]]+ci:debug' "${workflow_file}"; then
-      echo "PASS: workflow ${workflow_file} uses magew ci:debug"
     else
       echo "FAIL: workflow ${workflow_file} missing ci:debug invocation"
       exit 1
