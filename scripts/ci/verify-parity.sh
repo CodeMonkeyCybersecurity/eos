@@ -44,7 +44,14 @@ assert_regex "${package_json}" '"ci:debug"[[:space:]]*:[[:space:]]*"bash scripts
 
 # --- Magefile checks (kept for backward compatibility) ---
 assert_file "${magefile_file}"
-assert_regex "${magefile_file}" 'run\("bash",[[:space:]]*"scripts/ci/debug\.sh"\)' "mage target maps to debug script"
+if grep -Eq 'runNpmScript\("ci:debug",[[:space:]]*"bash",[[:space:]]*"scripts/ci/debug\.sh"\)' "${magefile_file}"; then
+  echo "PASS: mage target maps ci:debug via runNpmScript wrapper"
+elif grep -Eq 'run\("bash",[[:space:]]*"scripts/ci/debug\.sh"\)' "${magefile_file}"; then
+  echo "PASS: mage target maps ci:debug directly to debug script"
+else
+  echo "FAIL: mage target missing ci:debug mapping in ${magefile_file}"
+  exit 1
+fi
 
 # --- Workflow checks ---
 found_workflow=0

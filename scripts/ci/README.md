@@ -9,6 +9,7 @@ Script-based CI entrypoints for Gitea Actions (self-hosted, DinD runners).
 ```text
 scripts/ci/
   debug.sh           # Local/CI parity lane used by mage ci:debug + pre-commit
+  lib/lane-runtime.sh # Shared lane logging/reporting/error-handling helpers
   verify-parity.sh   # Enforces parity contract across hook, mage target, and CI workflows
   preflight.sh       # Runner health verification + Go cache setup
   coverage-delta.sh  # PR coverage regression gate vs base branch
@@ -19,6 +20,9 @@ scripts/ci/
 
 test/ci/tool/
   main.go            # Policy validator, JSONL summarizer, gosec allowlist checker
+
+test/ci/
+  test-verify-parity.sh # CI parity contract regression checks
 ```
 
 ## Usage

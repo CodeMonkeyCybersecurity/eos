@@ -22,6 +22,7 @@
     "governance:submodule": "bash scripts/prompts-submodule-freshness.sh",
     "test:submodule-freshness": "bash test/ci/test-submodule-freshness.sh",
     "test:governance-check": "bash test/ci/test-governance-check.sh",
+    "test:verify-parity": "bash test/ci/test-verify-parity.sh",
     "quality:self-update": "npm run ci:self-update-quality --silent",
     "build": "go build -o /tmp/eos-build ./cmd/",
     "lint": "golangci-lint run",

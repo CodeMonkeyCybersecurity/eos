@@ -200,6 +200,7 @@ fi
 run_step "compile_smoke" go test -run '^$' ./cmd/...
 run_step "submodule_freshness_pyramid" bash test/ci/test-submodule-freshness.sh
 run_step "governance_wrapper_tests" bash test/ci/test-governance-check.sh
+run_step "verify_parity_contract_tests" bash test/ci/test-verify-parity.sh
 
 failed_stage="none"
 failed_command=""

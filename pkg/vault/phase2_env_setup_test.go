@@ -60,7 +60,7 @@ func TestHandleTLSValidationFailure_InteractiveConsentDeclined(t *testing.T) {
 	}
 }
 
-func TestHandleTLSValidationFailure_NonInteractive(t *testing.T) {
+func TestHandleTLSValidationFailure_NonInteractive_Unit(t *testing.T) {
 	t.Setenv("Eos_ALLOW_INSECURE_VAULT", "")
 
 	origInteractive := vaultIsInteractive

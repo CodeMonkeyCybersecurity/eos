@@ -6,8 +6,9 @@
 package git
 
 import (
+	cryptorand "crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,7 @@ var (
 			args = append(args, "--autostash")
 		}
 		args = append(args, "origin", branch)
+		// #nosec G204 -- args are assembled from fixed tokens plus validated branch/repo inputs.
 		pullCmd := exec.Command("git", args...)
 		if len(extraEnv) > 0 {
 			pullCmd.Env = append(os.Environ(), extraEnv...)
@@ -37,6 +39,11 @@ var (
 		}
 		return pullCmd.CombinedOutput()
 	}
+)
+
+const (
+	gitPullFailureReasonPermanent = "permanent"
+	gitPullFailureReasonUnknown   = "unknown"
 )
 
 // RepositoryState represents the state of a git repository
@@ -498,8 +505,19 @@ func runGitPullWithRetry(rc *eos_io.RuntimeContext, repoDir, branch string, auto
 // Formula: (attempt * base) + random(0, maxJitter).
 func retryBackoff(attempt int) time.Duration {
 	base := time.Duration(attempt) * GitPullBaseBackoff
-	jitter := time.Duration(rand.Int63n(int64(GitPullMaxJitter)))
+	jitter := randomJitterDuration(GitPullMaxJitter)
 	return base + jitter
+}
+
+func randomJitterDuration(max time.Duration) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(max.Nanoseconds()+1))
+	if err != nil {
+		return 0
+	}
+	return time.Duration(n.Int64())
 }
 
 // permanentMarkers lists error substrings that indicate non-retryable failures.
@@ -547,7 +565,7 @@ func isTransientGitPullFailure(output string) (bool, string) {
 
 	for _, marker := range permanentMarkers {
 		if strings.Contains(lower, marker) {
-			return false, "permanent"
+			return false, gitPullFailureReasonPermanent
 		}
 	}
 
@@ -557,7 +575,7 @@ func isTransientGitPullFailure(output string) (bool, string) {
 		}
 	}
 
-	return false, "unknown"
+	return false, gitPullFailureReasonUnknown
 }
 
 // RestoreStash restores a specific stash by its SHA ref

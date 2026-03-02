@@ -93,6 +93,34 @@ jobs:
         run: |
           test -f outputs/ci/self-update-quality/report.json && cat outputs/ci/self-update-quality/report.json || true
 
+      - name: Alert on self-update quality failure details
+        if: always()
+        run: |
+          set -euo pipefail
+          report="outputs/ci/self-update-quality/report.json"
+          if [[ ! -f "${report}" ]]; then
+            echo "::warning::self-update-quality report missing"
+            exit 0
+          fi
+          python3 - <<'PY' "${report}"
+import json
+import sys
+from pathlib import Path
+
+report = Path(sys.argv[1])
+data = json.loads(report.read_text(encoding="utf-8"))
+status = data.get("status", "unknown")
+if status == "pass":
+    print("self-update-quality status=pass")
+    raise SystemExit(0)
+
+stage = data.get("stage", "unknown")
+failed_command = data.get("failed_command", "unknown")
+coverage = data.get("coverage_percent", "n/a")
+message = data.get("message", "unknown")
+print(f"::error::self-update-quality failed stage={stage} command={failed_command} coverage={coverage} message={message}")
+PY
+
   lint:
     name: lint
     runs-on: ubuntu-latest

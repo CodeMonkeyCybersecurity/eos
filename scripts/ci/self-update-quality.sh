@@ -1,82 +1,72 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
-lane="self-update-quality"
-lane_dir="outputs/ci/${lane}"
-mkdir -p "${lane_dir}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+# shellcheck source=lib/lane-runtime.sh
+source "${script_dir}/lib/lane-runtime.sh"
 
-report="${lane_dir}/report.json"
-metrics="${lane_dir}/metrics.prom"
-coverage_file="${lane_dir}/coverage.out"
+lane_init "self-update-quality" "${repo_root}"
+lane_acquire_lock
+trap 'lane_on_err "${LINENO}" "${BASH_COMMAND}"' ERR
 
-log() {
-  echo "[${lane}] $*"
+coverage_file="${CI_LANE_DIR}/coverage.out"
+focus_threshold="90"
+
+unit_weight=70
+integration_weight=20
+e2e_weight=10
+
+log_human() {
+  local msg="${1:?message required}"
+  echo "[${CI_LANE_NAME}] ${msg}"
+  lane_log "INFO" "self_update_quality.message" "${msg}" "${CI_LANE_STAGE}"
 }
 
-# --- Test discovery: verify expected tests exist before running ---
+require_test() {
+  local pkg="${1:?pkg required}"
+  local regex="${2:?regex required}"
+  local label="${3:?label required}"
+  shift 3
+
+  local listed
+  listed="$(go test "$@" -list "${regex}" "${pkg}" 2>/dev/null || true)"
+  if ! grep -Eq "${regex}" <<< "${listed}"; then
+    lane_log "ERROR" "self_update_quality.discovery.missing" "Required test missing: ${label}" "${CI_LANE_STAGE}"
+    echo "[${CI_LANE_NAME}] ERROR: required test missing (${label})" >&2
+    echo "[${CI_LANE_NAME}] Remediation: add/restore test matching /${regex}/ in ${pkg}" >&2
+    return 1
+  fi
+  lane_log "INFO" "self_update_quality.discovery.found" "Required test discovered: ${label}" "${CI_LANE_STAGE}"
+}
+
 verify_tests_exist() {
-  local missing=0
-
-  # Unit tests (pkg/git)
-  local git_tests
-  git_tests="$(go test -list 'TestIsTransientGitPullFailure|TestRunGitPullWithRetry' ./pkg/git 2>/dev/null || true)"
-  if [[ -z "${git_tests}" ]]; then
-    log "ERROR: expected unit tests not found in pkg/git"
-    missing=1
-  fi
-
-  # Unit tests (pkg/vault)
-  local vault_tests
-  vault_tests="$(go test -list 'TestHandleTLSValidationFailure' ./pkg/vault 2>/dev/null || true)"
-  if [[ -z "${vault_tests}" ]]; then
-    log "ERROR: expected unit tests not found in pkg/vault"
-    missing=1
-  fi
-
-  if [[ "${missing}" -ne 0 ]]; then
-    log "FATAL: required tests missing - lane cannot produce valid results"
-    exit 1
-  fi
-
-  log "test discovery OK"
+  lane_run_step "test_discovery" require_test "./pkg/git" 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*)' "git retry unit suite"
+  lane_run_step "test_discovery" require_test "./pkg/vault" 'TestHandleTLSValidationFailure_.*' "vault TLS consent unit suite"
+  lane_run_step "test_discovery" require_test "./cmd/self" 'TestBackupRunCommandIntegration' "self backup integration test"
+  lane_run_step "test_discovery" require_test "./pkg/git" 'TestCheckRepositoryState_WithTrustedRemote' "git trusted remote integration test"
+  lane_run_step "test_discovery" require_test "./test/e2e/smoke/self" 'TestSelfUpdateHelpSmoke' "self update e2e smoke test" -tags=e2e_smoke
 }
 
 run_unit() {
-  log "running unit tests (70%)"
+  log_human "running unit tests (${unit_weight}%)"
   go test -count=1 -short -coverprofile="${coverage_file}" -covermode=atomic \
     ./pkg/git ./pkg/vault \
     -run 'TestIsTransientGitPullFailure|TestRunGitPullWithRetry_.*|TestRetryBackoff_.*|TestVerifyTrustedRemote_.*|TestHandleTLSValidationFailure_.*'
 }
 
 run_integration() {
-  log "running integration tests (20%)"
-  # Use -list to verify tests exist, then run them. Skip gracefully if missing.
-  if go test -list 'TestBackupRunCommandIntegration' ./cmd/self 2>/dev/null | grep -q 'TestBackup'; then
-    go test -count=1 ./cmd/self -run 'TestBackupRunCommandIntegration'
-  else
-    log "WARN: TestBackupRunCommandIntegration not found in cmd/self, skipping"
-  fi
-  if go test -list 'TestCheckRepositoryState_WithTrustedRemote' ./pkg/git 2>/dev/null | grep -q 'TestCheck'; then
-    go test -count=1 ./pkg/git -run 'TestCheckRepositoryState_WithTrustedRemote'
-  else
-    log "WARN: TestCheckRepositoryState_WithTrustedRemote not found in pkg/git, skipping"
-  fi
+  log_human "running integration tests (${integration_weight}%)"
+  go test -count=1 ./cmd/self -run 'TestBackupRunCommandIntegration'
+  go test -count=1 ./pkg/git -run 'TestCheckRepositoryState_WithTrustedRemote'
 }
 
 run_e2e() {
-  log "running e2e smoke tests (10%)"
+  log_human "running e2e smoke tests (${e2e_weight}%)"
   go test -count=1 -tags=e2e_smoke ./test/e2e/smoke/self/...
 }
 
-verify_tests_exist
-run_unit
-run_integration
-run_e2e
-
-# Coverage gate: compute focused coverage for critical retry/consent functions.
-# Uses go tool cover output which lists per-function coverage percentages.
-# The AWK pattern matches the function names we care about.
-focus_coverage="$(
+compute_focus_coverage() {
   go tool cover -func="${coverage_file}" | awk '
     /runGitPullWithRetry|isTransientGitPullFailure|retryBackoff|handleTLSValidationFailure/ {
       gsub("%","",$3); total += $3; count += 1
@@ -89,51 +79,43 @@ focus_coverage="$(
       }
     }
   '
-)"
-threshold="90"
+}
 
+lane_log "INFO" "self_update_quality.start" "Starting self-update quality lane" "bootstrap"
+verify_tests_exist
+lane_run_step "unit" run_unit
+lane_run_step "integration" run_integration
+lane_run_step "e2e" run_e2e
+
+focus_coverage="$(compute_focus_coverage)"
 if [[ -z "${focus_coverage}" ]]; then
-  log "ERROR: failed to parse focused coverage from ${coverage_file}"
-  log "This usually means the tracked functions were renamed."
-  log "Update the AWK pattern in this script to match current function names."
-  exit 1
+  lane_log "ERROR" "self_update_quality.coverage.parse_failed" "Failed to parse focused coverage from ${coverage_file}" "coverage_gate"
+  echo "[${CI_LANE_NAME}] ERROR: failed to parse focused coverage from ${coverage_file}" >&2
+  echo "[${CI_LANE_NAME}] Remediation: update the function-name pattern in compute_focus_coverage()" >&2
+  false
 fi
 
-log "focused coverage=${focus_coverage}% threshold=${threshold}%"
-awk -v cov="${focus_coverage}" -v min="${threshold}" 'BEGIN { if (cov+0 < min+0) exit 1 }' || {
-  log "ERROR: focused coverage ${focus_coverage}% is below threshold ${threshold}%"
-  exit 1
+CI_LANE_STAGE="coverage_gate"
+log_human "focused coverage=${focus_coverage}% threshold=${focus_threshold}%"
+awk -v cov="${focus_coverage}" -v min="${focus_threshold}" 'BEGIN { if (cov+0 < min+0) exit 1 }' || {
+  lane_log "ERROR" "self_update_quality.coverage.below_threshold" "Focused coverage ${focus_coverage}% below ${focus_threshold}%" "${CI_LANE_STAGE}"
+  echo "[${CI_LANE_NAME}] ERROR: focused coverage ${focus_coverage}% below threshold ${focus_threshold}%" >&2
+  false
 }
 
-# Weights rationale:
-# - Unit (70%): Fast, focused coverage of critical retry/consent paths
-# - Integration (20%): Realistic scenarios with actual git/command interactions
-# - E2E (10%): Smoke-level validation that CLI wiring works end-to-end
-cat > "${metrics}" <<EOF
-# TYPE eos_self_update_quality_coverage_percent gauge
+CI_LANE_EXTRA_METRICS="# TYPE eos_self_update_quality_coverage_percent gauge
 eos_self_update_quality_coverage_percent ${focus_coverage}
 # TYPE eos_self_update_quality_threshold_percent gauge
-eos_self_update_quality_threshold_percent ${threshold}
+eos_self_update_quality_threshold_percent ${focus_threshold}
 # TYPE eos_self_update_quality_unit_weight gauge
-eos_self_update_quality_unit_weight 70
+eos_self_update_quality_unit_weight ${unit_weight}
 # TYPE eos_self_update_quality_integration_weight gauge
-eos_self_update_quality_integration_weight 20
+eos_self_update_quality_integration_weight ${integration_weight}
 # TYPE eos_self_update_quality_e2e_weight gauge
-eos_self_update_quality_e2e_weight 10
-EOF
+eos_self_update_quality_e2e_weight ${e2e_weight}"
 
-cat > "${report}" <<EOF
-{
-  "lane": "${lane}",
-  "status": "pass",
-  "coverage_percent": ${focus_coverage},
-  "coverage_threshold": ${threshold},
-  "weights": {
-    "unit": 70,
-    "integration": 20,
-    "e2e": 10
-  }
-}
-EOF
+CI_LANE_REPORT_EXTRA_JSON="\"coverage_percent\": ${focus_coverage}, \"coverage_threshold\": ${focus_threshold}, \"weights\": {\"unit\": ${unit_weight}, \"integration\": ${integration_weight}, \"e2e\": ${e2e_weight}}"
 
-log "completed"
+lane_log "INFO" "self_update_quality.complete" "Self-update quality lane completed" "complete"
+CI_LANE_STAGE="complete"
+lane_finish "pass" "self-update quality lane completed successfully" 0
