@@ -1,7 +1,6 @@
 package self
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -198,24 +199,13 @@ func (eu *EosUpdater) CleanupOldBackups() {
 	}
 }
 
-// PullLatestCode pulls the latest code from git
+// PullLatestCode pulls the latest code from git.
+// Delegates to pkg/git.PullLatestCode which includes:
+//   - Trusted remote verification (security)
+//   - Credential checking (UX)
+//   - GIT_TERMINAL_PROMPT safety (non-interactive safety)
 func (eu *EosUpdater) PullLatestCode() error {
-	eu.logger.Info("Pulling latest changes from git repository",
-		zap.String("branch", eu.config.GitBranch))
-
-	// Use --autostash to automatically handle uncommitted changes
-	// This is more reliable than manual stashing and prevents orphaned stashes
-	cmd := exec.Command("git", "-C", eu.config.SourceDir, "pull", "--autostash", "origin", eu.config.GitBranch)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		eu.logger.Error("Git pull failed",
-			zap.Error(err),
-			zap.String("output", string(output)))
-		return fmt.Errorf("git pull failed: %w", err)
-	}
-
-	eu.logger.Info("Git pull completed", zap.String("output", strings.TrimSpace(string(output))))
-	return nil
+	return git.PullLatestCode(eu.rc, eu.config.SourceDir, eu.config.GitBranch)
 }
 
 // BuildBinary builds the new Eos binary to a temporary location

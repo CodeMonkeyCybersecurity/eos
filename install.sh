@@ -578,7 +578,7 @@ check_prerequisites() {
 update_from_git() {
   # Pull latest code from git if we're in a git repo
   if [ -d "$Eos_SRC_DIR/.git" ]; then
-    log INFO " Pulling latest changes from GitHub..."
+    log INFO " Pulling latest changes from git remote..."
     cd "$Eos_SRC_DIR"
 
     # RESILIENCE: Check for and recover from merge conflicts FIRST

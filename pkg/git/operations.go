@@ -119,6 +119,8 @@ func GetCurrentCommit(rc *eos_io.RuntimeContext, repoDir string) (string, error)
 // PullLatestCode pulls the latest code from the remote repository
 // Uses --autostash to handle uncommitted changes safely
 // SECURITY: Verifies remote URL is trusted before pulling
+// CREDENTIAL SAFETY: Checks credential config and sets GIT_TERMINAL_PROMPT=0
+// to prevent hanging on interactive prompts in non-interactive contexts.
 func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -131,13 +133,31 @@ func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 		return err // Error already includes detailed message
 	}
 
+	// CREDENTIAL CHECK: Warn if credentials are not configured for HTTPS remotes.
+	// Non-blocking: we still attempt the pull (user may have a TTY to enter creds).
+	if err := EnsureCredentials(rc, repoDir); err != nil {
+		logger.Warn("Credential check: credentials may not be stored",
+			zap.Error(err))
+	}
+
 	// Use --autostash to handle uncommitted changes automatically
-	// This is safer than manual stash management
 	pullCmd := exec.Command("git", "-C", repoDir, "pull", "--autostash", "origin", branch)
+
+	// When running non-interactively (CI, cron), set GIT_TERMINAL_PROMPT=0
+	// to prevent git from hanging on credential prompts.
+	// When running interactively, pass through stdin/stderr so git can prompt.
+	if extraEnv := GitPullEnv(); len(extraEnv) > 0 {
+		pullCmd.Env = append(os.Environ(), extraEnv...)
+	}
+	if IsInteractive() {
+		pullCmd.Stdin = os.Stdin
+		pullCmd.Stderr = os.Stderr
+	}
+
 	pullOutput, err := pullCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git pull failed: %w\nOutput: %s",
-			err, strings.TrimSpace(string(pullOutput)))
+		outputStr := strings.TrimSpace(string(pullOutput))
+		return fmt.Errorf("git pull failed: %w\nOutput: %s", err, outputStr)
 	}
 
 	logger.Debug("Git pull completed",
@@ -244,6 +264,12 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		return false, "", err // Error already includes detailed message
 	}
 
+	// CREDENTIAL CHECK: Warn if credentials are not configured for HTTPS remotes.
+	if err := EnsureCredentials(rc, repoDir); err != nil {
+		logger.Warn("Credential check: credentials may not be stored",
+			zap.Error(err))
+	}
+
 	// Get commit before pull
 	commitBefore, err := GetCurrentCommit(rc, repoDir)
 	if err != nil {
@@ -299,6 +325,14 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 
 	// Now pull WITHOUT --autostash (we already manually stashed if needed)
 	pullCmd := exec.Command("git", "-C", repoDir, "pull", "origin", branch)
+	// When running non-interactively, prevent credential prompt hangs
+	if extraEnv := GitPullEnv(); len(extraEnv) > 0 {
+		pullCmd.Env = append(os.Environ(), extraEnv...)
+	}
+	if IsInteractive() {
+		pullCmd.Stdin = os.Stdin
+		pullCmd.Stderr = os.Stderr
+	}
 	pullOutput, err := pullCmd.CombinedOutput()
 	if err != nil {
 		// Pull failed - try to restore stash if we created one
