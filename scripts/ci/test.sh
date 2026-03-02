@@ -53,6 +53,9 @@ run_unit() {
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -short -count=1 -vet=off -coverprofile='${coverage_file}' -covermode=atomic -p 4 ./pkg/... | tee '${unit_jsonl}'; test \${PIPESTATUS[0]} -eq 0"
 
+  run_with_timeout 10m bash -c \
+    "set -euo pipefail; go test -json -short -count=1 -vet=off ./cmd/backup/... | tee '${lane_dir}/unit-cmd-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+
   run_with_timeout 15m bash -c \
     "set -euo pipefail; go test -json -short -count=1 -race -vet=off ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... | tee '${race_jsonl}'; test \${PIPESTATUS[0]} -eq 0"
 

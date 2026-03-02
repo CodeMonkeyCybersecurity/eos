@@ -3,17 +3,17 @@
 package vault
 
 import (
-    "crypto/tls"
-    "crypto/x509"
-    "fmt"
-    "net"
-    "net/url"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "syscall"
-    "time"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"net"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
@@ -334,7 +334,7 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 	fmt.Scanln(&response)
 
 	response = strings.ToLower(strings.TrimSpace(response))
-	if response != "yes" {
+	if !isAffirmativeConsent(response) {
 		log.Info("User declined to proceed without TLS validation (security-conscious choice)",
 			zap.String("response", response))
 		return "", fmt.Errorf("TLS validation failed and user declined to proceed insecurely")
@@ -352,6 +352,15 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("vault_addr", addr))
 
 	return addr, nil
+}
+
+func isAffirmativeConsent(response string) bool {
+	switch strings.ToLower(strings.TrimSpace(response)) {
+	case "y", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 // isInteractiveTerminal checks if stdin is connected to an interactive terminal

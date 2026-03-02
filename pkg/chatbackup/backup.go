@@ -1,20 +1,21 @@
-// pkg/chatbackup/backup.go
-// Core backup logic for AI chat archive
+// Package chatbackup provides encrypted, deduplicated backup of AI coding tool
+// conversations (Claude Code, Codex, Cursor, etc.) using restic.
 //
 // Follows Assess → Intervene → Evaluate pattern:
-//   ASSESS:     Discover which AI tools have data, resolve paths
-//   INTERVENE:  Run restic backup with resolved paths
-//   EVALUATE:   Parse results, update status, report
+//
+//	ASSESS:     Discover which AI tools have data, resolve paths
+//	INTERVENE:  Run restic backup with resolved paths
+//	EVALUATE:   Parse results, update status, report
 //
 // RATIONALE: Go-native restic invocation instead of embedded bash scripts.
 // This is testable, type-safe, and observable via structured logging.
-
 package chatbackup
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -127,7 +128,7 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 		updateStatus(logger, statusFile, nil, toolsFound)
 		return nil, &opError{
 			Op:  "check restic installation",
-			Err: fmt.Errorf("restic not found: install with 'sudo apt install restic'"),
+			Err: fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled),
 		}
 	}
 
@@ -136,8 +137,8 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 		updateStatus(logger, statusFile, nil, toolsFound)
 		return nil, &opError{
 			Op: "check repository initialization",
-			Err: fmt.Errorf("restic repository not initialized at %s: %w\n"+
-				"Run 'eos backup chats --setup' to initialize", repoPath, err),
+			Err: fmt.Errorf("%w at %s: %v\n"+
+				"Run 'eos backup chats --setup' to initialize", ErrRepositoryNotInitialized, repoPath, err),
 		}
 	}
 
@@ -558,7 +559,7 @@ func acquireBackupLock(lockFile string) (*os.File, error) {
 
 	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
-		return nil, fmt.Errorf("another backup is already running")
+		return nil, fmt.Errorf("%w: another backup is already running", ErrBackupAlreadyRunning)
 	}
 
 	return f, nil
@@ -570,4 +571,56 @@ func releaseBackupLock(f *os.File) {
 	}
 	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 	_ = f.Close()
+}
+
+// ListSnapshots lists chat-archive snapshots from the restic repository.
+func ListSnapshots(rc *eos_io.RuntimeContext, config BackupConfig) (string, error) {
+	homeDir := config.HomeDir
+	if homeDir == "" {
+		var err error
+		homeDir, err = resolveHomeDir(config.User)
+		if err != nil {
+			return "", &opError{
+				Op:  "resolve home directory",
+				Err: fmt.Errorf("user %q: %w", config.User, err),
+			}
+		}
+	}
+
+	repoPath := filepath.Join(homeDir, ResticRepoSubdir)
+	passwordFile := filepath.Join(homeDir, ResticPasswordSubdir)
+
+	if _, err := exec.LookPath("restic"); err != nil {
+		return "", &opError{
+			Op:  "check restic installation",
+			Err: fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled),
+		}
+	}
+
+	if err := checkRepoInitialized(rc.Ctx, repoPath, passwordFile); err != nil {
+		return "", &opError{
+			Op: "check repository initialization",
+			Err: fmt.Errorf("%w at %s: %v\nRun 'eos backup chats --setup' to initialize",
+				ErrRepositoryNotInitialized, repoPath, err),
+		}
+	}
+
+	listCtx, cancel := context.WithTimeout(rc.Ctx, ResticCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(listCtx, "restic", //nolint:gosec // args are validated constants and paths
+		"-r", repoPath,
+		"--password-file", passwordFile,
+		"snapshots",
+		"--tag", BackupTag,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(listCtx.Err(), context.DeadlineExceeded) {
+			return "", fmt.Errorf("list snapshots timed out after %s", ResticCommandTimeout)
+		}
+		return "", fmt.Errorf("failed to list snapshots: %w\n%s", err, strings.TrimSpace(string(output)))
+	}
+
+	return string(output), nil
 }

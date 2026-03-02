@@ -10,15 +10,15 @@
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
-	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/chatbackup"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"github.com/spf13/cobra"
@@ -70,6 +70,13 @@ Examples:
 	RunE: eos.Wrap(runBackupChats),
 }
 
+var (
+	chatbackupRunBackupFn     = chatbackup.RunBackup
+	chatbackupSetupFn         = chatbackup.Setup
+	chatbackupRunPruneFn      = chatbackup.RunPrune
+	chatbackupListSnapshotsFn = chatbackup.ListSnapshots
+)
+
 func init() {
 	BackupCmd.AddCommand(chatsCmd)
 
@@ -91,6 +98,9 @@ func init() {
 	// Schedule flags (for --setup)
 	chatsCmd.Flags().String("backup-cron", chatbackup.DefaultBackupCron, "Cron schedule for backups")
 	chatsCmd.Flags().String("prune-cron", chatbackup.DefaultPruneCron, "Cron schedule for pruning")
+
+	chatsCmd.MarkFlagsMutuallyExclusive("setup", "prune", "list")
+	chatsCmd.MarkFlagsMutuallyExclusive("list", "dry-run")
 }
 
 func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -106,32 +116,41 @@ func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		username = resolveCurrentUser()
 	}
 
-	// Parse retention policy
-	retention := chatbackup.DefaultRetentionPolicy()
-	if cmd.Flags().Changed("keep-within") {
-		retention.KeepWithin, _ = cmd.Flags().GetString("keep-within")
-	}
-	if cmd.Flags().Changed("keep-hourly") {
-		retention.KeepHourly, _ = cmd.Flags().GetInt("keep-hourly")
-	}
-	if cmd.Flags().Changed("keep-daily") {
-		retention.KeepDaily, _ = cmd.Flags().GetInt("keep-daily")
-	}
-	if cmd.Flags().Changed("keep-weekly") {
-		retention.KeepWeekly, _ = cmd.Flags().GetInt("keep-weekly")
-	}
-	if cmd.Flags().Changed("keep-monthly") {
-		retention.KeepMonthly, _ = cmd.Flags().GetInt("keep-monthly")
+	retention, err := parseRetentionPolicy(cmd)
+	if err != nil {
+		return mapChatbackupError(rc, "parse retention policy", err)
 	}
 
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	scanDirs, _ := cmd.Flags().GetStringSlice("scan-dirs")
+	dryRun, err := cmd.Flags().GetBool("dry-run")
+	if err != nil {
+		return mapChatbackupError(rc, "read dry-run flag", err)
+	}
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return mapChatbackupError(rc, "read verbose flag", err)
+	}
+	scanDirs, err := cmd.Flags().GetStringSlice("scan-dirs")
+	if err != nil {
+		return mapChatbackupError(rc, "read scan-dirs flag", err)
+	}
 
 	// Route to the appropriate operation
-	doSetup, _ := cmd.Flags().GetBool("setup")
-	doPrune, _ := cmd.Flags().GetBool("prune")
-	doList, _ := cmd.Flags().GetBool("list")
+	doSetup, err := cmd.Flags().GetBool("setup")
+	if err != nil {
+		return mapChatbackupError(rc, "read setup flag", err)
+	}
+	doPrune, err := cmd.Flags().GetBool("prune")
+	if err != nil {
+		return mapChatbackupError(rc, "read prune flag", err)
+	}
+	doList, err := cmd.Flags().GetBool("list")
+	if err != nil {
+		return mapChatbackupError(rc, "read list flag", err)
+	}
+
+	if err := validateModeFlags(doSetup, doPrune, doList, dryRun); err != nil {
+		return mapChatbackupError(rc, "validate mode flags", err)
+	}
 
 	switch {
 	case doSetup:
@@ -146,8 +165,14 @@ func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 }
 
 func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobra.Command, username string, retention chatbackup.RetentionPolicy, dryRun bool) error {
-	backupCron, _ := cmd.Flags().GetString("backup-cron")
-	pruneCron, _ := cmd.Flags().GetString("prune-cron")
+	backupCron, err := cmd.Flags().GetString("backup-cron")
+	if err != nil {
+		return mapChatbackupError(rc, "read backup-cron flag", err)
+	}
+	pruneCron, err := cmd.Flags().GetString("prune-cron")
+	if err != nil {
+		return mapChatbackupError(rc, "read prune-cron flag", err)
+	}
 
 	config := chatbackup.ScheduleConfig{
 		BackupConfig: chatbackup.BackupConfig{
@@ -159,9 +184,9 @@ func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobr
 		PruneCron:  pruneCron,
 	}
 
-	result, err := chatbackup.Setup(rc, config)
+	result, err := chatbackupSetupFn(rc, config)
 	if err != nil {
-		return fmt.Errorf("chat archive setup failed: %w", err)
+		return mapChatbackupError(rc, "chat archive setup", err)
 	}
 
 	// Display results
@@ -191,8 +216,8 @@ func runPrune(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username 
 		DryRun:    dryRun,
 	}
 
-	if err := chatbackup.RunPrune(rc, config); err != nil {
-		return fmt.Errorf("chat archive prune failed: %w", err)
+	if err := chatbackupRunPruneFn(rc, config); err != nil {
+		return mapChatbackupError(rc, "chat archive prune", err)
 	}
 
 	logger.Info("Chat archive prune completed")
@@ -200,29 +225,13 @@ func runPrune(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username 
 }
 
 func runList(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string) error {
-	homeDir, err := resolveHomeDirForUser(username)
+	logger.Info("Listing chat archive snapshots", zap.String("user", username))
+
+	output, err := chatbackupListSnapshotsFn(rc, chatbackup.BackupConfig{User: username})
 	if err != nil {
-		return err
+		return mapChatbackupError(rc, "list chat archive snapshots", err)
 	}
-
-	repoPath := filepath.Join(homeDir, chatbackup.ResticRepoSubdir)
-	passwordFile := filepath.Join(homeDir, chatbackup.ResticPasswordSubdir)
-
-	logger.Info("Listing chat archive snapshots",
-		zap.String("repo", repoPath))
-
-	cmd := exec.CommandContext(rc.Ctx, "restic",
-		"-r", repoPath,
-		"--password-file", passwordFile,
-		"snapshots",
-		"--tag", chatbackup.BackupTag)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to list snapshots: %w\n"+
-			"Run 'eos backup chats --setup' if not yet initialized", err)
-	}
+	fmt.Print(output)
 
 	return nil
 }
@@ -236,9 +245,9 @@ func runBackup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username
 		Verbose:       verbose,
 	}
 
-	result, err := chatbackup.RunBackup(rc, config)
+	result, err := chatbackupRunBackupFn(rc, config)
 	if err != nil {
-		return fmt.Errorf("chat archive backup failed: %w", err)
+		return mapChatbackupError(rc, "chat archive backup", err)
 	}
 
 	// Display results
@@ -280,28 +289,6 @@ func resolveCurrentUser() string {
 	return u.Username
 }
 
-// resolveHomeDirForUser resolves a user's home directory.
-func resolveHomeDirForUser(username string) (string, error) {
-	if username == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("could not determine current user home directory: %w", err)
-		}
-		return homeDir, nil
-	}
-
-	if username == "root" {
-		return "/root", nil
-	}
-
-	homeDir := filepath.Join("/home", username)
-	if _, err := os.Stat(homeDir); err != nil {
-		return "", fmt.Errorf("home directory not found for user %s", username)
-	}
-
-	return homeDir, nil
-}
-
 // FormatResult formats a backup result for display.
 func FormatResult(result *chatbackup.BackupResult) string {
 	var sb strings.Builder
@@ -322,4 +309,90 @@ func FormatResult(result *chatbackup.BackupResult) string {
 	}
 
 	return sb.String()
+}
+
+func parseRetentionPolicy(cmd *cobra.Command) (chatbackup.RetentionPolicy, error) {
+	retention := chatbackup.DefaultRetentionPolicy()
+
+	var err error
+	if cmd.Flags().Changed("keep-within") {
+		retention.KeepWithin, err = cmd.Flags().GetString("keep-within")
+		if err != nil {
+			return retention, err
+		}
+	}
+	if cmd.Flags().Changed("keep-hourly") {
+		retention.KeepHourly, err = cmd.Flags().GetInt("keep-hourly")
+		if err != nil {
+			return retention, err
+		}
+	}
+	if cmd.Flags().Changed("keep-daily") {
+		retention.KeepDaily, err = cmd.Flags().GetInt("keep-daily")
+		if err != nil {
+			return retention, err
+		}
+	}
+	if cmd.Flags().Changed("keep-weekly") {
+		retention.KeepWeekly, err = cmd.Flags().GetInt("keep-weekly")
+		if err != nil {
+			return retention, err
+		}
+	}
+	if cmd.Flags().Changed("keep-monthly") {
+		retention.KeepMonthly, err = cmd.Flags().GetInt("keep-monthly")
+		if err != nil {
+			return retention, err
+		}
+	}
+
+	return retention, nil
+}
+
+func validateModeFlags(setup, prune, list, dryRun bool) error {
+	modeCount := 0
+	if setup {
+		modeCount++
+	}
+	if prune {
+		modeCount++
+	}
+	if list {
+		modeCount++
+	}
+	if modeCount > 1 {
+		return eos_err.NewValidationError("flags --setup, --prune, and --list are mutually exclusive")
+	}
+	if list && dryRun {
+		return eos_err.NewValidationError("--dry-run cannot be combined with --list")
+	}
+	return nil
+}
+
+func mapChatbackupError(rc *eos_io.RuntimeContext, op string, err error) error {
+	_ = rc
+
+	switch {
+	case errors.Is(err, chatbackup.ErrResticNotInstalled):
+		return eos_err.NewDependencyError("restic", op, "Install with: sudo apt install restic")
+	case errors.Is(err, chatbackup.ErrRepositoryNotInitialized):
+		return eos_err.NewFilesystemError(
+			fmt.Sprintf("%s failed: chat backup repository is not initialized", op),
+			err,
+			"Run: eos backup chats --setup",
+			"Retry your original command",
+		)
+	case errors.Is(err, chatbackup.ErrBackupAlreadyRunning):
+		return eos_err.NewFilesystemError(
+			fmt.Sprintf("%s failed: another backup is currently running", op),
+			err,
+			"Wait for the current backup to finish",
+			"Check lock file: ~/.eos/restic/chat-archive.lock",
+		)
+	default:
+		if err == nil {
+			return nil
+		}
+		return fmt.Errorf("%s failed: %w", op, err)
+	}
 }

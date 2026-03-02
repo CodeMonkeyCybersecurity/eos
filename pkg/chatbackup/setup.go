@@ -141,7 +141,7 @@ func ensureRestic(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Warn("restic not found", zap.String("hint", "install with: sudo apt install restic"))
-	return fmt.Errorf("restic is required for backup functionality; install with 'sudo apt install restic'")
+	return fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled)
 }
 
 // generatePassword creates a secure password file.
@@ -300,8 +300,8 @@ func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 	}
 
 	if err := checkRepoInitialized(rc.Ctx, repoPath, passwordFile); err != nil {
-		return fmt.Errorf("restic repository not initialized at %s: %w\n"+
-			"Run 'eos backup chats --setup' to initialize", repoPath, err)
+		return fmt.Errorf("%w at %s: %v\n"+
+			"Run 'eos backup chats --setup' to initialize", ErrRepositoryNotInitialized, repoPath, err)
 	}
 
 	args := []string{

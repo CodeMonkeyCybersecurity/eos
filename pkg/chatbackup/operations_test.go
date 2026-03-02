@@ -208,6 +208,7 @@ func TestRunBackup_LockConflictFails(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "acquire backup lock")
+	assert.ErrorIs(t, err, ErrBackupAlreadyRunning)
 }
 
 func TestRunResticBackup_NoSummaryFails(t *testing.T) {
@@ -309,6 +310,7 @@ func TestRunBackup_RepoNotInitialized(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "repository initialization")
+	assert.ErrorIs(t, err, ErrRepositoryNotInitialized)
 }
 
 func TestRunBackup_ResticFailureUpdatesFailureStatus(t *testing.T) {
@@ -371,7 +373,8 @@ func TestSetup_MissingResticFails(t *testing.T) {
 		PruneCron:  "5 3 * * *",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "restic is required")
+	assert.Contains(t, err.Error(), "install with")
+	assert.ErrorIs(t, err, ErrResticNotInstalled)
 }
 
 func TestSetup_CronFailureBecomesWarning(t *testing.T) {
@@ -549,6 +552,7 @@ func TestRunBackup_ResticMissing(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "restic")
+	assert.ErrorIs(t, err, ErrResticNotInstalled)
 }
 
 func TestRunBackup_ResolveHomeError(t *testing.T) {
@@ -652,4 +656,42 @@ func TestRunPrune_ResticFailure(t *testing.T) {
 	err := RunPrune(newRuntimeContext(), BackupConfig{HomeDir: tmp})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "prune failed")
+}
+
+func TestListSnapshots_Success(t *testing.T) {
+	prependFakeBin(t, map[string]string{"restic": fakeResticScript()})
+
+	tmp := t.TempDir()
+	repoPath := filepath.Join(tmp, ResticRepoSubdir)
+	passwordFile := filepath.Join(tmp, ResticPasswordSubdir)
+	require.NoError(t, os.MkdirAll(repoPath, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "config"), []byte("ok"), 0600))
+	require.NoError(t, os.MkdirAll(filepath.Dir(passwordFile), 0700))
+	require.NoError(t, os.WriteFile(passwordFile, []byte("password"), 0400))
+
+	out, err := ListSnapshots(newRuntimeContext(), BackupConfig{HomeDir: tmp})
+	require.NoError(t, err)
+	assert.Contains(t, out, "ID")
+}
+
+func TestListSnapshots_ResticMissing(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("PATH", t.TempDir())
+
+	_, err := ListSnapshots(newRuntimeContext(), BackupConfig{HomeDir: tmp})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrResticNotInstalled)
+}
+
+func TestListSnapshots_RepoNotInitialized(t *testing.T) {
+	prependFakeBin(t, map[string]string{"restic": fakeResticScript()})
+
+	tmp := t.TempDir()
+	passwordFile := filepath.Join(tmp, ResticPasswordSubdir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(passwordFile), 0700))
+	require.NoError(t, os.WriteFile(passwordFile, []byte("password"), 0400))
+
+	_, err := ListSnapshots(newRuntimeContext(), BackupConfig{HomeDir: tmp})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrRepositoryNotInitialized)
 }

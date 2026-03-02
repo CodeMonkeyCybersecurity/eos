@@ -91,6 +91,12 @@ Example:
 - Track `bytes_added` trend for unusual spikes or sudden drops.
 - Track `tools_found` changes to detect missing tool data after migrations.
 
+Example health check (returns `0=OK`, `1=WARNING`, `2=CRITICAL`):
+
+```bash
+scripts/monitor/chatbackup-health.sh
+```
+
 ## Testing and CI
 
 - Unit tests: `go test ./pkg/chatbackup/... ./cmd/backup/...`
@@ -100,6 +106,7 @@ Example:
 CI wiring:
 
 - Unit lane enforces coverage threshold from `test/ci/suites.yaml`.
+- Unit lane also runs `cmd/backup` tests to catch command orchestration regressions.
 - Integration lane runs `pkg/chatbackup` integration tests and installs `restic` when missing.
 - E2E smoke includes `backup chats --dry-run` command stability validation.
 

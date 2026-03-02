@@ -270,3 +270,29 @@ func TestIntegration_Prune_Works(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	assert.NoError(t, err, "prune should succeed. Output: %s", string(output))
 }
+
+func TestIntegration_ListSnapshots_Works(t *testing.T) {
+	requireRestic(t)
+
+	tmpDir := t.TempDir()
+	claudeDir := filepath.Join(tmpDir, ".claude", "projects")
+	require.NoError(t, os.MkdirAll(claudeDir, 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(claudeDir, "session.jsonl"),
+		[]byte(`{"test": true}`+"\n"),
+		0644))
+
+	repoPath := filepath.Join(tmpDir, ResticRepoSubdir)
+	passwordFile := filepath.Join(tmpDir, ResticPasswordSubdir)
+	require.NoError(t, generatePassword(passwordFile))
+
+	rc := newTestRC(t)
+	require.NoError(t, initRepo(rc, repoPath, passwordFile))
+
+	_, err := runResticBackup(rc.Ctx, newSilentLogger(), repoPath, passwordFile, []string{claudeDir})
+	require.NoError(t, err)
+
+	output, err := ListSnapshots(rc, BackupConfig{HomeDir: tmpDir})
+	require.NoError(t, err)
+	assert.Contains(t, output, "ID")
+}
