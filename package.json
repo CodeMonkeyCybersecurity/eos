@@ -1,0 +1,33 @@
+{
+  "name": "eos",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Eos CLI for Ubuntu server administration - DevSecOps tooling",
+  "scripts": {
+    "ci:debug": "bash scripts/ci/debug.sh",
+    "ci:preflight": "bash scripts/ci/preflight.sh",
+    "ci:lint": "bash scripts/ci/lint.sh",
+    "ci:lint:changed": "bash scripts/ci/lint.sh changed",
+    "ci:unit": "bash scripts/ci/test.sh unit",
+    "ci:integration": "bash scripts/ci/test.sh integration",
+    "ci:e2e-smoke": "bash scripts/ci/test.sh e2e-smoke",
+    "ci:e2e-full": "bash scripts/ci/test.sh e2e-full",
+    "ci:fuzz": "bash scripts/ci/test.sh fuzz",
+    "ci:deps-unit": "bash scripts/ci/test.sh deps-unit",
+    "ci:coverage-delta": "bash scripts/ci/coverage-delta.sh",
+    "ci:verify-parity": "bash scripts/ci/verify-parity.sh",
+    "ci:security": "bash scripts/ci/security-checks.sh",
+    "governance:check": "bash scripts/check-governance.sh",
+    "governance:submodule": "bash scripts/prompts-submodule-freshness.sh",
+    "test:submodule-freshness": "bash test/ci/test-submodule-freshness.sh",
+    "test:governance-check": "bash test/ci/test-governance-check.sh",
+    "build": "go build -o /tmp/eos-build ./cmd/",
+    "lint": "golangci-lint run",
+    "test": "go test -short ./pkg/...",
+    "test:verbose": "go test -v -short ./pkg/...",
+    "test:race": "go test -race -short ./pkg/crypto ./pkg/interaction ./pkg/parse ./pkg/verify",
+    "fmt": "gofmt -s -w .",
+    "fmt:check": "test -z \"$(gofmt -s -l .)\"",
+    "vet": "go vet ./..."
+  }
+}

@@ -141,7 +141,7 @@ func ensureRestic(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Warn("restic not found", zap.String("hint", "install with: sudo apt install restic"))
-	return fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled)
+	return fmt.Errorf("%w", ErrResticNotInstalled)
 }
 
 // generatePassword creates a secure password file.

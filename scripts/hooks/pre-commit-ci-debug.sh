@@ -19,8 +19,10 @@ ge_unset_git_local_env
 echo "pre-commit: verifying ci:debug parity contract"
 bash "${repo_root}/scripts/ci/verify-parity.sh"
 
-echo "pre-commit: running mage ci:debug"
-if [[ -x "${repo_root}/magew" ]]; then
+echo "pre-commit: running ci:debug"
+if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
+  npm run ci:debug --silent
+elif [[ -x "${repo_root}/magew" ]]; then
   "${repo_root}/magew" ci:debug
 else
   mage ci:debug

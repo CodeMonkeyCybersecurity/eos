@@ -373,7 +373,6 @@ func TestSetup_MissingResticFails(t *testing.T) {
 		PruneCron:  "5 3 * * *",
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "install with")
 	assert.ErrorIs(t, err, ErrResticNotInstalled)
 }
 
@@ -417,7 +416,7 @@ func TestEnsureRestic_Missing(t *testing.T) {
 	t.Setenv("PATH", emptyPath)
 	err := ensureRestic(newRuntimeContext())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "install with")
+	assert.ErrorIs(t, err, ErrResticNotInstalled)
 }
 
 func TestEnsureRestic_Installed(t *testing.T) {

@@ -36,6 +36,7 @@ go.work.sum
 *.ini
 *.venv
 *.json
+!package.json
 
 # python 
 __pycache__

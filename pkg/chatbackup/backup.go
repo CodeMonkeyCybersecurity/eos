@@ -128,7 +128,7 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 		updateStatus(logger, statusFile, nil, toolsFound)
 		return nil, &opError{
 			Op:  "check restic installation",
-			Err: fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled),
+			Err: fmt.Errorf("%w", ErrResticNotInstalled),
 		}
 	}
 
@@ -136,9 +136,8 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 	if err := checkRepoInitialized(rc.Ctx, repoPath, passwordFile); err != nil {
 		updateStatus(logger, statusFile, nil, toolsFound)
 		return nil, &opError{
-			Op: "check repository initialization",
-			Err: fmt.Errorf("%w at %s: %v\n"+
-				"Run 'eos backup chats --setup' to initialize", ErrRepositoryNotInitialized, repoPath, err),
+			Op:  "check repository initialization",
+			Err: fmt.Errorf("%w at %s: %v", ErrRepositoryNotInitialized, repoPath, err),
 		}
 	}
 
@@ -593,15 +592,14 @@ func ListSnapshots(rc *eos_io.RuntimeContext, config BackupConfig) (string, erro
 	if _, err := exec.LookPath("restic"); err != nil {
 		return "", &opError{
 			Op:  "check restic installation",
-			Err: fmt.Errorf("%w: install with 'sudo apt install restic'", ErrResticNotInstalled),
+			Err: fmt.Errorf("%w", ErrResticNotInstalled),
 		}
 	}
 
 	if err := checkRepoInitialized(rc.Ctx, repoPath, passwordFile); err != nil {
 		return "", &opError{
-			Op: "check repository initialization",
-			Err: fmt.Errorf("%w at %s: %v\nRun 'eos backup chats --setup' to initialize",
-				ErrRepositoryNotInitialized, repoPath, err),
+			Op:  "check repository initialization",
+			Err: fmt.Errorf("%w at %s: %v", ErrRepositoryNotInitialized, repoPath, err),
 		}
 	}
 
