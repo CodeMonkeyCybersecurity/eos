@@ -11,16 +11,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+)
+
+var (
+	vaultPromptYesNo   = interaction.PromptYesNoSafe
+	vaultIsInteractive = isInteractiveTerminal
 )
 
 //--------------------------------------------------------------------
@@ -299,7 +304,7 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("reason", "CA certificate not found or connection failed"))
 
 	// Check if we're in non-interactive mode
-	if !isInteractiveTerminal() {
+	if !vaultIsInteractive() {
 		return "", fmt.Errorf("TLS validation failed and cannot prompt in non-interactive mode\n\n"+
 			"Remediation:\n"+
 			"  1. RECOMMENDED: Install proper CA certificate to /etc/vault/tls/ca.crt\n"+
@@ -314,29 +319,26 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 	}
 
 	// Interactive mode: Ask for informed consent
-	fmt.Println("\n⚠️  SECURITY WARNING: Vault TLS Certificate Validation Failed")
-	fmt.Println("────────────────────────────────────────────────────────────")
-	fmt.Println("Cannot verify Vault server identity. This could indicate:")
-	fmt.Println("  • Vault is using a self-signed certificate (expected during setup)")
-	fmt.Println("  • CA certificate is not in the system trust store")
-	fmt.Println("  • OR a man-in-the-middle attack is in progress")
-	fmt.Println()
-	fmt.Println("Proceeding WITHOUT certificate validation is INSECURE.")
-	fmt.Println("An attacker could intercept your connection and steal secrets.")
-	fmt.Println()
-	fmt.Println("Recommended actions:")
-	fmt.Println("  1. Install Vault's CA certificate to /etc/vault/tls/ca.crt")
-	fmt.Println("  2. Verify with: openssl s_client -connect", addr, "-CAfile /etc/vault/tls/ca.crt")
-	fmt.Println()
-	fmt.Print("Do you want to proceed WITHOUT certificate validation? (yes/NO): ")
-
-	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
-	if !isAffirmativeConsent(response) {
+	// NOTE: Security warning uses structured logging per P0 Rule #1.
+	// Each line is a separate log call for readability in both terminal and telemetry.
+	log.Warn("SECURITY WARNING: Vault TLS Certificate Validation Failed")
+	log.Warn("Cannot verify Vault server identity. This could indicate:",
+		zap.String("possibility_1", "Vault is using a self-signed certificate (expected during setup)"),
+		zap.String("possibility_2", "CA certificate is not in the system trust store"),
+		zap.String("possibility_3", "A man-in-the-middle attack is in progress"))
+	log.Warn("Proceeding WITHOUT certificate validation is INSECURE - an attacker could intercept your connection and steal secrets")
+	log.Info("Recommended actions",
+		zap.String("action_1", "Install Vault CA certificate to /etc/vault/tls/ca.crt"),
+		zap.String("action_2", "Verify with: openssl s_client -connect "+addr+" -CAfile /etc/vault/tls/ca.crt"))
+	response, err := vaultPromptYesNo(rc,
+		"Proceed WITHOUT certificate validation? (INSECURE)",
+		false)
+	if err != nil {
+		return "", fmt.Errorf("failed to get TLS consent: %w", err)
+	}
+	if !response {
 		log.Info("User declined to proceed without TLS validation (security-conscious choice)",
-			zap.String("response", response))
+			zap.Bool("response", false))
 		return "", fmt.Errorf("TLS validation failed and user declined to proceed insecurely")
 	}
 
@@ -352,15 +354,6 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("vault_addr", addr))
 
 	return addr, nil
-}
-
-func isAffirmativeConsent(response string) bool {
-	switch strings.ToLower(strings.TrimSpace(response)) {
-	case "y", "yes":
-		return true
-	default:
-		return false
-	}
 }
 
 // isInteractiveTerminal checks if stdin is connected to an interactive terminal

@@ -7,14 +7,36 @@ package git
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+)
+
+var (
+	gitPullRetrySleep = time.Sleep
+	runGitPullAttempt = func(repoDir, branch string, autostash bool, interactive bool, extraEnv []string) ([]byte, error) {
+		args := []string{"-C", repoDir, "pull"}
+		if autostash {
+			args = append(args, "--autostash")
+		}
+		args = append(args, "origin", branch)
+		pullCmd := exec.Command("git", args...)
+		if len(extraEnv) > 0 {
+			pullCmd.Env = append(os.Environ(), extraEnv...)
+		}
+		if interactive {
+			pullCmd.Stdin = os.Stdin
+			pullCmd.Stderr = os.Stderr
+		}
+		return pullCmd.CombinedOutput()
+	}
 )
 
 // RepositoryState represents the state of a git repository
@@ -140,21 +162,7 @@ func PullLatestCode(rc *eos_io.RuntimeContext, repoDir, branch string) error {
 			zap.Error(err))
 	}
 
-	// Use --autostash to handle uncommitted changes automatically
-	pullCmd := exec.Command("git", "-C", repoDir, "pull", "--autostash", "origin", branch)
-
-	// When running non-interactively (CI, cron), set GIT_TERMINAL_PROMPT=0
-	// to prevent git from hanging on credential prompts.
-	// When running interactively, pass through stdin/stderr so git can prompt.
-	if extraEnv := GitPullEnv(); len(extraEnv) > 0 {
-		pullCmd.Env = append(os.Environ(), extraEnv...)
-	}
-	if IsInteractive() {
-		pullCmd.Stdin = os.Stdin
-		pullCmd.Stderr = os.Stderr
-	}
-
-	pullOutput, err := pullCmd.CombinedOutput()
+	pullOutput, err := runGitPullWithRetry(rc, repoDir, branch, true)
 	if err != nil {
 		outputStr := strings.TrimSpace(string(pullOutput))
 		return fmt.Errorf("git pull failed: %w\nOutput: %s", err, outputStr)
@@ -324,16 +332,7 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 	}
 
 	// Now pull WITHOUT --autostash (we already manually stashed if needed)
-	pullCmd := exec.Command("git", "-C", repoDir, "pull", "origin", branch)
-	// When running non-interactively, prevent credential prompt hangs
-	if extraEnv := GitPullEnv(); len(extraEnv) > 0 {
-		pullCmd.Env = append(os.Environ(), extraEnv...)
-	}
-	if IsInteractive() {
-		pullCmd.Stdin = os.Stdin
-		pullCmd.Stderr = os.Stderr
-	}
-	pullOutput, err := pullCmd.CombinedOutput()
+	pullOutput, err := runGitPullWithRetry(rc, repoDir, branch, false)
 	if err != nil {
 		// Pull failed - try to restore stash if we created one
 		if stashRef != "" {
@@ -436,6 +435,129 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 	}
 
 	return true, stashRef, nil
+}
+
+func runGitPullWithRetry(rc *eos_io.RuntimeContext, repoDir, branch string, autostash bool) ([]byte, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	interactive := IsInteractive()
+	extraEnv := GitPullEnv()
+
+	var (
+		lastOutput []byte
+		lastErr    error
+		attempts   []string // Collect per-attempt context for diagnostics
+	)
+
+	for attempt := 1; attempt <= GitPullMaxAttempts; attempt++ {
+		output, err := runGitPullAttempt(repoDir, branch, autostash, interactive, extraEnv)
+		if err == nil {
+			if attempt > 1 {
+				logger.Info("Git pull succeeded after transient failure(s)",
+					zap.Int("successful_attempt", attempt),
+					zap.Strings("prior_failures", attempts))
+			}
+			return output, nil
+		}
+
+		outputStr := strings.TrimSpace(string(output))
+		lastOutput = output
+		lastErr = err
+
+		transient, reason := isTransientGitPullFailure(outputStr)
+		attempts = append(attempts, fmt.Sprintf("attempt=%d reason=%s", attempt, reason))
+
+		if !transient {
+			logger.Warn("Permanent git pull failure, not retrying",
+				zap.String("reason", reason),
+				zap.String("output", outputStr))
+			break
+		}
+
+		if attempt == GitPullMaxAttempts {
+			logger.Error("Git pull failed after all retry attempts",
+				zap.Int("attempts", attempt),
+				zap.Strings("failure_history", attempts))
+			break
+		}
+
+		backoff := retryBackoff(attempt)
+		logger.Warn("Transient git pull failure, retrying",
+			zap.Int("attempt", attempt),
+			zap.Int("max_attempts", GitPullMaxAttempts),
+			zap.Duration("backoff", backoff),
+			zap.String("reason", reason),
+			zap.String("output", outputStr))
+		gitPullRetrySleep(backoff)
+	}
+
+	return lastOutput, fmt.Errorf("git pull failed after %d attempt(s) [%s]: %w",
+		len(attempts), strings.Join(attempts, "; "), lastErr)
+}
+
+// retryBackoff calculates backoff duration with jitter to prevent thundering herd.
+// Formula: (attempt * base) + random(0, maxJitter).
+func retryBackoff(attempt int) time.Duration {
+	base := time.Duration(attempt) * GitPullBaseBackoff
+	jitter := time.Duration(rand.Int63n(int64(GitPullMaxJitter)))
+	return base + jitter
+}
+
+// permanentMarkers lists error substrings that indicate non-retryable failures.
+// These represent deterministic errors that won't resolve on retry.
+// Reference: CLAUDE.md Retry Logic section.
+var permanentMarkers = []string{
+	"authentication failed",
+	"permission denied",
+	"repository not found",
+	"could not read username",
+	"not in trusted whitelist",
+	"security violation",
+	"invalid credentials",
+}
+
+// transientMarkers maps error substrings to reason codes for retryable failures.
+// Sources:
+//   - HTTP 5xx/429: RFC 9110 sections 15.6.3-15.6.5
+//   - Git network errors: git source, observed in production logs
+//   - DNS/TLS: OS-level transient failures
+var transientMarkers = map[string]string{
+	// HTTP gateway/server errors (RFC 9110)
+	"requested url returned error: 500": "http_500",
+	"requested url returned error: 502": "http_502",
+	"requested url returned error: 503": "http_503",
+	"requested url returned error: 504": "http_504",
+	"requested url returned error: 429": "http_429",
+	// TLS errors
+	"tls handshake timeout": "tls_timeout",
+	// Network-level errors
+	"i/o timeout":              "io_timeout",
+	"connection reset by peer": "connection_reset",
+	"connection refused":       "connection_refused",
+	"broken pipe":              "broken_pipe",
+	"unexpected eof":           "unexpected_eof",
+	// DNS errors
+	"temporary failure in name resolution": "dns_temporary_failure",
+	"could not resolve host":               "dns_resolution_failure",
+	// Git-specific transient errors
+	"remote end hung up unexpectedly": "remote_hung_up",
+}
+
+func isTransientGitPullFailure(output string) (bool, string) {
+	lower := strings.ToLower(strings.TrimSpace(output))
+
+	for _, marker := range permanentMarkers {
+		if strings.Contains(lower, marker) {
+			return false, "permanent"
+		}
+	}
+
+	for marker, reason := range transientMarkers {
+		if strings.Contains(lower, marker) {
+			return true, reason
+		}
+	}
+
+	return false, "unknown"
 }
 
 // RestoreStash restores a specific stash by its SHA ref

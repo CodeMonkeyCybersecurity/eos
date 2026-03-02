@@ -46,6 +46,53 @@ jobs:
         run: |
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
 
+  ci-self-update-quality:
+    name: ci-self-update-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: Run self-update quality lane
+        run: npm run ci:self-update-quality --silent
+
+      - name: Summarize self-update quality lane
+        if: always()
+        env:
+          CI_LANE: self-update-quality
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/self-update-quality
+          CI_COVERAGE_FILE: outputs/ci/self-update-quality/coverage.out
+          CI_REPORT_FILE: outputs/ci/self-update-quality/report.json
+          CI_SUMMARY_FILE: outputs/ci/self-update-quality/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle self-update quality artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/self-update-quality-artifacts.tgz -C outputs/ci self-update-quality || true
+          ls -lh outputs/ci/self-update-quality-artifacts.tgz || true
+
+      - name: Print self-update quality report
+        if: always()
+        run: |
+          test -f outputs/ci/self-update-quality/report.json && cat outputs/ci/self-update-quality/report.json || true
+
   lint:
     name: lint
     runs-on: ubuntu-latest

@@ -46,4 +46,4 @@ if [[ "${hook_sha}" != "${source_sha}" ]]; then
 fi
 
 echo "Hook matches source: true"
-echo "Hook command: mage ci:debug"
+echo "Hook command: npm run ci:debug --silent"
