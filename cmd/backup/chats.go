@@ -33,13 +33,17 @@ var chatsCmd = &cobra.Command{
 
 Backs up conversations, settings, memory files, and project context from:
   - Claude Code (~/.claude): sessions, settings, MEMORY.md, todos, plans
-  - OpenAI Codex (~/.codex): sessions, config, skills
+  - OpenAI Codex (~/.codex): sessions, config, skills, archives, exports
   - VS Code (~/.config/Code): Cline, Roo Code, Copilot chat history
   - Windsurf (~/.config/Windsurf): global storage, settings
   - Cursor (~/.config/Cursor): state database, settings
   - Continue (~/.continue): sessions, config
   - Amazon Q (~/.aws/amazonq): chat history
   - Aider (~/.aider.*): chat history
+  - OpenClaw (~/.openclaw): config, sessions, skills, environment vars
+  - Gemini CLI (~/.gemini): shell history, session checkpoints, config
+  - ChatGPT Desktop (~/.config/ChatGPT): third-party desktop app data
+  - Gemini Desktop (~/.config/gemini-desktop): third-party desktop app data
   - Project context: CLAUDE.md, AGENTS.md, .claude/ dirs in /opt/
 
 Features:

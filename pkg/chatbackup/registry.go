@@ -197,6 +197,98 @@ func DefaultToolRegistry() []ToolSource {
 				},
 			},
 		},
+		// ─── OpenClaw ──────────────────────────────────────────────
+		{
+			Name:        "openclaw",
+			Description: "OpenClaw self-hosted AI assistant config and sessions",
+			Paths: []SourcePath{
+				{
+					Path:        "~/.openclaw/openclaw.json",
+					Description: "OpenClaw configuration file",
+				},
+				{
+					Path:        "~/.openclaw/config.yaml",
+					Description: "OpenClaw main config (YAML format)",
+				},
+				{
+					Path:        "~/.openclaw/.env",
+					Description: "OpenClaw environment variables (API keys, secrets)",
+				},
+				{
+					Path:        "~/.openclaw/workspace/skills",
+					Description: "OpenClaw custom skills",
+				},
+				{
+					Path:        "~/.openclaw/sessions",
+					Includes:    []string{"*.json", "*.jsonl"},
+					Description: "OpenClaw session transcripts",
+				},
+			},
+		},
+		// ─── Gemini CLI ────────────────────────────────────────────
+		{
+			Name:        "gemini-cli",
+			Description: "Google Gemini CLI agent chat history and config",
+			Paths: []SourcePath{
+				{
+					Path:        "~/.gemini/tmp",
+					Includes:    []string{"shell_history", "*/shell_history"},
+					Description: "Gemini CLI shell history and session checkpoints",
+				},
+				{
+					Path:        "~/.gemini/config",
+					Description: "Gemini CLI configuration",
+				},
+			},
+		},
+		// ─── ChatGPT Desktop (Third-Party) ────────────────────────
+		// Multiple third-party ChatGPT desktop apps exist for Linux
+		// We cover the most common ones (lencx/ChatGPT, electron-based)
+		{
+			Name:        "chatgpt-desktop",
+			Description: "ChatGPT desktop app (third-party) chat history",
+			Paths: []SourcePath{
+				{
+					Path:        "~/.config/ChatGPT",
+					Description: "ChatGPT desktop app config and state",
+				},
+				{
+					Path:        "~/.local/share/ChatGPT",
+					Description: "ChatGPT desktop app data storage",
+				},
+			},
+		},
+		// ─── Gemini Desktop (Third-Party) ─────────────────────────
+		{
+			Name:        "gemini-desktop",
+			Description: "Gemini desktop app (third-party) chat history",
+			Paths: []SourcePath{
+				{
+					Path:        "~/.config/gemini-desktop",
+					Description: "Gemini desktop app config and state",
+				},
+				{
+					Path:        "~/.local/share/gemini-desktop",
+					Description: "Gemini desktop app data storage",
+				},
+			},
+		},
+		// ─── Codex Archives ────────────────────────────────────────
+		// Extended coverage for Codex session archives and logs
+		{
+			Name:        "codex-archives",
+			Description: "OpenAI Codex archived sessions and exported data",
+			Paths: []SourcePath{
+				{
+					Path:        "~/.codex/archives",
+					Description: "Archived Codex sessions",
+				},
+				{
+					Path:        "~/.codex/exports",
+					Description: "Exported Codex data",
+				},
+			},
+		},
 	}
 }
 
