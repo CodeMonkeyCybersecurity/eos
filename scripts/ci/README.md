@@ -8,7 +8,7 @@ Script-based CI entrypoints for Gitea Actions (self-hosted, DinD runners).
 
 ```text
 scripts/ci/
-  debug.sh           # Local/CI parity lane used by mage ci:debug + pre-commit
+  debug.sh           # Local/CI parity lane used by npm ci:debug + magew ci:debug + pre-commit
   lib/lane-runtime.sh # Shared lane logging/reporting/error-handling helpers
   verify-parity.sh   # Enforces parity contract across hook, mage target, and CI workflows
   preflight.sh       # Runner health verification + Go cache setup
@@ -50,7 +50,7 @@ make ci-verify-parity # Verify parity contract wiring
 - **Fail-fast**: scripts use `set -euo pipefail` (or `set -Eeuo pipefail` where `ERR` trap propagation matters) and explicit exit codes.
 - **Structured observability**: lane-scoped outputs at `outputs/ci/<lane>/` with machine-readable report + metrics + JSONL events.
 - **Hook-safe Git handling**: shared `scripts/lib/git-env.sh` clears hook-exported Git-local env vars before foreign-repo Git commands.
-- **Parity contract**: `scripts/ci/verify-parity.sh` prevents drift between hook command, Mage target, and both `.gitea`/`.github` CI debug workflows.
+- **Parity contract**: `scripts/ci/verify-parity.sh` prevents drift between hook command, `magew ci:debug`, npm script mapping, Make target, and both `.gitea`/`.github` CI debug workflows.
 
 ## Debug Lane Artifacts
 

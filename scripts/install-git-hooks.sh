@@ -46,4 +46,4 @@ if [[ "${hook_sha}" != "${source_sha}" ]]; then
 fi
 
 echo "Hook matches source: true"
-echo "Hook command: npm run ci:debug --silent"
+echo "Hook command: ./magew ci:debug (fallback: npm run ci:debug --silent)"

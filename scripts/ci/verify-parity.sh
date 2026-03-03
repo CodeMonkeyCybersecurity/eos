@@ -4,9 +4,11 @@ set -euo pipefail
 # verify-parity.sh - Verify ci:debug parity contract
 #
 # Ensures the same ci:debug entry point is wired across:
-#   1. Pre-commit hook (npm run ci:debug -> scripts/ci/debug.sh)
+#   1. Pre-commit hook (magew ci:debug -> npm run ci:debug -> scripts/ci/debug.sh fallback)
 #   2. package.json     ("ci:debug": "bash scripts/ci/debug.sh")
-#   3. CI workflow       (npm run ci:debug --silent)
+#   3. magew target      ("ci:debug" dispatches to npm run ci:debug --silent)
+#   4. CI workflow       (npm run ci:debug --silent)
+#   5. Make target        (ci-debug uses magew ci:debug)
 #
 # All layers must resolve to scripts/ci/debug.sh as the single source of truth.
 
@@ -14,6 +16,8 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "${repo_root}"
 
 hook_file="scripts/hooks/pre-commit-ci-debug.sh"
+magew_file="magew"
+makefile="Makefile"
 package_json="package.json"
 workflow_candidates=(
   ".gitea/workflows/ci-debug-parity.yml"
@@ -42,12 +46,24 @@ assert_regex() {
 
 # --- Hook file checks ---
 assert_file "${hook_file}"
-assert_regex "${hook_file}" 'npm run ci:debug' "hook uses npm run ci:debug"
+assert_regex "${hook_file}" 'magew" ci:debug' "hook uses magew ci:debug"
+assert_regex "${hook_file}" 'npm run ci:debug' "hook supports npm ci:debug fallback"
 assert_regex "${hook_file}" 'scripts/ci/debug\.sh' "hook fallback uses scripts/ci/debug.sh"
 
 # --- package.json checks ---
 assert_file "${package_json}"
 assert_regex "${package_json}" '"ci:debug"[[:space:]]*:[[:space:]]*"bash scripts/ci/debug\.sh"' "package.json ci:debug maps to debug script"
+
+# --- magew checks ---
+assert_file "${magew_file}"
+assert_regex "${magew_file}" 'ci:debug\|launch:verify' "magew exposes ci:debug target"
+assert_regex "${magew_file}" 'npm run ci:debug --silent' "magew dispatches ci:debug to npm"
+assert_regex "${magew_file}" 'scripts/ci/debug\.sh' "magew has script fallback for ci:debug"
+
+# --- Makefile checks ---
+assert_file "${makefile}"
+assert_regex "${makefile}" '^ci-debug:.*' "make ci-debug target exists"
+assert_regex "${makefile}" '\./magew ci:debug' "make ci-debug dispatches to magew"
 
 # --- Workflow checks ---
 found_workflow=0

@@ -48,7 +48,7 @@ run_unit() {
   race_jsonl="${lane_dir}/unit-race.jsonl"
   coverage_file="${lane_dir}/coverage.out"
 
-  run_with_timeout 8m go build -o /tmp/eos-build ./cmd/
+  run_with_timeout 8m go build -o /tmp/eos-build .
 
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -short -count=1 -vet=off -coverprofile='${coverage_file}' -covermode=atomic -p 4 ./pkg/... | tee '${unit_jsonl}'; test \${PIPESTATUS[0]} -eq 0"

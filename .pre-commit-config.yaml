@@ -47,6 +47,15 @@ repos:
   # Local hooks for custom checks
   - repo: local
     hooks:
+      # Enforce local/CI parity lane via mage-compatible entrypoint
+      - id: ci-debug-parity
+        name: CI debug parity gate (magew ci:debug)
+        entry: ./magew ci:debug
+        language: system
+        pass_filenames: false
+        require_serial: true
+        description: Runs the same ci:debug lane used by hooks and CI
+
       # Run fast tests (skip integration and E2E)
       - id: go-test-fast
         name: Run unit tests
@@ -66,7 +75,7 @@ repos:
       # Build verification
       - id: go-build
         name: Verify build
-        entry: go build -o /tmp/eos-build-precommit ./cmd/
+        entry: go build -o /tmp/eos-build-precommit .
         language: system
         pass_filenames: false
         description: Ensures code compiles successfully

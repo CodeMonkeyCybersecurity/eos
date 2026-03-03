@@ -34,11 +34,11 @@ help: ## Display this help
 build: ## Build Eos binary with CGO support
 	@echo "[INFO] Building Eos with libvirt and Ceph support..."
 	@echo "[INFO] CGO_ENABLED=$(CGO_ENABLED)"
-	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/
+	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) .
 
 build-debug: ## Build with debug symbols and race detector
 	@echo "[INFO] Building Eos with debug symbols..."
-	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -race -o $(BUILD_DIR)/$(BINARY_NAME)-debug ./cmd/
+	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -race -o $(BUILD_DIR)/$(BINARY_NAME)-debug .
 
 install: build ## Build and install Eos to /usr/local/bin
 	@echo "[INFO] Installing Eos to $(INSTALL_DIR)..."

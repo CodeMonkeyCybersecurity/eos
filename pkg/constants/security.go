@@ -41,6 +41,7 @@ const PrimaryRemoteSSH = "ssh://git@gitea.cybermonkey.sh:9001/cybermonkey/eos.gi
 var TrustedRemotes = []string{
 	PrimaryRemoteHTTPS,
 	PrimaryRemoteSSH,
+	"git@gitea.cybermonkey.sh:cybermonkey/eos.git",
 	"https://github.com/CodeMonkeyCybersecurity/eos.git",
 	"git@github.com:CodeMonkeyCybersecurity/eos.git",
 }
