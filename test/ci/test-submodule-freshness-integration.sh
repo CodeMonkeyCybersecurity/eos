@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
+CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 # shellcheck source=../../scripts/lib/git-env.sh
 source "${GIT_ENV_SCRIPT}"
@@ -52,6 +53,8 @@ ge_run_clean_git git -C "${repo}" commit -m "add stale prompts submodule" >/dev/
 mkdir -p "${repo}/scripts/lib"
 cp "${FRESHNESS_SCRIPT}" "${repo}/scripts/prompts-submodule-freshness.sh"
 cp "${HELPER_SCRIPT}" "${repo}/scripts/lib/prompts-submodule.sh"
+cp "${CI_COMMON_SCRIPT}" "${repo}/scripts/lib/ci-common.sh"
+cp "${GIT_ENV_SCRIPT}" "${repo}/scripts/lib/git-env.sh"
 chmod +x "${repo}/scripts/prompts-submodule-freshness.sh"
 
 th_assert_run "stale-fail-without-auto-update" 1 '"outcome":"fail_stale"' \

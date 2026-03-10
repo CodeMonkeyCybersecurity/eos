@@ -6,13 +6,16 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${script_dir}/lib/prompts-submodule.sh"
 
 repo_root="$(ps_repo_root "${BASH_SOURCE[0]}")"
-report_path="${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}"
 
 created_link=false
 created_dir=false
 checker_path=""
 
-ps_ctx_init "governance" "${report_path}" "" "${repo_root}" "" "unknown" "unknown" "unknown" "auto" "false"
+# Set context vars directly, then call ps_ctx_init to normalize/validate.
+PS_CTX_KIND="governance"
+PS_CTX_REPORT_PATH="${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}"
+PS_CTX_REPO_ROOT="${repo_root}"
+ps_ctx_init
 
 cleanup() {
   if [[ "${created_link}" == "true" ]]; then
@@ -34,8 +37,9 @@ if [[ -x "${repo_root}/third_party/prompts/scripts/check-governance.sh" ]]; then
   checker_path="${repo_root}/third_party/prompts/scripts/check-governance.sh"
   if CONSUMING_REPO_ROOT="${repo_root}" "${checker_path}"; then
     ps_finish_and_exit "pass_checked_direct" "PASS: governance check completed via third_party/prompts path" 0
+  else
+    rc=$?
   fi
-  rc=$?
   ps_finish_and_exit "fail_checker_error" "FAIL: governance checker failed with exit code ${rc}" "${rc}"
 fi
 
@@ -59,6 +63,7 @@ fi
 checker_path="${repo_root}/prompts/scripts/check-governance.sh"
 if CONSUMING_REPO_ROOT="${repo_root}" "${checker_path}"; then
   ps_finish_and_exit "pass_checked_via_symlink" "PASS: governance check completed via prompts path with temporary symlink" 0
+else
+  rc=$?
 fi
-rc=$?
 ps_finish_and_exit "fail_checker_error" "FAIL: governance checker failed with exit code ${rc}" "${rc}"

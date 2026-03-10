@@ -3,6 +3,11 @@ set -Eeuo pipefail
 
 # Shared runtime helpers for CI lanes with JSONL logging and idempotent artifacts.
 
+# Source shared CI primitives (ci_json_escape, ci_now_utc, ci_epoch).
+_lane_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../lib/ci-common.sh
+source "${_lane_lib_dir}/../../lib/ci-common.sh"
+
 lane_init() {
   local lane="${1:?lane name required}"
   local root="${2:-.}"
@@ -13,8 +18,8 @@ lane_init() {
   CI_LANE_REPORT="${CI_LANE_DIR}/report.json"
   CI_LANE_METRICS="${CI_LANE_DIR}/metrics.prom"
   CI_LANE_EVENTS="${CI_LANE_DIR}/events.jsonl"
-  CI_LANE_START_EPOCH="$(date +%s)"
-  CI_LANE_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  CI_LANE_START_EPOCH="$(ci_epoch)"
+  CI_LANE_RUN_ID="$(ci_now_utc | tr -d ':T-' | cut -c1-15)Z-$$"
   CI_LANE_STAGE="bootstrap"
   CI_LANE_FAILED_STAGE="none"
   CI_LANE_FAILED_COMMAND=""
@@ -38,19 +43,9 @@ lane_acquire_lock() {
   echo "WARN: flock not found; continuing without lane lock (${CI_LANE_NAME})" >&2
 }
 
-lane_json_escape() {
-  local value="${1:-}"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "${value}"
-}
-
-lane_now_utc() {
-  date -u +%Y-%m-%dT%H:%M:%SZ
-}
+# Backward-compatible aliases — delegates to ci-common.sh.
+lane_json_escape() { ci_json_escape "$@"; }
+lane_now_utc() { ci_now_utc; }
 
 lane_log() {
   local level="${1:-INFO}"
@@ -62,7 +57,7 @@ lane_log() {
   local cmd="${7:-}"
 
   local payload
-  payload="{\"ts\":\"$(lane_now_utc)\",\"run_id\":\"$(lane_json_escape "${CI_LANE_RUN_ID}")\",\"lane\":\"$(lane_json_escape "${CI_LANE_NAME}")\",\"level\":\"$(lane_json_escape "${level}")\",\"event\":\"$(lane_json_escape "${event}")\",\"stage\":\"$(lane_json_escape "${stage}")\",\"exit_code\":${exit_code},\"line\":${line},\"failed_command\":\"$(lane_json_escape "${cmd}")\",\"message\":\"$(lane_json_escape "${message}")\"}"
+  payload="{\"ts\":\"$(ci_now_utc)\",\"run_id\":\"$(ci_json_escape "${CI_LANE_RUN_ID}")\",\"lane\":\"$(ci_json_escape "${CI_LANE_NAME}")\",\"level\":\"$(ci_json_escape "${level}")\",\"event\":\"$(ci_json_escape "${event}")\",\"stage\":\"$(ci_json_escape "${stage}")\",\"exit_code\":${exit_code},\"line\":${line},\"failed_command\":\"$(ci_json_escape "${cmd}")\",\"message\":\"$(ci_json_escape "${message}")\"}"
   printf '%s\n' "${payload}"
   printf '%s\n' "${payload}" >> "${CI_LANE_EVENTS}"
 }
@@ -108,7 +103,7 @@ lane_finish() {
   trap - ERR
 
   local end_epoch duration level
-  end_epoch="$(date +%s)"
+  end_epoch="$(ci_epoch)"
   duration="$((end_epoch - CI_LANE_START_EPOCH))"
   level="INFO"
   if [[ "${status}" != "pass" ]]; then
@@ -119,17 +114,17 @@ lane_finish() {
 
   cat > "${CI_LANE_REPORT}" <<EOF_REPORT
 {
-  "ts": "$(lane_json_escape "$(lane_now_utc)")",
-  "run_id": "$(lane_json_escape "${CI_LANE_RUN_ID}")",
-  "lane": "$(lane_json_escape "${CI_LANE_NAME}")",
-  "status": "$(lane_json_escape "${status}")",
+  "ts": "$(ci_json_escape "$(ci_now_utc)")",
+  "run_id": "$(ci_json_escape "${CI_LANE_RUN_ID}")",
+  "lane": "$(ci_json_escape "${CI_LANE_NAME}")",
+  "status": "$(ci_json_escape "${status}")",
   "exit_code": ${exit_code},
-  "stage": "$(lane_json_escape "${CI_LANE_FAILED_STAGE}")",
+  "stage": "$(ci_json_escape "${CI_LANE_FAILED_STAGE}")",
   "line": ${CI_LANE_FAILED_LINE},
-  "failed_command": "$(lane_json_escape "${CI_LANE_FAILED_COMMAND}")",
+  "failed_command": "$(ci_json_escape "${CI_LANE_FAILED_COMMAND}")",
   "duration_seconds": ${duration},
   ${CI_LANE_REPORT_EXTRA_JSON:-"\"extra\":null"},
-  "message": "$(lane_json_escape "${message}")"
+  "message": "$(ci_json_escape "${message}")"
 }
 EOF_REPORT
 

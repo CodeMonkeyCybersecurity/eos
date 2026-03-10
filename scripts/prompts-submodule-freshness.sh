@@ -6,13 +6,16 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${script_dir}/lib/prompts-submodule.sh"
 
 repo_root="$(ps_repo_root "${BASH_SOURCE[0]}")"
-auto_update="$(ps_normalize_bool "${AUTO_UPDATE:-false}")"
-strict_remote="$(ps_normalize_strict_remote "${STRICT_REMOTE:-auto}")"
 fetch_timeout_sec="${SUBMODULE_FETCH_TIMEOUT_SEC:-20}"
-report_path="${SUBMODULE_REPORT_JSON:-${repo_root}/outputs/ci/submodule-freshness/report.json}"
-metrics_path="${SUBMODULE_METRICS_TEXTFILE:-}"
 
-ps_ctx_init "freshness" "${report_path}" "${metrics_path}" "${repo_root}" "" "unknown" "unknown" "unknown" "${strict_remote}" "${auto_update}"
+# Set context vars directly, then call ps_ctx_init to normalize/validate.
+PS_CTX_KIND="freshness"
+PS_CTX_REPORT_PATH="${SUBMODULE_REPORT_JSON:-${repo_root}/outputs/ci/submodule-freshness/report.json}"
+PS_CTX_METRICS_PATH="${SUBMODULE_METRICS_TEXTFILE:-}"
+PS_CTX_REPO_ROOT="${repo_root}"
+PS_CTX_STRICT_REMOTE="${STRICT_REMOTE:-auto}"
+PS_CTX_AUTO_UPDATE="${AUTO_UPDATE:-false}"
+ps_ctx_init
 trap 'ps_finish_and_exit "fail_internal" "FAIL: unexpected script error at line ${LINENO}" 1' ERR
 
 ps_log_json "INFO" "submodule_freshness.start" "skip_not_registered" "Starting prompts submodule freshness check"
@@ -32,14 +35,14 @@ fi
 
 PS_CTX_REMOTE_BRANCH="$(ps_tracking_branch "${repo_root}" "${PS_CTX_PROMPTS_PATH}")"
 if ! ps_git_fetch_remote_branch "${repo_root}/${PS_CTX_PROMPTS_PATH}" "${PS_CTX_REMOTE_BRANCH}" "${fetch_timeout_sec}" 2>/dev/null; then
-  if ps_should_strict_fail_remote "${strict_remote}"; then
-    ps_finish_and_exit "fail_remote_unreachable" "FAIL: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} while STRICT_REMOTE=${strict_remote}" 2
+  if ps_should_strict_fail_remote "${PS_CTX_STRICT_REMOTE}"; then
+    ps_finish_and_exit "fail_remote_unreachable" "FAIL: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} while STRICT_REMOTE=${PS_CTX_STRICT_REMOTE}" 2
   fi
   ps_finish_and_exit "skip_remote_unreachable" "SKIP: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} (offline or auth issue)" 0
 fi
 
 if ! PS_CTX_REMOTE_SHA="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" rev-parse "origin/${PS_CTX_REMOTE_BRANCH}" 2>/dev/null)"; then
-  if ps_should_strict_fail_remote "${strict_remote}"; then
+  if ps_should_strict_fail_remote "${PS_CTX_STRICT_REMOTE}"; then
     ps_finish_and_exit "fail_missing_remote_ref" "FAIL: origin/${PS_CTX_REMOTE_BRANCH} not available for ${PS_CTX_PROMPTS_PATH}" 2
   fi
   ps_finish_and_exit "skip_missing_remote_ref" "SKIP: origin/${PS_CTX_REMOTE_BRANCH} not available for ${PS_CTX_PROMPTS_PATH}" 0
@@ -51,7 +54,7 @@ if [[ "${PS_CTX_LOCAL_SHA}" == "${PS_CTX_REMOTE_SHA}" ]]; then
   ps_finish_and_exit "pass_up_to_date" "PASS: prompts submodule is up to date" 0
 fi
 
-if [[ "${auto_update}" != "true" ]]; then
+if [[ "${PS_CTX_AUTO_UPDATE}" != "true" ]]; then
   ps_finish_and_exit "fail_stale" "FAIL: prompts submodule is stale (${PS_CTX_LOCAL_SHA:0:7} != ${PS_CTX_REMOTE_SHA:0:7}). Run: git submodule update --remote -- ${PS_CTX_PROMPTS_PATH}" 1
 fi
 

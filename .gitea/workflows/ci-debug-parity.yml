@@ -45,6 +45,7 @@ jobs:
           set -euo pipefail
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
           test -f outputs/ci/debug/metrics.prom && cat outputs/ci/debug/metrics.prom || true
+          test -f outputs/ci/governance-propagation-coverage/coverage.txt && cat outputs/ci/governance-propagation-coverage/coverage.txt || true
 
       - name: Alert on ci:debug failure details
         if: always()

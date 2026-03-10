@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+# Source shared CI primitives (ci_json_escape, ci_now_utc, ci_in_ci, ci_normalize_bool).
+_ps_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ci-common.sh
+source "${_ps_lib_dir}/ci-common.sh"
+# shellcheck source=git-env.sh
+source "${_ps_lib_dir}/git-env.sh"
 
 PS_CTX_KIND="${PS_CTX_KIND:-}"
 PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
@@ -13,36 +20,11 @@ PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
 PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
 PS_CTX_ARTIFACT_WARNINGS="${PS_CTX_ARTIFACT_WARNINGS:-0}"
 
-ps_json_escape() {
-  local value="${1:-}"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\r'/\\r}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "${value}"
-}
-
-ps_now_utc() {
-  date -u +%Y-%m-%dT%H:%M:%SZ
-}
-
-ps_in_ci() {
-  [[ -n "${CI:-}" || -n "${GITHUB_ACTIONS:-}" || -n "${GITEA_ACTIONS:-}" ]]
-}
-
-ps_normalize_bool() {
-  local v
-  v="$(printf '%s' "${1:-false}" | tr '[:upper:]' '[:lower:]')"
-  case "${v}" in
-    true|1|yes|y|on)
-      printf 'true'
-      ;;
-    *)
-      printf 'false'
-      ;;
-  esac
-}
+# Backward-compatible aliases for callers that use the old ps_ names.
+ps_json_escape() { ci_json_escape "$@"; }
+ps_now_utc() { ci_now_utc; }
+ps_in_ci() { ci_in_ci; }
+ps_normalize_bool() { ci_normalize_bool "$@"; }
 
 ps_normalize_strict_remote() {
   local v
@@ -63,17 +45,22 @@ ps_repo_root() {
 }
 
 ps_ctx_init() {
-  PS_CTX_KIND="${1:?kind required}"
-  PS_CTX_REPORT_PATH="${2:?report path required}"
-  PS_CTX_METRICS_PATH="${3:-}"
-  PS_CTX_REPO_ROOT="${4:-}"
-  PS_CTX_PROMPTS_PATH="${5:-}"
-  PS_CTX_LOCAL_SHA="${6:-unknown}"
-  PS_CTX_REMOTE_SHA="${7:-unknown}"
-  PS_CTX_REMOTE_BRANCH="${8:-unknown}"
-  PS_CTX_STRICT_REMOTE="$(ps_normalize_strict_remote "${9:-auto}")"
-  PS_CTX_AUTO_UPDATE="$(ps_normalize_bool "${10:-false}")"
+  # No positional args. Callers set PS_CTX_* vars directly before calling.
+  # This function normalizes values and validates required fields.
+  if [[ -z "${PS_CTX_KIND:-}" ]]; then
+    printf 'FAIL: PS_CTX_KIND must be set before calling ps_ctx_init\n' >&2
+    return 1
+  fi
+  if [[ -z "${PS_CTX_REPORT_PATH:-}" ]]; then
+    printf 'FAIL: PS_CTX_REPORT_PATH must be set before calling ps_ctx_init\n' >&2
+    return 1
+  fi
+  PS_CTX_STRICT_REMOTE="$(ps_normalize_strict_remote "${PS_CTX_STRICT_REMOTE:-auto}")"
+  PS_CTX_AUTO_UPDATE="$(ci_normalize_bool "${PS_CTX_AUTO_UPDATE:-false}")"
   PS_CTX_ARTIFACT_WARNINGS=0
+  # Clear hook-exported git env vars so submodule git operations work
+  # even when invoked from a pre-commit hook context.
+  ge_unset_git_local_env
 }
 
 ps_ctx_require() {
@@ -166,11 +153,11 @@ ps_should_strict_fail_remote() {
       return 1
       ;;
     auto)
-      ps_in_ci
+      ci_in_ci
       return $?
       ;;
     *)
-      ps_in_ci
+      ci_in_ci
       return $?
       ;;
   esac
@@ -236,22 +223,16 @@ ps_log_json() {
   local outcome="${3:-unknown}"
   local message="${4:-}"
 
-  printf '{"ts":"%s","level":"%s","event":"%s","kind":"%s","outcome":"%s","status":"%s","repo_root":"%s","prompts_path":"%s","local_sha":"%s","remote_sha":"%s","remote_branch":"%s","strict_remote":"%s","auto_update":"%s","artifact_warnings":%s,"message":"%s"}\n' \
-    "$(ps_now_utc)" \
-    "$(ps_json_escape "${level}")" \
-    "$(ps_json_escape "${event}")" \
-    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
-    "$(ps_json_escape "${outcome}")" \
+  # Slim event log: context fields (repo_root, SHAs, strict_remote, etc.) live
+  # in the JSON report artifact. Logs carry only event-specific data.
+  printf '{"ts":"%s","level":"%s","kind":"%s","event":"%s","outcome":"%s","status":"%s","message":"%s"}\n' \
+    "$(ci_now_utc)" \
+    "$(ci_json_escape "${level}")" \
+    "$(ci_json_escape "${PS_CTX_KIND:-unknown}")" \
+    "$(ci_json_escape "${event}")" \
+    "$(ci_json_escape "${outcome}")" \
     "$(ps_status_from_outcome "${outcome}")" \
-    "$(ps_json_escape "${PS_CTX_REPO_ROOT:-}")" \
-    "$(ps_json_escape "${PS_CTX_PROMPTS_PATH:-}")" \
-    "$(ps_json_escape "${PS_CTX_LOCAL_SHA:-unknown}")" \
-    "$(ps_json_escape "${PS_CTX_REMOTE_SHA:-unknown}")" \
-    "$(ps_json_escape "${PS_CTX_REMOTE_BRANCH:-unknown}")" \
-    "$(ps_json_escape "${PS_CTX_STRICT_REMOTE:-auto}")" \
-    "$(ps_json_escape "${PS_CTX_AUTO_UPDATE:-false}")" \
-    "${PS_CTX_ARTIFACT_WARNINGS:-0}" \
-    "$(ps_json_escape "${message}")"
+    "$(ci_json_escape "${message}")"
 }
 
 ps_log_level_for_outcome() {
@@ -275,13 +256,12 @@ ps_warn_artifact_failure() {
   local detail="${3:-unknown error}"
 
   PS_CTX_ARTIFACT_WARNINGS=$((PS_CTX_ARTIFACT_WARNINGS + 1))
-  printf '{"ts":"%s","level":"WARN","event":"%s.artifact_warning","kind":"%s","artifact":"%s","path":"%s","message":"%s"}\n' \
-    "$(ps_now_utc)" \
-    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
-    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
-    "$(ps_json_escape "${artifact_kind}")" \
-    "$(ps_json_escape "${artifact_path}")" \
-    "$(ps_json_escape "${detail}")" >&2
+  printf '{"ts":"%s","level":"WARN","kind":"%s","event":"artifact_warning","artifact":"%s","path":"%s","message":"%s"}\n' \
+    "$(ci_now_utc)" \
+    "$(ci_json_escape "${PS_CTX_KIND:-unknown}")" \
+    "$(ci_json_escape "${artifact_kind}")" \
+    "$(ci_json_escape "${artifact_path}")" \
+    "$(ci_json_escape "${detail}")" >&2
 }
 
 ps_write_atomic_file() {
@@ -313,20 +293,20 @@ ps_write_json_report() {
 
   ps_write_atomic_file "${report_path}" <<JSON || {
 {
-  "ts": "$(ps_json_escape "$(ps_now_utc)")",
-  "kind": "$(ps_json_escape "${PS_CTX_KIND}")",
-  "outcome": "$(ps_json_escape "${outcome}")",
-  "status": "$(ps_json_escape "$(ps_status_from_outcome "${outcome}")")",
+  "ts": "$(ci_json_escape "$(ci_now_utc)")",
+  "kind": "$(ci_json_escape "${PS_CTX_KIND}")",
+  "outcome": "$(ci_json_escape "${outcome}")",
+  "status": "$(ci_json_escape "$(ps_status_from_outcome "${outcome}")")",
   "exit_code": ${exit_code},
-  "repo_root": "$(ps_json_escape "${PS_CTX_REPO_ROOT}")",
-  "prompts_path": "$(ps_json_escape "${PS_CTX_PROMPTS_PATH}")",
-  "local_sha": "$(ps_json_escape "${PS_CTX_LOCAL_SHA}")",
-  "remote_sha": "$(ps_json_escape "${PS_CTX_REMOTE_SHA}")",
-  "remote_branch": "$(ps_json_escape "${PS_CTX_REMOTE_BRANCH}")",
-  "strict_remote": "$(ps_json_escape "${PS_CTX_STRICT_REMOTE}")",
-  "auto_update": "$(ps_json_escape "${PS_CTX_AUTO_UPDATE}")",
+  "repo_root": "$(ci_json_escape "${PS_CTX_REPO_ROOT}")",
+  "prompts_path": "$(ci_json_escape "${PS_CTX_PROMPTS_PATH}")",
+  "local_sha": "$(ci_json_escape "${PS_CTX_LOCAL_SHA}")",
+  "remote_sha": "$(ci_json_escape "${PS_CTX_REMOTE_SHA}")",
+  "remote_branch": "$(ci_json_escape "${PS_CTX_REMOTE_BRANCH}")",
+  "strict_remote": "$(ci_json_escape "${PS_CTX_STRICT_REMOTE}")",
+  "auto_update": "$(ci_json_escape "${PS_CTX_AUTO_UPDATE}")",
   "artifact_warnings": ${PS_CTX_ARTIFACT_WARNINGS},
-  "message": "$(ps_json_escape "${message}")"
+  "message": "$(ci_json_escape "${message}")"
 }
 JSON
     ps_warn_artifact_failure "report" "${report_path}" "failed to write JSON report"
@@ -363,7 +343,7 @@ prompts_submodule_freshness_status{outcome="${outcome}",strict_remote="${PS_CTX_
 # TYPE prompts_submodule_freshness_stale gauge
 prompts_submodule_freshness_stale ${stale_value}
 # TYPE prompts_submodule_freshness_last_run_timestamp_seconds gauge
-prompts_submodule_freshness_last_run_timestamp_seconds $(date -u +%s)
+prompts_submodule_freshness_last_run_timestamp_seconds $(ci_epoch)
 EOF_METRICS
     ps_warn_artifact_failure "metrics" "${PS_CTX_METRICS_PATH}" "failed to write Prometheus textfile"
     return 1

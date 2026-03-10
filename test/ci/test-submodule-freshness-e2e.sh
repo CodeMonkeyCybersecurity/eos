@@ -9,6 +9,8 @@ source "${SCRIPT_DIR}/lib/test-harness.sh"
 WORKFLOW_FILE="${REPO_ROOT}/.gitea/workflows/submodule-freshness.yml"
 FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
+CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
+GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 REPORT_ALERT_SCRIPT="${REPO_ROOT}/scripts/ci/report-alert.py"
 
 th_assert_run "workflow-yaml-valid" 0 "" python3 -c "
@@ -46,6 +48,8 @@ trap 'rm -rf "${tmpdir}"' EXIT
 mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/scripts/ci"
 cp "${FRESHNESS_SCRIPT}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
 cp "${HELPER_SCRIPT}" "${tmpdir}/scripts/lib/prompts-submodule.sh"
+cp "${CI_COMMON_SCRIPT}" "${tmpdir}/scripts/lib/ci-common.sh"
+cp "${GIT_ENV_SCRIPT}" "${tmpdir}/scripts/lib/git-env.sh"
 cp "${REPORT_ALERT_SCRIPT}" "${tmpdir}/scripts/ci/report-alert.py"
 chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/scripts/ci/report-alert.py"
 
