@@ -5,6 +5,7 @@
   "description": "Eos CLI for Ubuntu server administration - DevSecOps tooling",
   "scripts": {
     "ci:debug": "bash scripts/ci/debug.sh",
+    "ci": "npm run ci:debug --silent",
     "ci:preflight": "bash scripts/ci/preflight.sh",
     "ci:lint": "bash scripts/ci/lint.sh",
     "ci:lint:changed": "bash scripts/ci/lint.sh changed",

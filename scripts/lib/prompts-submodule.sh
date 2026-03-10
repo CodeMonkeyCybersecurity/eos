@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+PS_CTX_KIND="${PS_CTX_KIND:-}"
+PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
+PS_CTX_METRICS_PATH="${PS_CTX_METRICS_PATH:-}"
+PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
+PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
+PS_CTX_LOCAL_SHA="${PS_CTX_LOCAL_SHA:-unknown}"
+PS_CTX_REMOTE_SHA="${PS_CTX_REMOTE_SHA:-unknown}"
+PS_CTX_REMOTE_BRANCH="${PS_CTX_REMOTE_BRANCH:-unknown}"
+PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
+PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
+PS_CTX_ARTIFACT_WARNINGS="${PS_CTX_ARTIFACT_WARNINGS:-0}"
+
 ps_json_escape() {
   local value="${1:-}"
   value="${value//\\/\\\\}"
@@ -48,6 +60,25 @@ ps_normalize_strict_remote() {
 ps_repo_root() {
   local script_path="${1:?script path required}"
   cd "$(dirname "${script_path}")/.." && pwd
+}
+
+ps_ctx_init() {
+  PS_CTX_KIND="${1:?kind required}"
+  PS_CTX_REPORT_PATH="${2:?report path required}"
+  PS_CTX_METRICS_PATH="${3:-}"
+  PS_CTX_REPO_ROOT="${4:-}"
+  PS_CTX_PROMPTS_PATH="${5:-}"
+  PS_CTX_LOCAL_SHA="${6:-unknown}"
+  PS_CTX_REMOTE_SHA="${7:-unknown}"
+  PS_CTX_REMOTE_BRANCH="${8:-unknown}"
+  PS_CTX_STRICT_REMOTE="$(ps_normalize_strict_remote "${9:-auto}")"
+  PS_CTX_AUTO_UPDATE="$(ps_normalize_bool "${10:-false}")"
+  PS_CTX_ARTIFACT_WARNINGS=0
+}
+
+ps_ctx_require() {
+  [[ -n "${PS_CTX_KIND:-}" ]] || return 1
+  [[ -n "${PS_CTX_REPORT_PATH:-}" ]] || return 1
 }
 
 ps_prompts_submodule_path() {
@@ -204,83 +235,23 @@ ps_log_json() {
   local event="${2:-event}"
   local outcome="${3:-unknown}"
   local message="${4:-}"
-  local repo_root="${5:-}"
-  local prompts_path="${6:-}"
-  local local_sha="${7:-unknown}"
-  local remote_sha="${8:-unknown}"
-  local remote_branch="${9:-unknown}"
-  local strict_remote="${10:-auto}"
-  local auto_update="${11:-false}"
-  printf '{"ts":"%s","level":"%s","event":"%s","outcome":"%s","status":"%s","repo_root":"%s","prompts_path":"%s","local_sha":"%s","remote_sha":"%s","remote_branch":"%s","strict_remote":"%s","auto_update":"%s","message":"%s"}\n' \
+
+  printf '{"ts":"%s","level":"%s","event":"%s","kind":"%s","outcome":"%s","status":"%s","repo_root":"%s","prompts_path":"%s","local_sha":"%s","remote_sha":"%s","remote_branch":"%s","strict_remote":"%s","auto_update":"%s","artifact_warnings":%s,"message":"%s"}\n' \
     "$(ps_now_utc)" \
     "$(ps_json_escape "${level}")" \
     "$(ps_json_escape "${event}")" \
+    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
     "$(ps_json_escape "${outcome}")" \
     "$(ps_status_from_outcome "${outcome}")" \
-    "$(ps_json_escape "${repo_root}")" \
-    "$(ps_json_escape "${prompts_path}")" \
-    "$(ps_json_escape "${local_sha}")" \
-    "$(ps_json_escape "${remote_sha}")" \
-    "$(ps_json_escape "${remote_branch}")" \
-    "$(ps_json_escape "${strict_remote}")" \
-    "$(ps_json_escape "${auto_update}")" \
+    "$(ps_json_escape "${PS_CTX_REPO_ROOT:-}")" \
+    "$(ps_json_escape "${PS_CTX_PROMPTS_PATH:-}")" \
+    "$(ps_json_escape "${PS_CTX_LOCAL_SHA:-unknown}")" \
+    "$(ps_json_escape "${PS_CTX_REMOTE_SHA:-unknown}")" \
+    "$(ps_json_escape "${PS_CTX_REMOTE_BRANCH:-unknown}")" \
+    "$(ps_json_escape "${PS_CTX_STRICT_REMOTE:-auto}")" \
+    "$(ps_json_escape "${PS_CTX_AUTO_UPDATE:-false}")" \
+    "${PS_CTX_ARTIFACT_WARNINGS:-0}" \
     "$(ps_json_escape "${message}")"
-}
-
-ps_write_json_report() {
-  local report_path="${1:?report path required}"
-  local kind="${2:?kind required}"
-  local outcome="${3:?outcome required}"
-  local message="${4:-}"
-  local repo_root="${5:-}"
-  local prompts_path="${6:-}"
-  local local_sha="${7:-unknown}"
-  local remote_sha="${8:-unknown}"
-  local remote_branch="${9:-unknown}"
-  local strict_remote="${10:-auto}"
-  local auto_update="${11:-false}"
-  local exit_code="${12:-0}"
-
-  mkdir -p "$(dirname "${report_path}")"
-  cat > "${report_path}" <<JSON
-{
-  "ts": "$(ps_json_escape "$(ps_now_utc)")",
-  "kind": "$(ps_json_escape "${kind}")",
-  "outcome": "$(ps_json_escape "${outcome}")",
-  "status": "$(ps_json_escape "$(ps_status_from_outcome "${outcome}")")",
-  "exit_code": ${exit_code},
-  "repo_root": "$(ps_json_escape "${repo_root}")",
-  "prompts_path": "$(ps_json_escape "${prompts_path}")",
-  "local_sha": "$(ps_json_escape "${local_sha}")",
-  "remote_sha": "$(ps_json_escape "${remote_sha}")",
-  "remote_branch": "$(ps_json_escape "${remote_branch}")",
-  "strict_remote": "$(ps_json_escape "${strict_remote}")",
-  "auto_update": "$(ps_json_escape "${auto_update}")",
-  "message": "$(ps_json_escape "${message}")"
-}
-JSON
-}
-
-ps_emit_prom_metrics() {
-  local metrics_path="${1:-}"
-  local outcome="${2:-unknown}"
-  local strict_remote="${3:-auto}"
-  if [[ -z "${metrics_path}" ]]; then
-    return 0
-  fi
-
-  local stale_value=0
-  if [[ "${outcome}" == "fail_stale" ]]; then
-    stale_value=1
-  fi
-
-  mkdir -p "$(dirname "${metrics_path}")"
-  cat > "${metrics_path}" <<EOF
-# TYPE prompts_submodule_freshness_status gauge
-prompts_submodule_freshness_status{outcome="${outcome}",strict_remote="${strict_remote}"} 1
-# TYPE prompts_submodule_freshness_stale gauge
-prompts_submodule_freshness_stale ${stale_value}
-EOF
 }
 
 ps_log_level_for_outcome() {
@@ -298,23 +269,119 @@ ps_log_level_for_outcome() {
   esac
 }
 
-ps_finish_and_exit() {
-  local kind="${1:?kind required}"
-  local outcome="${2:?outcome required}"
-  local message="${3:?message required}"
-  local exit_code="${4:?exit code required}"
-  local report_path="${5:?report path required}"
-  local metrics_path="${6:-}"
-  local repo_root="${7:-}"
-  local prompts_path="${8:-}"
-  local local_sha="${9:-unknown}"
-  local remote_sha="${10:-unknown}"
-  local remote_branch="${11:-unknown}"
-  local strict_remote="${12:-auto}"
-  local auto_update="${13:-false}"
+ps_warn_artifact_failure() {
+  local artifact_kind="${1:?artifact kind required}"
+  local artifact_path="${2:-unknown}"
+  local detail="${3:-unknown error}"
 
-  if ! ps_outcome_known "${kind}" "${outcome}"; then
-    if [[ "${kind}" == "freshness" ]]; then
+  PS_CTX_ARTIFACT_WARNINGS=$((PS_CTX_ARTIFACT_WARNINGS + 1))
+  printf '{"ts":"%s","level":"WARN","event":"%s.artifact_warning","kind":"%s","artifact":"%s","path":"%s","message":"%s"}\n' \
+    "$(ps_now_utc)" \
+    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
+    "$(ps_json_escape "${PS_CTX_KIND:-unknown}")" \
+    "$(ps_json_escape "${artifact_kind}")" \
+    "$(ps_json_escape "${artifact_path}")" \
+    "$(ps_json_escape "${detail}")" >&2
+}
+
+ps_write_atomic_file() {
+  local target_path="${1:?target path required}"
+  local tmp_path
+
+  mkdir -p "$(dirname "${target_path}")" || return 1
+  tmp_path="$(mktemp "${target_path}.tmp.XXXXXX")" || return 1
+  cat > "${tmp_path}" || {
+    rm -f "${tmp_path}"
+    return 1
+  }
+  mv -f "${tmp_path}" "${target_path}" || {
+    rm -f "${tmp_path}"
+    return 1
+  }
+}
+
+ps_write_json_report() {
+  local report_path="${1:?report path required}"
+  local outcome="${2:?outcome required}"
+  local message="${3:-}"
+  local exit_code="${4:-0}"
+
+  if ! ps_ctx_require; then
+    ps_warn_artifact_failure "report" "${report_path}" "context missing for report emission"
+    return 1
+  fi
+
+  ps_write_atomic_file "${report_path}" <<JSON || {
+{
+  "ts": "$(ps_json_escape "$(ps_now_utc)")",
+  "kind": "$(ps_json_escape "${PS_CTX_KIND}")",
+  "outcome": "$(ps_json_escape "${outcome}")",
+  "status": "$(ps_json_escape "$(ps_status_from_outcome "${outcome}")")",
+  "exit_code": ${exit_code},
+  "repo_root": "$(ps_json_escape "${PS_CTX_REPO_ROOT}")",
+  "prompts_path": "$(ps_json_escape "${PS_CTX_PROMPTS_PATH}")",
+  "local_sha": "$(ps_json_escape "${PS_CTX_LOCAL_SHA}")",
+  "remote_sha": "$(ps_json_escape "${PS_CTX_REMOTE_SHA}")",
+  "remote_branch": "$(ps_json_escape "${PS_CTX_REMOTE_BRANCH}")",
+  "strict_remote": "$(ps_json_escape "${PS_CTX_STRICT_REMOTE}")",
+  "auto_update": "$(ps_json_escape "${PS_CTX_AUTO_UPDATE}")",
+  "artifact_warnings": ${PS_CTX_ARTIFACT_WARNINGS},
+  "message": "$(ps_json_escape "${message}")"
+}
+JSON
+    ps_warn_artifact_failure "report" "${report_path}" "failed to write JSON report"
+    return 1
+  }
+}
+
+ps_emit_prom_metrics() {
+  local outcome="${1:-unknown}"
+  if [[ -z "${PS_CTX_METRICS_PATH:-}" ]]; then
+    return 0
+  fi
+
+  local stale_value=0
+  local status_value=0
+  case "$(ps_status_from_outcome "${outcome}")" in
+    pass)
+      status_value=1
+      ;;
+    skip)
+      status_value=0
+      ;;
+    fail)
+      status_value=-1
+      ;;
+  esac
+  if [[ "${outcome}" == "fail_stale" ]]; then
+    stale_value=1
+  fi
+
+  ps_write_atomic_file "${PS_CTX_METRICS_PATH}" <<EOF_METRICS || {
+# TYPE prompts_submodule_freshness_status gauge
+prompts_submodule_freshness_status{outcome="${outcome}",strict_remote="${PS_CTX_STRICT_REMOTE}"} ${status_value}
+# TYPE prompts_submodule_freshness_stale gauge
+prompts_submodule_freshness_stale ${stale_value}
+# TYPE prompts_submodule_freshness_last_run_timestamp_seconds gauge
+prompts_submodule_freshness_last_run_timestamp_seconds $(date -u +%s)
+EOF_METRICS
+    ps_warn_artifact_failure "metrics" "${PS_CTX_METRICS_PATH}" "failed to write Prometheus textfile"
+    return 1
+  }
+}
+
+ps_finish_and_exit() {
+  local outcome="${1:?outcome required}"
+  local message="${2:?message required}"
+  local exit_code="${3:?exit code required}"
+
+  if ! ps_ctx_require; then
+    printf 'FAIL: prompts-submodule context missing (kind/report_path)\n' >&2
+    exit 1
+  fi
+
+  if ! ps_outcome_known "${PS_CTX_KIND}" "${outcome}"; then
+    if [[ "${PS_CTX_KIND}" == "freshness" ]]; then
       outcome="fail_internal"
     else
       outcome="fail_checker_error"
@@ -325,13 +392,13 @@ ps_finish_and_exit() {
 
   local level event
   level="$(ps_log_level_for_outcome "${outcome}")"
-  event="${kind}_check.finish"
+  event="${PS_CTX_KIND}_check.finish"
 
-  ps_log_json "${level}" "${event}" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}"
-  ps_write_json_report "${report_path}" "${kind}" "${outcome}" "${message}" "${repo_root}" "${prompts_path}" "${local_sha}" "${remote_sha}" "${remote_branch}" "${strict_remote}" "${auto_update}" "${exit_code}"
+  ps_log_json "${level}" "${event}" "${outcome}" "${message}"
+  ps_write_json_report "${PS_CTX_REPORT_PATH}" "${outcome}" "${message}" "${exit_code}" || true
 
-  if [[ "${kind}" == "freshness" ]]; then
-    ps_emit_prom_metrics "${metrics_path}" "${outcome}" "${strict_remote}"
+  if [[ "${PS_CTX_KIND}" == "freshness" ]]; then
+    ps_emit_prom_metrics "${outcome}" || true
   fi
 
   exit "${exit_code}"

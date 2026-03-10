@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Emit human-readable CI annotations from a structured report JSON.
+
+This helper intentionally exits 0 so alert extraction never masks the original job result.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+
+def annotation(level: str, message: str) -> int:
+    level = level.lower()
+    if level not in {"error", "warning", "notice"}:
+        level = "notice"
+    print(f"::{level}::{message}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 3:
+        print("usage: report-alert.py <profile> <report-path>", file=sys.stderr)
+        return 2
+
+    profile = argv[1]
+    report_path = Path(argv[2])
+    if not report_path.is_file():
+        return annotation("warning", f"{profile} report missing at {report_path}")
+
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return annotation("error", f"{profile} report unreadable at {report_path}: {exc}")
+
+    status = str(data.get("status", "unknown"))
+    outcome = str(data.get("outcome", "unknown"))
+    message = str(data.get("message", "unknown"))
+
+    if profile == "submodule-freshness":
+        exit_code = data.get("exit_code", "unknown")
+        if status == "fail":
+            return annotation("error", f"submodule freshness failed outcome={outcome} exit_code={exit_code} message={message}")
+        if status == "skip":
+            return annotation("warning", f"submodule freshness skipped outcome={outcome} message={message}")
+        return annotation("notice", f"submodule freshness passed outcome={outcome}")
+
+    if profile == "ci-debug":
+        stage = str(data.get("stage", "unknown"))
+        failed_command = str(data.get("failed_command", "unknown"))
+        if status != "pass":
+            return annotation("error", f"ci:debug failed stage={stage} command={failed_command} message={message}")
+        return annotation("notice", "ci:debug status=pass")
+
+    return annotation("warning", f"unknown report-alert profile={profile} report={report_path}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

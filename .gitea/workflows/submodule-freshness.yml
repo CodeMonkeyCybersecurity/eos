@@ -82,18 +82,4 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          report="outputs/ci/submodule-freshness/report.json"
-          if [[ ! -f "${report}" ]]; then
-            echo "::warning::submodule freshness report missing"
-            exit 0
-          fi
-          outcome="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("outcome","unknown"))' "${report}")"
-          status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], "r", encoding="utf-8")).get("status","unknown"))' "${report}")"
-          echo "freshness_outcome=${outcome}"
-          if [[ "${status}" == "fail" ]]; then
-            echo "::error::submodule freshness failed with outcome=${outcome}"
-            exit 1
-          fi
-          if [[ "${status}" == "skip" ]]; then
-            echo "::warning::submodule freshness skipped with outcome=${outcome}"
-          fi
+          python3 scripts/ci/report-alert.py submodule-freshness outputs/ci/submodule-freshness/report.json
