@@ -173,6 +173,9 @@ func runGitCombinedOutput(repoDir string, args ...string) ([]byte, error) {
 }
 
 func shortRef(ref string) string {
+	if ref == "" {
+		return ""
+	}
 	if len(ref) <= 8 {
 		return ref
 	}
@@ -486,7 +489,7 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 
 	if !result.CodeChanged {
 		logger.Info("Already on latest version",
-			zap.String("commit", commitAfter[:8]))
+			zap.String("commit", shortRef(commitAfter)))
 
 		if result.StashRef != "" {
 			logger.Info("No code changes, restoring stash immediately")
@@ -502,8 +505,8 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 
 	logger.Info("Updates pulled",
 		zap.String("event", "self_update.git.pull.updated"),
-		zap.String("from", commitBefore[:8]),
-		zap.String("to", commitAfter[:8]))
+		zap.String("from", shortRef(commitBefore)),
+		zap.String("to", shortRef(commitAfter)))
 
 	if options.VerifyCommitSignatures {
 		results, err := VerifyCommitChain(rc, repoDir, commitBefore, commitAfter)
@@ -800,12 +803,19 @@ func RestoreStash(rc *eos_io.RuntimeContext, repoDir, stashRef string) error {
 		return fmt.Errorf("failed to list stash untracked files: %w", filesErr)
 	}
 
-	// Remove the blocking untracked files so stash apply can recreate them
+	// Remove the blocking untracked files so stash apply can recreate them.
+	// NOTE: These files exist because they were recreated between stash and restore
+	// (e.g., by a build step). The stashed versions will replace them.
 	for _, fname := range strings.Split(strings.TrimSpace(string(filesOutput)), "\n") {
 		if fname == "" {
 			continue
 		}
 		fullPath := filepath.Join(repoDir, fname)
+		if _, statErr := os.Stat(fullPath); statErr == nil {
+			logger.Info("Removing blocking untracked file to restore stashed version",
+				zap.String("file", fname),
+				zap.String("reason", "file recreated between stash and restore"))
+		}
 		if rmErr := os.Remove(fullPath); rmErr != nil && !os.IsNotExist(rmErr) {
 			logger.Warn("Could not remove blocking untracked file",
 				zap.String("file", fname),
@@ -948,7 +958,7 @@ func ResetToCommit(rc *eos_io.RuntimeContext, repoDir, commitHash string) error 
 
 	logger.Warn("Performing git reset --hard",
 		zap.String("repo", repoDir),
-		zap.String("commit", commitHash[:8]))
+		zap.String("commit", shortRef(commitHash)))
 
 	resetCmd := exec.Command("git", "-C", repoDir, "reset", "--hard", commitHash)
 	resetOutput, err := resetCmd.CombinedOutput()
@@ -958,7 +968,7 @@ func ResetToCommit(rc *eos_io.RuntimeContext, repoDir, commitHash string) error 
 	}
 
 	logger.Info("Git repository reset successfully",
-		zap.String("commit", commitHash[:8]))
+		zap.String("commit", shortRef(commitHash)))
 
 	return nil
 }

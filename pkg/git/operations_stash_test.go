@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/constants"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/stretchr/testify/require"
 )
@@ -64,6 +63,7 @@ func TestCreateRollbackStash_UntrackedChanges(t *testing.T) {
 func TestShortRef(t *testing.T) {
 	require.Equal(t, "1234", shortRef("1234"))
 	require.Equal(t, "12345678...", shortRef("1234567890abcdef"))
+	require.Equal(t, "", shortRef(""))
 }
 
 func TestRestoreStash_EmptyRef(t *testing.T) {
@@ -77,50 +77,20 @@ func TestNormalizeRepositoryOwnershipForSudoUser_NoSudoContext(t *testing.T) {
 	rc := testutil.TestContext(t)
 	repoDir := setupGitRepo(t)
 
-	origUID := os.Getenv("SUDO_UID")
-	origGID := os.Getenv("SUDO_GID")
-	t.Cleanup(func() {
-		_ = os.Setenv("SUDO_UID", origUID)
-		_ = os.Setenv("SUDO_GID", origGID)
-	})
-	_ = os.Unsetenv("SUDO_UID")
-	_ = os.Unsetenv("SUDO_GID")
+	t.Setenv("SUDO_UID", "")
+	t.Setenv("SUDO_GID", "")
 
 	require.NoError(t, normalizeRepositoryOwnershipForSudoUser(rc, repoDir))
 }
 
 func TestPullWithStashTracking_NoRemoteChangeRestoresStashImmediately(t *testing.T) {
 	rc := testutil.TestContext(t)
-	baseDir := t.TempDir()
+	cr := setupCloneableRepo(t)
 
-	remoteBare := filepath.Join(baseDir, "origin.git")
-	runGitTestCmd(t, baseDir, "init", "--bare", remoteBare)
-
-	seedRepo := filepath.Join(baseDir, "seed")
-	require.NoError(t, os.MkdirAll(seedRepo, 0o755))
-	runGitTestCmd(t, seedRepo, "init")
-	runGitTestCmd(t, seedRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, seedRepo, "config", "user.name", "Eos Tests")
-	runGitTestCmd(t, seedRepo, "branch", "-M", "main")
-	require.NoError(t, os.WriteFile(filepath.Join(seedRepo, "app.txt"), []byte("v1\n"), 0o644))
-	runGitTestCmd(t, seedRepo, "add", "app.txt")
-	runGitTestCmd(t, seedRepo, "commit", "-m", "seed v1")
-	runGitTestCmd(t, seedRepo, "remote", "add", "origin", remoteBare)
-	runGitTestCmd(t, seedRepo, "push", "-u", "origin", "main")
-
-	localRepo := filepath.Join(baseDir, "local")
-	runGitTestCmd(t, baseDir, "clone", "--branch", "main", remoteBare, localRepo)
-	runGitTestCmd(t, localRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, localRepo, "config", "user.name", "Eos Tests")
-
-	untracked := filepath.Join(localRepo, "local-only.txt")
+	untracked := filepath.Join(cr.LocalRepo, "local-only.txt")
 	require.NoError(t, os.WriteFile(untracked, []byte("local\n"), 0o644))
 
-	originalTrusted := append([]string(nil), constants.TrustedRemotes...)
-	constants.TrustedRemotes = append(constants.TrustedRemotes, remoteBare)
-	t.Cleanup(func() { constants.TrustedRemotes = originalTrusted })
-
-	changed, stashRef, err := PullWithStashTracking(rc, localRepo, "main")
+	changed, stashRef, err := PullWithStashTracking(rc, cr.LocalRepo, "main")
 	require.NoError(t, err)
 	require.False(t, changed)
 	require.Empty(t, stashRef, "stash ref should clear when no code changed")

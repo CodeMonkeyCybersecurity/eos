@@ -201,6 +201,8 @@ run_integration() {
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee '${lane_dir}/integration-suite.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
+    "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/git/... | tee '${lane_dir}/integration-git.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/chatbackup/... | tee '${lane_dir}/integration-chatbackup.jsonl'; test \${PIPESTATUS[0]} -eq 0"

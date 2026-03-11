@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/constants"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -185,8 +186,8 @@ func EnsureCredentials(rc *eos_io.RuntimeContext, repoDir string) error {
 
 	return fmt.Errorf("git credentials not configured for HTTPS remote %s: "+
 		"run 'sudo git config --global credential.helper store' and configure a token at https://%s/-/user/settings/applications, "+
-		"or switch to SSH with 'sudo git remote set-url origin ssh://git@%s:9001/cybermonkey/eos.git' in %s",
-		remoteURL, host, host, repoDir)
+		"or switch to SSH with 'sudo git remote set-url origin %s' in %s",
+		remoteURL, host, constants.PrimaryRemoteSSH, repoDir)
 }
 
 // IsInteractive returns true if stdin is connected to a terminal (TTY).

@@ -5,41 +5,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/constants"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPullRepository_FetchFirstSkipsStashWhenRemoteUnchanged(t *testing.T) {
 	rc := testutil.TestContext(t)
-	baseDir := t.TempDir()
+	cr := setupCloneableRepo(t)
 
-	remoteBare := filepath.Join(baseDir, "origin.git")
-	runGitTestCmd(t, baseDir, "init", "--bare", remoteBare)
-
-	seedRepo := filepath.Join(baseDir, "seed")
-	require.NoError(t, os.MkdirAll(seedRepo, 0o755))
-	runGitTestCmd(t, seedRepo, "init")
-	runGitTestCmd(t, seedRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, seedRepo, "config", "user.name", "Eos Tests")
-	runGitTestCmd(t, seedRepo, "branch", "-M", "main")
-	require.NoError(t, os.WriteFile(filepath.Join(seedRepo, "app.txt"), []byte("v1\n"), 0o644))
-	runGitTestCmd(t, seedRepo, "add", "app.txt")
-	runGitTestCmd(t, seedRepo, "commit", "-m", "seed v1")
-	runGitTestCmd(t, seedRepo, "remote", "add", "origin", remoteBare)
-	runGitTestCmd(t, seedRepo, "push", "-u", "origin", "main")
-
-	localRepo := filepath.Join(baseDir, "local")
-	runGitTestCmd(t, baseDir, "clone", "--branch", "main", remoteBare, localRepo)
-	runGitTestCmd(t, localRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, localRepo, "config", "user.name", "Eos Tests")
-
-	untracked := filepath.Join(localRepo, "local-only.txt")
+	untracked := filepath.Join(cr.LocalRepo, "local-only.txt")
 	require.NoError(t, os.WriteFile(untracked, []byte("local\n"), 0o644))
-
-	originalTrusted := append([]string(nil), constants.TrustedRemotes...)
-	constants.TrustedRemotes = append(constants.TrustedRemotes, remoteBare)
-	t.Cleanup(func() { constants.TrustedRemotes = originalTrusted })
 
 	origRun := runGitPullAttempt
 	t.Cleanup(func() { runGitPullAttempt = origRun })
@@ -48,7 +23,7 @@ func TestPullRepository_FetchFirstSkipsStashWhenRemoteUnchanged(t *testing.T) {
 		return nil, nil
 	}
 
-	result, err := PullRepository(rc, localRepo, "main", PullOptions{
+	result, err := PullRepository(rc, cr.LocalRepo, "main", PullOptions{
 		VerifyRemote:                  true,
 		FailOnMissingHTTPSCredentials: true,
 		TrackRollbackStash:            true,
@@ -78,41 +53,15 @@ func TestPullLatestCode_FailsEarlyWithoutHTTPSCredentials(t *testing.T) {
 
 func TestPullRepository_PullsRemoteChangeAndTracksRollbackStash(t *testing.T) {
 	rc := testutil.TestContext(t)
-	baseDir := t.TempDir()
+	cr := setupCloneableRepo(t)
 
-	remoteBare := filepath.Join(baseDir, "origin.git")
-	runGitTestCmd(t, baseDir, "init", "--bare", remoteBare)
+	// Push a new version
+	cr.pushNewVersion(t, "v2")
 
-	seedRepo := filepath.Join(baseDir, "seed")
-	require.NoError(t, os.MkdirAll(seedRepo, 0o755))
-	runGitTestCmd(t, seedRepo, "init")
-	runGitTestCmd(t, seedRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, seedRepo, "config", "user.name", "Eos Tests")
-	runGitTestCmd(t, seedRepo, "branch", "-M", "main")
-	require.NoError(t, os.WriteFile(filepath.Join(seedRepo, "app.txt"), []byte("v1\n"), 0o644))
-	runGitTestCmd(t, seedRepo, "add", "app.txt")
-	runGitTestCmd(t, seedRepo, "commit", "-m", "seed v1")
-	runGitTestCmd(t, seedRepo, "remote", "add", "origin", remoteBare)
-	runGitTestCmd(t, seedRepo, "push", "-u", "origin", "main")
-
-	localRepo := filepath.Join(baseDir, "local")
-	runGitTestCmd(t, baseDir, "clone", "--branch", "main", remoteBare, localRepo)
-	runGitTestCmd(t, localRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, localRepo, "config", "user.name", "Eos Tests")
-
-	require.NoError(t, os.WriteFile(filepath.Join(seedRepo, "app.txt"), []byte("v2\n"), 0o644))
-	runGitTestCmd(t, seedRepo, "add", "app.txt")
-	runGitTestCmd(t, seedRepo, "commit", "-m", "seed v2")
-	runGitTestCmd(t, seedRepo, "push", "origin", "main")
-
-	untracked := filepath.Join(localRepo, "local-dev-notes.txt")
+	untracked := filepath.Join(cr.LocalRepo, "local-dev-notes.txt")
 	require.NoError(t, os.WriteFile(untracked, []byte("my local notes\n"), 0o644))
 
-	originalTrusted := append([]string(nil), constants.TrustedRemotes...)
-	constants.TrustedRemotes = append(constants.TrustedRemotes, remoteBare)
-	t.Cleanup(func() { constants.TrustedRemotes = originalTrusted })
-
-	result, err := PullRepository(rc, localRepo, "main", PullOptions{
+	result, err := PullRepository(rc, cr.LocalRepo, "main", PullOptions{
 		VerifyRemote:                  true,
 		FailOnMissingHTTPSCredentials: true,
 		TrackRollbackStash:            true,
@@ -124,40 +73,16 @@ func TestPullRepository_PullsRemoteChangeAndTracksRollbackStash(t *testing.T) {
 	require.NotEmpty(t, result.StashRef)
 	require.NoFileExists(t, untracked, "untracked file should stay stashed until rollback/restore")
 
-	require.NoError(t, RestoreStash(rc, localRepo, result.StashRef))
+	require.NoError(t, RestoreStash(rc, cr.LocalRepo, result.StashRef))
 	require.FileExists(t, untracked)
 }
 
 func TestPullRepository_RestoresStashOnPullFailure(t *testing.T) {
 	rc := testutil.TestContext(t)
-	baseDir := t.TempDir()
+	cr := setupCloneableRepo(t)
 
-	remoteBare := filepath.Join(baseDir, "origin.git")
-	runGitTestCmd(t, baseDir, "init", "--bare", remoteBare)
-
-	seedRepo := filepath.Join(baseDir, "seed")
-	require.NoError(t, os.MkdirAll(seedRepo, 0o755))
-	runGitTestCmd(t, seedRepo, "init")
-	runGitTestCmd(t, seedRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, seedRepo, "config", "user.name", "Eos Tests")
-	runGitTestCmd(t, seedRepo, "branch", "-M", "main")
-	require.NoError(t, os.WriteFile(filepath.Join(seedRepo, "app.txt"), []byte("v1\n"), 0o644))
-	runGitTestCmd(t, seedRepo, "add", "app.txt")
-	runGitTestCmd(t, seedRepo, "commit", "-m", "seed v1")
-	runGitTestCmd(t, seedRepo, "remote", "add", "origin", remoteBare)
-	runGitTestCmd(t, seedRepo, "push", "-u", "origin", "main")
-
-	localRepo := filepath.Join(baseDir, "local")
-	runGitTestCmd(t, baseDir, "clone", "--branch", "main", remoteBare, localRepo)
-	runGitTestCmd(t, localRepo, "config", "user.email", "eos-tests@example.com")
-	runGitTestCmd(t, localRepo, "config", "user.name", "Eos Tests")
-
-	untracked := filepath.Join(localRepo, "local-dev-notes.txt")
+	untracked := filepath.Join(cr.LocalRepo, "local-dev-notes.txt")
 	require.NoError(t, os.WriteFile(untracked, []byte("my local notes\n"), 0o644))
-
-	originalTrusted := append([]string(nil), constants.TrustedRemotes...)
-	constants.TrustedRemotes = append(constants.TrustedRemotes, remoteBare)
-	t.Cleanup(func() { constants.TrustedRemotes = originalTrusted })
 
 	origRun := runGitPullAttempt
 	t.Cleanup(func() { runGitPullAttempt = origRun })
@@ -165,7 +90,7 @@ func TestPullRepository_RestoresStashOnPullFailure(t *testing.T) {
 		return []byte("remote: Authentication failed"), os.ErrPermission
 	}
 
-	_, err := PullRepository(rc, localRepo, "main", PullOptions{
+	_, err := PullRepository(rc, cr.LocalRepo, "main", PullOptions{
 		VerifyRemote:                  true,
 		FailOnMissingHTTPSCredentials: true,
 		TrackRollbackStash:            true,

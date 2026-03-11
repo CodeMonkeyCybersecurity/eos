@@ -144,53 +144,33 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	eeu.logger.Info(" Enhanced self-update completed successfully",
 		zap.Duration("duration", time.Since(eeu.transaction.StartTime)))
 
-	// Display clear success summary to user
-	fmt.Println()
-	fmt.Println("════════════════════════════════════════════════════════════════")
+	// Display clear success summary to user via structured logging
 	if eeu.transaction.BinaryInstalled {
-		// Show before/after commit hashes (first 8 chars)
 		afterCommit := "unknown"
 		if currentCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir); err == nil {
 			afterCommit = currentCommit
 		}
-		if len(eeu.transaction.GitCommitBefore) >= 8 && len(afterCommit) >= 8 {
-			fmt.Printf("Update complete: %s → %s\n",
-				eeu.transaction.GitCommitBefore[:8],
-				afterCommit[:8])
-		} else {
-			fmt.Println("Update complete")
-		}
+		eeu.logger.Info("Update complete",
+			zap.String("from", truncateCommit(eeu.transaction.GitCommitBefore)),
+			zap.String("to", truncateCommit(afterCommit)))
 	} else {
-		// Already on latest version
-		if len(eeu.transaction.GitCommitBefore) >= 8 {
-			fmt.Printf("Already on latest version: %s\n",
-				eeu.transaction.GitCommitBefore[:8])
-		} else {
-			fmt.Println("Already on latest version")
-		}
+		eeu.logger.Info("Already on latest version",
+			zap.String("commit", truncateCommit(eeu.transaction.GitCommitBefore)))
 	}
 
-	// Show what was updated
 	if eeu.enhancedConfig.UpdateSystemPackages {
-		fmt.Println("   System packages: Updated")
+		eeu.logger.Info("System packages updated")
 	}
 	if eeu.enhancedConfig.UpdateGoVersion {
-		fmt.Println("   Go compiler: Updated")
+		eeu.logger.Info("Go compiler updated")
 	}
-
-	fmt.Println("════════════════════════════════════════════════════════════════")
-	fmt.Println()
 
 	// Check for running processes - use existing pattern
 	if eeu.enhancedConfig.CheckRunningProcesses {
-		// Use WarnAboutRunningProcesses which already checks and logs
 		if err := process.WarnAboutRunningProcesses(eeu.rc, "eos"); err == nil {
-			fmt.Println("")
-			fmt.Println("Restart running eos processes to use new version")
+			eeu.logger.Info("Restart running eos processes to use new version")
 		}
 	}
-
-	fmt.Println()
 
 	return nil
 }
@@ -340,30 +320,10 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		}
 
 		// Interactive mode - prompt for informed consent
-		fmt.Println()
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println("⚠️  WARNING: Uncommitted Changes Detected")
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println()
-		fmt.Printf("Repository: %s\n", eeu.config.SourceDir)
-		fmt.Println()
-		fmt.Println("You have uncommitted changes in your Eos source directory.")
-		fmt.Println()
-		fmt.Println("RISKS:")
-		fmt.Println("  • If the update fails, your changes will be preserved BUT")
-		fmt.Println("  • The repository will be in an inconsistent state")
-		fmt.Println("  • Rollback will restore your changes, but this adds complexity")
-		fmt.Println()
-		fmt.Println("SAFER OPTIONS:")
-		fmt.Println("  1. Cancel now, commit your changes, then re-run update")
-		fmt.Println("  2. Cancel now, stash your changes, then re-run update")
-		fmt.Println("  3. Cancel now, discard your changes, then re-run update")
-		fmt.Println()
-		fmt.Println("OR:")
-		fmt.Println("  4. Continue at your own risk (changes will be auto-stashed)")
-		fmt.Println()
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println()
+		eeu.logger.Warn("Uncommitted changes detected - user consent required",
+			zap.String("repo", eeu.config.SourceDir))
+		eeu.logger.Info("RISKS: If the update fails, changes are preserved but repository will be in inconsistent state. Rollback restores changes but adds complexity")
+		eeu.logger.Info("SAFER OPTIONS: (1) Cancel, commit changes, re-run; (2) Cancel, stash, re-run; (3) Cancel, discard, re-run; (4) Continue (changes auto-stashed)")
 
 		// Use interaction package for consistent prompting
 		// Default to NO (safer option)
@@ -386,11 +346,8 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		}
 
 		// User chose to continue - warn and proceed
-		eeu.logger.Warn("User chose to proceed with uncommitted changes",
+		eeu.logger.Warn("User chose to proceed with uncommitted changes - auto-stashing",
 			zap.String("repo", eeu.config.SourceDir))
-		fmt.Println()
-		fmt.Println("Proceeding with update (uncommitted changes will be auto-stashed)...")
-		fmt.Println()
 
 		// Note: P0-2 already implemented stash tracking, so this is now safe
 		// Changes will be stashed before pull and restored if rollback needed
@@ -526,7 +483,7 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 	}
 
 	eeu.transaction.GitCommitBefore = commitHash
-	eeu.logger.Info("Git state recorded", zap.String("commit", commitHash[:8]))
+	eeu.logger.Info("Git state recorded", zap.String("commit", truncateCommit(commitHash)))
 
 	return nil
 }
@@ -912,27 +869,14 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 			currentSize, backupFdStat.Size())
 	}
 
-	// Phase 8: Verify backup hash by re-reading from the SAME FD
-	// P0 FIX: Check Seek() error - unchecked seek can cause silent data corruption
-	if _, err := backupFd.Seek(0, 0); err != nil {
+	// Phase 8: Verify backup hash using streaming hash (avoids double memory allocation)
+	// Close the FD first so HashFile can open it independently
+	backupFd.Close()
+	backupHash, err := crypto.HashFile(expectedBackupPath)
+	if err != nil {
 		_ = os.Remove(expectedBackupPath)
-		return "", fmt.Errorf("failed to rewind backup file for verification: %w\n"+
-			"This could indicate:\n"+
-			"  1. File descriptor corruption\n"+
-			"  2. Filesystem errors\n"+
-			"  3. File was deleted during write", err)
+		return "", fmt.Errorf("failed to hash backup for verification: %w", err)
 	}
-
-	backupData := make([]byte, currentSize)
-	defer func() { backupData = nil }() // P1 FIX: Explicit hint to GC for large allocations
-
-	n, err = backupFd.Read(backupData)
-	if err != nil || int64(n) != currentSize {
-		_ = os.Remove(expectedBackupPath)
-		return "", fmt.Errorf("failed to re-read backup for verification: %w", err)
-	}
-
-	backupHash := crypto.HashData(backupData)
 	if backupHash != currentHash {
 		_ = os.Remove(expectedBackupPath)
 		return "", fmt.Errorf("backup hash mismatch after write\n"+
@@ -946,9 +890,8 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 			currentHash[:16]+"...", backupHash[:16]+"...")
 	}
 
-	// Explicit memory cleanup - we've verified backup, don't need data anymore
+	// Release source data - backup is verified
 	binaryData = nil
-	backupData = nil
 
 	eeu.logger.Info("Transaction backup created and verified via FD operations",
 		zap.String("path", expectedBackupPath),
@@ -980,7 +923,7 @@ func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
 
 	if result.StashRef != "" {
 		eeu.logger.Info("Stash tracked in transaction for rollback",
-			zap.String("ref", result.StashRef[:8]+"..."))
+			zap.String("ref", truncateCommit(result.StashRef)))
 	}
 
 	return result.CodeChanged, nil
@@ -1176,7 +1119,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("Reverting git repository to previous commit",
-					zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
+					zap.String("commit", truncateCommit(eeu.transaction.GitCommitBefore)))
 
 				// SAFETY: Only do hard reset if we have a stash OR working tree is clean
 				// This prevents destroying uncommitted work if stash creation failed
@@ -1249,7 +1192,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("Restoring uncommitted changes from stash",
-					zap.String("ref", eeu.transaction.GitStashRef[:8]+"..."))
+					zap.String("ref", truncateCommit(eeu.transaction.GitStashRef)))
 
 				// Use helper function from git package
 				if err := git.RestoreStash(eeu.rc, eeu.config.SourceDir, eeu.transaction.GitStashRef); err != nil {
@@ -1257,7 +1200,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					// Stash is still preserved for manual recovery
 					eeu.logger.Warn("Failed to restore stash automatically",
 						zap.Error(err),
-						zap.String("stash_ref", eeu.transaction.GitStashRef[:8]+"..."))
+						zap.String("stash_ref", truncateCommit(eeu.transaction.GitStashRef)))
 					return fmt.Errorf("failed to restore stash (stash preserved): %w\n\n"+
 						"Your uncommitted changes are saved in stash.\n"+
 						"Manual recovery:\n"+
@@ -1426,34 +1369,9 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	}
 
 	// Explain what will happen
-	eeu.logger.Info("System package update available")
-	fmt.Println("\nEos can update your system packages to ensure build dependencies are current.")
-	fmt.Println("")
-	fmt.Printf("Package manager: %s\n", packageManager)
-	fmt.Println("")
-	fmt.Println("This will run:")
-
-	switch packageManager {
-	case system.PackageManagerApt:
-		fmt.Println("  1. sudo apt update        (refresh package lists)")
-		fmt.Println("  2. sudo apt upgrade -y    (install updates)")
-		fmt.Println("  3. sudo apt autoremove -y (remove old packages)")
-	case system.PackageManagerYum:
-		fmt.Println("  1. sudo yum update -y     (update packages)")
-		fmt.Println("  2. sudo yum autoremove -y (remove old packages)")
-	case system.PackageManagerDnf:
-		fmt.Println("  1. sudo dnf update -y     (update packages)")
-		fmt.Println("  2. sudo dnf autoremove -y (remove old packages)")
-	case system.PackageManagerPacman:
-		fmt.Println("  1. sudo pacman -Syu       (update packages)")
-	}
-
-	fmt.Println("")
-	fmt.Println("IMPORTANT:")
-	fmt.Println("  • This may take 5-30 minutes depending on your system")
-	fmt.Println("  • Some updates may require a system reboot")
-	fmt.Println("  • You can skip this and update packages manually later")
-	fmt.Println("")
+	eeu.logger.Info("System package update available",
+		zap.String("manager", string(packageManager)))
+	eeu.logger.Info("System package updates ensure build dependencies are current. This may take 5-30 minutes. Some updates may require a reboot. You can skip and update manually later")
 
 	// Ask for consent
 	confirmed, err := interaction.PromptYesNoSafe(eeu.rc,
@@ -1465,27 +1383,12 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	}
 
 	if !confirmed {
-		eeu.logger.Info("User declined system package updates")
-		fmt.Println("\nSkipping system package updates.")
-		fmt.Println("You can update manually with:")
-
-		switch packageManager {
-		case system.PackageManagerApt:
-			fmt.Println("  sudo apt update && sudo apt upgrade -y")
-		case system.PackageManagerYum:
-			fmt.Println("  sudo yum update -y")
-		case system.PackageManagerDnf:
-			fmt.Println("  sudo dnf update -y")
-		case system.PackageManagerPacman:
-			fmt.Println("  sudo pacman -Syu")
-		}
-
+		eeu.logger.Info("User declined system package updates. Update manually with your package manager when ready")
 		return nil
 	}
 
 	// User consented - proceed with update
-	eeu.logger.Info("User consented to system package updates")
-	fmt.Println("\nUpdating system packages...")
+	eeu.logger.Info("User consented to system package updates, proceeding")
 
 	return system.UpdateSystemPackages(eeu.rc, packageManager)
 }

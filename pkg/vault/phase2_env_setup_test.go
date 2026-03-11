@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func TestHandleTLSValidationFailure_NonInteractive_Unit(t *testing.T) {
 	}
 	// Verify error contains remediation guidance
 	errMsg := err.Error()
-	if !testContains(errMsg, "Remediation") {
+	if !strings.Contains(errMsg, "Remediation") {
 		t.Fatalf("error should contain remediation steps, got: %s", errMsg)
 	}
 }
@@ -156,7 +157,7 @@ func TestHandleTLSValidationFailure_AuditFailureBlocksInsecureFallback(t *testin
 	if err == nil {
 		t.Fatal("expected audit trail failure to block insecure fallback")
 	}
-	if !testContains(err.Error(), "audit trail") {
+	if !strings.Contains(err.Error(), "audit trail") {
 		t.Fatalf("expected audit trail error, got: %v", err)
 	}
 }
@@ -181,15 +182,4 @@ func getenvOrEmpty(key string) string {
 		return ""
 	}
 	return val
-}
-
-// testContains checks if haystack contains needle.
-// Named to avoid collision with contains() in discovery.go.
-func testContains(haystack, needle string) bool {
-	for i := 0; i <= len(haystack)-len(needle); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return true
-		}
-	}
-	return false
 }

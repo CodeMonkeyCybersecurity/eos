@@ -1,41 +1,79 @@
-# Self-Update Follow-Up Issues
+*Last Updated: 2026-03-11*
 
-## 1. Add explicit `--force-insecure` plumbing for Vault TLS fallback
+# Self-Update Follow-Up Issues (2026-03-11)
 
-Problem: `pkg/vault/phase2_env_setup.go` still relies on environment-variable overrides for non-interactive insecure fallback rather than a first-class CLI flag.
+## P2 - Important
 
-Why it matters: the current audit trail is stronger than before, but the consent model is still uneven across commands that call `EnsureVaultEnv`.
+### 1. Reduce disk space checks from 4 to 2
 
-Next step: introduce a shared `--force-insecure` flag at the command layer, thread it through `RuntimeContext.Attributes`, and require a matching audit record before setting `VAULT_SKIP_VERIFY=1`.
+**Problem**: `updater_enhanced.go` runs disk space checks at 4 points (pre-flight, pre-build, pre-install, pre-Go-install). The pre-build and pre-install checks are redundant since the binary size is known by then.
 
-## 2. Replace fetch-then-pull with fetch-plus-fast-forward/merge strategy
+**Root cause**: Defensive coding during initial implementation; no consolidation pass.
 
-Problem: `pkg/git/PullRepository` now fetches before deciding whether to stash, but it still performs a subsequent `git pull`, which duplicates the network step.
+**Next step**: Keep pre-flight (catches obvious issues early) and pre-Go-install (different partition may apply). Remove pre-build and pre-install checks.
 
-Why it matters: the behavior is safer and simpler than before, but not yet optimal for latency or traceability.
+### 2. Ownership normalization runs twice on success
 
-Next step: add a `mergeFetchedHead` path that applies `FETCH_HEAD` directly when the preflight shows a clean fast-forward, and fall back to retryable pull only when needed.
+**Problem**: `normalizeOwnership()` is called both in the success path and in rollback cleanup. On a successful update, the success-path call is sufficient.
 
-## 3. Promote self-update quality lane into the default CI debug lane for touched files
+**Root cause**: Belt-and-suspenders approach; rollback path added normalization without checking if it was already done.
 
-Problem: `npm run ci` passes through `ci:debug`, while the self-update-specific 90% focused gate runs separately today.
+**Next step**: Gate the rollback normalization on `transaction.RolledBack == true` to avoid redundant work.
 
-Why it matters: local and CI success can still diverge if contributors forget to run the focused lane after touching `pkg/git`, `pkg/self`, or Vault TLS consent code.
+### 3. PullOptions named presets
 
-Next step: either invoke `ci:self-update-quality` from `ci:debug` when relevant files change, or make `npm run ci` compose both lanes.
+**Problem**: `PullOptions` has 6+ fields, and callers construct them inline with magic combinations (e.g., self-update uses `{Autostash: true, Interactive: true, TrustPolicy: Strict}` while CI uses different settings).
 
-## 4. Add alert routing for self-update regressions
+**Root cause**: Organic growth of options without a preset layer.
 
-Problem: the self-update lane emits structured metrics and reports, but there is no dedicated alert policy for repeated failures or coverage regression over time.
+**Next step**: Add `PullOptions.SelfUpdate()`, `PullOptions.CI()`, `PullOptions.Interactive()` constructors that encode tested defaults.
 
-Why it matters: the current observability is good for manual inspection, not proactive detection.
+### 4. vaultInsecureAuditLogPath is a package-level var
 
-Next step: publish the focused coverage metric to the existing monitoring pipeline and add an alert on consecutive failures or coverage dropping below 90%.
+**Problem**: `pkg/vault/phase2_env_setup.go` uses a package-level `var` for the audit log path, swapped in tests. This is a test-only seam that weakens production code encapsulation.
 
-## 5. Add mutation/property coverage for pull decision logic
+**Root cause**: Needed testability without refactoring to dependency injection.
 
-Problem: the new tests cover the major branches in `PullRepository`, but they do not yet prove resilience against subtle control-flow regressions in the decision matrix.
+**Next step**: Refactor to pass the audit path via a config struct or function parameter, removing the package-level var.
 
-Why it matters: this path coordinates trust validation, credential policy, stash safety, fetch-first logic, and rollback semantics.
+## P3 - Recommended
 
-Next step: add table-driven property tests for option combinations and mutation-oriented checks around stash restoration and fetch-first early exits.
+### 5. getLatestGoVersion shells out to curl
+
+**Problem**: `updater_enhanced.go` uses `exec.Command("curl", ...)` to fetch the latest Go version from `go.dev`. This bypasses Go's `net/http` client, losing retry logic, timeout control, and proxy support.
+
+**Root cause**: Quick implementation; curl was the fastest path to a working prototype.
+
+**Next step**: Replace with `http.Client` call using the project's standard HTTP patterns (timeouts, retries, user-agent).
+
+### 6. Go install is non-atomic (rm -rf then extract)
+
+**Problem**: The Go toolchain install removes `/usr/local/go` then extracts the new tarball. A crash between rm and extract leaves the system without a Go compiler.
+
+**Root cause**: Following the official Go install docs verbatim (`rm -rf /usr/local/go && tar -C /usr/local -xzf ...`).
+
+**Next step**: Extract to a temp directory first, then `os.Rename` the old dir to `.bak`, rename new dir into place, and only remove `.bak` on success.
+
+### 7. fetchRemoteBranch doesn't validate branch name
+
+**Problem**: The branch name passed to `git fetch origin <branch>` is not validated against injection (e.g., `--upload-pack=...`).
+
+**Root cause**: Branch name comes from internal code (not user input), so validation was deferred.
+
+**Next step**: Add `validateBranchName()` that rejects names starting with `-` or containing shell metacharacters. Defense in depth.
+
+### 8. First-class Vault --force-insecure CLI flag
+
+**Problem**: `pkg/vault/phase2_env_setup.go` relies on env var `Eos_ALLOW_INSECURE_VAULT` for non-interactive insecure fallback rather than a first-class CLI flag.
+
+**Root cause**: Env var was the minimal viable approach for CI/scripted usage.
+
+**Next step**: Introduce `--force-insecure` flag at the command layer, thread through `RuntimeContext.Attributes`, require matching audit record before setting `VAULT_SKIP_VERIFY=1`.
+
+### 9. PullRepository coverage gap
+
+**Problem**: `PullRepository` is the main orchestrator function but only has integration tests that exercise it end-to-end. Individual decision branches (fetch-first skip, stash-not-needed, credential-fail-fast) lack isolated unit tests.
+
+**Root cause**: Function is tightly coupled to real git operations, making unit testing harder.
+
+**Next step**: Extract the decision logic into a pure function (`pullDecision(state) -> action`) that can be unit tested with table-driven tests, keeping the effectful code thin.

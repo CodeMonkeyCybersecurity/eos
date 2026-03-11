@@ -2,7 +2,11 @@
 set -euo pipefail
 trap 'echo " Installation failed on line $LINENO"; exit 1' ERR
 
-log() { echo "[$1] $2"; }
+log() {
+  local level="$1"
+  shift
+  printf "%s level=%s component=install.sh msg=%q\n" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "$level" "$*"
+}
 
 declare -A GO_CHECKSUMS=(
   ["linux_amd64"]="f022b6aad78e362bcba9b0b94d09ad58c5a70c6ba3b7582905fababf5fe0181a"
@@ -26,6 +30,60 @@ verify_checksum() {
     log ERR " Actual:   $actual"
     exit 1
   fi
+}
+
+is_placeholder_checksum() {
+  local checksum="${1:-}"
+  [[ "$checksum" =~ ^0{64}$ ]]
+}
+
+fetch_go_checksum_from_source() {
+  local go_tarball="$1"
+  local checksum_url="https://go.dev/dl/${go_tarball}.sha256"
+  local checksum_file
+  checksum_file="$(mktemp)"
+
+  if ! curl --fail --retry 3 --retry-delay 2 -sSL "$checksum_url" -o "$checksum_file"; then
+    rm -f "$checksum_file"
+    return 1
+  fi
+
+  local checksum
+  checksum="$(tr -d '[:space:]' < "$checksum_file")"
+  rm -f "$checksum_file"
+
+  if [[ ! "$checksum" =~ ^[0-9a-f]{64}$ ]]; then
+    return 1
+  fi
+
+  echo "$checksum"
+}
+
+resolve_go_checksum() {
+  local checksum_key="$1"
+  local go_tarball="$2"
+  local expected_checksum="${GO_CHECKSUMS[$checksum_key]:-}"
+
+  if [[ -n "$expected_checksum" ]] && ! is_placeholder_checksum "$expected_checksum"; then
+    log INFO "Using pinned Go checksum for ${checksum_key}"
+    echo "$expected_checksum"
+    return 0
+  fi
+
+  if is_placeholder_checksum "$expected_checksum"; then
+    log WARN "Pinned checksum placeholder detected for ${checksum_key}; using official checksum endpoint"
+  else
+    log WARN "Pinned checksum missing for ${checksum_key}; using official checksum endpoint"
+  fi
+
+  local fetched_checksum
+  if ! fetched_checksum="$(fetch_go_checksum_from_source "$go_tarball")"; then
+    log ERR "Unable to resolve checksum for ${go_tarball} from table or go.dev"
+    return 1
+  fi
+
+  log INFO "Resolved Go checksum from official source for ${go_tarball}"
+  echo "$fetched_checksum"
 }
 
 # --- Platform Detection ---
@@ -201,7 +259,11 @@ install_go() {
       fi
 
       local checksum_key="${os}_${arch}"
-      local expected_checksum="${GO_CHECKSUMS[$checksum_key]}"
+      local expected_checksum
+      expected_checksum="$(resolve_go_checksum "$checksum_key" "$go_tarball")" || {
+        log ERR "Checksum resolution failed for ${go_tarball}"
+        exit 1
+      }
       verify_checksum "$go_tarball" "$expected_checksum"
       
       # Verify download

@@ -164,7 +164,7 @@ func TestRunGitPullWithRetry_InteractiveMode(t *testing.T) {
 
 	// PullLatestCode uses autostash=true, but we're testing retry with interactive
 	// through the lower-level function
-	out, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", true)
+	out, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", true)
 	require.NoError(t, err)
 	require.Equal(t, "Already up to date.", string(out))
 	require.Equal(t, 2, callCount)

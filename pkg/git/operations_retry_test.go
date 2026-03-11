@@ -1,13 +1,12 @@
 package git
 
 import (
-	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"go.uber.org/zap/zaptest"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
 // --- Classification tests ---
@@ -150,7 +149,7 @@ func TestRunGitPullWithRetry_SucceedsAfterTransientFailures(t *testing.T) {
 	var sleptDurations []time.Duration
 	gitPullRetrySleep = func(d time.Duration) { sleptDurations = append(sleptDurations, d) }
 
-	out, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", false)
+	out, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", false)
 	if err != nil {
 		t.Fatalf("runGitPullWithRetry() error = %v", err)
 	}
@@ -189,7 +188,7 @@ func TestRunGitPullWithRetry_DoesNotRetryPermanentFailures(t *testing.T) {
 		t.Fatal("should not sleep on permanent failure")
 	}
 
-	_, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", false)
+	_, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", false)
 	if err == nil {
 		t.Fatal("expected error for permanent failure")
 	}
@@ -213,7 +212,7 @@ func TestRunGitPullWithRetry_ExhaustsAllAttempts(t *testing.T) {
 	}
 	gitPullRetrySleep = func(d time.Duration) {}
 
-	_, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", false)
+	_, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", false)
 	if err == nil {
 		t.Fatal("expected error after exhausting all attempts")
 	}
@@ -222,7 +221,7 @@ func TestRunGitPullWithRetry_ExhaustsAllAttempts(t *testing.T) {
 	}
 	// Verify error message includes failure history
 	errMsg := err.Error()
-	if !containsStr(errMsg, "attempt=1") || !containsStr(errMsg, "http_503") {
+	if !strings.Contains(errMsg, "attempt=1") || !strings.Contains(errMsg, "http_503") {
 		t.Fatalf("error should contain failure history, got: %s", errMsg)
 	}
 }
@@ -242,7 +241,7 @@ func TestRunGitPullWithRetry_SucceedsFirstTry(t *testing.T) {
 		t.Fatal("should not sleep on first-try success")
 	}
 
-	out, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", true)
+	out, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,7 +275,7 @@ func TestRunGitPullWithRetry_MixedTransientErrors(t *testing.T) {
 	}
 	gitPullRetrySleep = func(d time.Duration) {}
 
-	out, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", false)
+	out, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -305,7 +304,7 @@ func TestRunGitPullWithRetry_UnknownErrorDoesNotRetry(t *testing.T) {
 		t.Fatal("should not sleep on unknown error")
 	}
 
-	_, err := runGitPullWithRetry(testRC(t), "/tmp/repo", "main", false)
+	_, err := runGitPullWithRetry(testutil.TestContext(t), "/tmp/repo", "main", false)
 	if err == nil {
 		t.Fatal("expected error for unknown failure")
 	}
@@ -336,29 +335,4 @@ func TestRetryBackoff_IncreasesByAttempt(t *testing.T) {
 		}
 		prev = d
 	}
-}
-
-// --- Helpers ---
-
-func testRC(t *testing.T) *eos_io.RuntimeContext {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	t.Cleanup(cancel)
-	return &eos_io.RuntimeContext{
-		Ctx:        ctx,
-		Log:        zaptest.NewLogger(t),
-		Timestamp:  time.Now(),
-		Component:  "test",
-		Command:    "test",
-		Attributes: map[string]string{},
-	}
-}
-
-func containsStr(haystack, needle string) bool {
-	for i := 0; i <= len(haystack)-len(needle); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return true
-		}
-	}
-	return false
 }
