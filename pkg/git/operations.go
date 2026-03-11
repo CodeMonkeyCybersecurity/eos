@@ -6,12 +6,14 @@
 package git
 
 import (
+	"bytes"
 	cryptorand "crypto/rand"
 	"fmt"
 	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +24,12 @@ import (
 
 var (
 	gitPullRetrySleep = time.Sleep
+	// runGitPullAttempt executes a single git pull attempt.
+	// FIX: Previously set Stderr AND called CombinedOutput(), which panics with
+	// "exec: Stderr already set" (Go's exec package disallows this).
+	// Solution: Use a shared buffer for both Stdout and Stderr (same as CombinedOutput
+	// but without the internal conflict). When interactive, also tee stdin.
+	// Reference: https://pkg.go.dev/os/exec#Cmd.CombinedOutput
 	runGitPullAttempt = func(repoDir, branch string, autostash bool, interactive bool, extraEnv []string) ([]byte, error) {
 		args := []string{"-C", repoDir, "pull"}
 		if autostash {
@@ -33,11 +41,18 @@ var (
 		if len(extraEnv) > 0 {
 			pullCmd.Env = append(os.Environ(), extraEnv...)
 		}
+
+		// Capture combined stdout+stderr into a single buffer.
+		// This is what CombinedOutput() does internally, but we do it manually
+		// so we can also set Stdin for interactive sessions without conflict.
+		var buf bytes.Buffer
+		pullCmd.Stdout = &buf
+		pullCmd.Stderr = &buf
 		if interactive {
 			pullCmd.Stdin = os.Stdin
-			pullCmd.Stderr = os.Stderr
 		}
-		return pullCmd.CombinedOutput()
+		err := pullCmd.Run()
+		return buf.Bytes(), err
 	}
 )
 
@@ -136,13 +151,125 @@ func CheckRepositoryState(rc *eos_io.RuntimeContext, repoDir string) (*Repositor
 
 // GetCurrentCommit returns the current git commit hash
 func GetCurrentCommit(rc *eos_io.RuntimeContext, repoDir string) (string, error) {
-	commitCmd := exec.Command("git", "-C", repoDir, "rev-parse", "HEAD")
-	commitOutput, err := commitCmd.Output()
+	commitOutput, err := runGitOutput(repoDir, "rev-parse", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("failed to get current commit: %w", err)
 	}
 
 	return strings.TrimSpace(string(commitOutput)), nil
+}
+
+func runGitOutput(repoDir string, args ...string) ([]byte, error) {
+	// #nosec G204 -- args are assembled from fixed tokens plus validated inputs
+	cmd := exec.Command("git", append([]string{"-C", repoDir}, args...)...)
+	return cmd.Output()
+}
+
+func runGitCombinedOutput(repoDir string, args ...string) ([]byte, error) {
+	// #nosec G204 -- args are assembled from fixed tokens plus validated inputs
+	cmd := exec.Command("git", append([]string{"-C", repoDir}, args...)...)
+	return cmd.CombinedOutput()
+}
+
+func shortRef(ref string) string {
+	if len(ref) <= 8 {
+		return ref
+	}
+	return ref[:8] + "..."
+}
+
+// createRollbackStash creates a stash snapshot suitable for rollback recovery.
+// It includes untracked files to prevent false-positive "has changes" states
+// where stash creation appears to succeed but no stash ref exists.
+func createRollbackStash(rc *eos_io.RuntimeContext, repoDir string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	statusOutput, err := runGitOutput(repoDir, "status", "--porcelain")
+	if err != nil {
+		return "", fmt.Errorf("failed to check git status: %w", err)
+	}
+	if len(statusOutput) == 0 {
+		logger.Debug("No uncommitted changes, no stash needed")
+		return "", nil
+	}
+
+	logger.Info("Uncommitted changes detected, creating stash for rollback safety",
+		zap.String("event", "self_update.git.stash_create"),
+		zap.String("message", "eos self-update auto-stash"),
+		zap.Bool("include_untracked", true))
+
+	stashOutput, err := runGitCombinedOutput(repoDir, "stash", "push", "--include-untracked", "-m", "eos self-update auto-stash")
+	if err != nil {
+		return "", fmt.Errorf("failed to create stash: %w\nOutput: %s",
+			err, strings.TrimSpace(string(stashOutput)))
+	}
+
+	stashOutputStr := strings.TrimSpace(string(stashOutput))
+	logger.Debug("Stash command output", zap.String("output", stashOutputStr))
+
+	if strings.Contains(stashOutputStr, "No local changes to save") {
+		// Defensive fallback: treat as no-op instead of hard-failing stash ref resolution.
+		logger.Info("Stash reported no local changes; continuing without stash ref")
+		return "", nil
+	}
+
+	// Read the stash commit directly from refs/stash to avoid reflog-index assumptions.
+	stashRefOutput, err := runGitOutput(repoDir, "rev-parse", "--verify", "refs/stash")
+	if err != nil {
+		return "", fmt.Errorf("failed to get stash ref after creating stash: %w\n"+
+			"CRITICAL: Stash may exist but ref could not be retrieved.\n"+
+			"Manual recovery:\n"+
+			"  git -C %s stash list\n"+
+			"  git -C %s stash apply stash@{0}",
+			err, repoDir, repoDir)
+	}
+
+	stashRef := strings.TrimSpace(string(stashRefOutput))
+	logger.Info("Stash created successfully for rollback safety",
+		zap.String("event", "self_update.git.stash_created"),
+		zap.String("ref", shortRef(stashRef)),
+		zap.String("symbolic", "refs/stash"))
+	return stashRef, nil
+}
+
+func normalizeRepositoryOwnershipForSudoUser(rc *eos_io.RuntimeContext, repoDir string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if os.Geteuid() != 0 {
+		return nil
+	}
+
+	sudoUID := strings.TrimSpace(os.Getenv("SUDO_UID"))
+	sudoGID := strings.TrimSpace(os.Getenv("SUDO_GID"))
+	if sudoUID == "" || sudoGID == "" {
+		return nil
+	}
+
+	if _, err := strconv.Atoi(sudoUID); err != nil {
+		return fmt.Errorf("invalid SUDO_UID %q: %w", sudoUID, err)
+	}
+	if _, err := strconv.Atoi(sudoGID); err != nil {
+		return fmt.Errorf("invalid SUDO_GID %q: %w", sudoGID, err)
+	}
+
+	gitDir := filepath.Join(repoDir, ".git")
+	if _, err := os.Stat(gitDir); err != nil {
+		return fmt.Errorf("cannot stat git dir for ownership normalization: %w", err)
+	}
+
+	// #nosec G204 -- sudoUID/sudoGID validated as integers above
+	output, err := exec.Command("chown", "-R", fmt.Sprintf("%s:%s", sudoUID, sudoGID), gitDir).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to normalize git ownership to %s:%s: %w\nOutput: %s",
+			sudoUID, sudoGID, err, strings.TrimSpace(string(output)))
+	}
+
+	logger.Debug("Normalized .git ownership for sudo user",
+		zap.String("event", "self_update.git.ownership_normalized"),
+		zap.String("git_dir", gitDir),
+		zap.String("uid", sudoUID),
+		zap.String("gid", sudoGID))
+	return nil
 }
 
 // PullLatestCode pulls the latest code from the remote repository
@@ -248,6 +375,20 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		zap.String("repo", repoDir),
 		zap.String("branch", branch))
 
+	// If running under sudo, keep git metadata writable by the invoking user.
+	if ownErr := normalizeRepositoryOwnershipForSudoUser(rc, repoDir); ownErr != nil {
+		logger.Warn("Could not normalize git ownership before update",
+			zap.Error(ownErr),
+			zap.String("repo", repoDir))
+	}
+	defer func() {
+		if ownErr := normalizeRepositoryOwnershipForSudoUser(rc, repoDir); ownErr != nil {
+			logger.Warn("Could not normalize git ownership after update",
+				zap.Error(ownErr),
+				zap.String("repo", repoDir))
+		}
+	}()
+
 	// RESILIENCE: Check for and recover from existing merge conflicts FIRST
 	// This prevents the "needs merge" error that blocks stash operations
 	hasConflicts, conflictedFiles, err := HasMergeConflicts(rc, repoDir)
@@ -291,51 +432,9 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		return false, "", fmt.Errorf("failed to get commit before pull: %w", err)
 	}
 
-	// Check if we have uncommitted changes
-	statusCmd := exec.Command("git", "-C", repoDir, "status", "--porcelain")
-	statusOutput, err := statusCmd.Output()
+	stashRef, err = createRollbackStash(rc, repoDir)
 	if err != nil {
-		return false, "", fmt.Errorf("failed to check git status: %w", err)
-	}
-
-	hasChanges := len(statusOutput) > 0
-
-	// If we have changes, create a stash BEFORE pulling
-	if hasChanges {
-		logger.Info("Uncommitted changes detected, creating stash for rollback safety",
-			zap.String("message", "eos self-update auto-stash"))
-
-		// Create stash with descriptive message
-		stashCmd := exec.Command("git", "-C", repoDir, "stash", "push", "-m", "eos self-update auto-stash")
-		stashOutput, err := stashCmd.CombinedOutput()
-		if err != nil {
-			return false, "", fmt.Errorf("failed to create stash: %w\nOutput: %s",
-				err, strings.TrimSpace(string(stashOutput)))
-		}
-
-		logger.Debug("Stash created", zap.String("output", strings.TrimSpace(string(stashOutput))))
-
-		// Get stash ref (full SHA of stash@{0})
-		// CRITICAL: We need the full SHA, not symbolic ref, because stash@{0} changes
-		// when new stashes are created. The SHA is immutable.
-		stashRefCmd := exec.Command("git", "-C", repoDir, "rev-parse", "stash@{0}")
-		stashRefOutput, err := stashRefCmd.Output()
-		if err != nil {
-			// This is critical - if we can't get stash ref, we can't safely rollback
-			return false, "", fmt.Errorf("failed to get stash ref after creating stash: %w\n"+
-				"CRITICAL: Stash was created but ref cannot be retrieved.\n"+
-				"Manual recovery required:\n"+
-				"  git -C %s stash list\n"+
-				"  git -C %s stash pop  # If you want to restore changes",
-				err, repoDir, repoDir)
-		}
-
-		stashRef = strings.TrimSpace(string(stashRefOutput))
-		logger.Info("Stash created successfully for rollback safety",
-			zap.String("ref", stashRef[:8]+"..."),
-			zap.String("symbolic", "stash@{0}"))
-	} else {
-		logger.Debug("No uncommitted changes, no stash needed")
+		return false, "", err
 	}
 
 	// Now pull WITHOUT --autostash (we already manually stashed if needed)
@@ -344,12 +443,11 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		// Pull failed - try to restore stash if we created one
 		if stashRef != "" {
 			logger.Warn("Pull failed, attempting to restore stash",
-				zap.String("stash_ref", stashRef[:8]+"..."))
+				zap.String("stash_ref", shortRef(stashRef)))
 
 			// Use 'git stash apply <ref>' instead of 'git stash pop'
 			// This is safer because it doesn't remove the stash if apply fails
-			applyCmd := exec.Command("git", "-C", repoDir, "stash", "apply", stashRef)
-			applyOutput, applyErr := applyCmd.CombinedOutput()
+			applyOutput, applyErr := runGitCombinedOutput(repoDir, "stash", "apply", stashRef)
 			if applyErr != nil {
 				logger.Error("Failed to restore stash after failed pull",
 					zap.Error(applyErr),
@@ -383,8 +481,7 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		// Pull succeeded but can't get commit - try to restore stash
 		if stashRef != "" {
 			logger.Warn("Failed to get commit after pull, restoring stash")
-			applyCmd := exec.Command("git", "-C", repoDir, "stash", "apply", stashRef)
-			_ = applyCmd.Run() // Best effort
+			_, _ = runGitCombinedOutput(repoDir, "stash", "apply", stashRef) //nolint:errcheck // best-effort restore, error logged by caller
 		}
 		return false, stashRef, fmt.Errorf("failed to get commit after pull: %w", err)
 	}
@@ -398,8 +495,7 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 		// No code changes - restore stash immediately (don't need rollback capability)
 		if stashRef != "" {
 			logger.Info("No code changes, restoring stash immediately")
-			applyCmd := exec.Command("git", "-C", repoDir, "stash", "apply", stashRef)
-			applyOutput, applyErr := applyCmd.CombinedOutput()
+			applyOutput, applyErr := runGitCombinedOutput(repoDir, "stash", "apply", stashRef)
 			if applyErr != nil {
 				logger.Warn("Failed to restore stash after no-op pull",
 					zap.Error(applyErr),
@@ -438,7 +534,7 @@ func PullWithStashTracking(rc *eos_io.RuntimeContext, repoDir, branch string) (c
 	// Return with stash ref tracked for rollback
 	if stashRef != "" {
 		logger.Info("Stash tracked for potential rollback",
-			zap.String("ref", stashRef[:8]+"..."))
+			zap.String("ref", shortRef(stashRef)))
 	}
 
 	return true, stashRef, nil
@@ -578,8 +674,17 @@ func isTransientGitPullFailure(output string) (bool, string) {
 	return false, gitPullFailureReasonUnknown
 }
 
-// RestoreStash restores a specific stash by its SHA ref
-// P0-2 FIX: Used during rollback to restore uncommitted changes
+// RestoreStash restores a specific stash by its SHA ref.
+// P0-2 FIX: Used during rollback to restore uncommitted changes.
+//
+// Handles the common failure mode where `git stash apply` fails with
+// "could not restore untracked files from stash" because untracked files
+// already exist in the working tree. In this case, we remove the blocking
+// untracked files (they came from the stash, so they'll be restored) and retry.
+//
+// We use 'apply' instead of 'pop' because:
+//  1. If apply fails, stash is still preserved for manual recovery
+//  2. We can verify apply succeeded before dropping the stash
 func RestoreStash(rc *eos_io.RuntimeContext, repoDir, stashRef string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -589,26 +694,77 @@ func RestoreStash(rc *eos_io.RuntimeContext, repoDir, stashRef string) error {
 	}
 
 	logger.Info("Restoring stash from rollback",
-		zap.String("ref", stashRef[:8]+"..."))
+		zap.String("ref", shortRef(stashRef)))
 
-	// Use 'git stash apply <ref>' to restore the stash
-	// We use 'apply' instead of 'pop' because:
-	// 1. If apply fails, stash is still preserved for manual recovery
-	// 2. We can verify apply succeeded before dropping the stash
-	applyCmd := exec.Command("git", "-C", repoDir, "stash", "apply", stashRef)
-	applyOutput, err := applyCmd.CombinedOutput()
-	if err != nil {
+	applyOutput, err := runGitCombinedOutput(repoDir, "stash", "apply", stashRef)
+	if err == nil {
+		logger.Info("Stash restored successfully",
+			zap.String("ref", shortRef(stashRef)))
+		return nil
+	}
+
+	outputStr := strings.TrimSpace(string(applyOutput))
+
+	// Handle "could not restore untracked files from stash":
+	// This happens when untracked files that were in the stash already exist
+	// in the working tree (e.g., created by a build step between stash and restore).
+	// Fix: remove the blocking files then retry apply.
+	if !strings.Contains(outputStr, "could not restore untracked files from stash") &&
+		!strings.Contains(outputStr, "already exists, no checkout") {
 		return fmt.Errorf("failed to restore stash: %w\n"+
 			"Output: %s\n\n"+
 			"Manual recovery:\n"+
 			"  git -C %s stash apply %s",
-			err, strings.TrimSpace(string(applyOutput)),
-			repoDir, stashRef)
+			err, outputStr, repoDir, stashRef)
 	}
 
-	logger.Info("Stash restored successfully",
-		zap.String("ref", stashRef[:8]+"..."))
+	logger.Warn("Stash apply failed due to existing untracked files, removing blockers and retrying",
+		zap.String("ref", shortRef(stashRef)))
 
+	// List untracked files from the stash's third parent (the untracked tree)
+	// git rev-parse stashRef^3 gives the tree of untracked files
+	untrackedTreeOutput, treeErr := runGitOutput(repoDir, "rev-parse", "--verify", stashRef+"^3")
+	if treeErr != nil {
+		logger.Debug("Stash has no untracked files tree, cannot auto-recover",
+			zap.Error(treeErr))
+		return fmt.Errorf("failed to restore stash: %w\n"+
+			"Output: %s\n\n"+
+			"Manual recovery:\n"+
+			"  git -C %s stash apply %s",
+			err, outputStr, repoDir, stashRef)
+	}
+
+	untrackedTree := strings.TrimSpace(string(untrackedTreeOutput))
+	filesOutput, filesErr := runGitCombinedOutput(repoDir, "ls-tree", "-r", "--name-only", untrackedTree)
+	if filesErr != nil {
+		return fmt.Errorf("failed to list stash untracked files: %w", filesErr)
+	}
+
+	// Remove the blocking untracked files so stash apply can recreate them
+	for _, fname := range strings.Split(strings.TrimSpace(string(filesOutput)), "\n") {
+		if fname == "" {
+			continue
+		}
+		fullPath := filepath.Join(repoDir, fname)
+		if rmErr := os.Remove(fullPath); rmErr != nil && !os.IsNotExist(rmErr) {
+			logger.Warn("Could not remove blocking untracked file",
+				zap.String("file", fname),
+				zap.Error(rmErr))
+		}
+	}
+
+	// Retry apply after removing blockers
+	retryOutput, retryErr := runGitCombinedOutput(repoDir, "stash", "apply", stashRef)
+	if retryErr != nil {
+		return fmt.Errorf("failed to restore stash after removing blockers: %w\n"+
+			"Output: %s\n\n"+
+			"Manual recovery:\n"+
+			"  git -C %s stash apply %s",
+			retryErr, strings.TrimSpace(string(retryOutput)), repoDir, stashRef)
+	}
+
+	logger.Info("Stash restored successfully after removing blocking untracked files",
+		zap.String("ref", shortRef(stashRef)))
 	return nil
 }
 
