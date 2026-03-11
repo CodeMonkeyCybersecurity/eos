@@ -38,7 +38,7 @@ else
   bash "${repo_root}/scripts/ci/debug.sh"
 fi
 
-if echo "${staged_files}" | grep -Eq '^(pkg/self/|pkg/git/|pkg/vault/phase2_env_setup\.go|cmd/self/|scripts/ci/self-update-quality\.sh|test/e2e/smoke/self/|package\.json)'; then
+if echo "${staged_files}" | grep -Eq '^(pkg/self/|pkg/git/|pkg/vault/phase2_env_setup\.go|cmd/self/|scripts/ci/self-update-quality\.sh|test/e2e/smoke/|package\.json)'; then
   log "INFO" "pre_commit.self_update.start" "running self-update quality lane"
   if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
     npm run ci:self-update-quality --silent

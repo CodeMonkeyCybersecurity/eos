@@ -216,6 +216,7 @@ func TestIsTrustedRemote(t *testing.T) {
 		{"empty", "", false},
 		{"random text", "not-a-url", false},
 		{"path only", "/cybermonkey/eos.git", false},
+		{"local bare path not explicitly trusted", "/tmp/eos-origin.git", false},
 
 		// vhost7 internal hostname - untrusted by default
 		{"vhost7 internal", "ssh://git@vhost7:9001/cybermonkey/eos.git", false},
@@ -228,6 +229,16 @@ func TestIsTrustedRemote(t *testing.T) {
 				t.Errorf("IsTrustedRemote(%q) = %v, want %v", tt.remote, got, tt.trusted)
 			}
 		})
+	}
+}
+
+func TestIsTrustedRemote_ExactWhitelistSupportsLocalPaths(t *testing.T) {
+	original := append([]string(nil), TrustedRemotes...)
+	TrustedRemotes = append(TrustedRemotes, "/tmp/eos-origin.git")
+	t.Cleanup(func() { TrustedRemotes = original })
+
+	if !IsTrustedRemote("/tmp/eos-origin.git") {
+		t.Fatal("expected exact TrustedRemotes whitelist entry to be trusted")
 	}
 }
 

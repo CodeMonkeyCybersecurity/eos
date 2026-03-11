@@ -962,21 +962,28 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 // P0-2 FIX: Uses manual stash management to track stash ref for rollback
 // Returns true if code changed, false if already up-to-date
 func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
-	// Use stash tracking version for rollback safety
-	codeChanged, stashRef, err := git.PullWithStashTracking(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	result, err := git.PullRepository(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch, git.PullOptions{
+		VerifyRemote:                  true,
+		FailOnMissingHTTPSCredentials: true,
+		TrackRollbackStash:            true,
+		VerifyCommitSignatures:        true,
+		NormalizeOwnershipForSudo:     true,
+		RecoverMergeConflicts:         true,
+		FetchFirst:                    true,
+	})
 	if err != nil {
 		return false, err
 	}
 
 	// Store stash ref in transaction for rollback
-	eeu.transaction.GitStashRef = stashRef
+	eeu.transaction.GitStashRef = result.StashRef
 
-	if stashRef != "" {
+	if result.StashRef != "" {
 		eeu.logger.Info("Stash tracked in transaction for rollback",
-			zap.String("ref", stashRef[:8]+"..."))
+			zap.String("ref", result.StashRef[:8]+"..."))
 	}
 
-	return codeChanged, nil
+	return result.CodeChanged, nil
 }
 
 // installBinaryAtomic installs the binary atomically with flock-based locking

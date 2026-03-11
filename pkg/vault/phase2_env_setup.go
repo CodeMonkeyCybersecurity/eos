@@ -5,6 +5,7 @@ package vault
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -24,8 +25,9 @@ import (
 )
 
 var (
-	vaultPromptYesNo   = interaction.PromptYesNoSafe
-	vaultIsInteractive = isInteractiveTerminal
+	vaultPromptYesNo          = interaction.PromptYesNoSafe
+	vaultIsInteractive        = isInteractiveTerminal
+	vaultInsecureAuditLogPath = "/var/log/eos/vault-insecure-tls-audit.log"
 )
 
 //--------------------------------------------------------------------
@@ -289,6 +291,10 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 
 	// Check for development mode override
 	if os.Getenv("Eos_ALLOW_INSECURE_VAULT") == "true" {
+		if err := recordInsecureVaultTLSDecision(rc, addr, "dev_mode_environment_variable"); err != nil {
+			return "", fmt.Errorf("failed to persist insecure Vault TLS audit trail: %w", err)
+		}
+
 		log.Warn("⚠️  VAULT_SKIP_VERIFY enabled via Eos_ALLOW_INSECURE_VAULT (INSECURE - DEV MODE)",
 			zap.String("VAULT_SKIP_VERIFY", "1"),
 			zap.String("reason", "dev_mode_environment_variable"),
@@ -343,6 +349,10 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 	}
 
 	// User explicitly consented - enable skip_verify with logging
+	if err := recordInsecureVaultTLSDecision(rc, addr, "user_consent_interactive"); err != nil {
+		return "", fmt.Errorf("failed to persist insecure Vault TLS audit trail: %w", err)
+	}
+
 	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
 	_ = os.Setenv(shared.VaultAddrEnv, addr)
 
@@ -354,6 +364,42 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("vault_addr", addr))
 
 	return addr, nil
+}
+
+func recordInsecureVaultTLSDecision(rc *eos_io.RuntimeContext, addr, reason string) error {
+	entry := map[string]string{
+		"event":      "vault.insecure_tls_enabled",
+		"reason":     reason,
+		"vault_addr": addr,
+		"user":       os.Getenv("USER"),
+		"command":    rc.Command,
+		"component":  rc.Component,
+		"time":       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if err := os.MkdirAll(filepath.Dir(vaultInsecureAuditLogPath), 0o750); err != nil {
+		return fmt.Errorf("create audit log directory: %w", err)
+	}
+
+	payload, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("marshal audit entry: %w", err)
+	}
+
+	f, err := os.OpenFile(vaultInsecureAuditLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open audit log: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(append(payload, '\n')); err != nil {
+		return fmt.Errorf("write audit log: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync audit log: %w", err)
+	}
+
+	return nil
 }
 
 // isInteractiveTerminal checks if stdin is connected to an interactive terminal

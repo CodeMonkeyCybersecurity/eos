@@ -120,6 +120,13 @@ func ParseRemoteHostPath(raw string) (host string, repoPath string, ok bool) {
 // serving the Eos repository. It matches on host (case-insensitive,
 // port-stripped) and repo path (case-insensitive, .git-stripped).
 func IsTrustedRemote(remoteURL string) bool {
+	normalized := NormalizeRemoteURL(remoteURL)
+	for _, trusted := range TrustedRemotes {
+		if normalized == NormalizeRemoteURL(trusted) {
+			return true
+		}
+	}
+
 	host, repoPath, ok := ParseRemoteHostPath(remoteURL)
 	if !ok {
 		return false

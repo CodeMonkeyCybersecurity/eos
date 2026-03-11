@@ -3,6 +3,7 @@ package vault
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,10 +18,13 @@ func TestHandleTLSValidationFailure_InteractiveConsentAccepted(t *testing.T) {
 
 	origPrompt := vaultPromptYesNo
 	origInteractive := vaultIsInteractive
+	origAuditPath := vaultInsecureAuditLogPath
 	t.Cleanup(func() {
 		vaultPromptYesNo = origPrompt
 		vaultIsInteractive = origInteractive
+		vaultInsecureAuditLogPath = origAuditPath
 	})
+	vaultInsecureAuditLogPath = filepath.Join(t.TempDir(), "vault-insecure-tls-audit.log")
 
 	vaultIsInteractive = func() bool { return true }
 	vaultPromptYesNo = func(rc *eos_io.RuntimeContext, question string, defaultYes bool) (bool, error) {
@@ -37,6 +41,9 @@ func TestHandleTLSValidationFailure_InteractiveConsentAccepted(t *testing.T) {
 	}
 	if got := getenvOrEmpty("VAULT_SKIP_VERIFY"); got != "1" {
 		t.Fatalf("VAULT_SKIP_VERIFY = %q, want 1", got)
+	}
+	if _, err := os.Stat(vaultInsecureAuditLogPath); err != nil {
+		t.Fatalf("expected persistent audit log entry, stat error = %v", err)
 	}
 }
 
@@ -83,6 +90,9 @@ func TestHandleTLSValidationFailure_DevModeOverride(t *testing.T) {
 	t.Setenv("Eos_ALLOW_INSECURE_VAULT", "true")
 	t.Setenv("VAULT_SKIP_VERIFY", "")
 	t.Setenv("VAULT_ADDR", "")
+	origAuditPath := vaultInsecureAuditLogPath
+	t.Cleanup(func() { vaultInsecureAuditLogPath = origAuditPath })
+	vaultInsecureAuditLogPath = filepath.Join(t.TempDir(), "vault-insecure-tls-audit.log")
 
 	addr, err := handleTLSValidationFailure(testRuntimeContext(t), "https://vault.example.com:8200")
 	if err != nil {
@@ -93,6 +103,9 @@ func TestHandleTLSValidationFailure_DevModeOverride(t *testing.T) {
 	}
 	if got := getenvOrEmpty("VAULT_SKIP_VERIFY"); got != "1" {
 		t.Fatalf("VAULT_SKIP_VERIFY = %q, want 1", got)
+	}
+	if _, err := os.Stat(vaultInsecureAuditLogPath); err != nil {
+		t.Fatalf("expected persistent audit log entry, stat error = %v", err)
 	}
 }
 
@@ -116,6 +129,35 @@ func TestHandleTLSValidationFailure_PromptDefaultsToNo(t *testing.T) {
 	_, _ = handleTLSValidationFailure(testRuntimeContext(t), "https://vault.example.com:8200")
 	if capturedDefaultYes {
 		t.Fatal("TLS consent prompt should default to NO (defaultYes=false) for safety")
+	}
+}
+
+func TestHandleTLSValidationFailure_AuditFailureBlocksInsecureFallback(t *testing.T) {
+	t.Setenv("Eos_ALLOW_INSECURE_VAULT", "")
+	t.Setenv("VAULT_SKIP_VERIFY", "")
+	t.Setenv("VAULT_ADDR", "")
+
+	origPrompt := vaultPromptYesNo
+	origInteractive := vaultIsInteractive
+	origAuditPath := vaultInsecureAuditLogPath
+	t.Cleanup(func() {
+		vaultPromptYesNo = origPrompt
+		vaultIsInteractive = origInteractive
+		vaultInsecureAuditLogPath = origAuditPath
+	})
+
+	vaultIsInteractive = func() bool { return true }
+	vaultPromptYesNo = func(rc *eos_io.RuntimeContext, question string, defaultYes bool) (bool, error) {
+		return true, nil
+	}
+	vaultInsecureAuditLogPath = t.TempDir()
+
+	_, err := handleTLSValidationFailure(testRuntimeContext(t), "https://vault.example.com:8200")
+	if err == nil {
+		t.Fatal("expected audit trail failure to block insecure fallback")
+	}
+	if !testContains(err.Error(), "audit trail") {
+		t.Fatalf("expected audit trail error, got: %v", err)
 	}
 }
 

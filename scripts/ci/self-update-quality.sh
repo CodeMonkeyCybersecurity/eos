@@ -41,34 +41,34 @@ require_test() {
 }
 
 verify_tests_exist() {
-  lane_run_step "test_discovery" require_test "./pkg/git" 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*)' "git retry unit suite"
+  lane_run_step "test_discovery" require_test "./pkg/git" 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*|PullRepository_.*|PullLatestCode_FailsEarlyWithoutHTTPSCredentials)' "git retry/pull unit suite"
   lane_run_step "test_discovery" require_test "./pkg/vault" 'TestHandleTLSValidationFailure_.*' "vault TLS consent unit suite"
   lane_run_step "test_discovery" require_test "./cmd/self" 'TestBackupRunCommandIntegration' "self backup integration test"
-  lane_run_step "test_discovery" require_test "./pkg/git" 'TestCheckRepositoryState_WithTrustedRemote' "git trusted remote integration test"
-  lane_run_step "test_discovery" require_test "./test/e2e/smoke/self" 'TestSelfUpdateHelpSmoke' "self update e2e smoke test" -tags=e2e_smoke
+  lane_run_step "test_discovery" require_test "./pkg/git" 'Test(CheckRepositoryState_WithTrustedRemote|IntegrationPullWithStashTracking_PreservesUntrackedChanges)' "git trusted remote integration test"
+  lane_run_step "test_discovery" require_test "./test/e2e/smoke" 'TestSmoke_SelfUpdateHelp' "self update e2e smoke test" -tags=e2e_smoke
 }
 
 run_unit() {
   log_human "running unit tests (${unit_weight}%)"
   go test -count=1 -short -coverprofile="${coverage_file}" -covermode=atomic \
     ./pkg/git ./pkg/vault \
-    -run 'TestIsTransientGitPullFailure|TestRunGitPullWithRetry_.*|TestRetryBackoff_.*|TestVerifyTrustedRemote_.*|TestHandleTLSValidationFailure_.*'
+    -run 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*|VerifyTrustedRemote_.*|PullRepository_.*|PullLatestCode_FailsEarlyWithoutHTTPSCredentials|HandleTLSValidationFailure_.*)'
 }
 
 run_integration() {
   log_human "running integration tests (${integration_weight}%)"
   go test -count=1 ./cmd/self -run 'TestBackupRunCommandIntegration'
-  go test -count=1 ./pkg/git -run 'TestCheckRepositoryState_WithTrustedRemote'
+  go test -count=1 -tags=integration ./pkg/git -run 'TestIntegrationPullWithStashTracking_PreservesUntrackedChanges'
 }
 
 run_e2e() {
   log_human "running e2e smoke tests (${e2e_weight}%)"
-  go test -count=1 -tags=e2e_smoke ./test/e2e/smoke/self/...
+  go test -count=1 -tags=e2e_smoke ./test/e2e/smoke/...
 }
 
 compute_focus_coverage() {
   go tool cover -func="${coverage_file}" | awk '
-    /runGitPullWithRetry|isTransientGitPullFailure|retryBackoff|handleTLSValidationFailure/ {
+    /PullRepository|runGitPullWithRetry|isTransientGitPullFailure|retryBackoff|handleTLSValidationFailure/ {
       gsub("%","",$3); total += $3; count += 1
     }
     END {
