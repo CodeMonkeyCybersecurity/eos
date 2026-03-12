@@ -1,0 +1,74 @@
+name: Governance Check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 3 * * *"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  governance:
+    runs-on: [self-hosted, general]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Init submodules (HTTPS with token)
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+
+          TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [[ -n "${TOKEN}" ]]; then
+            git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
+          fi
+
+          if git submodule update --init --recursive 2>&1; then
+            echo "SUBMODULE_INIT=success"
+          else
+            echo "WARN: submodule init failed; governance wrapper will report actionable status"
+            echo "SUBMODULE_INIT=failed"
+          fi
+
+      - name: Run governance unit tests (70%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-governance-unit.sh
+
+      - name: Run governance integration tests (20%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-governance-integration.sh
+
+      - name: Run governance e2e tests (10%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-governance-e2e.sh
+
+      - name: Verify governance wiring
+        env:
+          GOVERNANCE_REPORT_JSON: outputs/ci/governance/report.json
+          GOVERNANCE_METRICS_TEXTFILE: outputs/ci/governance/metrics.prom
+        run: |
+          set -euo pipefail
+          chmod +x scripts/check-governance.sh
+          ./scripts/check-governance.sh
+
+      - name: Print governance report and metrics
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f outputs/ci/governance/report.json && cat outputs/ci/governance/report.json || true
+          test -f outputs/ci/governance/metrics.prom && cat outputs/ci/governance/metrics.prom || true
+          test -f outputs/ci/governance/events.jsonl && cat outputs/ci/governance/events.jsonl || true
+
+      - name: Alert on governance outcome
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/report-alert.py governance outputs/ci/governance/report.json

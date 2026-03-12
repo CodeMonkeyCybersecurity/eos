@@ -22,7 +22,8 @@ ps_log_json() {
   local outcome="${3:-pending}"
   local message="${4:-}"
 
-  ci_json_obj \
+  local payload
+  payload="$(ci_json_obj \
     ts             "$(ci_now_utc)" \
     schema_version "$(ps_schema_version)" \
     run_id         "${PS_CTX_RUN_ID:-unknown}" \
@@ -32,7 +33,11 @@ ps_log_json() {
     event          "${event}" \
     outcome        "${outcome}" \
     status         "$(ps_status_from_outcome "${outcome}")" \
-    message        "${message}"
+    message        "${message}")"
+  printf '%s\n' "${payload}"
+  if [[ -n "${PS_CTX_EVENTS_PATH:-}" ]]; then
+    printf '%s\n' "${payload}" >> "${PS_CTX_EVENTS_PATH}"
+  fi
 }
 
 ps_warn_artifact_failure() {
@@ -99,6 +104,8 @@ ps_write_json_report() {
     strict_remote    "${PS_CTX_STRICT_REMOTE}" \
     auto_update      "${PS_CTX_AUTO_UPDATE}" \
     artifact_warnings "#int:${PS_CTX_ARTIFACT_WARNINGS}" \
+    duration_seconds "#int:$(( $(ci_epoch) - ${PS_CTX_START_EPOCH:-0} ))" \
+    events_path      "${PS_CTX_EVENTS_PATH}" \
     message          "${message}")" || {
     ps_warn_artifact_failure "report" "${report_path}" "failed to build JSON report"
     return 1
@@ -138,6 +145,10 @@ ps_emit_prom_metrics() {
 prompts_submodule_${PS_CTX_KIND}_status{outcome="${outcome}",strict_remote="${PS_CTX_STRICT_REMOTE:-unknown}"} ${status_value}
 # TYPE prompts_submodule_${PS_CTX_KIND}_stale gauge
 prompts_submodule_${PS_CTX_KIND}_stale ${stale_value}
+# TYPE prompts_submodule_${PS_CTX_KIND}_duration_seconds gauge
+prompts_submodule_${PS_CTX_KIND}_duration_seconds $(( $(ci_epoch) - ${PS_CTX_START_EPOCH:-0} ))
+# TYPE prompts_submodule_${PS_CTX_KIND}_artifact_warnings gauge
+prompts_submodule_${PS_CTX_KIND}_artifact_warnings ${PS_CTX_ARTIFACT_WARNINGS:-0}
 # TYPE prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds gauge
 prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds $(ci_epoch)
 EOF_METRICS

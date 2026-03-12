@@ -86,6 +86,18 @@ th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c 
     "$(ps_normalize_strict_remote garbage)"
 ' _ "${HELPER_SCRIPT}"
 
+th_assert_run "capture-run-preserves-exit-code" 0 "7:warn" bash -c '
+  source "$1"
+  set +e
+  ps_capture_run bash -c "echo warn >&2; exit 7"
+  rc="$?"
+  set -e
+  if [[ "${rc}" -eq 0 ]]; then
+    exit 1
+  fi
+  printf "%s:%s\n" "${rc}" "${PS_LAST_COMMAND_STDERR}"
+' _ "${HELPER_SCRIPT}"
+
 # --- Context lifecycle ---
 th_assert_run "ctx-driven-json-log" 0 '"kind":"freshness"' bash -c '
   source "$1"
@@ -112,6 +124,8 @@ report = json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8
 assert report["kind"] == "freshness"
 assert report["outcome"] == "pass_up_to_date"
 assert report["strict_remote"] == "false"
+assert report["duration_seconds"] >= 0
+assert report["events_path"].endswith("/events.jsonl")
 print(report["status"])
 PY
 ' _ "${HELPER_SCRIPT}"
@@ -126,6 +140,16 @@ th_assert_run "ctx-driven-metrics" 0 "prompts_submodule_freshness_last_run_times
   ps_ctx_init
   ps_emit_prom_metrics fail_stale
   cat "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "ctx-events-log-created" 0 "\"event\":\"test.event\"" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_REPO_ROOT=/repo
+  ps_ctx_init
+  ps_log_json INFO test.event pending "hello"
+  cat "${tmpdir}/events.jsonl"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "governance-metrics-emitted" 0 "prompts_submodule_governance_status" bash -c '
@@ -432,11 +456,11 @@ th_assert_run "action-fail-checkout" 0 "fail_checkout" bash -c '
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
-args=("$@")
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
-if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then exit 1; fi
-if [[ "${args[*]}" == *" checkout --detach "* ]]; then exit 1; fi
+joined="$*"
+if [[ "${joined}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${joined}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${joined}" == *" submodule update --remote "* ]]; then exit 1; fi
+if [[ "${joined}" == *" checkout "* ]]; then exit 1; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -462,14 +486,14 @@ th_assert_run "action-pass-worktree-only-update" 0 "pass_auto_updated_worktree_o
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
-args=("$@")
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  if [[ "${args[*]}" == *" checkout --detach "* ]]; then echo feedface; else echo deadbeef; fi
+joined="$*"
+if [[ "${joined}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${joined}" == *" rev-parse HEAD"* ]]; then
+  if [[ -f "${TMPDIR_MARKER}/after-checkout" ]]; then echo feedface; else echo deadbeef; fi
   exit 0
 fi
-if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then exit 1; fi
-if [[ "${args[*]}" == *" checkout --detach "* ]]; then exit 0; fi
+if [[ "${joined}" == *" submodule update --remote "* ]]; then exit 1; fi
+if [[ "${joined}" == *" checkout "* ]]; then touch "${TMPDIR_MARKER}/after-checkout"; exit 0; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -479,6 +503,7 @@ EOF_GIT
   ps_git_fetch_remote_branch() { return 0; }
   ps_submodule_has_local_changes() { return 1; }
   (
+    export TMPDIR_MARKER="${tmpdir}"
     PATH="${tmpdir}/bin:${PATH}"
     AUTO_UPDATE=true
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
@@ -702,20 +727,11 @@ EOF_GIT
 
 # --- Hook install: hash mismatch detection ---
 th_assert_run "install-hook-hash-mismatch" 1 "Hook matches source: false" bash -c '
-  source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  git -C "${tmpdir}" init -q
-  mkdir -p "${tmpdir}/scripts/hooks"
-  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
-  chmod +x "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
-  ps_install_hook "${tmpdir}"
-  # Now tamper with the installed hook
-  echo "# tampered" >> "${tmpdir}/.git/hooks/pre-commit"
-  ps_install_hook "${tmpdir}" 2>&1 || true
-  # Re-install should overwrite - but test the detection by checking directly
-  echo "# tampered" >> "${tmpdir}/.git/hooks/pre-commit"
-  # Call the comparison part manually
+  mkdir -p "${tmpdir}/scripts/hooks" "${tmpdir}/.git/hooks"
+  printf "%s\n" "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  printf "%s\n" "#!/usr/bin/env bash" "# tampered" > "${tmpdir}/.git/hooks/pre-commit"
   hook_sha="$(sha256sum "${tmpdir}/.git/hooks/pre-commit" | awk "{print \$1}")"
   source_sha="$(sha256sum "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh" | awk "{print \$1}")"
   if [[ "${hook_sha}" != "${source_sha}" ]]; then

@@ -4,18 +4,44 @@ set -Eeuo pipefail
 # Default timeout (seconds) for the governance checker subprocess.
 PS_GOVERNANCE_CHECKER_TIMEOUT="${PS_GOVERNANCE_CHECKER_TIMEOUT:-120}"
 
+ps_compact_command_error() {
+  local detail="${1:-}"
+  detail="$(printf '%s' "${detail}" | tr '\n' ' ' | tr -s '[:space:]' ' ')"
+  detail="${detail#"${detail%%[![:space:]]*}"}"
+  detail="${detail%"${detail##*[![:space:]]}"}"
+  printf '%.200s' "${detail}"
+}
+
+ps_capture_run() {
+  local stdout_file stderr_file rc
+  stdout_file="$(mktemp)"
+  stderr_file="$(mktemp)"
+  if "$@" >"${stdout_file}" 2>"${stderr_file}"; then
+    PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
+    PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
+    rm -f "${stdout_file}" "${stderr_file}"
+    return 0
+  else
+    rc=$?
+    PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
+    PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
+    rm -f "${stdout_file}" "${stderr_file}"
+    return "${rc}"
+  fi
+}
+
 ps_run_freshness() {
   local repo_root="${1:?repo root required}"
   local fetch_timeout_sec="${SUBMODULE_FETCH_TIMEOUT_SEC:-20}"
 
-  PS_CTX_KIND="freshness"
-  PS_CTX_ACTION="freshness"
-  PS_CTX_REPORT_PATH="${SUBMODULE_REPORT_JSON:-${repo_root}/outputs/ci/submodule-freshness/report.json}"
-  PS_CTX_METRICS_PATH="${SUBMODULE_METRICS_TEXTFILE:-}"
-  PS_CTX_REPO_ROOT="${repo_root}"
-  PS_CTX_STRICT_REMOTE="${STRICT_REMOTE:-auto}"
-  PS_CTX_AUTO_UPDATE="${AUTO_UPDATE:-false}"
-  ps_ctx_init
+  ps_ctx_begin \
+    "freshness" \
+    "freshness" \
+    "${SUBMODULE_REPORT_JSON:-${repo_root}/outputs/ci/submodule-freshness/report.json}" \
+    "${SUBMODULE_METRICS_TEXTFILE:-}" \
+    "${repo_root}" \
+    "${STRICT_REMOTE:-auto}" \
+    "${AUTO_UPDATE:-false}"
   trap 'ps_finish_and_exit "fail_internal" "FAIL: unexpected script error at line ${LINENO}" 1' ERR
 
   ps_log_json "INFO" "submodule_freshness.start" "pending" "Starting prompts submodule freshness check"
@@ -34,11 +60,13 @@ ps_run_freshness() {
   fi
 
   PS_CTX_REMOTE_BRANCH="$(ps_tracking_branch "${repo_root}" "${PS_CTX_PROMPTS_PATH}")"
-  if ! ps_git_fetch_remote_branch "${repo_root}/${PS_CTX_PROMPTS_PATH}" "${PS_CTX_REMOTE_BRANCH}" "${fetch_timeout_sec}" 2>/dev/null; then
+  if ! ps_capture_run ps_git_fetch_remote_branch "${repo_root}/${PS_CTX_PROMPTS_PATH}" "${PS_CTX_REMOTE_BRANCH}" "${fetch_timeout_sec}"; then
+    local fetch_error
+    fetch_error="$(ps_compact_command_error "${PS_LAST_COMMAND_STDERR:-}")"
     if ps_should_strict_fail_remote "${PS_CTX_STRICT_REMOTE}"; then
-      ps_finish_and_exit "fail_remote_unreachable" "FAIL: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} while STRICT_REMOTE=${PS_CTX_STRICT_REMOTE}" 2
+      ps_finish_and_exit "fail_remote_unreachable" "FAIL: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} while STRICT_REMOTE=${PS_CTX_STRICT_REMOTE}${fetch_error:+ (${fetch_error})}" 2
     fi
-    ps_finish_and_exit "skip_remote_unreachable" "SKIP: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} (offline or auth issue)" 0
+    ps_finish_and_exit "skip_remote_unreachable" "SKIP: cannot fetch origin/${PS_CTX_REMOTE_BRANCH} for ${PS_CTX_PROMPTS_PATH} (offline or auth issue)${fetch_error:+ (${fetch_error})}" 0
   fi
 
   if ! PS_CTX_REMOTE_SHA="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" rev-parse "origin/${PS_CTX_REMOTE_BRANCH}" 2>/dev/null)"; then
@@ -64,7 +92,7 @@ ps_run_freshness() {
 
   local previous_sha updated_sha
   previous_sha="${PS_CTX_LOCAL_SHA}"
-  if git -C "${repo_root}" submodule update --remote -- "${PS_CTX_PROMPTS_PATH}" >/dev/null 2>&1; then
+  if ps_capture_run git -C "${repo_root}" submodule update --remote -- "${PS_CTX_PROMPTS_PATH}"; then
     updated_sha="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" rev-parse HEAD 2>/dev/null || true)"
     if [[ -n "${updated_sha}" && "${updated_sha}" == "${PS_CTX_REMOTE_SHA}" ]]; then
       PS_CTX_LOCAL_SHA="${updated_sha}"
@@ -72,8 +100,10 @@ ps_run_freshness() {
     fi
   fi
 
-  if ! git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" checkout --detach "${PS_CTX_REMOTE_SHA}" >/dev/null 2>&1; then
-    ps_finish_and_exit "fail_checkout" "FAIL: could not checkout ${PS_CTX_REMOTE_SHA:0:7} in ${PS_CTX_PROMPTS_PATH}" 1
+  if ! ps_capture_run git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" checkout --detach "${PS_CTX_REMOTE_SHA}"; then
+    local checkout_error
+    checkout_error="$(ps_compact_command_error "${PS_LAST_COMMAND_STDERR:-}")"
+    ps_finish_and_exit "fail_checkout" "FAIL: could not checkout ${PS_CTX_REMOTE_SHA:0:7} in ${PS_CTX_PROMPTS_PATH}${checkout_error:+ (${checkout_error})}" 1
   fi
   PS_CTX_LOCAL_SHA="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" rev-parse HEAD 2>/dev/null || echo unknown)"
   ps_finish_and_exit "pass_auto_updated_worktree_only" "PASS: prompts submodule worktree updated ${previous_sha:0:7} -> ${PS_CTX_LOCAL_SHA:0:7} (detached)" 0
@@ -83,12 +113,12 @@ ps_run_governance() {
   local repo_root="${1:?repo root required}"
   local checker_path outcome rc=0
 
-  PS_CTX_KIND="governance"
-  PS_CTX_ACTION="governance"
-  PS_CTX_REPORT_PATH="${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}"
-  PS_CTX_METRICS_PATH="${GOVERNANCE_METRICS_TEXTFILE:-}"
-  PS_CTX_REPO_ROOT="${repo_root}"
-  ps_ctx_init
+  ps_ctx_begin \
+    "governance" \
+    "governance" \
+    "${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}" \
+    "${GOVERNANCE_METRICS_TEXTFILE:-}" \
+    "${repo_root}"
   trap 'ps_finish_and_exit "fail_checker_error" "FAIL: unexpected governance wrapper error at line ${LINENO}" 1' ERR
 
   ps_log_json "INFO" "governance.start" "pending" "Starting governance check"
@@ -131,9 +161,16 @@ ps_install_hook() {
   local hook_source="scripts/hooks/pre-commit-ci-debug.sh"
   local hook_dest=".git/hooks/pre-commit"
 
+  ps_ctx_begin \
+    "hook_install" \
+    "install-hook" \
+    "${HOOK_INSTALL_REPORT_JSON:-${repo_root}/outputs/ci/install-hook/report.json}" \
+    "${HOOK_INSTALL_METRICS_TEXTFILE:-}" \
+    "${repo_root}"
+  trap 'ps_finish_and_exit "fail_install" "FAIL: unexpected install-hook error at line ${LINENO}" 1' ERR
+
   if [[ ! -e "${repo_root}/.git" ]]; then
-    ps_log_json "ERROR" "install_hook.check" "pending" "Not in a git repository"
-    return 1
+    ps_finish_and_exit "fail_not_git_repo" "FAIL: not in a git repository" 1
   fi
 
   mkdir -p "${repo_root}/.git/hooks"
@@ -147,24 +184,26 @@ ps_install_hook() {
   source_sha="$(sha256sum "${source_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${source_path}" | awk '{print $1}')"
 
   # Structured output for both human and machine consumption.
-  echo "Installed pre-commit hook: ${hook_path}"
-  echo "Hook source: ${source_path}"
-  echo "Hook mode: ${hook_mode}"
-  echo "Hook sha256: ${hook_sha}"
-  echo "Hook source sha256: ${source_sha}"
+  ps_log_json "INFO" "install_hook.install" "pending" "Installed pre-commit hook at ${hook_path}"
+  printf 'Installed pre-commit hook: %s\n' "${hook_path}"
+  printf 'Hook source: %s\n' "${source_path}"
+  printf 'Hook mode: %s\n' "${hook_mode}"
+  printf 'Hook sha256: %s\n' "${hook_sha}"
+  printf 'Hook source sha256: %s\n' "${source_sha}"
   if [[ ! -x "${hook_path}" ]]; then
-    echo "Hook executable: false"
-    return 1
+    printf 'Hook executable: false\n'
+    ps_finish_and_exit "fail_install" "FAIL: installed hook is not executable" 1
   fi
-  echo "Hook executable: true"
+  printf 'Hook executable: true\n'
 
   if [[ "${hook_sha}" != "${source_sha}" ]]; then
-    echo "Hook matches source: false"
-    return 1
+    printf 'Hook matches source: false\n'
+    ps_finish_and_exit "fail_install" "FAIL: installed hook hash does not match source" 1
   fi
 
-  echo "Hook matches source: true"
-  echo "Hook command: bash scripts/prompts-submodule.sh pre-commit"
+  printf 'Hook matches source: true\n'
+  printf 'Hook command: bash scripts/prompts-submodule.sh pre-commit\n'
+  ps_finish_and_exit "pass_installed" "PASS: installed pre-commit hook" 0
 }
 
 ps_run_pre_commit() {
@@ -173,18 +212,18 @@ ps_run_pre_commit() {
 
   # Ensure context lifecycle is active.
   if [[ -z "${PS_CTX_KIND:-}" ]]; then
-    PS_CTX_KIND="hook"
-    PS_CTX_ACTION="pre-commit"
-    PS_CTX_REPORT_PATH="${PRE_COMMIT_REPORT_JSON:-${repo_root}/outputs/ci/pre-commit/report.json}"
-    PS_CTX_REPO_ROOT="${repo_root}"
-    ps_ctx_init
+    ps_ctx_begin \
+      "hook" \
+      "pre-commit" \
+      "${PRE_COMMIT_REPORT_JSON:-${repo_root}/outputs/ci/pre-commit/report.json}" \
+      "${PRE_COMMIT_METRICS_TEXTFILE:-}" \
+      "${repo_root}"
   fi
   trap 'ps_finish_and_exit "fail_checker_error" "FAIL: unexpected pre-commit error at line ${LINENO}" 1' ERR
 
   staged_files="$(git -C "${repo_root}" diff --cached --name-only --diff-filter=ACMR)"
   if [[ -z "${staged_files}" ]]; then
-    ps_log_json "INFO" "pre_commit.skip" "pending" "No staged changes"
-    return 0
+    ps_finish_and_exit "pass_no_staged_changes" "PASS: No staged changes" 0
   fi
 
   ps_log_json "INFO" "pre_commit.parity.start" "pending" "Verifying ci:debug parity contract"
@@ -212,5 +251,8 @@ ps_run_pre_commit() {
     else
       bash "${repo_root}/scripts/ci/self-update-quality.sh"
     fi
+    ps_finish_and_exit "pass_ci_debug_self_update" "PASS: pre-commit checks completed with self-update quality lane" 0
   fi
+
+  ps_finish_and_exit "pass_ci_debug" "PASS: pre-commit checks completed" 0
 }

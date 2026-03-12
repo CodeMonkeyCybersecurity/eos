@@ -48,11 +48,14 @@ git -C "${hook_tmpdir}" init -q
 th_assert_run "install-hook-installs-wrapper" 0 "Hook matches source: true" \
   bash -c 'cd "$1" && bash scripts/install-git-hooks.sh' _ "${hook_tmpdir}"
 
+th_assert_json_field "install-hook-report-outcome" "${hook_tmpdir}/outputs/ci/install-hook/report.json" "outcome" "pass_installed"
+
 th_assert_run "pre-commit-no-staged-changes" 0 "No staged changes" \
   bash -c 'cd "$1" && bash scripts/hooks/pre-commit-ci-debug.sh' _ "${hook_tmpdir}"
+th_assert_json_field "pre-commit-report-outcome" "${hook_tmpdir}/outputs/ci/pre-commit/report.json" "outcome" "pass_no_staged_changes"
 
 # --- install-hook error: not a git repo ---
-th_assert_run "install-hook-not-git" 1 "Not in a git repository" bash -c '
+th_assert_run "install-hook-not-git" 1 "not in a git repository" bash -c '
   source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
@@ -60,6 +63,16 @@ th_assert_run "install-hook-not-git" 1 "Not in a git repository" bash -c '
   echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
   chmod +x "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
   ps_install_hook "${tmpdir}" 2>&1
+' _ "${HELPER_SCRIPT}"
+th_assert_run "install-hook-not-git-report" 0 "fail_not_git_repo" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/scripts/hooks"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  chmod +x "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  (ps_install_hook "${tmpdir}") >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/outputs/ci/install-hook/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 # --- pre-commit with staged changes but no tools ---
@@ -79,6 +92,27 @@ th_assert_run "pre-commit-parity-missing" 0 "verify-parity.sh not found" bash -c
   PS_CTX_KIND=hook PS_CTX_ACTION=pre-commit PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_REPO_ROOT="${tmpdir}"
   ps_ctx_init
   ps_run_pre_commit "${tmpdir}" 2>&1
+' _ "${HELPER_SCRIPT}"
+th_assert_run "pre-commit-parity-report" 0 "pass_ci_debug" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  echo "test" > "${tmpdir}/file.txt"
+  git -C "${tmpdir}" add file.txt
+  mkdir -p "${tmpdir}/scripts/ci"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  PRE_COMMIT_REPORT_JSON="${tmpdir}/pre-commit.json"
+  PS_CTX_KIND=hook
+  PS_CTX_ACTION=pre-commit
+  PS_CTX_REPORT_PATH="${tmpdir}/pre-commit.json"
+  PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  (ps_run_pre_commit "${tmpdir}") >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/pre-commit.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_summary "governance-unit"

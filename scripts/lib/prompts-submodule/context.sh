@@ -5,6 +5,7 @@ PS_CTX_KIND="${PS_CTX_KIND:-}"
 PS_CTX_ACTION="${PS_CTX_ACTION:-}"
 PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
 PS_CTX_METRICS_PATH="${PS_CTX_METRICS_PATH:-}"
+PS_CTX_EVENTS_PATH="${PS_CTX_EVENTS_PATH:-}"
 PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
 PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
 PS_CTX_LOCAL_SHA="${PS_CTX_LOCAL_SHA:-unknown}"
@@ -14,6 +15,27 @@ PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
 PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
 PS_CTX_ARTIFACT_WARNINGS="${PS_CTX_ARTIFACT_WARNINGS:-0}"
 PS_CTX_RUN_ID="${PS_CTX_RUN_ID:-}"
+PS_CTX_START_EPOCH="${PS_CTX_START_EPOCH:-0}"
+
+ps_ctx_begin() {
+  local kind="${1:?kind required}"
+  local action="${2:?action required}"
+  local report_path="${3:?report path required}"
+  local metrics_path="${4:-}"
+  local repo_root="${5:?repo root required}"
+  local strict_remote="${6:-auto}"
+  local auto_update="${7:-false}"
+
+  PS_CTX_KIND="${kind}"
+  PS_CTX_ACTION="${action}"
+  PS_CTX_REPORT_PATH="${report_path}"
+  PS_CTX_METRICS_PATH="${metrics_path}"
+  PS_CTX_EVENTS_PATH="$(dirname "${report_path}")/events.jsonl"
+  PS_CTX_REPO_ROOT="${repo_root}"
+  PS_CTX_STRICT_REMOTE="${strict_remote}"
+  PS_CTX_AUTO_UPDATE="${auto_update}"
+  ps_ctx_init
+}
 
 ps_ctx_init() {
   if [[ -z "${PS_CTX_KIND:-}" ]]; then
@@ -34,6 +56,16 @@ ps_ctx_init() {
   PS_CTX_ARTIFACT_WARNINGS=0
   if [[ -z "${PS_CTX_RUN_ID:-}" ]]; then
     PS_CTX_RUN_ID="$(ci_now_utc | tr -d ':T-' | cut -c1-15)Z-$$"
+  fi
+  PS_CTX_START_EPOCH="$(ci_epoch)"
+  if [[ -z "${PS_CTX_EVENTS_PATH:-}" ]]; then
+    PS_CTX_EVENTS_PATH="$(dirname "${PS_CTX_REPORT_PATH}")/events.jsonl"
+  fi
+  if [[ -n "${PS_CTX_EVENTS_PATH:-}" ]]; then
+    if ! mkdir -p "$(dirname "${PS_CTX_EVENTS_PATH}")" 2>/dev/null || ! : > "${PS_CTX_EVENTS_PATH}" 2>/dev/null; then
+      printf 'WARN: unable to initialize prompts-submodule events log at %s\n' "${PS_CTX_EVENTS_PATH}" >&2
+      PS_CTX_EVENTS_PATH=""
+    fi
   fi
 
   # Clear hook-exported git env vars so submodule git operations work
@@ -57,7 +89,10 @@ ps_outcome_known() {
     governance:pass_checked_direct|governance:pass_checked_via_override|governance:fail_checker_error|governance:skip_not_registered|governance:skip_uninitialized)
       return 0
       ;;
-    hook:pass_checked_direct|hook:pass_checked_via_override|hook:fail_checker_error|hook:skip_not_registered|hook:skip_uninitialized)
+    hook:pass_checked_direct|hook:pass_checked_via_override|hook:pass_no_staged_changes|hook:pass_ci_debug|hook:pass_ci_debug_self_update|hook:fail_checker_error|hook:skip_not_registered|hook:skip_uninitialized)
+      return 0
+      ;;
+    hook_install:pass_installed|hook_install:fail_not_git_repo|hook_install:fail_install)
       return 0
       ;;
     *)
@@ -76,4 +111,3 @@ ps_status_from_outcome() {
     *)        printf 'unknown' ;;
   esac
 }
-
