@@ -45,6 +45,25 @@ jobs:
         if: always()
         run: |
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
+          test -f outputs/ci/governance/report.json && cat outputs/ci/governance/report.json || true
+          test -f outputs/ci/governance-propagation-coverage/coverage.json && cat outputs/ci/governance-propagation-coverage/coverage.json || true
+
+      - name: Alert on governance wrapper report
+        if: always()
+        run: |
+          python3 scripts/ci/report-alert.py governance outputs/ci/governance/report.json
+          python3 scripts/ci/report-alert.py shell-coverage outputs/ci/governance-propagation-coverage/coverage.json
+
+      - name: Upload ci:debug artifacts
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: ci-debug-artifacts
+          path: |
+            outputs/ci/debug/**
+            outputs/ci/governance/**
+            outputs/ci/governance-propagation-coverage/**
+          if-no-files-found: warn
 
   ci-self-update-quality:
     name: ci-self-update-quality

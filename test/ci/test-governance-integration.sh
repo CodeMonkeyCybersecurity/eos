@@ -7,20 +7,28 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 GOV_SCRIPT="${REPO_ROOT}/scripts/check-governance.sh"
+ENTRY_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
 CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 
 tmpdir_direct="$(mktemp -d)"
-tmpdir_blocked="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_blocked}"' EXIT
+tmpdir_override="$(mktemp -d)"
+trap 'rm -rf "${tmpdir_direct}" "${tmpdir_override}"' EXIT
 
 mkdir -p "${tmpdir_direct}/scripts/lib" "${tmpdir_direct}/third_party/prompts/scripts"
 cp "${GOV_SCRIPT}" "${tmpdir_direct}/scripts/check-governance.sh"
+cp "${ENTRY_SCRIPT}" "${tmpdir_direct}/scripts/prompts-submodule.sh"
 cp "${HELPER_SCRIPT}" "${tmpdir_direct}/scripts/lib/prompts-submodule.sh"
 cp "${CI_COMMON_SCRIPT}" "${tmpdir_direct}/scripts/lib/ci-common.sh"
 cp "${GIT_ENV_SCRIPT}" "${tmpdir_direct}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir_direct}/scripts/check-governance.sh"
+mkdir -p "${tmpdir_direct}/scripts/lib/prompts-submodule"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/common.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/context.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/git.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/artifacts.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/actions.sh"
+chmod +x "${tmpdir_direct}/scripts/check-governance.sh" "${tmpdir_direct}/scripts/prompts-submodule.sh"
 cat > "${tmpdir_direct}/.gitmodules" <<'EOF_GITMODULES_DIRECT'
 [submodule "prompts"]
 	path = third_party/prompts
@@ -37,13 +45,20 @@ th_assert_run "governance-direct-path-pass" 0 '"outcome":"pass_checked_direct"' 
 th_assert_json_field "governance-direct-outcome" "${tmpdir_direct}/direct-report.json" "outcome" "pass_checked_direct"
 
 tmpdir_direct_fail="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_blocked}" "${tmpdir_direct_fail}"' EXIT
+trap 'rm -rf "${tmpdir_direct}" "${tmpdir_override}" "${tmpdir_direct_fail}"' EXIT
 mkdir -p "${tmpdir_direct_fail}/scripts/lib" "${tmpdir_direct_fail}/third_party/prompts/scripts"
 cp "${GOV_SCRIPT}" "${tmpdir_direct_fail}/scripts/check-governance.sh"
+cp "${ENTRY_SCRIPT}" "${tmpdir_direct_fail}/scripts/prompts-submodule.sh"
 cp "${HELPER_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule.sh"
 cp "${CI_COMMON_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/ci-common.sh"
 cp "${GIT_ENV_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir_direct_fail}/scripts/check-governance.sh"
+mkdir -p "${tmpdir_direct_fail}/scripts/lib/prompts-submodule"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/common.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/context.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/git.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/artifacts.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/actions.sh"
+chmod +x "${tmpdir_direct_fail}/scripts/check-governance.sh" "${tmpdir_direct_fail}/scripts/prompts-submodule.sh"
 cat > "${tmpdir_direct_fail}/.gitmodules" <<'EOF_GITMODULES_DIRECT_FAIL'
 [submodule "prompts"]
 	path = third_party/prompts
@@ -58,78 +73,38 @@ chmod +x "${tmpdir_direct_fail}/third_party/prompts/scripts/check-governance.sh"
 th_assert_run "governance-direct-path-fail" 7 '"outcome":"fail_checker_error"' \
   env GOVERNANCE_REPORT_JSON="${tmpdir_direct_fail}/direct-fail-report.json" bash "${tmpdir_direct_fail}/scripts/check-governance.sh"
 
-mkdir -p "${tmpdir_blocked}/scripts/lib" "${tmpdir_blocked}/prompts/scripts"
-cp "${GOV_SCRIPT}" "${tmpdir_blocked}/scripts/check-governance.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_blocked}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_blocked}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_blocked}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir_blocked}/scripts/check-governance.sh"
-cat > "${tmpdir_blocked}/.gitmodules" <<'EOF_GITMODULES_BLOCKED'
+mkdir -p "${tmpdir_override}/scripts/lib" "${tmpdir_override}/prompts/scripts" "${tmpdir_override}/prompts/lib"
+cp "${GOV_SCRIPT}" "${tmpdir_override}/scripts/check-governance.sh"
+cp "${ENTRY_SCRIPT}" "${tmpdir_override}/scripts/prompts-submodule.sh"
+cp "${HELPER_SCRIPT}" "${tmpdir_override}/scripts/lib/prompts-submodule.sh"
+cp "${CI_COMMON_SCRIPT}" "${tmpdir_override}/scripts/lib/ci-common.sh"
+cp "${GIT_ENV_SCRIPT}" "${tmpdir_override}/scripts/lib/git-env.sh"
+mkdir -p "${tmpdir_override}/scripts/lib/prompts-submodule"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/common.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/context.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/git.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/artifacts.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/actions.sh"
+chmod +x "${tmpdir_override}/scripts/check-governance.sh" "${tmpdir_override}/scripts/prompts-submodule.sh"
+cat > "${tmpdir_override}/.gitmodules" <<'EOF_GITMODULES_OVERRIDE'
 [submodule "prompts"]
 	path = prompts
 	url = https://example.invalid/prompts.git
-EOF_GITMODULES_BLOCKED
-cat > "${tmpdir_blocked}/prompts/scripts/check-governance.sh" <<'EOF_CHECKER'
+EOF_GITMODULES_OVERRIDE
+cat > "${tmpdir_override}/prompts/scripts/check-governance.sh" <<'EOF_CHECKER_OVERRIDE'
 #!/usr/bin/env bash
-exit 0
-EOF_CHECKER
-chmod +x "${tmpdir_blocked}/prompts/scripts/check-governance.sh"
-mkdir -p "${tmpdir_blocked}/third_party/prompts"
+echo "OK: ${PROMPTS_SUBMODULE_PATH}/ submodule present"
+echo "OK: README.md references ${PROMPTS_SUBMODULE_PATH}/"
+echo
+echo "PASS: Governance wiring is complete"
+EOF_CHECKER_OVERRIDE
+chmod +x "${tmpdir_override}/prompts/scripts/check-governance.sh"
+printf 'dummy\n' > "${tmpdir_override}/prompts/SOAPIER.md"
+printf '%s\n' "# repo" "third_party/prompts/" > "${tmpdir_override}/README.md"
 
-th_assert_run "governance-blocked-symlink-path" 1 '"outcome":"fail_checker_error"' \
-  env GOVERNANCE_REPORT_JSON="${tmpdir_blocked}/blocked-report.json" bash "${tmpdir_blocked}/scripts/check-governance.sh"
-th_assert_json_field "governance-blocked-outcome" "${tmpdir_blocked}/blocked-report.json" "outcome" "fail_checker_error"
-
-tmpdir_symlink="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_blocked}" "${tmpdir_direct_fail}" "${tmpdir_symlink}"' EXIT
-mkdir -p "${tmpdir_symlink}/scripts/lib" "${tmpdir_symlink}/prompts/scripts"
-cp "${GOV_SCRIPT}" "${tmpdir_symlink}/scripts/check-governance.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_symlink}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_symlink}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_symlink}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir_symlink}/scripts/check-governance.sh"
-cat > "${tmpdir_symlink}/.gitmodules" <<'EOF_GITMODULES_SYMLINK'
-[submodule "prompts"]
-	path = prompts
-	url = https://example.invalid/prompts.git
-EOF_GITMODULES_SYMLINK
-cat > "${tmpdir_symlink}/prompts/scripts/check-governance.sh" <<'EOF_CHECKER_SYMLINK'
-#!/usr/bin/env bash
-exit 0
-EOF_CHECKER_SYMLINK
-chmod +x "${tmpdir_symlink}/prompts/scripts/check-governance.sh"
-
-th_assert_run "governance-symlink-pass" 0 '"outcome":"pass_checked_via_symlink"' \
-  env GOVERNANCE_REPORT_JSON="${tmpdir_symlink}/symlink-report.json" bash "${tmpdir_symlink}/scripts/check-governance.sh"
-th_assert_json_field "governance-symlink-outcome" "${tmpdir_symlink}/symlink-report.json" "outcome" "pass_checked_via_symlink"
-if [[ -e "${tmpdir_symlink}/third_party/prompts" ]]; then
-  echo "FAIL: governance-symlink-cleanup"
-  th_fail=$((th_fail + 1))
-else
-  echo "PASS: governance-symlink-cleanup"
-  th_pass=$((th_pass + 1))
-fi
-
-tmpdir_symlink_fail="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_blocked}" "${tmpdir_direct_fail}" "${tmpdir_symlink}" "${tmpdir_symlink_fail}"' EXIT
-mkdir -p "${tmpdir_symlink_fail}/scripts/lib" "${tmpdir_symlink_fail}/prompts/scripts"
-cp "${GOV_SCRIPT}" "${tmpdir_symlink_fail}/scripts/check-governance.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_symlink_fail}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_symlink_fail}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_symlink_fail}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir_symlink_fail}/scripts/check-governance.sh"
-cat > "${tmpdir_symlink_fail}/.gitmodules" <<'EOF_GITMODULES_SYMLINK_FAIL'
-[submodule "prompts"]
-	path = prompts
-	url = https://example.invalid/prompts.git
-EOF_GITMODULES_SYMLINK_FAIL
-cat > "${tmpdir_symlink_fail}/prompts/scripts/check-governance.sh" <<'EOF_CHECKER_SYMLINK_FAIL'
-#!/usr/bin/env bash
-exit 9
-EOF_CHECKER_SYMLINK_FAIL
-chmod +x "${tmpdir_symlink_fail}/prompts/scripts/check-governance.sh"
-
-th_assert_run "governance-symlink-fail" 9 '"outcome":"fail_checker_error"' \
-  env GOVERNANCE_REPORT_JSON="${tmpdir_symlink_fail}/symlink-fail-report.json" bash "${tmpdir_symlink_fail}/scripts/check-governance.sh"
+th_assert_run "governance-override-path-pass" 0 '"outcome":"pass_checked_via_override"' \
+  env GOVERNANCE_REPORT_JSON="${tmpdir_override}/override-report.json" bash "${tmpdir_override}/scripts/check-governance.sh"
+th_assert_json_field "governance-override-outcome" "${tmpdir_override}/override-report.json" "outcome" "pass_checked_via_override"
+th_assert_json_field "governance-override-prompts-path" "${tmpdir_override}/override-report.json" "prompts_path" "prompts"
 
 th_summary "governance-integration"

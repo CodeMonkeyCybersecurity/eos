@@ -7,6 +7,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
+ENTRY_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
 CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
@@ -52,10 +53,17 @@ ge_run_clean_git git -C "${repo}" add .gitmodules prompts
 ge_run_clean_git git -C "${repo}" commit -m "add stale prompts submodule" >/dev/null
 mkdir -p "${repo}/scripts/lib"
 cp "${FRESHNESS_SCRIPT}" "${repo}/scripts/prompts-submodule-freshness.sh"
+cp "${ENTRY_SCRIPT}" "${repo}/scripts/prompts-submodule.sh"
 cp "${HELPER_SCRIPT}" "${repo}/scripts/lib/prompts-submodule.sh"
 cp "${CI_COMMON_SCRIPT}" "${repo}/scripts/lib/ci-common.sh"
 cp "${GIT_ENV_SCRIPT}" "${repo}/scripts/lib/git-env.sh"
-chmod +x "${repo}/scripts/prompts-submodule-freshness.sh"
+mkdir -p "${repo}/scripts/lib/prompts-submodule"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${repo}/scripts/lib/prompts-submodule/common.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${repo}/scripts/lib/prompts-submodule/context.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${repo}/scripts/lib/prompts-submodule/git.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${repo}/scripts/lib/prompts-submodule/artifacts.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${repo}/scripts/lib/prompts-submodule/actions.sh"
+chmod +x "${repo}/scripts/prompts-submodule-freshness.sh" "${repo}/scripts/prompts-submodule.sh"
 
 th_assert_run "stale-fail-without-auto-update" 1 '"outcome":"fail_stale"' \
   ge_run_clean_git env STRICT_REMOTE=false AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-stale.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
@@ -71,6 +79,7 @@ th_assert_run "auto-update-converges" 0 '"outcome":"pass_auto_updated"' \
   ge_run_clean_git env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-update.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
 th_assert_json_field "report-outcome-updated" "${repo}/report-update.json" "outcome" "pass_auto_updated"
 th_assert_json_field "report-remote-sha" "${repo}/report-update.json" "remote_sha" "${v2_sha}"
+th_assert_json_field "report-schema-updated" "${repo}/report-update.json" "schema_version" "2"
 
 ge_run_clean_git git -C "${repo}/prompts" remote set-url origin "${tmpdir}/does-not-exist.git"
 th_assert_run "strict-remote-failure" 2 '"outcome":"fail_remote_unreachable"' \

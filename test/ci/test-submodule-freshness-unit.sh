@@ -7,12 +7,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
+ENTRY_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule.sh"
 HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
 CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 REPORT_ALERT_SCRIPT="${REPO_ROOT}/scripts/ci/report-alert.py"
 
 th_assert_run "freshness-script-syntax" 0 "" bash -n "${FRESHNESS_SCRIPT}"
+th_assert_run "entry-script-syntax" 0 "" bash -n "${ENTRY_SCRIPT}"
 th_assert_run "helper-script-syntax" 0 "" bash -n "${HELPER_SCRIPT}"
 th_assert_run "ci-common-script-syntax" 0 "" bash -n "${CI_COMMON_SCRIPT}"
 th_assert_run "git-env-script-syntax" 0 "" bash -n "${GIT_ENV_SCRIPT}"
@@ -37,7 +39,7 @@ th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c 
 ' _ "${HELPER_SCRIPT}"
 th_assert_run "ctx-driven-json-log" 0 '"kind":"freshness"' bash -c '
   source "$1"
-  PS_CTX_KIND=freshness PS_CTX_REPORT_PATH=/tmp/report.json PS_CTX_METRICS_PATH=/tmp/metrics.prom \
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/report.json PS_CTX_METRICS_PATH=/tmp/metrics.prom \
     PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
     PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
   ps_ctx_init
@@ -47,7 +49,7 @@ th_assert_run "ctx-driven-json-report" 0 "pass" bash -c '
   source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  PS_CTX_KIND=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
     PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
     PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main PS_CTX_STRICT_REMOTE=false PS_CTX_AUTO_UPDATE=true
   ps_ctx_init
@@ -66,7 +68,7 @@ th_assert_run "ctx-driven-metrics" 0 "prompts_submodule_freshness_last_run_times
   source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  PS_CTX_KIND=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
     PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
     PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
   ps_ctx_init
@@ -156,23 +158,28 @@ th_assert_run "ctx-init-rejects-missing-kind" 1 "PS_CTX_KIND must be set" bash -
   PS_CTX_KIND="" PS_CTX_REPORT_PATH=/tmp/r.json
   ps_ctx_init
 ' _ "${HELPER_SCRIPT}"
+th_assert_run "ctx-init-rejects-missing-action" 1 "PS_CTX_ACTION must be set" bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION="" PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+' _ "${HELPER_SCRIPT}"
 th_assert_run "ctx-init-rejects-missing-report" 1 "PS_CTX_REPORT_PATH must be set" bash -c '
   source "$1"
-  PS_CTX_KIND=freshness PS_CTX_REPORT_PATH=""
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=""
   ps_ctx_init
 ' _ "${HELPER_SCRIPT}"
 
 # --- Slim log format verification ---
 th_assert_run "log-json-slim-format" 0 "" bash -c '
   source "$1"
-  PS_CTX_KIND=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
   ps_ctx_init
   output="$(ps_log_json INFO test.event pass_up_to_date "msg")"
   # Slim format should NOT contain repo_root, prompts_path, local_sha, remote_sha
   echo "${output}" | grep -q "repo_root" && exit 1
   echo "${output}" | grep -q "prompts_path" && exit 1
-  # But should contain the 7 expected fields
-  echo "${output}" | python3 -c "import sys,json; d=json.load(sys.stdin); assert len(d)==7, f\"expected 7 fields, got {len(d)}\""
+  # But should contain schema + run correlation fields
+  echo "${output}" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d[\"schema_version\"] == \"2\"; assert d[\"action\"] == \"freshness\"; assert \"run_id\" in d"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "status-from-outcome-unknown" 0 "unknown" bash -c '
@@ -196,6 +203,7 @@ th_assert_run "finish-and-exit-unknown-outcome" 0 "fail_internal" bash -c '
   trap "rm -rf \"${tmpdir}\"" EXIT
   (
     PS_CTX_KIND=freshness
+    PS_CTX_ACTION=freshness
     PS_CTX_REPORT_PATH="${tmpdir}/report.json"
     PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom"
     ps_ctx_init
@@ -256,6 +264,20 @@ th_assert_run "report-alert-unknown-profile" 0 "::warning::unknown report-alert 
   python3 "$1" unknown-profile "${tmpf}"
 ' _ "${REPORT_ALERT_SCRIPT}"
 
+th_assert_run "report-alert-governance-pass" 0 "::notice::governance check passed" bash -c '
+  tmpf="$(mktemp)"
+  trap "rm -f \"${tmpf}\"" EXIT
+  echo "{\"schema_version\":\"2\",\"status\":\"pass\",\"outcome\":\"pass_checked_via_override\",\"message\":\"ok\"}" > "${tmpf}"
+  python3 "$1" governance "${tmpf}"
+' _ "${REPORT_ALERT_SCRIPT}"
+
+th_assert_run "report-alert-shell-coverage-pass" 0 "::notice::shell coverage passed" bash -c '
+  tmpf="$(mktemp)"
+  trap "rm -f \"${tmpf}\"" EXIT
+  echo "{\"status\":\"pass\",\"coverage_percent\":97.5,\"threshold_percent\":90}" > "${tmpf}"
+  python3 "$1" shell-coverage "${tmpf}"
+' _ "${REPORT_ALERT_SCRIPT}"
+
 th_assert_run "report-alert-unreadable" 0 "::error::submodule-freshness report unreadable" bash -c '
   tmpf="$(mktemp)"
   trap "rm -f \"${tmpf}\"" EXIT
@@ -266,101 +288,50 @@ th_assert_run "report-alert-unreadable" 0 "::error::submodule-freshness report u
 th_assert_run "report-alert-usage-error" 2 "usage:" \
   python3 "${REPORT_ALERT_SCRIPT}"
 
-th_assert_run "wrapper-pass-up-to-date" 0 "pass_up_to_date" bash -c '
-  wrapper_src="$1"
+th_assert_run "entry-usage-error-no-command" 2 "usage:" bash "${ENTRY_SCRIPT}"
+th_assert_run "entry-usage-error-unknown-command" 2 "usage:" bash "${ENTRY_SCRIPT}" nope
+
+th_assert_run "action-pass-up-to-date" 0 "pass_up_to_date" bash -c '
+  source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/bin" "${tmpdir}/prompts"
-  cp "${wrapper_src}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-  cat > "${tmpdir}/scripts/lib/prompts-submodule.sh" <<'"'"'EOF_HELPER'"'"'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PS_CTX_KIND="${PS_CTX_KIND:-}"
-PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
-PS_CTX_METRICS_PATH="${PS_CTX_METRICS_PATH:-}"
-PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
-PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
-PS_CTX_LOCAL_SHA="${PS_CTX_LOCAL_SHA:-unknown}"
-PS_CTX_REMOTE_SHA="${PS_CTX_REMOTE_SHA:-unknown}"
-PS_CTX_REMOTE_BRANCH="${PS_CTX_REMOTE_BRANCH:-unknown}"
-PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
-PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
-ps_repo_root() { cd "$(dirname "$1")/.." && pwd; }
-ps_ctx_init() { : "${PS_CTX_KIND:?}"; : "${PS_CTX_REPORT_PATH:?}"; }
-ps_log_json() { :; }
-ps_prompts_submodule_path() { printf "prompts\n"; }
-ps_prompts_submodule_initialized() { return 0; }
-ps_tracking_branch() { printf "main\n"; }
-ps_git_fetch_remote_branch() { return "${FAKE_FETCH_RC:-0}"; }
-ps_should_strict_fail_remote() { [[ "${1:-auto}" == "true" ]]; }
-ps_submodule_has_local_changes() { [[ "${FAKE_DIRTY:-false}" == "true" ]]; }
-ps_finish_and_exit() {
-  mkdir -p "$(dirname "${PS_CTX_REPORT_PATH}")"
-  printf "{\"kind\":\"%s\",\"outcome\":\"%s\"}\n" "${PS_CTX_KIND}" "$1" > "${PS_CTX_REPORT_PATH}"
-  exit "${3:-0}"
-}
-EOF_HELPER
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
 if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  printf "%s\n" "${FAKE_HEAD_SHA:-deadbeef}"
+  echo deadbeef
   exit 0
 fi
 if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  printf "%s\n" "${FAKE_REMOTE_SHA:-deadbeef}"
+  echo deadbeef
   exit 0
-fi
-if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then
-  exit "${FAKE_SUBMODULE_UPDATE_RC:-0}"
-fi
-if [[ "${args[*]}" == *" checkout --detach "* ]]; then
-  exit "${FAKE_CHECKOUT_RC:-0}"
 fi
 exit 0
 EOF_GIT
-  chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/bin/git"
-  PATH="${tmpdir}/bin:${PATH}" SUBMODULE_REPORT_JSON="${tmpdir}/report.json" \
-    bash "${tmpdir}/scripts/prompts-submodule-freshness.sh" >/dev/null 2>&1
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
   python3 - <<PY
 import json
 from pathlib import Path
-report = json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))
-print(report["outcome"])
+print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
 PY
-' _ "${FRESHNESS_SCRIPT}"
+' _ "${HELPER_SCRIPT}"
 
-th_assert_run "wrapper-fail-corrupt-submodule" 0 "fail_corrupt_submodule" bash -c '
-  wrapper_src="$1"
+th_assert_run "action-fail-corrupt-submodule" 0 "fail_corrupt_submodule" bash -c '
+  source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/bin" "${tmpdir}/prompts"
-  cp "${wrapper_src}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-  cat > "${tmpdir}/scripts/lib/prompts-submodule.sh" <<'"'"'EOF_HELPER'"'"'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PS_CTX_KIND="${PS_CTX_KIND:-}"
-PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
-PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
-PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
-PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
-PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
-ps_repo_root() { cd "$(dirname "$1")/.." && pwd; }
-ps_ctx_init() { : "${PS_CTX_KIND:?}"; : "${PS_CTX_REPORT_PATH:?}"; }
-ps_log_json() { :; }
-ps_prompts_submodule_path() { printf "prompts\n"; }
-ps_prompts_submodule_initialized() { return 0; }
-ps_tracking_branch() { printf "main\n"; }
-ps_git_fetch_remote_branch() { return 0; }
-ps_should_strict_fail_remote() { return 1; }
-ps_submodule_has_local_changes() { return 1; }
-ps_finish_and_exit() {
-  mkdir -p "$(dirname "${PS_CTX_REPORT_PATH}")"
-  printf "{\"outcome\":\"%s\"}\n" "$1" > "${PS_CTX_REPORT_PATH}"
-  exit "${3:-0}"
-}
-EOF_HELPER
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -370,113 +341,122 @@ if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
 fi
 exit 0
 EOF_GIT
-  chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/bin/git"
-  rc=0
-  PATH="${tmpdir}/bin:${PATH}" SUBMODULE_REPORT_JSON="${tmpdir}/report.json" \
-    bash "${tmpdir}/scripts/prompts-submodule-freshness.sh" >/dev/null 2>&1 || rc=$?
-  [[ "${rc}" -eq 1 ]]
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
   python3 - <<PY
 import json
 from pathlib import Path
 print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
 PY
-' _ "${FRESHNESS_SCRIPT}"
+' _ "${HELPER_SCRIPT}"
 
-th_assert_run "wrapper-skip-remote-unreachable" 0 "skip_remote_unreachable" bash -c '
-  wrapper_src="$1"
+th_assert_run "action-skip-missing-remote-ref" 0 "skip_missing_remote_ref" bash -c '
+  source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/bin" "${tmpdir}/prompts"
-  cp "${wrapper_src}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-  cat > "${tmpdir}/scripts/lib/prompts-submodule.sh" <<'"'"'EOF_HELPER'"'"'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PS_CTX_KIND="${PS_CTX_KIND:-}"
-PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
-PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
-PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
-PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
-ps_repo_root() { cd "$(dirname "$1")/.." && pwd; }
-ps_ctx_init() { : "${PS_CTX_KIND:?}"; : "${PS_CTX_REPORT_PATH:?}"; }
-ps_log_json() { :; }
-ps_prompts_submodule_path() { printf "prompts\n"; }
-ps_prompts_submodule_initialized() { return 0; }
-ps_tracking_branch() { printf "main\n"; }
-ps_git_fetch_remote_branch() { return 1; }
-ps_should_strict_fail_remote() { return 1; }
-ps_submodule_has_local_changes() { return 1; }
-ps_finish_and_exit() {
-  mkdir -p "$(dirname "${PS_CTX_REPORT_PATH}")"
-  printf "{\"outcome\":\"%s\"}\n" "$1" > "${PS_CTX_REPORT_PATH}"
-  exit "${3:-0}"
-}
-EOF_HELPER
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
 if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  printf "%s\n" deadbeef
+  echo deadbeef
   exit 0
+fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
+  exit 1
 fi
 exit 0
 EOF_GIT
-  chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/bin/git"
-  PATH="${tmpdir}/bin:${PATH}" SUBMODULE_REPORT_JSON="${tmpdir}/report.json" \
-    bash "${tmpdir}/scripts/prompts-submodule-freshness.sh" >/dev/null 2>&1
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    STRICT_REMOTE=false
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
   python3 - <<PY
 import json
 from pathlib import Path
 print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
 PY
-' _ "${FRESHNESS_SCRIPT}"
+' _ "${HELPER_SCRIPT}"
 
-th_assert_run "wrapper-worktree-only-update" 0 "pass_auto_updated_worktree_only" bash -c '
-  wrapper_src="$1"
+th_assert_run "action-fail-checkout" 0 "fail_checkout" bash -c '
+  source "$1"
   tmpdir="$(mktemp -d)"
   trap "rm -rf \"${tmpdir}\"" EXIT
-  mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/bin" "${tmpdir}/prompts"
-  cp "${wrapper_src}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-  cat > "${tmpdir}/scripts/lib/prompts-submodule.sh" <<'"'"'EOF_HELPER'"'"'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-PS_CTX_KIND="${PS_CTX_KIND:-}"
-PS_CTX_REPORT_PATH="${PS_CTX_REPORT_PATH:-}"
-PS_CTX_REPO_ROOT="${PS_CTX_REPO_ROOT:-}"
-PS_CTX_PROMPTS_PATH="${PS_CTX_PROMPTS_PATH:-}"
-PS_CTX_STRICT_REMOTE="${PS_CTX_STRICT_REMOTE:-auto}"
-PS_CTX_AUTO_UPDATE="${PS_CTX_AUTO_UPDATE:-false}"
-ps_repo_root() { cd "$(dirname "$1")/.." && pwd; }
-ps_ctx_init() { : "${PS_CTX_KIND:?}"; : "${PS_CTX_REPORT_PATH:?}"; }
-ps_log_json() { :; }
-ps_prompts_submodule_path() { printf "prompts\n"; }
-ps_prompts_submodule_initialized() { return 0; }
-ps_tracking_branch() { printf "main\n"; }
-ps_git_fetch_remote_branch() { return 0; }
-ps_should_strict_fail_remote() { return 1; }
-ps_submodule_has_local_changes() { return 1; }
-ps_finish_and_exit() {
-  mkdir -p "$(dirname "${PS_CTX_REPORT_PATH}")"
-  printf "{\"outcome\":\"%s\"}\n" "$1" > "${PS_CTX_REPORT_PATH}"
-  exit "${3:-0}"
-}
-EOF_HELPER
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
   cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
 if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
+  echo deadbeef
+  exit 0
+fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
+  echo feedface
+  exit 0
+fi
+if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then
+  exit 1
+fi
+if [[ "${args[*]}" == *" checkout --detach "* ]]; then
+  exit 1
+fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  ps_submodule_has_local_changes() { return 1; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 - <<PY
+import json
+from pathlib import Path
+print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
+PY
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "action-pass-worktree-only-update" 0 "pass_auto_updated_worktree_only" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
+  echo feedface
+  exit 0
+fi
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
   if [[ "${args[*]}" == *" checkout --detach "* ]]; then
-    printf "%s\n" feedface
+    echo feedface
   else
-    printf "%s\n" "${FAKE_HEAD_SHA:-deadbeef}"
+    echo deadbeef
   fi
   exit 0
 fi
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  printf "%s\n" feedface
-  exit 0
-fi
 if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then
   exit 1
 fi
@@ -485,20 +465,29 @@ if [[ "${args[*]}" == *" checkout --detach "* ]]; then
 fi
 exit 0
 EOF_GIT
-  chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/bin/git"
-  PATH="${tmpdir}/bin:${PATH}" AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${tmpdir}/report.json" \
-    bash "${tmpdir}/scripts/prompts-submodule-freshness.sh" >/dev/null 2>&1
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  ps_submodule_has_local_changes() { return 1; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
   python3 - <<PY
 import json
 from pathlib import Path
 print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
 PY
-' _ "${FRESHNESS_SCRIPT}"
+' _ "${HELPER_SCRIPT}"
 
 th_assert_run "artifact-warning-does-not-mask-exit" 0 'artifact_warning' bash -c '
   source "$1"
   (
-    PS_CTX_KIND=freshness PS_CTX_REPORT_PATH=/proc/eos-test/report.json PS_CTX_METRICS_PATH=/proc/eos-test/metrics.prom \
+    PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/proc/eos-test/report.json PS_CTX_METRICS_PATH=/proc/eos-test/metrics.prom \
       PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
       PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
     ps_ctx_init
@@ -510,10 +499,17 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 mkdir -p "${tmpdir}/scripts/lib"
 cp "${FRESHNESS_SCRIPT}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
+cp "${ENTRY_SCRIPT}" "${tmpdir}/scripts/prompts-submodule.sh"
 cp "${HELPER_SCRIPT}" "${tmpdir}/scripts/lib/prompts-submodule.sh"
 cp "${CI_COMMON_SCRIPT}" "${tmpdir}/scripts/lib/ci-common.sh"
 cp "${GIT_ENV_SCRIPT}" "${tmpdir}/scripts/lib/git-env.sh"
-chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh"
+mkdir -p "${tmpdir}/scripts/lib/prompts-submodule"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir}/scripts/lib/prompts-submodule/common.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir}/scripts/lib/prompts-submodule/context.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir}/scripts/lib/prompts-submodule/git.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir}/scripts/lib/prompts-submodule/artifacts.sh"
+cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir}/scripts/lib/prompts-submodule/actions.sh"
+chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/scripts/prompts-submodule.sh"
 
 th_assert_run "skip-no-gitmodules" 0 '"outcome":"skip_not_registered"' \
   env SUBMODULE_REPORT_JSON="${tmpdir}/report1.json" bash "${tmpdir}/scripts/prompts-submodule-freshness.sh"
@@ -530,5 +526,8 @@ th_assert_run "skip-uninitialized" 0 '"outcome":"skip_uninitialized"' \
 th_assert_json_field "report-outcome-uninitialized" "${tmpdir}/report2.json" "outcome" "skip_uninitialized"
 th_assert_json_field "report-status-uninitialized" "${tmpdir}/report2.json" "status" "skip"
 th_assert_json_field "report-kind-uninitialized" "${tmpdir}/report2.json" "kind" "freshness"
+th_assert_json_field "report-schema-uninitialized" "${tmpdir}/report2.json" "schema_version" "2"
+th_assert_run "entry-governance-skip-uninitialized" 0 '"outcome":"skip_uninitialized"' \
+  env GOVERNANCE_REPORT_JSON="${tmpdir}/gov-report.json" bash "${tmpdir}/scripts/prompts-submodule.sh" governance
 
 th_summary "unit"

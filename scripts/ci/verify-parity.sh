@@ -4,18 +4,21 @@ set -euo pipefail
 # verify-parity.sh - Verify ci:debug parity contract
 #
 # Ensures the same ci:debug entry point is wired across:
-#   1. Pre-commit hook (magew ci:debug -> npm run ci:debug -> scripts/ci/debug.sh fallback)
-#   2. package.json     ("ci:debug": "bash scripts/ci/debug.sh")
-#   3. magew target      ("ci:debug" dispatches to npm run ci:debug --silent)
-#   4. CI workflow       (npm run ci:debug --silent)
-#   5. Make target        (ci-debug uses magew ci:debug)
+#   1. Pre-commit hook wrapper -> scripts/prompts-submodule.sh pre-commit
+#   2. package.json             ("ci:debug": "bash scripts/ci/debug.sh")
+#   3. magew target             ("ci:debug" dispatches to npm run ci:debug --silent)
+#   4. CI workflow              (npm run ci:debug --silent)
+#   5. Make target              (ci-debug uses magew ci:debug)
 #
-# All layers must resolve to scripts/ci/debug.sh as the single source of truth.
+# Pre-commit and governance wrappers must delegate through scripts/prompts-submodule.sh,
+# while ci:debug itself remains rooted at scripts/ci/debug.sh.
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "${repo_root}"
 
 hook_file="scripts/hooks/pre-commit-ci-debug.sh"
+entry_file="scripts/prompts-submodule.sh"
+entry_actions_file="scripts/lib/prompts-submodule/actions.sh"
 magew_file="magew"
 makefile="Makefile"
 package_json="package.json"
@@ -46,9 +49,14 @@ assert_regex() {
 
 # --- Hook file checks ---
 assert_file "${hook_file}"
-assert_regex "${hook_file}" 'magew" ci:debug' "hook uses magew ci:debug"
-assert_regex "${hook_file}" 'npm run ci:debug' "hook supports npm ci:debug fallback"
-assert_regex "${hook_file}" 'scripts/ci/debug\.sh' "hook fallback uses scripts/ci/debug.sh"
+assert_regex "${hook_file}" 'scripts/prompts-submodule\.sh" pre-commit' "hook delegates to prompts-submodule entry point"
+
+# --- prompts-submodule entry point checks ---
+assert_file "${entry_file}"
+assert_regex "${entry_file}" 'freshness\|governance\|install-hook\|pre-commit' "entry point exposes expected subcommands"
+assert_file "${entry_actions_file}"
+assert_regex "${entry_actions_file}" 'npm run ci:debug --silent' "entry point supports npm ci:debug fallback"
+assert_regex "${entry_actions_file}" 'scripts/ci/debug\.sh' "entry point fallback uses scripts/ci/debug.sh"
 
 # --- package.json checks ---
 assert_file "${package_json}"

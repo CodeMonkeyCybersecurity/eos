@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -69,6 +70,67 @@ func TestApprovedAllowlist(t *testing.T) {
 	}}
 	if !approved(issue, entries, time.Now().UTC()) {
 		t.Fatalf("expected allowlist approval")
+	}
+}
+
+func TestIsBroadAllowlistEntry(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		entry  gosecAllowlistItem
+		broad  bool
+		reason string
+	}{
+		{
+			name: "exact file is allowed",
+			entry: gosecAllowlistItem{
+				RuleID:    "G402",
+				FileRegex: `^pkg/httpclient/tls_helper\.go$`,
+			},
+			broad: false,
+		},
+		{
+			name: "wildcard rule denied",
+			entry: gosecAllowlistItem{
+				RuleID:    "*",
+				FileRegex: `^pkg/httpclient/tls_helper\.go$`,
+			},
+			broad:  true,
+			reason: "rule_id wildcard",
+		},
+		{
+			name: "repo wide regex denied",
+			entry: gosecAllowlistItem{
+				RuleID:    "G402",
+				FileRegex: `^.*$`,
+			},
+			broad:  true,
+			reason: "entire repository",
+		},
+		{
+			name: "all go files denied",
+			entry: gosecAllowlistItem{
+				RuleID:    "G402",
+				FileRegex: `^.*\.go$`,
+			},
+			broad:  true,
+			reason: "every Go file",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			broad, reason := isBroadAllowlistEntry(tc.entry)
+			if broad != tc.broad {
+				t.Fatalf("isBroadAllowlistEntry() broad=%v want %v", broad, tc.broad)
+			}
+			if tc.reason != "" && !strings.Contains(reason, tc.reason) {
+				t.Fatalf("isBroadAllowlistEntry() reason=%q want substring %q", reason, tc.reason)
+			}
+		})
 	}
 }
 

@@ -37,10 +37,10 @@ check_violation() {
   fi
 }
 
-# Wildcard allowlists defeat the security gate; fail fast when present.
-if grep -Eq '^\s*rule_id:\s*"?\*"?\s*$' "${allowlist_file}" \
-  && grep -Eq '^\s*file_regex:\s*"?\.\*"?\s*$' "${allowlist_file}"; then
-  echo "::error::security allowlist contains a global wildcard entry; replace with explicit rule/file entries"
+# Broad allowlist entries defeat the security gate; validate centrally in Go so
+# regex semantics stay consistent with gosec-check.
+if ! go run ./test/ci/tool allowlist-validate "${allowlist_file}"; then
+  echo "::error::security allowlist contains an over-broad or invalid entry; replace it with explicit rule/file entries"
   exit 1
 fi
 

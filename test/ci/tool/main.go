@@ -112,7 +112,7 @@ type gosecAllowlistItem struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		die("usage: go run ./test/ci/tool <policy-validate|policy-threshold|policy-should-run|summary|gosec-check> ...")
+		die("usage: go run ./test/ci/tool <policy-validate|policy-threshold|policy-should-run|summary|gosec-check|allowlist-validate> ...")
 	}
 	switch os.Args[1] {
 	case "policy-validate":
@@ -125,6 +125,8 @@ func main() {
 		cmdSummary(os.Args[2:])
 	case "gosec-check":
 		cmdGosecCheck(os.Args[2:])
+	case "allowlist-validate":
+		cmdAllowlistValidate(os.Args[2:])
 	default:
 		die("unknown command: %s", os.Args[1])
 	}
@@ -326,6 +328,7 @@ func cmdGosecCheck(args []string) {
 		die("parse gosec json: %v", err)
 	}
 	allow := mustLoadAllowlist(args[1])
+	validateAllowlistOrDie(allow)
 	now := time.Now().UTC()
 	var unapproved []string
 	for _, issue := range findings.Issues {
@@ -342,6 +345,15 @@ func cmdGosecCheck(args []string) {
 		os.Exit(1)
 	}
 	fmt.Printf("All gosec findings are allowlisted (%d findings).\n", len(findings.Issues))
+}
+
+func cmdAllowlistValidate(args []string) {
+	if len(args) != 1 {
+		die("usage: ... allowlist-validate <allowlist.yaml>")
+	}
+	allow := mustLoadAllowlist(args[0])
+	validateAllowlistOrDie(allow)
+	fmt.Println("allowlist valid")
 }
 
 func mustLoadSuites(path string) suitesConfig {
@@ -366,6 +378,18 @@ func mustLoadAllowlist(path string) gosecAllowlist {
 		die("parse allowlist: %v", err)
 	}
 	return a
+}
+
+func validateAllowlistOrDie(allow gosecAllowlist) {
+	if len(allow.Entries) == 0 {
+		return
+	}
+
+	for i, entry := range allow.Entries {
+		if broad, reason := isBroadAllowlistEntry(entry); broad {
+			die("allowlist validation failed: entry %d is too broad: %s (rule_id=%q file_regex=%q)", i+1, reason, entry.RuleID, entry.FileRegex)
+		}
+	}
 }
 
 func findLane(cfg suitesConfig, name string) *suiteConfig {
@@ -418,6 +442,49 @@ func matchesPattern(path, pattern string) bool {
 		return ok
 	}
 	return path == pattern
+}
+
+func isBroadAllowlistEntry(entry gosecAllowlistItem) (bool, string) {
+	ruleID := strings.TrimSpace(entry.RuleID)
+	fileRegex := strings.TrimSpace(entry.FileRegex)
+	if ruleID == "" || fileRegex == "" {
+		return true, "rule_id and file_regex must be set"
+	}
+	if ruleID == "*" {
+		return true, "rule_id wildcard is not allowed"
+	}
+
+	normalized := strings.ReplaceAll(fileRegex, " ", "")
+	normalized = strings.TrimPrefix(normalized, "^")
+	normalized = strings.TrimSuffix(normalized, "$")
+	switch normalized {
+	case ".*", ".+", ".*\\.go", ".+\\.go", "(.+)", "(.*)", "(.+)\\.go", "(.*)\\.go":
+		return true, "file_regex matches the entire repository or every Go file"
+	}
+
+	re, err := regexp.Compile(fileRegex)
+	if err != nil {
+		return true, fmt.Sprintf("file_regex does not compile: %v", err)
+	}
+
+	broadSamples := []string{
+		"pkg/httpclient/tls_helper.go",
+		"cmd/root.go",
+		"internal/service/executor.go",
+		"test/ci/tool/main.go",
+	}
+	matchesAll := true
+	for _, sample := range broadSamples {
+		if !re.MatchString(sample) {
+			matchesAll = false
+			break
+		}
+	}
+	if matchesAll {
+		return true, "file_regex matches representative files across the repository"
+	}
+
+	return false, ""
 }
 
 type timeWindow struct {
