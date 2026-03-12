@@ -6,29 +6,11 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=lib/test-harness.sh
 source "${SCRIPT_DIR}/lib/test-harness.sh"
 
-GOV_SCRIPT="${REPO_ROOT}/scripts/check-governance.sh"
-ENTRY_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule.sh"
-HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
-CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
-GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
+# --- Direct path (third_party/prompts) ---
+tmpdir_direct="$(th_create_fixture)"
+trap 'rm -rf "${tmpdir_direct}"' EXIT
 
-tmpdir_direct="$(mktemp -d)"
-tmpdir_override="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_override}"' EXIT
-
-mkdir -p "${tmpdir_direct}/scripts/lib" "${tmpdir_direct}/third_party/prompts/scripts"
-cp "${GOV_SCRIPT}" "${tmpdir_direct}/scripts/check-governance.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir_direct}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_direct}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_direct}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_direct}/scripts/lib/git-env.sh"
-mkdir -p "${tmpdir_direct}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_direct}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir_direct}/scripts/check-governance.sh" "${tmpdir_direct}/scripts/prompts-submodule.sh"
+mkdir -p "${tmpdir_direct}/third_party/prompts/scripts"
 cat > "${tmpdir_direct}/.gitmodules" <<'EOF_GITMODULES_DIRECT'
 [submodule "prompts"]
 	path = third_party/prompts
@@ -44,21 +26,11 @@ th_assert_run "governance-direct-path-pass" 0 '"outcome":"pass_checked_direct"' 
   env GOVERNANCE_REPORT_JSON="${tmpdir_direct}/direct-report.json" bash "${tmpdir_direct}/scripts/check-governance.sh"
 th_assert_json_field "governance-direct-outcome" "${tmpdir_direct}/direct-report.json" "outcome" "pass_checked_direct"
 
-tmpdir_direct_fail="$(mktemp -d)"
-trap 'rm -rf "${tmpdir_direct}" "${tmpdir_override}" "${tmpdir_direct_fail}"' EXIT
-mkdir -p "${tmpdir_direct_fail}/scripts/lib" "${tmpdir_direct_fail}/third_party/prompts/scripts"
-cp "${GOV_SCRIPT}" "${tmpdir_direct_fail}/scripts/check-governance.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir_direct_fail}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_direct_fail}/scripts/lib/git-env.sh"
-mkdir -p "${tmpdir_direct_fail}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_direct_fail}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir_direct_fail}/scripts/check-governance.sh" "${tmpdir_direct_fail}/scripts/prompts-submodule.sh"
+# --- Direct path checker failure ---
+tmpdir_direct_fail="$(th_create_fixture)"
+trap 'rm -rf "${tmpdir_direct}" "${tmpdir_direct_fail}"' EXIT
+
+mkdir -p "${tmpdir_direct_fail}/third_party/prompts/scripts"
 cat > "${tmpdir_direct_fail}/.gitmodules" <<'EOF_GITMODULES_DIRECT_FAIL'
 [submodule "prompts"]
 	path = third_party/prompts
@@ -73,19 +45,11 @@ chmod +x "${tmpdir_direct_fail}/third_party/prompts/scripts/check-governance.sh"
 th_assert_run "governance-direct-path-fail" 7 '"outcome":"fail_checker_error"' \
   env GOVERNANCE_REPORT_JSON="${tmpdir_direct_fail}/direct-fail-report.json" bash "${tmpdir_direct_fail}/scripts/check-governance.sh"
 
-mkdir -p "${tmpdir_override}/scripts/lib" "${tmpdir_override}/prompts/scripts" "${tmpdir_override}/prompts/lib"
-cp "${GOV_SCRIPT}" "${tmpdir_override}/scripts/check-governance.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir_override}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir_override}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir_override}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir_override}/scripts/lib/git-env.sh"
-mkdir -p "${tmpdir_override}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir_override}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir_override}/scripts/check-governance.sh" "${tmpdir_override}/scripts/prompts-submodule.sh"
+# --- Override path (prompts/) ---
+tmpdir_override="$(th_create_fixture)"
+trap 'rm -rf "${tmpdir_direct}" "${tmpdir_direct_fail}" "${tmpdir_override}"' EXIT
+
+mkdir -p "${tmpdir_override}/prompts/scripts" "${tmpdir_override}/prompts/lib"
 cat > "${tmpdir_override}/.gitmodules" <<'EOF_GITMODULES_OVERRIDE'
 [submodule "prompts"]
 	path = prompts

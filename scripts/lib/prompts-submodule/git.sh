@@ -79,20 +79,9 @@ ps_tracking_branch() {
 ps_should_strict_fail_remote() {
   local strict_remote="${1:-auto}"
   case "${strict_remote}" in
-    true)
-      return 0
-      ;;
-    false)
-      return 1
-      ;;
-    auto)
-      ci_in_ci
-      return $?
-      ;;
-    *)
-      ci_in_ci
-      return $?
-      ;;
+    true)  return 0 ;;
+    false) return 1 ;;
+    *)     ci_in_ci; return $? ;;
   esac
 }
 

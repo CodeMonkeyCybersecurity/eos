@@ -15,6 +15,7 @@ CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 REPORT_ALERT_SCRIPT="${REPO_ROOT}/scripts/ci/report-alert.py"
 
+# --- Syntax checks ---
 th_assert_run "governance-script-syntax" 0 "" bash -n "${GOV_SCRIPT}"
 th_assert_run "entry-script-syntax" 0 "" bash -n "${ENTRY_SCRIPT}"
 th_assert_run "install-hook-script-syntax" 0 "" bash -n "${INSTALL_HOOK_SCRIPT}"
@@ -24,21 +25,9 @@ th_assert_run "ci-common-script-syntax" 0 "" bash -n "${CI_COMMON_SCRIPT}"
 th_assert_run "git-env-script-syntax" 0 "" bash -n "${GIT_ENV_SCRIPT}"
 th_assert_run "report-alert-syntax" 0 "" python3 -m py_compile "${REPORT_ALERT_SCRIPT}"
 
-tmpdir="$(mktemp -d)"
+# --- Governance skip on uninitialized submodule ---
+tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}"' EXIT
-mkdir -p "${tmpdir}/scripts/lib"
-cp "${GOV_SCRIPT}" "${tmpdir}/scripts/check-governance.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir}/scripts/lib/git-env.sh"
-mkdir -p "${tmpdir}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir}/scripts/check-governance.sh" "${tmpdir}/scripts/prompts-submodule.sh"
 cat > "${tmpdir}/.gitmodules" <<'EOF_GITMODULES'
 [submodule "prompts"]
 	path = prompts
@@ -51,28 +40,45 @@ th_assert_json_field "governance-skip-kind" "${tmpdir}/governance-report.json" "
 th_assert_json_field "governance-skip-action" "${tmpdir}/governance-report.json" "action" "governance"
 th_assert_json_field "governance-skip-schema" "${tmpdir}/governance-report.json" "schema_version" "2"
 
-hook_tmpdir="$(mktemp -d)"
+# --- Hook installation ---
+hook_tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}" "${hook_tmpdir}"' EXIT
-mkdir -p "${hook_tmpdir}/scripts/lib" "${hook_tmpdir}/scripts/hooks"
 git -C "${hook_tmpdir}" init -q
-cp "${ENTRY_SCRIPT}" "${hook_tmpdir}/scripts/prompts-submodule.sh"
-cp "${INSTALL_HOOK_SCRIPT}" "${hook_tmpdir}/scripts/install-git-hooks.sh"
-cp "${PRE_COMMIT_SCRIPT}" "${hook_tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
-cp "${HELPER_SCRIPT}" "${hook_tmpdir}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${hook_tmpdir}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${hook_tmpdir}/scripts/lib/git-env.sh"
-mkdir -p "${hook_tmpdir}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${hook_tmpdir}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${hook_tmpdir}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${hook_tmpdir}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${hook_tmpdir}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${hook_tmpdir}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${hook_tmpdir}/scripts/prompts-submodule.sh" "${hook_tmpdir}/scripts/install-git-hooks.sh" "${hook_tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
 
 th_assert_run "install-hook-installs-wrapper" 0 "Hook matches source: true" \
   bash -c 'cd "$1" && bash scripts/install-git-hooks.sh' _ "${hook_tmpdir}"
 
-th_assert_run "pre-commit-no-staged-changes" 0 "pre-commit: no staged changes" \
+th_assert_run "pre-commit-no-staged-changes" 0 "No staged changes" \
   bash -c 'cd "$1" && bash scripts/hooks/pre-commit-ci-debug.sh' _ "${hook_tmpdir}"
+
+# --- install-hook error: not a git repo ---
+th_assert_run "install-hook-not-git" 1 "Not in a git repository" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/scripts/hooks"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  chmod +x "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  ps_install_hook "${tmpdir}" 2>&1
+' _ "${HELPER_SCRIPT}"
+
+# --- pre-commit with staged changes but no tools ---
+th_assert_run "pre-commit-parity-missing" 0 "verify-parity.sh not found" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  echo "test" > "${tmpdir}/file.txt"
+  git -C "${tmpdir}" add file.txt
+  # Create a minimal debug.sh that succeeds
+  mkdir -p "${tmpdir}/scripts/ci"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  PS_CTX_KIND=hook PS_CTX_ACTION=pre-commit PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  ps_run_pre_commit "${tmpdir}" 2>&1
+' _ "${HELPER_SCRIPT}"
 
 th_summary "governance-unit"

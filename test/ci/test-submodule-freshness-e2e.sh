@@ -7,11 +7,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 WORKFLOW_FILE="${REPO_ROOT}/.gitea/workflows/submodule-freshness.yml"
-FRESHNESS_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule-freshness.sh"
-ENTRY_SCRIPT="${REPO_ROOT}/scripts/prompts-submodule.sh"
-HELPER_SCRIPT="${REPO_ROOT}/scripts/lib/prompts-submodule.sh"
-CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
-GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 REPORT_ALERT_SCRIPT="${REPO_ROOT}/scripts/ci/report-alert.py"
 
 th_assert_run "workflow-yaml-valid" 0 "" python3 -c "
@@ -44,22 +39,9 @@ else
   th_fail=$((th_fail + 1))
 fi
 
-tmpdir="$(mktemp -d)"
+# --- Smoke test with fixture ---
+tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}"' EXIT
-mkdir -p "${tmpdir}/scripts/lib" "${tmpdir}/scripts/ci"
-cp "${FRESHNESS_SCRIPT}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir}/scripts/lib/git-env.sh"
-cp "${REPORT_ALERT_SCRIPT}" "${tmpdir}/scripts/ci/report-alert.py"
-mkdir -p "${tmpdir}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/scripts/prompts-submodule.sh" "${tmpdir}/scripts/ci/report-alert.py"
 
 th_assert_run "repo-script-smoke" 0 '"outcome":"skip_not_registered"' \
   env STRICT_REMOTE=false AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${tmpdir}/e2e-report.json" SUBMODULE_METRICS_TEXTFILE="${tmpdir}/e2e-metrics.prom" bash "${tmpdir}/scripts/prompts-submodule-freshness.sh"
@@ -75,6 +57,6 @@ else
 fi
 
 th_assert_run "report-alert-skip" 0 '::warning::submodule freshness skipped' \
-  python3 "${tmpdir}/scripts/ci/report-alert.py" submodule-freshness "${tmpdir}/e2e-report.json"
+  python3 "${REPORT_ALERT_SCRIPT}" submodule-freshness "${tmpdir}/e2e-report.json"
 
 th_summary "e2e"

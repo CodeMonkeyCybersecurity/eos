@@ -64,3 +64,45 @@ th_summary() {
   [[ "${th_fail}" -eq 0 ]]
 }
 
+# th_create_fixture copies the prompts-submodule library tree into a temp dir.
+# Returns the fixture root path via stdout. Caller is responsible for cleanup.
+# Usage: fixture_dir="$(th_create_fixture)"
+th_create_fixture() {
+  local repo_root
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+  local dest
+  dest="$(mktemp -d)"
+
+  mkdir -p "${dest}/scripts/lib/prompts-submodule" "${dest}/scripts/hooks" "${dest}/scripts/ci"
+
+  # Entry points and wrappers
+  cp "${repo_root}/scripts/prompts-submodule.sh"         "${dest}/scripts/prompts-submodule.sh"
+  cp "${repo_root}/scripts/check-governance.sh"          "${dest}/scripts/check-governance.sh"
+  cp "${repo_root}/scripts/prompts-submodule-freshness.sh" "${dest}/scripts/prompts-submodule-freshness.sh"
+  cp "${repo_root}/scripts/install-git-hooks.sh"         "${dest}/scripts/install-git-hooks.sh"
+  cp "${repo_root}/scripts/hooks/pre-commit-ci-debug.sh" "${dest}/scripts/hooks/pre-commit-ci-debug.sh"
+
+  # Library modules
+  cp "${repo_root}/scripts/lib/ci-common.sh"             "${dest}/scripts/lib/ci-common.sh"
+  cp "${repo_root}/scripts/lib/git-env.sh"               "${dest}/scripts/lib/git-env.sh"
+  cp "${repo_root}/scripts/lib/prompts-submodule.sh"     "${dest}/scripts/lib/prompts-submodule.sh"
+  for f in common.sh context.sh git.sh artifacts.sh actions.sh; do
+    cp "${repo_root}/scripts/lib/prompts-submodule/${f}" "${dest}/scripts/lib/prompts-submodule/${f}"
+  done
+
+  # Optional CI scripts (copy if they exist)
+  if [[ -f "${repo_root}/scripts/ci/report-alert.py" ]]; then
+    cp "${repo_root}/scripts/ci/report-alert.py" "${dest}/scripts/ci/report-alert.py"
+    chmod +x "${dest}/scripts/ci/report-alert.py"
+  fi
+
+  # Set executable bits
+  chmod +x "${dest}/scripts/prompts-submodule.sh" \
+           "${dest}/scripts/check-governance.sh" \
+           "${dest}/scripts/prompts-submodule-freshness.sh" \
+           "${dest}/scripts/install-git-hooks.sh" \
+           "${dest}/scripts/hooks/pre-commit-ci-debug.sh"
+
+  printf '%s\n' "${dest}"
+}
+

@@ -19,20 +19,20 @@ ps_log_level_for_outcome() {
 ps_log_json() {
   local level="${1:-INFO}"
   local event="${2:-event}"
-  local outcome="${3:-unknown}"
+  local outcome="${3:-pending}"
   local message="${4:-}"
 
-  printf '{"ts":"%s","schema_version":"%s","run_id":"%s","level":"%s","kind":"%s","action":"%s","event":"%s","outcome":"%s","status":"%s","message":"%s"}\n' \
-    "$(ci_now_utc)" \
-    "$(ci_json_escape "$(ps_schema_version)")" \
-    "$(ci_json_escape "${PS_CTX_RUN_ID:-unknown}")" \
-    "$(ci_json_escape "${level}")" \
-    "$(ci_json_escape "${PS_CTX_KIND:-unknown}")" \
-    "$(ci_json_escape "${PS_CTX_ACTION:-unknown}")" \
-    "$(ci_json_escape "${event}")" \
-    "$(ci_json_escape "${outcome}")" \
-    "$(ps_status_from_outcome "${outcome}")" \
-    "$(ci_json_escape "${message}")"
+  ci_json_obj \
+    ts             "$(ci_now_utc)" \
+    schema_version "$(ps_schema_version)" \
+    run_id         "${PS_CTX_RUN_ID:-unknown}" \
+    level          "${level}" \
+    kind           "${PS_CTX_KIND:-unknown}" \
+    action         "${PS_CTX_ACTION:-unknown}" \
+    event          "${event}" \
+    outcome        "${outcome}" \
+    status         "$(ps_status_from_outcome "${outcome}")" \
+    message        "${message}"
 }
 
 ps_warn_artifact_failure() {
@@ -41,15 +41,17 @@ ps_warn_artifact_failure() {
   local detail="${3:-unknown error}"
 
   PS_CTX_ARTIFACT_WARNINGS=$((PS_CTX_ARTIFACT_WARNINGS + 1))
-  printf '{"ts":"%s","schema_version":"%s","run_id":"%s","level":"WARN","kind":"%s","action":"%s","event":"artifact_warning","artifact":"%s","path":"%s","message":"%s"}\n' \
-    "$(ci_now_utc)" \
-    "$(ci_json_escape "$(ps_schema_version)")" \
-    "$(ci_json_escape "${PS_CTX_RUN_ID:-unknown}")" \
-    "$(ci_json_escape "${PS_CTX_KIND:-unknown}")" \
-    "$(ci_json_escape "${PS_CTX_ACTION:-unknown}")" \
-    "$(ci_json_escape "${artifact_kind}")" \
-    "$(ci_json_escape "${artifact_path}")" \
-    "$(ci_json_escape "${detail}")" >&2
+  ci_json_obj \
+    ts             "$(ci_now_utc)" \
+    schema_version "$(ps_schema_version)" \
+    run_id         "${PS_CTX_RUN_ID:-unknown}" \
+    level          "WARN" \
+    kind           "${PS_CTX_KIND:-unknown}" \
+    action         "${PS_CTX_ACTION:-unknown}" \
+    event          "artifact_warning" \
+    artifact       "${artifact_kind}" \
+    path           "${artifact_path}" \
+    message        "${detail}" >&2
 }
 
 ps_write_atomic_file() {
@@ -79,27 +81,30 @@ ps_write_json_report() {
     return 1
   fi
 
-  ps_write_atomic_file "${report_path}" <<JSON || {
-{
-  "ts": "$(ci_json_escape "$(ci_now_utc)")",
-  "schema_version": "$(ci_json_escape "$(ps_schema_version)")",
-  "run_id": "$(ci_json_escape "${PS_CTX_RUN_ID}")",
-  "kind": "$(ci_json_escape "${PS_CTX_KIND}")",
-  "action": "$(ci_json_escape "${PS_CTX_ACTION}")",
-  "outcome": "$(ci_json_escape "${outcome}")",
-  "status": "$(ci_json_escape "$(ps_status_from_outcome "${outcome}")")",
-  "exit_code": ${exit_code},
-  "repo_root": "$(ci_json_escape "${PS_CTX_REPO_ROOT}")",
-  "prompts_path": "$(ci_json_escape "${PS_CTX_PROMPTS_PATH}")",
-  "local_sha": "$(ci_json_escape "${PS_CTX_LOCAL_SHA}")",
-  "remote_sha": "$(ci_json_escape "${PS_CTX_REMOTE_SHA}")",
-  "remote_branch": "$(ci_json_escape "${PS_CTX_REMOTE_BRANCH}")",
-  "strict_remote": "$(ci_json_escape "${PS_CTX_STRICT_REMOTE}")",
-  "auto_update": "$(ci_json_escape "${PS_CTX_AUTO_UPDATE}")",
-  "artifact_warnings": ${PS_CTX_ARTIFACT_WARNINGS},
-  "message": "$(ci_json_escape "${message}")"
-}
-JSON
+  local json_content
+  json_content="$(ci_json_obj \
+    ts               "$(ci_now_utc)" \
+    schema_version   "$(ps_schema_version)" \
+    run_id           "${PS_CTX_RUN_ID}" \
+    kind             "${PS_CTX_KIND}" \
+    action           "${PS_CTX_ACTION}" \
+    outcome          "${outcome}" \
+    status           "$(ps_status_from_outcome "${outcome}")" \
+    exit_code        "#int:${exit_code}" \
+    repo_root        "${PS_CTX_REPO_ROOT}" \
+    prompts_path     "${PS_CTX_PROMPTS_PATH}" \
+    local_sha        "${PS_CTX_LOCAL_SHA}" \
+    remote_sha       "${PS_CTX_REMOTE_SHA}" \
+    remote_branch    "${PS_CTX_REMOTE_BRANCH}" \
+    strict_remote    "${PS_CTX_STRICT_REMOTE}" \
+    auto_update      "${PS_CTX_AUTO_UPDATE}" \
+    artifact_warnings "#int:${PS_CTX_ARTIFACT_WARNINGS}" \
+    message          "${message}")" || {
+    ps_warn_artifact_failure "report" "${report_path}" "failed to build JSON report"
+    return 1
+  }
+
+  ps_write_atomic_file "${report_path}" <<< "${json_content}" || {
     ps_warn_artifact_failure "report" "${report_path}" "failed to write JSON report"
     return 1
   }
@@ -129,12 +134,12 @@ ps_emit_prom_metrics() {
   fi
 
   ps_write_atomic_file "${PS_CTX_METRICS_PATH}" <<EOF_METRICS || {
-# TYPE prompts_submodule_freshness_status gauge
-prompts_submodule_freshness_status{outcome="${outcome}",strict_remote="${PS_CTX_STRICT_REMOTE}"} ${status_value}
-# TYPE prompts_submodule_freshness_stale gauge
-prompts_submodule_freshness_stale ${stale_value}
-# TYPE prompts_submodule_freshness_last_run_timestamp_seconds gauge
-prompts_submodule_freshness_last_run_timestamp_seconds $(ci_epoch)
+# TYPE prompts_submodule_${PS_CTX_KIND}_status gauge
+prompts_submodule_${PS_CTX_KIND}_status{outcome="${outcome}",strict_remote="${PS_CTX_STRICT_REMOTE:-unknown}"} ${status_value}
+# TYPE prompts_submodule_${PS_CTX_KIND}_stale gauge
+prompts_submodule_${PS_CTX_KIND}_stale ${stale_value}
+# TYPE prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds gauge
+prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds $(ci_epoch)
 EOF_METRICS
     ps_warn_artifact_failure "metrics" "${PS_CTX_METRICS_PATH}" "failed to write Prometheus textfile"
     return 1
@@ -167,11 +172,7 @@ ps_finish_and_exit() {
 
   ps_log_json "${level}" "${event}" "${outcome}" "${message}"
   ps_write_json_report "${PS_CTX_REPORT_PATH}" "${outcome}" "${message}" "${exit_code}" || true
-
-  if [[ "${PS_CTX_KIND}" == "freshness" ]]; then
-    ps_emit_prom_metrics "${outcome}" || true
-  fi
+  ps_emit_prom_metrics "${outcome}" || true
 
   exit "${exit_code}"
 }
-

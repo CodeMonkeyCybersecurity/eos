@@ -13,88 +13,39 @@ CI_COMMON_SCRIPT="${REPO_ROOT}/scripts/lib/ci-common.sh"
 GIT_ENV_SCRIPT="${REPO_ROOT}/scripts/lib/git-env.sh"
 REPORT_ALERT_SCRIPT="${REPO_ROOT}/scripts/ci/report-alert.py"
 
+# --- Syntax checks ---
 th_assert_run "freshness-script-syntax" 0 "" bash -n "${FRESHNESS_SCRIPT}"
 th_assert_run "entry-script-syntax" 0 "" bash -n "${ENTRY_SCRIPT}"
 th_assert_run "helper-script-syntax" 0 "" bash -n "${HELPER_SCRIPT}"
 th_assert_run "ci-common-script-syntax" 0 "" bash -n "${CI_COMMON_SCRIPT}"
 th_assert_run "git-env-script-syntax" 0 "" bash -n "${GIT_ENV_SCRIPT}"
 th_assert_run "report-alert-script-syntax" 0 "" python3 -m py_compile "${REPORT_ALERT_SCRIPT}"
-th_assert_run "normalize-bool-true-values" 0 "true true true true true false" bash -c '
-  source "$1"
-  printf "%s %s %s %s %s %s\n" \
-    "$(ps_normalize_bool true)" \
-    "$(ps_normalize_bool 1)" \
-    "$(ps_normalize_bool yes)" \
-    "$(ps_normalize_bool y)" \
-    "$(ps_normalize_bool on)" \
-    "$(ps_normalize_bool no)"
-' _ "${HELPER_SCRIPT}"
-th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c '
-  source "$1"
-  printf "%s %s %s %s\n" \
-    "$(ps_normalize_strict_remote true)" \
-    "$(ps_normalize_strict_remote false)" \
-    "$(ps_normalize_strict_remote auto)" \
-    "$(ps_normalize_strict_remote garbage)"
-' _ "${HELPER_SCRIPT}"
-th_assert_run "ctx-driven-json-log" 0 '"kind":"freshness"' bash -c '
-  source "$1"
-  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/report.json PS_CTX_METRICS_PATH=/tmp/metrics.prom \
-    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
-    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
-  ps_ctx_init
-  ps_log_json INFO submodule_freshness.start skip_not_registered "hello"
-' _ "${HELPER_SCRIPT}"
-th_assert_run "ctx-driven-json-report" 0 "pass" bash -c '
-  source "$1"
-  tmpdir="$(mktemp -d)"
-  trap "rm -rf \"${tmpdir}\"" EXIT
-  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
-    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
-    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main PS_CTX_STRICT_REMOTE=false PS_CTX_AUTO_UPDATE=true
-  ps_ctx_init
-  ps_write_json_report "${tmpdir}/report.json" pass_up_to_date "ok" 0
-  python3 - <<PY
-import json
-from pathlib import Path
-report = json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))
-assert report["kind"] == "freshness"
-assert report["outcome"] == "pass_up_to_date"
-assert report["strict_remote"] == "false"
-print(report["status"])
-PY
-' _ "${HELPER_SCRIPT}"
-th_assert_run "ctx-driven-metrics" 0 "prompts_submodule_freshness_last_run_timestamp_seconds" bash -c '
-  source "$1"
-  tmpdir="$(mktemp -d)"
-  trap "rm -rf \"${tmpdir}\"" EXIT
-  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
-    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
-    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
-  ps_ctx_init
-  ps_emit_prom_metrics fail_stale
-  cat "${tmpdir}/metrics.prom"
-' _ "${HELPER_SCRIPT}"
-th_assert_run "git-env-unset-local-vars" 0 "ok" bash -c '
-  source "$1"
-  export GIT_DIR=/tmp/fake-git
-  export GIT_WORK_TREE=/tmp/fake-worktree
-  export GIT_INDEX_FILE=/tmp/fake-index
-  export GIT_NOT_LOCAL=keep-me
-  ge_unset_git_local_env
-  ge_unset_git_local_env
-
-  [[ -z "${GIT_DIR:-}" ]] || exit 1
-  [[ -z "${GIT_WORK_TREE:-}" ]] || exit 1
-  [[ -z "${GIT_INDEX_FILE:-}" ]] || exit 1
-  [[ "${GIT_NOT_LOCAL:-}" == "keep-me" ]] || exit 1
-  echo ok
-' _ "${GIT_ENV_SCRIPT}"
 
 # --- ci-common.sh shared primitives ---
 th_assert_run "ci-common-json-escape" 0 'hello\"world' bash -c '
   source "$1"
   ci_json_escape "hello\"world"
+' _ "${CI_COMMON_SCRIPT}"
+th_assert_run "ci-common-json-escape-control-chars" 0 "clean" bash -c '
+  source "$1"
+  result="$(ci_json_escape "$(printf "has\x01\x02ctrl")")"
+  if [[ "${result}" == "hasctrl" ]]; then
+    echo "clean"
+  else
+    echo "FAIL: got ${result}"
+    exit 1
+  fi
+' _ "${CI_COMMON_SCRIPT}"
+th_assert_run "ci-common-json-obj-basic" 0 "" bash -c '
+  source "$1"
+  result="$(ci_json_obj key1 val1 key2 "#int:42")"
+  echo "${result}" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d[\"key1\"]==\"val1\"; assert d[\"key2\"]==42"
+' _ "${CI_COMMON_SCRIPT}"
+th_assert_run "ci-common-json-obj-python-fallback" 0 "" bash -c '
+  source "$1"
+  # Force python fallback by calling the internal function directly
+  result="$(_ci_json_obj_python a b c "#int:1")"
+  echo "${result}" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d[\"a\"]==\"b\"; assert d[\"c\"]==1"
 ' _ "${CI_COMMON_SCRIPT}"
 th_assert_run "ci-common-normalize-bool" 0 "true false true false" bash -c '
   source "$1"
@@ -115,6 +66,98 @@ th_assert_run "ci-common-double-source-guard" 0 "ok" bash -c '
   echo ok
 ' _ "${CI_COMMON_SCRIPT}"
 
+# --- normalize helpers ---
+th_assert_run "normalize-bool-true-values" 0 "true true true true true false" bash -c '
+  source "$1"
+  printf "%s %s %s %s %s %s\n" \
+    "$(ps_normalize_bool true)" \
+    "$(ps_normalize_bool 1)" \
+    "$(ps_normalize_bool yes)" \
+    "$(ps_normalize_bool y)" \
+    "$(ps_normalize_bool on)" \
+    "$(ps_normalize_bool no)"
+' _ "${HELPER_SCRIPT}"
+th_assert_run "normalize-strict-remote-values" 0 "true false auto auto" bash -c '
+  source "$1"
+  printf "%s %s %s %s\n" \
+    "$(ps_normalize_strict_remote true)" \
+    "$(ps_normalize_strict_remote false)" \
+    "$(ps_normalize_strict_remote auto)" \
+    "$(ps_normalize_strict_remote garbage)"
+' _ "${HELPER_SCRIPT}"
+
+# --- Context lifecycle ---
+th_assert_run "ctx-driven-json-log" 0 '"kind":"freshness"' bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/report.json PS_CTX_METRICS_PATH=/tmp/metrics.prom \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_log_json INFO submodule_freshness.start pending "hello"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "ctx-driven-json-report" 0 "pass" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main PS_CTX_STRICT_REMOTE=false PS_CTX_AUTO_UPDATE=true
+  ps_ctx_init
+  ps_write_json_report "${tmpdir}/report.json" pass_up_to_date "ok" 0
+  python3 - <<PY
+import json
+from pathlib import Path
+report = json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))
+assert report["kind"] == "freshness"
+assert report["outcome"] == "pass_up_to_date"
+assert report["strict_remote"] == "false"
+print(report["status"])
+PY
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "ctx-driven-metrics" 0 "prompts_submodule_freshness_last_run_timestamp_seconds" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics fail_stale
+  cat "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "governance-metrics-emitted" 0 "prompts_submodule_governance_status" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=governance PS_CTX_ACTION=governance PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=unknown \
+    PS_CTX_REMOTE_SHA=unknown PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics pass_checked_direct
+  cat "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+# --- git-env ---
+th_assert_run "git-env-unset-local-vars" 0 "ok" bash -c '
+  source "$1"
+  export GIT_DIR=/tmp/fake-git
+  export GIT_WORK_TREE=/tmp/fake-worktree
+  export GIT_INDEX_FILE=/tmp/fake-index
+  export GIT_NOT_LOCAL=keep-me
+  ge_unset_git_local_env
+  ge_unset_git_local_env
+
+  [[ -z "${GIT_DIR:-}" ]] || exit 1
+  [[ -z "${GIT_WORK_TREE:-}" ]] || exit 1
+  [[ -z "${GIT_INDEX_FILE:-}" ]] || exit 1
+  [[ "${GIT_NOT_LOCAL:-}" == "keep-me" ]] || exit 1
+  echo ok
+' _ "${GIT_ENV_SCRIPT}"
+
+# --- Submodule path detection ---
 th_assert_run "prompts-submodule-path-no-match" 0 "miss" bash -c '
   source "$1"
   tmpdir="$(mktemp -d)"
@@ -169,12 +212,12 @@ th_assert_run "ctx-init-rejects-missing-report" 1 "PS_CTX_REPORT_PATH must be se
   ps_ctx_init
 ' _ "${HELPER_SCRIPT}"
 
-# --- Slim log format verification ---
+# --- Log format verification ---
 th_assert_run "log-json-slim-format" 0 "" bash -c '
   source "$1"
   PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
   ps_ctx_init
-  output="$(ps_log_json INFO test.event pass_up_to_date "msg")"
+  output="$(ps_log_json INFO test.event pending "msg")"
   # Slim format should NOT contain repo_root, prompts_path, local_sha, remote_sha
   echo "${output}" | grep -q "repo_root" && exit 1
   echo "${output}" | grep -q "prompts_path" && exit 1
@@ -182,9 +225,22 @@ th_assert_run "log-json-slim-format" 0 "" bash -c '
   echo "${output}" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d[\"schema_version\"] == \"2\"; assert d[\"action\"] == \"freshness\"; assert \"run_id\" in d"
 ' _ "${HELPER_SCRIPT}"
 
+th_assert_run "log-json-pending-status" 0 "pending" bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+  output="$(ps_log_json INFO test.event pending "msg")"
+  echo "${output}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[\"status\"])"
+' _ "${HELPER_SCRIPT}"
+
 th_assert_run "status-from-outcome-unknown" 0 "unknown" bash -c '
   source "$1"
   ps_status_from_outcome mystery
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "status-from-outcome-pending" 0 "pending" bash -c '
+  source "$1"
+  ps_status_from_outcome pending
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "report-context-missing" 1 "context missing for report emission" bash -c '
@@ -291,6 +347,7 @@ th_assert_run "report-alert-usage-error" 2 "usage:" \
 th_assert_run "entry-usage-error-no-command" 2 "usage:" bash "${ENTRY_SCRIPT}"
 th_assert_run "entry-usage-error-unknown-command" 2 "usage:" bash "${ENTRY_SCRIPT}" nope
 
+# --- Action outcome tests with mock git ---
 th_assert_run "action-pass-up-to-date" 0 "pass_up_to_date" bash -c '
   source "$1"
   tmpdir="$(mktemp -d)"
@@ -300,14 +357,8 @@ th_assert_run "action-pass-up-to-date" 0 "pass_up_to_date" bash -c '
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  echo deadbeef
-  exit 0
-fi
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  echo deadbeef
-  exit 0
-fi
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo deadbeef; exit 0; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -320,11 +371,7 @@ EOF_GIT
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
     ps_run_freshness "${tmpdir}"
   ) >/dev/null 2>&1 || true
-  python3 - <<PY
-import json
-from pathlib import Path
-print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
-PY
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "action-fail-corrupt-submodule" 0 "fail_corrupt_submodule" bash -c '
@@ -336,9 +383,7 @@ th_assert_run "action-fail-corrupt-submodule" 0 "fail_corrupt_submodule" bash -c
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  exit 1
-fi
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then exit 1; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -349,11 +394,7 @@ EOF_GIT
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
     ps_run_freshness "${tmpdir}"
   ) >/dev/null 2>&1 || true
-  python3 - <<PY
-import json
-from pathlib import Path
-print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
-PY
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "action-skip-missing-remote-ref" 0 "skip_missing_remote_ref" bash -c '
@@ -365,13 +406,8 @@ th_assert_run "action-skip-missing-remote-ref" 0 "skip_missing_remote_ref" bash 
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  echo deadbeef
-  exit 0
-fi
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  exit 1
-fi
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then exit 1; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -385,11 +421,7 @@ EOF_GIT
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
     ps_run_freshness "${tmpdir}"
   ) >/dev/null 2>&1 || true
-  python3 - <<PY
-import json
-from pathlib import Path
-print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
-PY
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "action-fail-checkout" 0 "fail_checkout" bash -c '
@@ -401,20 +433,10 @@ th_assert_run "action-fail-checkout" 0 "fail_checkout" bash -c '
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
-if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  echo deadbeef
-  exit 0
-fi
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  echo feedface
-  exit 0
-fi
-if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then
-  exit 1
-fi
-if [[ "${args[*]}" == *" checkout --detach "* ]]; then
-  exit 1
-fi
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then exit 1; fi
+if [[ "${args[*]}" == *" checkout --detach "* ]]; then exit 1; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -429,11 +451,7 @@ EOF_GIT
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
     ps_run_freshness "${tmpdir}"
   ) >/dev/null 2>&1 || true
-  python3 - <<PY
-import json
-from pathlib import Path
-print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
-PY
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "action-pass-worktree-only-update" 0 "pass_auto_updated_worktree_only" bash -c '
@@ -445,24 +463,13 @@ th_assert_run "action-pass-worktree-only-update" 0 "pass_auto_updated_worktree_o
 #!/usr/bin/env bash
 set -euo pipefail
 args=("$@")
-if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then
-  echo feedface
-  exit 0
-fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
 if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
-  if [[ "${args[*]}" == *" checkout --detach "* ]]; then
-    echo feedface
-  else
-    echo deadbeef
-  fi
+  if [[ "${args[*]}" == *" checkout --detach "* ]]; then echo feedface; else echo deadbeef; fi
   exit 0
 fi
-if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then
-  exit 1
-fi
-if [[ "${args[*]}" == *" checkout --detach "* ]]; then
-  exit 0
-fi
+if [[ "${args[*]}" == *" submodule update --remote -- prompts"* ]]; then exit 1; fi
+if [[ "${args[*]}" == *" checkout --detach "* ]]; then exit 0; fi
 exit 0
 EOF_GIT
   chmod +x "${tmpdir}/bin/git"
@@ -477,11 +484,7 @@ EOF_GIT
     SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
     ps_run_freshness "${tmpdir}"
   ) >/dev/null 2>&1 || true
-  python3 - <<PY
-import json
-from pathlib import Path
-print(json.loads(Path(${tmpdir@Q} + "/report.json").read_text(encoding="utf-8"))["outcome"])
-PY
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
 ' _ "${HELPER_SCRIPT}"
 
 th_assert_run "artifact-warning-does-not-mask-exit" 0 'artifact_warning' bash -c '
@@ -495,21 +498,82 @@ th_assert_run "artifact-warning-does-not-mask-exit" 0 'artifact_warning' bash -c
   )
 ' _ "${HELPER_SCRIPT}"
 
-tmpdir="$(mktemp -d)"
+# --- Governance action coverage ---
+th_assert_run "governance-start-event-pending" 0 '"outcome":"pending"' bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/prompts/scripts"
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+EOF
+  cat > "${tmpdir}/prompts/scripts/check-governance.sh" <<'"'"'CHECKER'"'"'
+#!/usr/bin/env bash
+exit 0
+CHECKER
+  chmod +x "${tmpdir}/prompts/scripts/check-governance.sh"
+  mkdir -p "${tmpdir}/scripts/lib/prompts-submodule" "${tmpdir}/scripts/hooks" "${tmpdir}/scripts/ci"
+  for f in prompts-submodule.sh check-governance.sh prompts-submodule-freshness.sh install-git-hooks.sh; do
+    cp "'"${REPO_ROOT}"'/scripts/${f}" "${tmpdir}/scripts/${f}" 2>/dev/null || true
+  done
+  cp "'"${REPO_ROOT}"'/scripts/hooks/pre-commit-ci-debug.sh" "${tmpdir}/scripts/hooks/" 2>/dev/null || true
+  for f in ci-common.sh git-env.sh prompts-submodule.sh; do
+    cp "'"${REPO_ROOT}"'/scripts/lib/${f}" "${tmpdir}/scripts/lib/${f}"
+  done
+  for f in common.sh context.sh git.sh artifacts.sh actions.sh; do
+    cp "'"${REPO_ROOT}"'/scripts/lib/prompts-submodule/${f}" "${tmpdir}/scripts/lib/prompts-submodule/${f}"
+  done
+  chmod +x "${tmpdir}/scripts/prompts-submodule.sh" "${tmpdir}/scripts/check-governance.sh"
+  (
+    GOVERNANCE_REPORT_JSON="${tmpdir}/gov-report.json"
+    GOVERNANCE_METRICS_TEXTFILE="${tmpdir}/gov-metrics.prom"
+    bash "${tmpdir}/scripts/check-governance.sh"
+  )
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "governance-timeout-checker" 0 "fail_checker_error" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/prompts/scripts"
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+EOF
+  cat > "${tmpdir}/prompts/scripts/check-governance.sh" <<'"'"'CHECKER'"'"'
+#!/usr/bin/env bash
+sleep 10
+exit 0
+CHECKER
+  chmod +x "${tmpdir}/prompts/scripts/check-governance.sh"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_governance_checker_path() { printf "%s/prompts/scripts/check-governance.sh\n" "$1"; }
+  (
+    PS_GOVERNANCE_CHECKER_TIMEOUT=1
+    GOVERNANCE_REPORT_JSON="${tmpdir}/gov-report.json"
+    ps_run_governance "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/gov-report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- Pre-commit edge case: verify-parity.sh missing ---
+th_assert_run "pre-commit-missing-parity-script" 0 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  PS_CTX_KIND=hook PS_CTX_ACTION=pre-commit PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  # No staged files means early exit
+  ps_run_pre_commit "${tmpdir}" 2>/dev/null
+' _ "${HELPER_SCRIPT}"
+
+# --- Fixture-based freshness wrapper tests (using th_create_fixture DRY helper) ---
+tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}"' EXIT
-mkdir -p "${tmpdir}/scripts/lib"
-cp "${FRESHNESS_SCRIPT}" "${tmpdir}/scripts/prompts-submodule-freshness.sh"
-cp "${ENTRY_SCRIPT}" "${tmpdir}/scripts/prompts-submodule.sh"
-cp "${HELPER_SCRIPT}" "${tmpdir}/scripts/lib/prompts-submodule.sh"
-cp "${CI_COMMON_SCRIPT}" "${tmpdir}/scripts/lib/ci-common.sh"
-cp "${GIT_ENV_SCRIPT}" "${tmpdir}/scripts/lib/git-env.sh"
-mkdir -p "${tmpdir}/scripts/lib/prompts-submodule"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/common.sh" "${tmpdir}/scripts/lib/prompts-submodule/common.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/context.sh" "${tmpdir}/scripts/lib/prompts-submodule/context.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/git.sh" "${tmpdir}/scripts/lib/prompts-submodule/git.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/artifacts.sh" "${tmpdir}/scripts/lib/prompts-submodule/artifacts.sh"
-cp "${REPO_ROOT}/scripts/lib/prompts-submodule/actions.sh" "${tmpdir}/scripts/lib/prompts-submodule/actions.sh"
-chmod +x "${tmpdir}/scripts/prompts-submodule-freshness.sh" "${tmpdir}/scripts/prompts-submodule.sh"
 
 th_assert_run "skip-no-gitmodules" 0 '"outcome":"skip_not_registered"' \
   env SUBMODULE_REPORT_JSON="${tmpdir}/report1.json" bash "${tmpdir}/scripts/prompts-submodule-freshness.sh"
@@ -529,5 +593,10 @@ th_assert_json_field "report-kind-uninitialized" "${tmpdir}/report2.json" "kind"
 th_assert_json_field "report-schema-uninitialized" "${tmpdir}/report2.json" "schema_version" "2"
 th_assert_run "entry-governance-skip-uninitialized" 0 '"outcome":"skip_uninitialized"' \
   env GOVERNANCE_REPORT_JSON="${tmpdir}/gov-report.json" bash "${tmpdir}/scripts/prompts-submodule.sh" governance
+
+# --- JSON report validity (jq-generated must be valid) ---
+th_assert_run "report-valid-json" 0 "" bash -c '
+  python3 -c "import json; json.load(open(\"$1\"))" "$1"
+' _ "${tmpdir}/report2.json"
 
 th_summary "unit"

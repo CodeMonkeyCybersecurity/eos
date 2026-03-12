@@ -57,6 +57,9 @@ ps_outcome_known() {
     governance:pass_checked_direct|governance:pass_checked_via_override|governance:fail_checker_error|governance:skip_not_registered|governance:skip_uninitialized)
       return 0
       ;;
+    hook:pass_checked_direct|hook:pass_checked_via_override|hook:fail_checker_error|hook:skip_not_registered|hook:skip_uninitialized)
+      return 0
+      ;;
     *)
       return 1
       ;;
@@ -66,18 +69,11 @@ ps_outcome_known() {
 ps_status_from_outcome() {
   local outcome="${1:?outcome required}"
   case "${outcome}" in
-    pass_*)
-      printf 'pass'
-      ;;
-    skip_*)
-      printf 'skip'
-      ;;
-    fail_*)
-      printf 'fail'
-      ;;
-    *)
-      printf 'unknown'
-      ;;
+    pass_*)   printf 'pass' ;;
+    skip_*)   printf 'skip' ;;
+    fail_*)   printf 'fail' ;;
+    pending)  printf 'pending' ;;
+    *)        printf 'unknown' ;;
   esac
 }
 

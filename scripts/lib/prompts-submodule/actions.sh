@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Default timeout (seconds) for the governance checker subprocess.
+PS_GOVERNANCE_CHECKER_TIMEOUT="${PS_GOVERNANCE_CHECKER_TIMEOUT:-120}"
+
 ps_run_freshness() {
   local repo_root="${1:?repo root required}"
   local fetch_timeout_sec="${SUBMODULE_FETCH_TIMEOUT_SEC:-20}"
@@ -15,7 +18,7 @@ ps_run_freshness() {
   ps_ctx_init
   trap 'ps_finish_and_exit "fail_internal" "FAIL: unexpected script error at line ${LINENO}" 1' ERR
 
-  ps_log_json "INFO" "submodule_freshness.start" "skip_not_registered" "Starting prompts submodule freshness check"
+  ps_log_json "INFO" "submodule_freshness.start" "pending" "Starting prompts submodule freshness check"
 
   PS_CTX_PROMPTS_PATH="$(ps_prompts_submodule_path "${repo_root}" || true)"
   if [[ -z "${PS_CTX_PROMPTS_PATH}" ]]; then
@@ -45,7 +48,7 @@ ps_run_freshness() {
     ps_finish_and_exit "skip_missing_remote_ref" "SKIP: origin/${PS_CTX_REMOTE_BRANCH} not available for ${PS_CTX_PROMPTS_PATH}" 0
   fi
 
-  ps_log_json "INFO" "submodule_freshness.compare" "pass_up_to_date" "Comparing local and remote SHA"
+  ps_log_json "INFO" "submodule_freshness.compare" "pending" "Comparing local and remote SHA"
 
   if [[ "${PS_CTX_LOCAL_SHA}" == "${PS_CTX_REMOTE_SHA}" ]]; then
     ps_finish_and_exit "pass_up_to_date" "PASS: prompts submodule is up to date" 0
@@ -83,9 +86,12 @@ ps_run_governance() {
   PS_CTX_KIND="governance"
   PS_CTX_ACTION="governance"
   PS_CTX_REPORT_PATH="${GOVERNANCE_REPORT_JSON:-${repo_root}/outputs/ci/governance/report.json}"
+  PS_CTX_METRICS_PATH="${GOVERNANCE_METRICS_TEXTFILE:-}"
   PS_CTX_REPO_ROOT="${repo_root}"
   ps_ctx_init
   trap 'ps_finish_and_exit "fail_checker_error" "FAIL: unexpected governance wrapper error at line ${LINENO}" 1' ERR
+
+  ps_log_json "INFO" "governance.start" "pending" "Starting governance check"
 
   PS_CTX_PROMPTS_PATH="$(ps_prompts_submodule_path "${repo_root}" || true)"
   if [[ -z "${PS_CTX_PROMPTS_PATH}" ]]; then
@@ -103,10 +109,19 @@ ps_run_governance() {
     outcome="pass_checked_via_override"
   fi
 
-  if CONSUMING_REPO_ROOT="${repo_root}" PROMPTS_SUBMODULE_PATH="${PS_CTX_PROMPTS_PATH}" "${checker_path}"; then
+  # Run the checker with a timeout to prevent hangs from blocking CI.
+  local checker_cmd=(bash "${checker_path}")
+  if command -v timeout >/dev/null 2>&1; then
+    checker_cmd=(timeout --signal=TERM --kill-after=10s "${PS_GOVERNANCE_CHECKER_TIMEOUT}s" "${checker_cmd[@]}")
+  fi
+
+  if CONSUMING_REPO_ROOT="${repo_root}" PROMPTS_SUBMODULE_PATH="${PS_CTX_PROMPTS_PATH}" "${checker_cmd[@]}"; then
     ps_finish_and_exit "${outcome}" "PASS: governance check completed via ${PS_CTX_PROMPTS_PATH}" 0
   else
     rc=$?
+    if [[ "${rc}" -eq 124 ]]; then
+      ps_finish_and_exit "fail_checker_error" "FAIL: governance checker timed out after ${PS_GOVERNANCE_CHECKER_TIMEOUT}s" "${rc}"
+    fi
     ps_finish_and_exit "fail_checker_error" "FAIL: governance checker failed with exit code ${rc}" "${rc}"
   fi
 }
@@ -117,7 +132,7 @@ ps_install_hook() {
   local hook_dest=".git/hooks/pre-commit"
 
   if [[ ! -e "${repo_root}/.git" ]]; then
-    echo "Error: not in a git repository"
+    ps_log_json "ERROR" "install_hook.check" "pending" "Not in a git repository"
     return 1
   fi
 
@@ -131,6 +146,7 @@ ps_install_hook() {
   hook_sha="$(sha256sum "${hook_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${hook_path}" | awk '{print $1}')"
   source_sha="$(sha256sum "${source_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${source_path}" | awk '{print $1}')"
 
+  # Structured output for both human and machine consumption.
   echo "Installed pre-commit hook: ${hook_path}"
   echo "Hook source: ${source_path}"
   echo "Hook mode: ${hook_mode}"
@@ -155,28 +171,42 @@ ps_run_pre_commit() {
   local repo_root="${1:?repo root required}"
   local staged_files
 
+  # Ensure context lifecycle is active.
+  if [[ -z "${PS_CTX_KIND:-}" ]]; then
+    PS_CTX_KIND="hook"
+    PS_CTX_ACTION="pre-commit"
+    PS_CTX_REPORT_PATH="${PRE_COMMIT_REPORT_JSON:-${repo_root}/outputs/ci/pre-commit/report.json}"
+    PS_CTX_REPO_ROOT="${repo_root}"
+    ps_ctx_init
+  fi
+  trap 'ps_finish_and_exit "fail_checker_error" "FAIL: unexpected pre-commit error at line ${LINENO}" 1' ERR
+
   staged_files="$(git -C "${repo_root}" diff --cached --name-only --diff-filter=ACMR)"
   if [[ -z "${staged_files}" ]]; then
-    echo "pre-commit: no staged changes"
+    ps_log_json "INFO" "pre_commit.skip" "pending" "No staged changes"
     return 0
   fi
 
-  ps_log_json "INFO" "pre_commit.parity.start" "pass_checked_direct" "verifying ci:debug parity contract"
-  bash "${repo_root}/scripts/ci/verify-parity.sh"
+  ps_log_json "INFO" "pre_commit.parity.start" "pending" "Verifying ci:debug parity contract"
+  if [[ -f "${repo_root}/scripts/ci/verify-parity.sh" ]]; then
+    bash "${repo_root}/scripts/ci/verify-parity.sh"
+  else
+    ps_log_json "WARN" "pre_commit.parity.skip" "pending" "verify-parity.sh not found; skipping"
+  fi
 
-  ps_log_json "INFO" "pre_commit.ci_debug.start" "pass_checked_direct" "running ci:debug via magew"
+  ps_log_json "INFO" "pre_commit.ci_debug.start" "pending" "Running ci:debug"
   if [[ -x "${repo_root}/magew" ]]; then
     "${repo_root}/magew" ci:debug
   elif [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
-    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "skip_missing_remote_ref" "magew missing; using npm fallback"
+    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "pending" "magew missing; using npm fallback"
     npm run ci:debug --silent
   else
-    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "skip_missing_remote_ref" "magew/npm missing; using script fallback"
+    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "pending" "magew/npm missing; using script fallback"
     bash "${repo_root}/scripts/ci/debug.sh"
   fi
 
   if echo "${staged_files}" | grep -Eq '^(pkg/self/|pkg/git/|pkg/vault/phase2_env_setup\.go|cmd/self/|scripts/ci/self-update-quality\.sh|test/e2e/smoke/|package\.json)'; then
-    ps_log_json "INFO" "pre_commit.self_update.start" "pass_checked_direct" "running self-update quality lane"
+    ps_log_json "INFO" "pre_commit.self_update.start" "pending" "Running self-update quality lane"
     if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
       npm run ci:self-update-quality --silent
     else
