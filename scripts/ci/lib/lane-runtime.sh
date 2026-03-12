@@ -2,8 +2,9 @@
 set -Eeuo pipefail
 
 # Shared runtime helpers for CI lanes with JSONL logging and idempotent artifacts.
+# Uses ci_json_obj() for all JSON generation — no hand-rolled string concatenation.
 
-# Source shared CI primitives (ci_json_escape, ci_now_utc, ci_epoch).
+# Source shared CI primitives (ci_json_escape, ci_json_obj, ci_now_utc, ci_epoch).
 _lane_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../../lib/ci-common.sh
 source "${_lane_lib_dir}/../../lib/ci-common.sh"
@@ -21,10 +22,12 @@ lane_init() {
   CI_LANE_START_EPOCH="$(ci_epoch)"
   CI_LANE_RUN_ID="$(ci_now_utc | tr -d ':T-' | cut -c1-15)Z-$$"
   CI_LANE_STAGE="bootstrap"
+  CI_LANE_STEP_SEQ=0
   CI_LANE_FAILED_STAGE="none"
   CI_LANE_FAILED_COMMAND=""
   CI_LANE_FAILED_LINE=0
   CI_LANE_FAILED_EXIT=0
+  CI_LANE_LOCK_FD=""
 
   mkdir -p "${CI_LANE_DIR}"
   : > "${CI_LANE_EVENTS}"
@@ -43,9 +46,12 @@ lane_acquire_lock() {
   echo "WARN: flock not found; continuing without lane lock (${CI_LANE_NAME})" >&2
 }
 
-# Backward-compatible aliases — delegates to ci-common.sh.
-lane_json_escape() { ci_json_escape "$@"; }
-lane_now_utc() { ci_now_utc; }
+_lane_release_lock() {
+  if [[ -n "${CI_LANE_LOCK_FD:-}" ]]; then
+    eval "exec ${CI_LANE_LOCK_FD}>&-" 2>/dev/null || true
+    CI_LANE_LOCK_FD=""
+  fi
+}
 
 lane_log() {
   local level="${1:-INFO}"
@@ -57,7 +63,17 @@ lane_log() {
   local cmd="${7:-}"
 
   local payload
-  payload="{\"ts\":\"$(ci_now_utc)\",\"run_id\":\"$(ci_json_escape "${CI_LANE_RUN_ID}")\",\"lane\":\"$(ci_json_escape "${CI_LANE_NAME}")\",\"level\":\"$(ci_json_escape "${level}")\",\"event\":\"$(ci_json_escape "${event}")\",\"stage\":\"$(ci_json_escape "${stage}")\",\"exit_code\":${exit_code},\"line\":${line},\"failed_command\":\"$(ci_json_escape "${cmd}")\",\"message\":\"$(ci_json_escape "${message}")\"}"
+  payload="$(ci_json_obj \
+    ts             "$(ci_now_utc)" \
+    run_id         "${CI_LANE_RUN_ID}" \
+    lane           "${CI_LANE_NAME}" \
+    level          "${level}" \
+    event          "${event}" \
+    stage          "${stage}" \
+    exit_code      "#int:${exit_code}" \
+    line           "#int:${line}" \
+    failed_command "${cmd}" \
+    message        "${message}")"
   printf '%s\n' "${payload}"
   printf '%s\n' "${payload}" >> "${CI_LANE_EVENTS}"
 }
@@ -65,10 +81,11 @@ lane_log() {
 lane_run_step() {
   local name="${1:?step name required}"
   shift
+  CI_LANE_STEP_SEQ=$((CI_LANE_STEP_SEQ + 1))
   CI_LANE_STAGE="${name}"
-  lane_log "INFO" "lane.step.start" "Running step ${name}" "${name}"
+  lane_log "INFO" "lane.step.start" "Running step ${name} (#${CI_LANE_STEP_SEQ})" "${name}"
   "$@"
-  lane_log "INFO" "lane.step.finish" "Step ${name} completed" "${name}"
+  lane_log "INFO" "lane.step.finish" "Step ${name} completed (#${CI_LANE_STEP_SEQ})" "${name}"
 }
 
 lane_emit_base_metrics() {
@@ -100,6 +117,7 @@ lane_finish() {
   local message="${2:?message required}"
   local exit_code="${3:?exit code required}"
 
+  # Prevent recursive ERR trap firing if lane_finish itself fails.
   trap - ERR
 
   local end_epoch duration level
@@ -112,23 +130,37 @@ lane_finish() {
 
   lane_log "${level}" "lane.finish" "${message}" "${CI_LANE_STAGE}" "${exit_code}" "${CI_LANE_FAILED_LINE}" "${CI_LANE_FAILED_COMMAND}"
 
-  cat > "${CI_LANE_REPORT}" <<EOF_REPORT
-{
-  "ts": "$(ci_json_escape "$(ci_now_utc)")",
-  "run_id": "$(ci_json_escape "${CI_LANE_RUN_ID}")",
-  "lane": "$(ci_json_escape "${CI_LANE_NAME}")",
-  "status": "$(ci_json_escape "${status}")",
-  "exit_code": ${exit_code},
-  "stage": "$(ci_json_escape "${CI_LANE_FAILED_STAGE}")",
-  "line": ${CI_LANE_FAILED_LINE},
-  "failed_command": "$(ci_json_escape "${CI_LANE_FAILED_COMMAND}")",
-  "duration_seconds": ${duration},
-  ${CI_LANE_REPORT_EXTRA_JSON:-"\"extra\":null"},
-  "message": "$(ci_json_escape "${message}")"
-}
-EOF_REPORT
+  # Build report using ci_json_obj for safe JSON generation.
+  # Extra fields are passed via CI_LANE_EXTRA_REPORT_FIELDS (key=value pairs).
+  local report_json
+  local -a extra_args=()
+  if [[ -n "${CI_LANE_EXTRA_REPORT_FIELDS:-}" ]]; then
+    local pair
+    while IFS= read -r pair; do
+      [[ -n "${pair}" ]] || continue
+      local k="${pair%%=*}" v="${pair#*=}"
+      extra_args+=("${k}" "${v}")
+    done <<< "${CI_LANE_EXTRA_REPORT_FIELDS}"
+  fi
+
+  report_json="$(ci_json_obj \
+    ts               "$(ci_now_utc)" \
+    run_id           "${CI_LANE_RUN_ID}" \
+    lane             "${CI_LANE_NAME}" \
+    status           "${status}" \
+    exit_code        "#int:${exit_code}" \
+    stage            "${CI_LANE_FAILED_STAGE}" \
+    line             "#int:${CI_LANE_FAILED_LINE}" \
+    failed_command   "${CI_LANE_FAILED_COMMAND}" \
+    duration_seconds "#int:${duration}" \
+    steps_executed   "#int:${CI_LANE_STEP_SEQ}" \
+    message          "${message}" \
+    "${extra_args[@]}")"
+
+  printf '%s\n' "${report_json}" > "${CI_LANE_REPORT}"
 
   lane_emit_base_metrics "${status}" "${duration}"
+  _lane_release_lock
   exit "${exit_code}"
 }
 

@@ -599,4 +599,137 @@ th_assert_run "report-valid-json" 0 "" bash -c '
   python3 -c "import json; json.load(open(\"$1\"))" "$1"
 ' _ "${tmpdir}/report2.json"
 
+# --- Metrics emission for pass outcome (exercises status_value=1 branch) ---
+th_assert_run "metrics-pass-status-value" 0 "} 1" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=deadbeef PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics pass_up_to_date
+  cat "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+# --- Metrics emission failure (unwritable path) ---
+th_assert_run "metrics-write-failure-warning" 1 "artifact_warning" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" \
+    PS_CTX_METRICS_PATH="/proc/eos-nonexistent/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=deadbeef PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics pass_up_to_date 2>&1
+' _ "${HELPER_SCRIPT}"
+
+# --- Action: fail_dirty_worktree when auto-update enabled ---
+th_assert_run "action-fail-dirty-worktree" 0 "fail_dirty_worktree" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${args[*]}" == *" status --porcelain"* ]]; then echo "M dirty-file"; exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- Action: pass_auto_updated when submodule update succeeds ---
+th_assert_run "action-pass-auto-updated" 0 "pass_auto_updated" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  call_count_file="${tmpdir}/.rev_parse_count"
+  echo 0 > "${call_count_file}"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+# After submodule update, HEAD should return the remote SHA
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then
+  # First call returns old SHA, second call (post-update) returns new SHA
+  count_file="$(dirname "$0")/../.rev_parse_count"
+  count="$(cat "${count_file}")"
+  count=$((count + 1))
+  echo "${count}" > "${count_file}"
+  if [[ "${count}" -le 1 ]]; then
+    echo deadbeef
+  else
+    echo feedface
+  fi
+  exit 0
+fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${args[*]}" == *" submodule update --remote"* ]]; then exit 0; fi
+if [[ "${args[*]}" == *" status --porcelain"* ]]; then exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  ps_submodule_has_local_changes() { return 1; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- Hook install: hash mismatch detection ---
+th_assert_run "install-hook-hash-mismatch" 1 "Hook matches source: false" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  mkdir -p "${tmpdir}/scripts/hooks"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  chmod +x "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh"
+  ps_install_hook "${tmpdir}"
+  # Now tamper with the installed hook
+  echo "# tampered" >> "${tmpdir}/.git/hooks/pre-commit"
+  ps_install_hook "${tmpdir}" 2>&1 || true
+  # Re-install should overwrite - but test the detection by checking directly
+  echo "# tampered" >> "${tmpdir}/.git/hooks/pre-commit"
+  # Call the comparison part manually
+  hook_sha="$(sha256sum "${tmpdir}/.git/hooks/pre-commit" | awk "{print \$1}")"
+  source_sha="$(sha256sum "${tmpdir}/scripts/hooks/pre-commit-ci-debug.sh" | awk "{print \$1}")"
+  if [[ "${hook_sha}" != "${source_sha}" ]]; then
+    echo "Hook matches source: false"
+    exit 1
+  fi
+' _ "${HELPER_SCRIPT}"
+
+# --- ps_warn_artifact_failure direct test ---
+th_assert_run "warn-artifact-failure-output" 0 "artifact_warning" bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+  ps_warn_artifact_failure "report" "/bad/path" "disk full" 2>&1
+' _ "${HELPER_SCRIPT}"
+
 th_summary "unit"

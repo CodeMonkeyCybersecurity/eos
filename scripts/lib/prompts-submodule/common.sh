@@ -3,10 +3,7 @@ set -Eeuo pipefail
 
 PS_SCHEMA_VERSION="2"
 
-# Backward-compatible aliases for callers that use the old ps_ names.
-ps_json_escape() { ci_json_escape "$@"; }
-ps_now_utc() { ci_now_utc; }
-ps_in_ci() { ci_in_ci; }
+# Alias: ps_normalize_bool is used by tests exercising the normalization path.
 ps_normalize_bool() { ci_normalize_bool "$@"; }
 
 ps_schema_version() {

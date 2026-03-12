@@ -115,7 +115,11 @@ eos_self_update_quality_integration_weight ${integration_weight}
 # TYPE eos_self_update_quality_e2e_weight gauge
 eos_self_update_quality_e2e_weight ${e2e_weight}"
 
-CI_LANE_REPORT_EXTRA_JSON="\"coverage_percent\": ${focus_coverage}, \"coverage_threshold\": ${focus_threshold}, \"weights\": {\"unit\": ${unit_weight}, \"integration\": ${integration_weight}, \"e2e\": ${e2e_weight}}"
+CI_LANE_EXTRA_REPORT_FIELDS="coverage_percent=${focus_coverage}
+coverage_threshold=#int:${focus_threshold}
+weight_unit=#int:${unit_weight}
+weight_integration=#int:${integration_weight}
+weight_e2e=#int:${e2e_weight}"
 
 lane_log "INFO" "self_update_quality.complete" "Self-update quality lane completed" "complete"
 CI_LANE_STAGE="complete"

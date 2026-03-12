@@ -78,10 +78,12 @@ else
 fi
 
 lane_run_step "compile_smoke" go test -run '^$' ./cmd/...
+lane_run_step "lane_runtime_unit_tests" bash test/ci/test-lane-runtime-unit.sh
 lane_run_step "submodule_freshness_pyramid" bash test/ci/test-submodule-freshness.sh
 lane_run_step "governance_wrapper_tests" bash test/ci/test-governance-check.sh
 lane_run_step "governance_propagation_shell_coverage" \
   bash scripts/ci/shell-coverage.sh outputs/ci/governance-propagation-coverage 90 \
+    scripts/ci/lib/lane-runtime.sh \
     scripts/lib/ci-common.sh \
     scripts/lib/prompts-submodule.sh \
     scripts/lib/prompts-submodule/common.sh \
@@ -94,7 +96,7 @@ lane_run_step "governance_propagation_shell_coverage" \
     scripts/check-governance.sh \
     scripts/install-git-hooks.sh \
     scripts/hooks/pre-commit-ci-debug.sh \
-    -- bash -c 'bash test/ci/test-submodule-freshness.sh && bash test/ci/test-governance-check.sh'
+    -- bash -c 'bash test/ci/test-lane-runtime-unit.sh && bash test/ci/test-submodule-freshness.sh && bash test/ci/test-governance-check.sh'
 lane_run_step "verify_parity_contract_tests" bash test/ci/test-verify-parity.sh
 
 CI_LANE_FAILED_STAGE="none"
