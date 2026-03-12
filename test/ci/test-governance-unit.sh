@@ -25,6 +25,24 @@ th_assert_run "ci-common-script-syntax" 0 "" bash -n "${CI_COMMON_SCRIPT}"
 th_assert_run "git-env-script-syntax" 0 "" bash -n "${GIT_ENV_SCRIPT}"
 th_assert_run "report-alert-syntax" 0 "" python3 -m py_compile "${REPORT_ALERT_SCRIPT}"
 
+# --- ShellCheck lint (if available) ---
+if command -v shellcheck >/dev/null 2>&1; then
+  for script in "${GOV_SCRIPT}" "${ENTRY_SCRIPT}" "${INSTALL_HOOK_SCRIPT}" "${PRE_COMMIT_SCRIPT}"; do
+    script_name="$(basename "${script}")"
+    th_assert_run "shellcheck-${script_name}" 0 "" shellcheck -x -S warning "${script}"
+  done
+  for lib in "${HELPER_SCRIPT}" "${CI_COMMON_SCRIPT}" "${GIT_ENV_SCRIPT}"; do
+    lib_name="$(basename "${lib}")"
+    th_assert_run "shellcheck-${lib_name}" 0 "" shellcheck -x -S warning "${lib}"
+  done
+  for mod in "${REPO_ROOT}/scripts/lib/prompts-submodule/"*.sh; do
+    mod_name="$(basename "${mod}")"
+    th_assert_run "shellcheck-${mod_name}" 0 "" shellcheck -x -S warning "${mod}"
+  done
+else
+  echo "SKIP: shellcheck not installed"
+fi
+
 # --- Governance skip on uninitialized submodule ---
 tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}"' EXIT

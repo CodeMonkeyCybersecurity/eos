@@ -140,18 +140,23 @@ ps_emit_prom_metrics() {
     stale_value=1
   fi
 
-  ps_write_atomic_file "${PS_CTX_METRICS_PATH}" <<EOF_METRICS || {
+  local duration_seconds=$(( $(ci_epoch) - ${PS_CTX_START_EPOCH:-0} ))
+  local metrics_content
+  metrics_content="$(cat <<EOF_METRICS
 # TYPE prompts_submodule_${PS_CTX_KIND}_status gauge
 prompts_submodule_${PS_CTX_KIND}_status{outcome="${outcome}",strict_remote="${PS_CTX_STRICT_REMOTE:-unknown}"} ${status_value}
 # TYPE prompts_submodule_${PS_CTX_KIND}_stale gauge
 prompts_submodule_${PS_CTX_KIND}_stale ${stale_value}
 # TYPE prompts_submodule_${PS_CTX_KIND}_duration_seconds gauge
-prompts_submodule_${PS_CTX_KIND}_duration_seconds $(( $(ci_epoch) - ${PS_CTX_START_EPOCH:-0} ))
+prompts_submodule_${PS_CTX_KIND}_duration_seconds ${duration_seconds}
 # TYPE prompts_submodule_${PS_CTX_KIND}_artifact_warnings gauge
 prompts_submodule_${PS_CTX_KIND}_artifact_warnings ${PS_CTX_ARTIFACT_WARNINGS:-0}
 # TYPE prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds gauge
 prompts_submodule_${PS_CTX_KIND}_last_run_timestamp_seconds $(ci_epoch)
 EOF_METRICS
+)"
+
+  ps_write_atomic_file "${PS_CTX_METRICS_PATH}" <<< "${metrics_content}" || {
     ps_warn_artifact_failure "metrics" "${PS_CTX_METRICS_PATH}" "failed to write Prometheus textfile"
     return 1
   }

@@ -9,25 +9,23 @@ ps_compact_command_error() {
   detail="$(printf '%s' "${detail}" | tr '\n' ' ' | tr -s '[:space:]' ' ')"
   detail="${detail#"${detail%%[![:space:]]*}"}"
   detail="${detail%"${detail##*[![:space:]]}"}"
-  printf '%.200s' "${detail}"
+  if [[ ${#detail} -gt 200 ]]; then
+    printf '%.200s...' "${detail}"
+  else
+    printf '%s' "${detail}"
+  fi
 }
 
 ps_capture_run() {
-  local stdout_file stderr_file rc
-  stdout_file="$(mktemp)"
-  stderr_file="$(mktemp)"
-  if "$@" >"${stdout_file}" 2>"${stderr_file}"; then
-    PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
-    PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
-    rm -f "${stdout_file}" "${stderr_file}"
-    return 0
-  else
-    rc=$?
-    PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
-    PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
-    rm -f "${stdout_file}" "${stderr_file}"
-    return "${rc}"
-  fi
+  local stdout_file stderr_file rc=0
+  stdout_file="$(mktemp)" || return 1
+  stderr_file="$(mktemp)" || { rm -f "${stdout_file}"; return 1; }
+  # Ensure temp files are cleaned up on any exit path (including signals).
+  trap 'rm -f "${stdout_file}" "${stderr_file}"' RETURN
+  "$@" >"${stdout_file}" 2>"${stderr_file}" || rc=$?
+  PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
+  PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
+  return "${rc}"
 }
 
 ps_run_freshness() {

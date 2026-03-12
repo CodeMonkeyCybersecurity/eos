@@ -42,6 +42,10 @@ ps_ctx_init() {
     printf 'FAIL: PS_CTX_KIND must be set before calling ps_ctx_init\n' >&2
     return 1
   fi
+  if [[ ! "${PS_CTX_KIND}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+    printf 'FAIL: PS_CTX_KIND contains invalid characters for metric names: %s\n' "${PS_CTX_KIND}" >&2
+    return 1
+  fi
   if [[ -z "${PS_CTX_ACTION:-}" ]]; then
     printf 'FAIL: PS_CTX_ACTION must be set before calling ps_ctx_init\n' >&2
     return 1
@@ -54,14 +58,16 @@ ps_ctx_init() {
   PS_CTX_STRICT_REMOTE="$(ps_normalize_strict_remote "${PS_CTX_STRICT_REMOTE:-auto}")"
   PS_CTX_AUTO_UPDATE="$(ci_normalize_bool "${PS_CTX_AUTO_UPDATE:-false}")"
   PS_CTX_ARTIFACT_WARNINGS=0
+  local _ps_first_init="false"
   if [[ -z "${PS_CTX_RUN_ID:-}" ]]; then
+    _ps_first_init="true"
     PS_CTX_RUN_ID="$(ci_now_utc | tr -d ':T-' | cut -c1-15)Z-$$"
   fi
   PS_CTX_START_EPOCH="$(ci_epoch)"
   if [[ -z "${PS_CTX_EVENTS_PATH:-}" ]]; then
     PS_CTX_EVENTS_PATH="$(dirname "${PS_CTX_REPORT_PATH}")/events.jsonl"
   fi
-  if [[ -n "${PS_CTX_EVENTS_PATH:-}" ]]; then
+  if [[ -n "${PS_CTX_EVENTS_PATH:-}" && "${_ps_first_init}" == "true" ]]; then
     if ! mkdir -p "$(dirname "${PS_CTX_EVENTS_PATH}")" 2>/dev/null || ! : > "${PS_CTX_EVENTS_PATH}" 2>/dev/null; then
       printf 'WARN: unable to initialize prompts-submodule events log at %s\n' "${PS_CTX_EVENTS_PATH}" >&2
       PS_CTX_EVENTS_PATH=""

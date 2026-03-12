@@ -748,4 +748,475 @@ th_assert_run "warn-artifact-failure-output" 0 "artifact_warning" bash -c '
   ps_warn_artifact_failure "report" "/bad/path" "disk full" 2>&1
 ' _ "${HELPER_SCRIPT}"
 
+# --- NEW: ps_ctx_init metric name validation ---
+th_assert_run "ctx-init-rejects-invalid-kind-chars" 1 "invalid characters for metric names" bash -c '
+  source "$1"
+  PS_CTX_KIND="bad-chars" PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "ctx-init-rejects-kind-starting-with-digit" 1 "invalid characters" bash -c '
+  source "$1"
+  PS_CTX_KIND="9start" PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "ctx-init-accepts-underscored-kind" 0 "" bash -c '
+  source "$1"
+  PS_CTX_KIND=fresh_ness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init >/dev/null 2>&1
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_ctx_init double-init idempotency (events not truncated) ---
+th_assert_run "ctx-double-init-preserves-events" 0 "first_event" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+  ps_ctx_init
+  ps_log_json INFO first_event pending "should survive" >/dev/null
+  # Second init should NOT truncate events
+  ps_ctx_init
+  cat "${tmpdir}/events.jsonl"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_ctx_begin full parameter flow ---
+th_assert_run "ctx-begin-sets-all-fields" 0 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  ps_ctx_begin freshness freshness "${tmpdir}/report.json" "${tmpdir}/metrics.prom" /repo true true
+  [[ "${PS_CTX_KIND}" == "freshness" ]] || exit 1
+  [[ "${PS_CTX_ACTION}" == "freshness" ]] || exit 1
+  [[ "${PS_CTX_STRICT_REMOTE}" == "true" ]] || exit 1
+  [[ "${PS_CTX_AUTO_UPDATE}" == "true" ]] || exit 1
+  [[ -n "${PS_CTX_RUN_ID}" ]] || exit 1
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_compact_command_error truncation indicator ---
+th_assert_run "compact-error-short-no-ellipsis" 0 "short error" bash -c '
+  source "$1"
+  result="$(ps_compact_command_error "short error")"
+  [[ "${result}" == "short error" ]] || { echo "got: ${result}"; exit 1; }
+  echo "${result}"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "compact-error-long-has-ellipsis" 0 "..." bash -c '
+  source "$1"
+  long="$(printf "%0.s=x" {1..150})"
+  result="$(ps_compact_command_error "${long}")"
+  [[ "${result}" == *"..." ]] || { echo "missing ellipsis: ${result}"; exit 1; }
+  echo "${result}"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "compact-error-empty" 0 "" bash -c '
+  source "$1"
+  result="$(ps_compact_command_error "")"
+  [[ -z "${result}" ]] || { echo "expected empty, got: ${result}"; exit 1; }
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_capture_run preserves stdout and stderr ---
+th_assert_run "capture-run-preserves-stdout" 0 "hello" bash -c '
+  source "$1"
+  ps_capture_run echo hello
+  printf "%s" "${PS_LAST_COMMAND_STDOUT}"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "capture-run-success-returns-0" 0 "" bash -c '
+  source "$1"
+  ps_capture_run true
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_emit_prom_metrics skip branch (no metrics path) ---
+th_assert_run "metrics-skip-when-no-path" 0 "" bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json PS_CTX_METRICS_PATH=""
+  ps_ctx_init
+  ps_emit_prom_metrics pass_up_to_date
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_emit_prom_metrics skip outcome (status_value=0) ---
+th_assert_run "metrics-skip-outcome-status-0" 0 "} 0" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=deadbeef PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics skip_not_registered
+  grep "status{" "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_emit_prom_metrics fail outcome (status_value=-1) ---
+th_assert_run "metrics-fail-outcome-status-neg1" 0 "} -1" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts PS_CTX_LOCAL_SHA=deadbeef \
+    PS_CTX_REMOTE_SHA=feedface PS_CTX_REMOTE_BRANCH=main
+  ps_ctx_init
+  ps_emit_prom_metrics fail_remote_unreachable
+  grep "status{" "${tmpdir}/metrics.prom"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_emit_prom_metrics stale flag ---
+th_assert_run "metrics-stale-flag-set-on-fail-stale" 0 "_stale 1" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts
+  ps_ctx_init
+  ps_emit_prom_metrics fail_stale
+  grep "_stale " "${tmpdir}/metrics.prom" | grep -v TYPE
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "metrics-stale-flag-zero-on-pass" 0 "_stale 0" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH="${tmpdir}/report.json" PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom" \
+    PS_CTX_REPO_ROOT=/repo PS_CTX_PROMPTS_PATH=prompts
+  ps_ctx_init
+  ps_emit_prom_metrics pass_up_to_date
+  grep "_stale " "${tmpdir}/metrics.prom" | grep -v TYPE
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_log_level_for_outcome ---
+th_assert_run "log-level-fail-is-error" 0 "ERROR" bash -c '
+  source "$1"
+  ps_log_level_for_outcome fail_stale
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "log-level-skip-is-warn" 0 "WARN" bash -c '
+  source "$1"
+  ps_log_level_for_outcome skip_not_registered
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "log-level-pass-is-info" 0 "INFO" bash -c '
+  source "$1"
+  ps_log_level_for_outcome pass_up_to_date
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_finish_and_exit unknown outcome for non-freshness kind ---
+th_assert_run "finish-exit-unknown-outcome-governance" 0 "fail_checker_error" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  (
+    PS_CTX_KIND=governance
+    PS_CTX_ACTION=governance
+    PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+    PS_CTX_METRICS_PATH="${tmpdir}/metrics.prom"
+    ps_ctx_init
+    ps_finish_and_exit not_real "bad" 9
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_write_atomic_file failure paths ---
+th_assert_run "write-atomic-file-mkdir-failure" 1 "" bash -c '
+  source "$1"
+  ps_write_atomic_file "/proc/eos-nonexistent/subdir/file.json" <<< "data"
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "write-atomic-file-success" 0 "hello" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  ps_write_atomic_file "${tmpdir}/test.txt" <<< "hello"
+  cat "${tmpdir}/test.txt"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_prompts_submodule_name match ---
+th_assert_run "submodule-name-found" 0 "myprompts" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "myprompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+EOF
+  ps_prompts_submodule_name "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_governance_checker_path not executable ---
+th_assert_run "governance-checker-not-executable" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/prompts/scripts"
+  echo "#!/usr/bin/env bash" > "${tmpdir}/prompts/scripts/check-governance.sh"
+  chmod -x "${tmpdir}/prompts/scripts/check-governance.sh"
+  ps_governance_checker_path "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_tracking_branch explicit branch (not ".") ---
+th_assert_run "tracking-branch-explicit" 0 "develop" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+	branch = develop
+EOF
+  ps_tracking_branch "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_tracking_branch no branch configured (default to main) ---
+th_assert_run "tracking-branch-default-main" 0 "main" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+EOF
+  ps_tracking_branch "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_repo_root ---
+th_assert_run "repo-root-from-script-path" 0 "" bash -c '
+  source "$1"
+  result="$(ps_repo_root "/opt/eos/scripts/check-governance.sh")"
+  [[ "${result}" == "/opt/eos" ]] || { echo "got: ${result}"; exit 1; }
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_schema_version ---
+th_assert_run "schema-version-is-2" 0 "2" bash -c '
+  source "$1"
+  ps_schema_version
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ci_in_ci ---
+th_assert_run "ci-in-ci-with-CI-var" 0 "" bash -c '
+  source "$1"
+  CI=true ci_in_ci
+' _ "${CI_COMMON_SCRIPT}"
+
+th_assert_run "ci-in-ci-with-github-actions" 0 "" bash -c '
+  source "$1"
+  unset CI GITEA_ACTIONS
+  GITHUB_ACTIONS=true ci_in_ci
+' _ "${CI_COMMON_SCRIPT}"
+
+th_assert_run "ci-in-ci-with-gitea-actions" 0 "" bash -c '
+  source "$1"
+  unset CI GITHUB_ACTIONS
+  GITEA_ACTIONS=true ci_in_ci
+' _ "${CI_COMMON_SCRIPT}"
+
+th_assert_run "ci-in-ci-returns-false-locally" 1 "" bash -c '
+  source "$1"
+  unset CI GITHUB_ACTIONS GITEA_ACTIONS
+  ci_in_ci
+' _ "${CI_COMMON_SCRIPT}"
+
+# --- NEW: ps_outcome_known exhaustive coverage ---
+th_assert_run "outcome-known-hook-pass-ci-debug-self-update" 0 "" bash -c '
+  source "$1"
+  ps_outcome_known hook pass_ci_debug_self_update
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "outcome-known-hook-install-fail-install" 0 "" bash -c '
+  source "$1"
+  ps_outcome_known hook_install fail_install
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "outcome-known-freshness-fail-remote-unreachable" 0 "" bash -c '
+  source "$1"
+  ps_outcome_known freshness fail_remote_unreachable
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "outcome-unknown-returns-1" 1 "" bash -c '
+  source "$1"
+  ps_outcome_known freshness totally_made_up
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_submodule_has_local_changes ---
+th_assert_run "submodule-no-local-changes" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  ps_submodule_has_local_changes "$(dirname "${tmpdir}")" "$(basename "${tmpdir}")"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: freshness fail_stale (AUTO_UPDATE=false with stale submodule) ---
+th_assert_run "action-fail-stale" 0 "fail_stale" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=false
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: freshness strict remote fail ---
+th_assert_run "action-fail-remote-unreachable-strict" 0 "fail_remote_unreachable" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 1; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    STRICT_REMOTE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: freshness skip remote unreachable (non-strict) ---
+th_assert_run "action-skip-remote-unreachable" 0 "skip_remote_unreachable" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 1; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    STRICT_REMOTE=false
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: freshness strict missing remote ref ---
+th_assert_run "action-fail-missing-remote-ref-strict" 0 "fail_missing_remote_ref" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if [[ "${args[*]}" == *" rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${args[*]}" == *" rev-parse origin/main"* ]]; then exit 1; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    STRICT_REMOTE=true
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_write_json_report to unwritable path ---
+th_assert_run "report-write-failure" 1 "failed to write JSON report" bash -c '
+  source "$1"
+  PS_CTX_KIND=freshness PS_CTX_ACTION=freshness PS_CTX_REPORT_PATH=/tmp/r.json
+  ps_ctx_init
+  ps_write_json_report /proc/eos-nonexistent/report.json pass_up_to_date "ok" 0 2>&1
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ci_json_escape with tabs and newlines ---
+th_assert_run "ci-json-escape-tabs-newlines" 0 "" bash -c '
+  source "$1"
+  result="$(ci_json_escape "$(printf "line1\nline2\ttab")")"
+  [[ "${result}" == "line1\nline2\ttab" ]] || { echo "got: ${result}"; exit 1; }
+' _ "${CI_COMMON_SCRIPT}"
+
+# --- NEW: ps_prompts_submodule_path with third_party/prompts ---
+th_assert_run "submodule-path-third-party" 0 "third_party/prompts" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = third_party/prompts
+	url = https://example.invalid/prompts.git
+EOF
+  ps_prompts_submodule_path "${tmpdir}"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_prompts_submodule_path with no .gitmodules ---
+th_assert_run "submodule-path-no-gitmodules" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  ps_prompts_submodule_path "${tmpdir}"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_prompts_submodule_initialized with uninitialized ---
+th_assert_run "submodule-not-initialized" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  cat > "${tmpdir}/.gitmodules" <<EOF
+[submodule "prompts"]
+	path = prompts
+	url = https://example.invalid/prompts.git
+EOF
+  ps_prompts_submodule_initialized "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ge_run_clean_git ---
+th_assert_run "ge-run-clean-git-works" 0 "hello" bash -c '
+  source "$1"
+  export GIT_DIR=/tmp/fake
+  ge_run_clean_git bash -c "echo hello; [[ -z \${GIT_DIR:-} ]]"
+' _ "${GIT_ENV_SCRIPT}"
+
 th_summary "unit"
