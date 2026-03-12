@@ -36,6 +36,17 @@ type UpdateTransaction struct {
 	ChangesPulled    bool
 	BinaryInstalled  bool
 	Success          bool
+	SkipReason       string
+	Steps            []UpdateStepResult
+}
+
+// UpdateStepResult captures a transaction step for structured logging and postmortem review.
+type UpdateStepResult struct {
+	Name       string
+	Status     string
+	Message    string
+	Duration   time.Duration
+	OccurredAt time.Time
 }
 
 // EnhancedUpdateConfig extends UpdateConfig with safety features
@@ -76,6 +87,43 @@ func NewEnhancedEosUpdater(rc *eos_io.RuntimeContext, config *EnhancedUpdateConf
 			StartTime: time.Now(),
 		},
 	}
+}
+
+func (eeu *EnhancedEosUpdater) recordTransactionStep(name, status, message string, started time.Time) {
+	result := UpdateStepResult{
+		Name:       name,
+		Status:     status,
+		Message:    message,
+		Duration:   time.Since(started),
+		OccurredAt: started.UTC(),
+	}
+	eeu.transaction.Steps = append(eeu.transaction.Steps, result)
+	eeu.logger.Info("Self-update transaction step",
+		zap.String("event", "self_update.transaction.step"),
+		zap.String("step", result.Name),
+		zap.String("status", result.Status),
+		zap.String("message", result.Message),
+		zap.Duration("duration", result.Duration),
+		zap.Time("started_at", result.OccurredAt))
+}
+
+func (eeu *EnhancedEosUpdater) runTransactionStep(name, message string, fn func() error) error {
+	started := time.Now()
+	eeu.logger.Info("Starting self-update transaction step",
+		zap.String("event", "self_update.transaction.step.start"),
+		zap.String("step", name),
+		zap.String("message", message))
+	if err := fn(); err != nil {
+		eeu.recordTransactionStep(name, "failed", err.Error(), started)
+		return err
+	}
+	eeu.recordTransactionStep(name, "completed", message, started)
+	return nil
+}
+
+func (eeu *EnhancedEosUpdater) skipTransactionStep(name, message string) {
+	started := time.Now()
+	eeu.recordTransactionStep(name, "skipped", message, started)
 }
 
 // UpdateWithRollback performs update with automatic rollback on failure
@@ -648,72 +696,64 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	defer updateLock.Release()
 	eeu.logger.Debug("Update lock acquired - safe to proceed with transaction")
 
-	// Step 1: Create binary backup and record current binary hash
-	currentHash, err := eeu.createTransactionBackup()
-	if err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
-	}
-
-	// Step 2: Pull latest code
-	codeChanged, err := eeu.pullLatestCodeWithVerification()
-	if err != nil {
-		return fmt.Errorf("failed to pull latest code: %w", err)
-	}
-	eeu.transaction.ChangesPulled = codeChanged
-
-	// Check if binary needs rebuilding by comparing embedded commit vs source HEAD
-	// This is the key fix: even if git pull returns no changes (already up-to-date),
-	// the binary might have been built from an older commit
-	sourceCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
-	if err != nil {
-		eeu.logger.Warn("Could not get source commit for comparison", zap.Error(err))
-		// Continue with rebuild to be safe
-	} else {
-		binaryCommit := shared.BuildCommit
-		eeu.logger.Info("Comparing binary vs source commit",
-			zap.String("binary_commit", truncateCommit(binaryCommit)),
-			zap.String("source_commit", truncateCommit(sourceCommit)))
-
-		// If binary was built from same commit as source HEAD, skip rebuild
-		if binaryCommit != "" && binaryCommit == sourceCommit {
-			eeu.logger.Info(" Binary is built from current source commit, skipping rebuild",
-				zap.String("commit", truncateCommit(sourceCommit)))
-			eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
-			return nil
+	var currentHash string
+	if err := eeu.runTransactionStep("pull_source", "Pull latest source changes", func() error {
+		codeChanged, pullErr := eeu.pullLatestCodeWithVerification()
+		if pullErr != nil {
+			return fmt.Errorf("failed to pull latest code: %w", pullErr)
 		}
+		eeu.transaction.ChangesPulled = codeChanged
+		return nil
+	}); err != nil {
+		return err
+	}
 
-		// Binary needs rebuild - either no commit embedded or commits don't match
-		if binaryCommit == "" {
-			eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
-				zap.String("source_commit", truncateCommit(sourceCommit)))
-		} else {
-			eeu.logger.Info(" Binary commit differs from source, rebuilding",
-				zap.String("binary_commit", truncateCommit(binaryCommit)),
-				zap.String("source_commit", truncateCommit(sourceCommit)))
+	buildNeeded, reason := eeu.shouldBuildBinary()
+	if !buildNeeded {
+		eeu.transaction.SkipReason = reason
+		eeu.skipTransactionStep("build_binary", reason)
+		eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
+		return nil
+	}
+
+	if err := eeu.runTransactionStep("hash_current_binary", "Hash currently installed binary", func() error {
+		hash, hashErr := crypto.HashFile(eeu.config.BinaryPath)
+		if hashErr != nil {
+			return fmt.Errorf("failed to hash current binary: %w", hashErr)
 		}
+		currentHash = hash
+		eeu.logger.Info("Current binary metadata",
+			zap.String("event", "self_update.binary.current"),
+			zap.String("sha256", currentHash[:16]+"..."))
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// Step 3: Build new binary
-	eeu.logger.Info(" Building new binary from source")
-	tempBinary, err := eeu.BuildBinary()
-	if err != nil {
-		return fmt.Errorf("failed to build new binary: %w", err)
+	if err := eeu.runTransactionStep("build_binary", "Build new eos binary from source", func() error {
+		tempBinary, buildErr := eeu.BuildBinary()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build new binary: %w", buildErr)
+		}
+		eeu.transaction.TempBinaryPath = tempBinary
+		return nil
+	}); err != nil {
+		return err
 	}
-	eeu.transaction.TempBinaryPath = tempBinary
 
-	// Step 3a: Compare new binary hash with current binary hash
-	newHash, err := crypto.HashFile(tempBinary)
+	newHash, err := crypto.HashFile(eeu.transaction.TempBinaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to hash new binary: %w", err)
 	}
 
 	if newHash == currentHash {
+		eeu.transaction.SkipReason = "built binary matches installed binary"
 		eeu.logger.Info(" New binary is identical to current binary (SHA256 match)",
 			zap.String("sha256", newHash[:16]+"..."))
 		eeu.logger.Info("terminal prompt: ✓ Binary unchanged - no update needed")
-
-		// Clean up temp binary
-		_ = os.Remove(tempBinary)
+		_ = os.Remove(eeu.transaction.TempBinaryPath)
+		eeu.skipTransactionStep("backup_binary", "Skipped backup because install was not required")
+		eeu.skipTransactionStep("install_binary", eeu.transaction.SkipReason)
 		return nil
 	}
 
@@ -721,26 +761,82 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 		zap.String("old_sha256", currentHash[:16]+"..."),
 		zap.String("new_sha256", newHash[:16]+"..."))
 
-	// Step 4: Validate new binary
-	if !eeu.config.SkipValidation {
-		if err := eeu.ValidateBinary(tempBinary); err != nil {
-			return fmt.Errorf("new binary validation failed: %w", err)
+	if err := eeu.runTransactionStep("backup_binary", "Create verified rollback backup of installed binary", func() error {
+		backupHash, backupErr := eeu.createTransactionBackup()
+		if backupErr != nil {
+			return fmt.Errorf("failed to create backup: %w", backupErr)
 		}
+		if backupHash != currentHash {
+			return fmt.Errorf("backup hash mismatch with current binary hash")
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// Step 5: Install new binary atomically
-	if err := eeu.installBinaryAtomic(tempBinary); err != nil {
-		return fmt.Errorf("failed to install new binary: %w", err)
+	if !eeu.config.SkipValidation {
+		if err := eeu.runTransactionStep("validate_binary", "Validate newly built binary", func() error {
+			if validateErr := eeu.ValidateBinary(eeu.transaction.TempBinaryPath); validateErr != nil {
+				return fmt.Errorf("new binary validation failed: %w", validateErr)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	} else {
+		eeu.skipTransactionStep("validate_binary", "Binary validation skipped by configuration")
 	}
-	eeu.transaction.BinaryInstalled = true
 
-	// Step 6: Verify installed binary
-	if err := eeu.Verify(); err != nil {
-		return fmt.Errorf("installed binary verification failed: %w", err)
+	if err := eeu.runTransactionStep("install_binary", "Install binary atomically", func() error {
+		if installErr := eeu.installBinaryAtomic(eeu.transaction.TempBinaryPath); installErr != nil {
+			return fmt.Errorf("failed to install new binary: %w", installErr)
+		}
+		eeu.transaction.BinaryInstalled = true
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := eeu.runTransactionStep("verify_install", "Verify installed binary", func() error {
+		if verifyErr := eeu.Verify(); verifyErr != nil {
+			return fmt.Errorf("installed binary verification failed: %w", verifyErr)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	eeu.logger.Info(" Update transaction completed successfully")
 	return nil
+}
+
+func (eeu *EnhancedEosUpdater) shouldBuildBinary() (bool, string) {
+	sourceCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
+	if err != nil {
+		eeu.logger.Warn("Could not get source commit for comparison", zap.Error(err))
+		return true, "source commit unavailable; rebuilding defensively"
+	}
+
+	binaryCommit := shared.BuildCommit
+	eeu.logger.Info("Comparing binary vs source commit",
+		zap.String("event", "self_update.binary.compare"),
+		zap.String("binary_commit", truncateCommit(binaryCommit)),
+		zap.String("source_commit", truncateCommit(sourceCommit)))
+
+	if binaryCommit != "" && binaryCommit == sourceCommit {
+		return false, "installed binary already matches source commit"
+	}
+
+	if binaryCommit == "" {
+		eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
+			zap.String("source_commit", truncateCommit(sourceCommit)))
+	} else {
+		eeu.logger.Info(" Binary commit differs from source, rebuilding",
+			zap.String("binary_commit", truncateCommit(binaryCommit)),
+			zap.String("source_commit", truncateCommit(sourceCommit)))
+	}
+
+	return true, "installed binary commit differs from source commit"
 }
 
 // createTransactionBackup creates a backup with transaction metadata and returns current binary hash
@@ -1344,6 +1440,14 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 
 	// Note: We no longer manually manage stash - git pull --autostash handles it automatically
 	// This prevents orphaned stashes and merge conflicts
+
+	for _, step := range eeu.transaction.Steps {
+		eeu.logger.Debug("Transaction step summary",
+			zap.String("step", step.Name),
+			zap.String("status", step.Status),
+			zap.String("message", step.Message),
+			zap.Duration("duration", step.Duration))
+	}
 
 	return nil
 }
