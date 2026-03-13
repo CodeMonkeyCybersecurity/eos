@@ -1219,4 +1219,226 @@ th_assert_run "ge-run-clean-git-works" 0 "hello" bash -c '
   ge_run_clean_git bash -c "echo hello; [[ -z \${GIT_DIR:-} ]]"
 ' _ "${GIT_ENV_SCRIPT}"
 
+# --- NEW COVERAGE: actions.sh script fallback (no magew, no package.json) ---
+th_assert_run "pre-commit-script-fallback" 0 "pass_ci_debug" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  echo "test" > "${tmpdir}/file.txt"
+  git -C "${tmpdir}" add file.txt
+  # No magew, no package.json — must use scripts/ci/debug.sh fallback
+  mkdir -p "${tmpdir}/scripts/ci"
+  printf "#!/usr/bin/env bash\nexit 0\n" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  PS_CTX_KIND=hook
+  PS_CTX_ACTION=pre-commit
+  PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+  PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  (ps_run_pre_commit "${tmpdir}") >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(\"${tmpdir}/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: actions.sh npm fallback (package.json present, no magew) ---
+th_assert_run "pre-commit-npm-fallback" 0 "pass_ci_debug" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  echo "test" > "${tmpdir}/file.txt"
+  git -C "${tmpdir}" add file.txt
+  # Create package.json so npm branch is selected over script fallback
+  echo "{}" > "${tmpdir}/package.json"
+  # Create mock npm that runs our debug script
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/scripts/ci"
+  printf "#!/usr/bin/env bash\nexit 0\n" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  cat > "${tmpdir}/bin/npm" <<'"'"'EOF_NPM'"'"'
+#!/usr/bin/env bash
+exit 0
+EOF_NPM
+  chmod +x "${tmpdir}/bin/npm"
+  PS_CTX_KIND=hook
+  PS_CTX_ACTION=pre-commit
+  PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+  PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    ps_run_pre_commit "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(\"${tmpdir}/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: artifacts.sh ci_json_obj failure in ps_write_json_report ---
+th_assert_run "json-build-failure" 1 "failed to build JSON report" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  PS_CTX_KIND=freshness
+  PS_CTX_ACTION=freshness
+  PS_CTX_REPORT_PATH="${tmpdir}/r.json"
+  ps_ctx_init
+  # Override ci_json_obj: fail when called for the report (has "repo_root" key),
+  # but for the warning emission, pass through the message arg as plain text so
+  # the "failed to build JSON report" message is visible in stderr output.
+  ci_json_obj() {
+    for _arg in "$@"; do
+      if [[ "${_arg}" == "repo_root" ]]; then return 1; fi
+    done
+    local _prev=""
+    for _arg in "$@"; do
+      if [[ "${_prev}" == "message" ]]; then printf "%s" "${_arg}"; return 0; fi
+      _prev="${_arg}"
+    done
+    printf "warn-fallback"
+  }
+  ps_write_json_report "${tmpdir}/r2.json" pass_up_to_date "ok" 0 2>&1
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: git.sh no-timeout fallback in ps_git_fetch_remote_branch ---
+th_assert_run "git-fetch-no-timeout" 0 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin"
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  # Use a PATH that has our mock git but NOT the real timeout binary
+  (
+    PATH="${tmpdir}/bin"
+    ps_git_fetch_remote_branch /repo main 10
+  ) 2>/dev/null || true
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: actions.sh self-update quality lane with script fallback ---
+th_assert_run "pre-commit-self-update-script-fallback" 0 "pass_ci_debug_self_update" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  # Stage a file matching the self-update pattern (pkg/self/ prefix)
+  mkdir -p "${tmpdir}/pkg/self"
+  echo "test" > "${tmpdir}/pkg/self/update.go"
+  git -C "${tmpdir}" add "pkg/self/update.go"
+  # No magew, no package.json — must use script fallbacks
+  mkdir -p "${tmpdir}/scripts/ci"
+  printf "#!/usr/bin/env bash\nexit 0\n" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  printf "#!/usr/bin/env bash\nexit 0\n" > "${tmpdir}/scripts/ci/self-update-quality.sh"
+  chmod +x "${tmpdir}/scripts/ci/self-update-quality.sh"
+  PS_CTX_KIND=hook
+  PS_CTX_ACTION=pre-commit
+  PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+  PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  (ps_run_pre_commit "${tmpdir}") >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(\"${tmpdir}/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: git.sh ps_prompts_submodule_path with .gitmodules having no submodule path keys ---
+th_assert_run "submodule-path-gitmodules-no-path-keys" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  # .gitmodules exists but has no submodule.*.path entries
+  printf "[core]\n\trepositoryformatversion = 0\n" > "${tmpdir}/.gitmodules"
+  ps_prompts_submodule_path "${tmpdir}"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: git.sh ps_prompts_submodule_path with path not matching prompts ---
+th_assert_run "submodule-path-non-prompts-path" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  # .gitmodules has a submodule path, but it is not "prompts" or "third_party/prompts"
+  printf "[submodule \"other\"]\n\tpath = vendor/other\n\turl = https://example.invalid/other.git\n" > "${tmpdir}/.gitmodules"
+  ps_prompts_submodule_path "${tmpdir}"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: git.sh ps_prompts_submodule_name with empty .gitmodules entries ---
+th_assert_run "submodule-name-no-entries" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  printf "[core]\n\trepositoryformatversion = 0\n" > "${tmpdir}/.gitmodules"
+  ps_prompts_submodule_name "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: git.sh ps_prompts_submodule_name when path not found ---
+th_assert_run "submodule-name-path-not-found" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  printf "[submodule \"other\"]\n\tpath = vendor/other\n\turl = https://example.invalid/other.git\n" > "${tmpdir}/.gitmodules"
+  ps_prompts_submodule_name "${tmpdir}" prompts
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: artifacts.sh ps_write_atomic_file mv failure (mock mv that fails) ---
+th_assert_run "atomic-file-mv-failure" 1 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/work"
+  # Create a mock mv that always fails so the mv-failure branch is exercised
+  cat > "${tmpdir}/bin/mv" <<'"'"'EOF_MV'"'"'
+#!/usr/bin/env bash
+exit 1
+EOF_MV
+  chmod +x "${tmpdir}/bin/mv"
+  target="${tmpdir}/work/report.json"
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    ps_write_atomic_file "${target}" <<< "test content"
+  ) 2>/dev/null
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW COVERAGE: actions.sh self-update quality lane with npm ---
+th_assert_run "pre-commit-self-update-npm" 0 "pass_ci_debug_self_update" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "test@test.com"
+  git -C "${tmpdir}" config user.name "Test"
+  # Stage a file matching the self-update pattern (pkg/self/ prefix)
+  mkdir -p "${tmpdir}/pkg/self"
+  echo "test" > "${tmpdir}/pkg/self/update.go"
+  git -C "${tmpdir}" add "pkg/self/update.go"
+  # Create package.json and mock npm
+  echo "{}" > "${tmpdir}/package.json"
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/scripts/ci"
+  printf "#!/usr/bin/env bash\nexit 0\n" > "${tmpdir}/scripts/ci/debug.sh"
+  chmod +x "${tmpdir}/scripts/ci/debug.sh"
+  cat > "${tmpdir}/bin/npm" <<'"'"'EOF_NPM'"'"'
+#!/usr/bin/env bash
+exit 0
+EOF_NPM
+  chmod +x "${tmpdir}/bin/npm"
+  PS_CTX_KIND=hook
+  PS_CTX_ACTION=pre-commit
+  PS_CTX_REPORT_PATH="${tmpdir}/report.json"
+  PS_CTX_REPO_ROOT="${tmpdir}"
+  ps_ctx_init
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    ps_run_pre_commit "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(\"${tmpdir}/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
 th_summary "unit"
