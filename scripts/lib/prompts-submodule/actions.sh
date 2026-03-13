@@ -23,6 +23,8 @@ ps_capture_run() {
   # Ensure temp files are cleaned up on any exit path (including signals).
   trap 'rm -f "${stdout_file}" "${stderr_file}"' RETURN
   "$@" >"${stdout_file}" 2>"${stderr_file}" || rc=$?
+  # PS_LAST_COMMAND_STDOUT is intentionally captured but not always used by callers.
+  # shellcheck disable=SC2034
   PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
   PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
   return "${rc}"

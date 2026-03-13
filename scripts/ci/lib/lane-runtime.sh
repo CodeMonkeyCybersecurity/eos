@@ -171,6 +171,6 @@ lane_on_err() {
   CI_LANE_FAILED_STAGE="${CI_LANE_STAGE}"
   CI_LANE_FAILED_COMMAND="${cmd}"
   CI_LANE_FAILED_LINE="${line}"
-  CI_LANE_FAILED_EXIT="${exit_code}"
+  export CI_LANE_FAILED_EXIT="${exit_code}"
   lane_finish "fail" "${CI_LANE_NAME} failed at stage ${CI_LANE_STAGE} line ${line}" "${exit_code}"
 }

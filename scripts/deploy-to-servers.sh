@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-SERVERS="${@:-vhost2}"  # Default to vhost2, or use provided list
+SERVERS="${*:-vhost2}"  # Default to vhost2, or use provided list
 BUILD_DIR="/tmp/eos-deploy-$(date +%s)"
 INSTALL_PATH="/usr/local/bin/eos"
 

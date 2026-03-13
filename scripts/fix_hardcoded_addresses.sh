@@ -4,13 +4,6 @@
 
 set -euo pipefail
 
-# Detect OS for sed compatibility
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    SED_INPLACE="sed -i ''"
-else
-    SED_INPLACE="sed -i"
-fi
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'

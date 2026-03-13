@@ -104,7 +104,7 @@ awk -v cov="${focus_coverage}" -v min="${focus_threshold}" 'BEGIN { if (cov+0 < 
   false
 }
 
-CI_LANE_EXTRA_METRICS="# TYPE eos_self_update_quality_coverage_percent gauge
+export CI_LANE_EXTRA_METRICS="# TYPE eos_self_update_quality_coverage_percent gauge
 eos_self_update_quality_coverage_percent ${focus_coverage}
 # TYPE eos_self_update_quality_threshold_percent gauge
 eos_self_update_quality_threshold_percent ${focus_threshold}
@@ -115,7 +115,7 @@ eos_self_update_quality_integration_weight ${integration_weight}
 # TYPE eos_self_update_quality_e2e_weight gauge
 eos_self_update_quality_e2e_weight ${e2e_weight}"
 
-CI_LANE_EXTRA_REPORT_FIELDS="coverage_percent=${focus_coverage}
+export CI_LANE_EXTRA_REPORT_FIELDS="coverage_percent=${focus_coverage}
 coverage_threshold=#int:${focus_threshold}
 weight_unit=#int:${unit_weight}
 weight_integration=#int:${integration_weight}
