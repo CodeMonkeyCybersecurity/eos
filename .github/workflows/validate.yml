@@ -1,45 +1,86 @@
+# validate.yml - Workflow YAML validation
+# Last Updated: 2026-02-22
+
 name: Validate Workflows
+
 on:
   pull_request:
     paths:
       - '.github/workflows/**'
+      - '.github/actions/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Go for actionlint
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Validate YAML syntax
         run: |
-          echo "Validating workflow YAML files..."
-          # Install yq for YAML validation
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml
           for file in .github/workflows/*.yml; do
             echo "Checking $file"
-            yq eval '.' "$file" > /dev/null || exit 1
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" || exit 1
           done
           echo "All workflow files are valid YAML"
 
       - name: Check workflow structure
         run: |
-          echo "Checking basic workflow structure..."
           for file in .github/workflows/*.yml; do
             if ! grep -q "^name:" "$file"; then
-              echo "Error: $file missing 'name' field"
+              echo "::error file=$file::Missing 'name' field"
               exit 1
             fi
             if ! grep -q "^on:" "$file"; then
-              echo "Error: $file missing 'on' field"
+              echo "::error file=$file::Missing 'on' field"
               exit 1
             fi
             if ! grep -q "^jobs:" "$file"; then
-              echo "Error: $file missing 'jobs' field"
+              echo "::error file=$file::Missing 'jobs' field"
               exit 1
             fi
           done
           echo "All workflow files have required structure"
+
+      - name: Run actionlint
+        run: |
+          if command -v go >/dev/null 2>&1; then
+            go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.11 -color
+          else
+            echo "::warning::go runtime is unavailable; skipping actionlint"
+          fi
+
+      - name: Check composite action references
+        run: |
+          rm -f /tmp/validate-action-fail
+          for file in .github/workflows/*.yml; do
+            ACTIONS=$(grep -o 'uses: \.\/\.github\/actions\/[^[:space:]]*' "$file" 2>/dev/null || true)
+            if [ -z "$ACTIONS" ]; then
+              continue
+            fi
+            echo "$ACTIONS" | sed 's|uses: \./\.github/actions/||' | sort -u | while read -r action; do
+              action="${action%/}"
+              if [ -n "$action" ] && [ ! -f ".github/actions/$action/action.yml" ]; then
+                echo "::error file=$file::References nonexistent action: .github/actions/$action"
+                echo "FAIL" > /tmp/validate-action-fail
+              fi
+            done
+          done
+          if [ -f /tmp/validate-action-fail ]; then
+            rm -f /tmp/validate-action-fail
+            exit 1
+          fi
+          echo "All composite action references are valid"

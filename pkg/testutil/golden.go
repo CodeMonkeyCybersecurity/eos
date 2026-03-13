@@ -47,9 +47,11 @@ func NewGolden(t *testing.T) *GoldenFile {
 		t.Fatalf("Failed to create golden directory: %v", err)
 	}
 
-	// Configure cupaloy to use our directory structure
+	// Configure cupaloy to use our directory structure.
+	// FatalOnMismatch ensures test stops immediately on snapshot mismatch.
 	snapshotter := cupaloy.New(
 		cupaloy.SnapshotSubdirectory(goldenDir),
+		cupaloy.FatalOnMismatch(true),
 		cupaloy.ShouldUpdate(func() bool {
 			// Check for -update flag
 			for _, arg := range os.Args {
@@ -72,14 +74,18 @@ func NewGolden(t *testing.T) *GoldenFile {
 // On first run, it creates the golden file
 // On subsequent runs, it compares against the golden file
 // With -update flag, it updates the golden file
+//
+// Uses t.Name() for the snapshot filename, which produces cross-platform safe
+// names (e.g. "TestFoo_Bar"). Do NOT use cupaloy's Snapshot() directly — it
+// derives filenames from runtime.Callers() which includes Go pointer receiver
+// syntax like (*Type), producing NTFS-illegal characters (* and parentheses).
 func (g *GoldenFile) Assert(got interface{}) {
 	g.t.Helper()
 
-	// Use test name as snapshot name
-	err := g.snapshotter.Snapshot(got)
-	if err != nil {
-		g.t.Fatalf("Golden file assertion failed: %v\n\nTo update golden files, run:\n  go test -update", err)
-	}
+	// Use SnapshotT (t.Name()-based) instead of Snapshot (callstack-based)
+	// to avoid NTFS-illegal characters in golden filenames.
+	// See: cybermonkey/gitea#102, cybermonkey/eos#19
+	g.snapshotter.SnapshotT(g.t, got)
 }
 
 // AssertWithName compares with a custom snapshot name

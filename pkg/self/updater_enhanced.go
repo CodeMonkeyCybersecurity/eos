@@ -36,6 +36,17 @@ type UpdateTransaction struct {
 	ChangesPulled    bool
 	BinaryInstalled  bool
 	Success          bool
+	SkipReason       string
+	Steps            []UpdateStepResult
+}
+
+// UpdateStepResult captures a transaction step for structured logging and postmortem review.
+type UpdateStepResult struct {
+	Name       string
+	Status     string
+	Message    string
+	Duration   time.Duration
+	OccurredAt time.Time
 }
 
 // EnhancedUpdateConfig extends UpdateConfig with safety features
@@ -76,6 +87,43 @@ func NewEnhancedEosUpdater(rc *eos_io.RuntimeContext, config *EnhancedUpdateConf
 			StartTime: time.Now(),
 		},
 	}
+}
+
+func (eeu *EnhancedEosUpdater) recordTransactionStep(name, status, message string, started time.Time) {
+	result := UpdateStepResult{
+		Name:       name,
+		Status:     status,
+		Message:    message,
+		Duration:   time.Since(started),
+		OccurredAt: started.UTC(),
+	}
+	eeu.transaction.Steps = append(eeu.transaction.Steps, result)
+	eeu.logger.Info("Self-update transaction step",
+		zap.String("event", "self_update.transaction.step"),
+		zap.String("step", result.Name),
+		zap.String("status", result.Status),
+		zap.String("message", result.Message),
+		zap.Duration("duration", result.Duration),
+		zap.Time("started_at", result.OccurredAt))
+}
+
+func (eeu *EnhancedEosUpdater) runTransactionStep(name, message string, fn func() error) error {
+	started := time.Now()
+	eeu.logger.Info("Starting self-update transaction step",
+		zap.String("event", "self_update.transaction.step.start"),
+		zap.String("step", name),
+		zap.String("message", message))
+	if err := fn(); err != nil {
+		eeu.recordTransactionStep(name, "failed", err.Error(), started)
+		return err
+	}
+	eeu.recordTransactionStep(name, "completed", message, started)
+	return nil
+}
+
+func (eeu *EnhancedEosUpdater) skipTransactionStep(name, message string) {
+	started := time.Now()
+	eeu.recordTransactionStep(name, "skipped", message, started)
 }
 
 // UpdateWithRollback performs update with automatic rollback on failure
@@ -144,53 +192,33 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	eeu.logger.Info(" Enhanced self-update completed successfully",
 		zap.Duration("duration", time.Since(eeu.transaction.StartTime)))
 
-	// Display clear success summary to user
-	fmt.Println()
-	fmt.Println("════════════════════════════════════════════════════════════════")
+	// Display clear success summary to user via structured logging
 	if eeu.transaction.BinaryInstalled {
-		// Show before/after commit hashes (first 8 chars)
 		afterCommit := "unknown"
 		if currentCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir); err == nil {
 			afterCommit = currentCommit
 		}
-		if len(eeu.transaction.GitCommitBefore) >= 8 && len(afterCommit) >= 8 {
-			fmt.Printf("Update complete: %s → %s\n",
-				eeu.transaction.GitCommitBefore[:8],
-				afterCommit[:8])
-		} else {
-			fmt.Println("Update complete")
-		}
+		eeu.logger.Info("Update complete",
+			zap.String("from", truncateCommit(eeu.transaction.GitCommitBefore)),
+			zap.String("to", truncateCommit(afterCommit)))
 	} else {
-		// Already on latest version
-		if len(eeu.transaction.GitCommitBefore) >= 8 {
-			fmt.Printf("Already on latest version: %s\n",
-				eeu.transaction.GitCommitBefore[:8])
-		} else {
-			fmt.Println("Already on latest version")
-		}
+		eeu.logger.Info("Already on latest version",
+			zap.String("commit", truncateCommit(eeu.transaction.GitCommitBefore)))
 	}
 
-	// Show what was updated
 	if eeu.enhancedConfig.UpdateSystemPackages {
-		fmt.Println("   System packages: Updated")
+		eeu.logger.Info("System packages updated")
 	}
 	if eeu.enhancedConfig.UpdateGoVersion {
-		fmt.Println("   Go compiler: Updated")
+		eeu.logger.Info("Go compiler updated")
 	}
-
-	fmt.Println("════════════════════════════════════════════════════════════════")
-	fmt.Println()
 
 	// Check for running processes - use existing pattern
 	if eeu.enhancedConfig.CheckRunningProcesses {
-		// Use WarnAboutRunningProcesses which already checks and logs
 		if err := process.WarnAboutRunningProcesses(eeu.rc, "eos"); err == nil {
-			fmt.Println("")
-			fmt.Println("Restart running eos processes to use new version")
+			eeu.logger.Info("Restart running eos processes to use new version")
 		}
 	}
-
-	fmt.Println()
 
 	return nil
 }
@@ -340,30 +368,10 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		}
 
 		// Interactive mode - prompt for informed consent
-		fmt.Println()
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println("⚠️  WARNING: Uncommitted Changes Detected")
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println()
-		fmt.Printf("Repository: %s\n", eeu.config.SourceDir)
-		fmt.Println()
-		fmt.Println("You have uncommitted changes in your Eos source directory.")
-		fmt.Println()
-		fmt.Println("RISKS:")
-		fmt.Println("  • If the update fails, your changes will be preserved BUT")
-		fmt.Println("  • The repository will be in an inconsistent state")
-		fmt.Println("  • Rollback will restore your changes, but this adds complexity")
-		fmt.Println()
-		fmt.Println("SAFER OPTIONS:")
-		fmt.Println("  1. Cancel now, commit your changes, then re-run update")
-		fmt.Println("  2. Cancel now, stash your changes, then re-run update")
-		fmt.Println("  3. Cancel now, discard your changes, then re-run update")
-		fmt.Println()
-		fmt.Println("OR:")
-		fmt.Println("  4. Continue at your own risk (changes will be auto-stashed)")
-		fmt.Println()
-		fmt.Println("═══════════════════════════════════════════════════════════════")
-		fmt.Println()
+		eeu.logger.Warn("Uncommitted changes detected - user consent required",
+			zap.String("repo", eeu.config.SourceDir))
+		eeu.logger.Info("RISKS: If the update fails, changes are preserved but repository will be in inconsistent state. Rollback restores changes but adds complexity")
+		eeu.logger.Info("SAFER OPTIONS: (1) Cancel, commit changes, re-run; (2) Cancel, stash, re-run; (3) Cancel, discard, re-run; (4) Continue (changes auto-stashed)")
 
 		// Use interaction package for consistent prompting
 		// Default to NO (safer option)
@@ -386,11 +394,8 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		}
 
 		// User chose to continue - warn and proceed
-		eeu.logger.Warn("User chose to proceed with uncommitted changes",
+		eeu.logger.Warn("User chose to proceed with uncommitted changes - auto-stashing",
 			zap.String("repo", eeu.config.SourceDir))
-		fmt.Println()
-		fmt.Println("Proceeding with update (uncommitted changes will be auto-stashed)...")
-		fmt.Println()
 
 		// Note: P0-2 already implemented stash tracking, so this is now safe
 		// Changes will be stashed before pull and restored if rollback needed
@@ -526,7 +531,7 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 	}
 
 	eeu.transaction.GitCommitBefore = commitHash
-	eeu.logger.Info("Git state recorded", zap.String("commit", commitHash[:8]))
+	eeu.logger.Info("Git state recorded", zap.String("commit", truncateCommit(commitHash)))
 
 	return nil
 }
@@ -691,72 +696,64 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	defer updateLock.Release()
 	eeu.logger.Debug("Update lock acquired - safe to proceed with transaction")
 
-	// Step 1: Create binary backup and record current binary hash
-	currentHash, err := eeu.createTransactionBackup()
-	if err != nil {
-		return fmt.Errorf("failed to create backup: %w", err)
-	}
-
-	// Step 2: Pull latest code
-	codeChanged, err := eeu.pullLatestCodeWithVerification()
-	if err != nil {
-		return fmt.Errorf("failed to pull latest code: %w", err)
-	}
-	eeu.transaction.ChangesPulled = codeChanged
-
-	// Check if binary needs rebuilding by comparing embedded commit vs source HEAD
-	// This is the key fix: even if git pull returns no changes (already up-to-date),
-	// the binary might have been built from an older commit
-	sourceCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
-	if err != nil {
-		eeu.logger.Warn("Could not get source commit for comparison", zap.Error(err))
-		// Continue with rebuild to be safe
-	} else {
-		binaryCommit := shared.BuildCommit
-		eeu.logger.Info("Comparing binary vs source commit",
-			zap.String("binary_commit", truncateCommit(binaryCommit)),
-			zap.String("source_commit", truncateCommit(sourceCommit)))
-
-		// If binary was built from same commit as source HEAD, skip rebuild
-		if binaryCommit != "" && binaryCommit == sourceCommit {
-			eeu.logger.Info(" Binary is built from current source commit, skipping rebuild",
-				zap.String("commit", truncateCommit(sourceCommit)))
-			eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
-			return nil
+	var currentHash string
+	if err := eeu.runTransactionStep("pull_source", "Pull latest source changes", func() error {
+		codeChanged, pullErr := eeu.pullLatestCodeWithVerification()
+		if pullErr != nil {
+			return fmt.Errorf("failed to pull latest code: %w", pullErr)
 		}
+		eeu.transaction.ChangesPulled = codeChanged
+		return nil
+	}); err != nil {
+		return err
+	}
 
-		// Binary needs rebuild - either no commit embedded or commits don't match
-		if binaryCommit == "" {
-			eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
-				zap.String("source_commit", truncateCommit(sourceCommit)))
-		} else {
-			eeu.logger.Info(" Binary commit differs from source, rebuilding",
-				zap.String("binary_commit", truncateCommit(binaryCommit)),
-				zap.String("source_commit", truncateCommit(sourceCommit)))
+	buildNeeded, reason := eeu.shouldBuildBinary()
+	if !buildNeeded {
+		eeu.transaction.SkipReason = reason
+		eeu.skipTransactionStep("build_binary", reason)
+		eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
+		return nil
+	}
+
+	if err := eeu.runTransactionStep("hash_current_binary", "Hash currently installed binary", func() error {
+		hash, hashErr := crypto.HashFile(eeu.config.BinaryPath)
+		if hashErr != nil {
+			return fmt.Errorf("failed to hash current binary: %w", hashErr)
 		}
+		currentHash = hash
+		eeu.logger.Info("Current binary metadata",
+			zap.String("event", "self_update.binary.current"),
+			zap.String("sha256", currentHash[:16]+"..."))
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// Step 3: Build new binary
-	eeu.logger.Info(" Building new binary from source")
-	tempBinary, err := eeu.BuildBinary()
-	if err != nil {
-		return fmt.Errorf("failed to build new binary: %w", err)
+	if err := eeu.runTransactionStep("build_binary", "Build new eos binary from source", func() error {
+		tempBinary, buildErr := eeu.BuildBinary()
+		if buildErr != nil {
+			return fmt.Errorf("failed to build new binary: %w", buildErr)
+		}
+		eeu.transaction.TempBinaryPath = tempBinary
+		return nil
+	}); err != nil {
+		return err
 	}
-	eeu.transaction.TempBinaryPath = tempBinary
 
-	// Step 3a: Compare new binary hash with current binary hash
-	newHash, err := crypto.HashFile(tempBinary)
+	newHash, err := crypto.HashFile(eeu.transaction.TempBinaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to hash new binary: %w", err)
 	}
 
 	if newHash == currentHash {
+		eeu.transaction.SkipReason = "built binary matches installed binary"
 		eeu.logger.Info(" New binary is identical to current binary (SHA256 match)",
 			zap.String("sha256", newHash[:16]+"..."))
 		eeu.logger.Info("terminal prompt: ✓ Binary unchanged - no update needed")
-
-		// Clean up temp binary
-		_ = os.Remove(tempBinary)
+		_ = os.Remove(eeu.transaction.TempBinaryPath)
+		eeu.skipTransactionStep("backup_binary", "Skipped backup because install was not required")
+		eeu.skipTransactionStep("install_binary", eeu.transaction.SkipReason)
 		return nil
 	}
 
@@ -764,26 +761,82 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 		zap.String("old_sha256", currentHash[:16]+"..."),
 		zap.String("new_sha256", newHash[:16]+"..."))
 
-	// Step 4: Validate new binary
-	if !eeu.config.SkipValidation {
-		if err := eeu.ValidateBinary(tempBinary); err != nil {
-			return fmt.Errorf("new binary validation failed: %w", err)
+	if err := eeu.runTransactionStep("backup_binary", "Create verified rollback backup of installed binary", func() error {
+		backupHash, backupErr := eeu.createTransactionBackup()
+		if backupErr != nil {
+			return fmt.Errorf("failed to create backup: %w", backupErr)
 		}
+		if backupHash != currentHash {
+			return fmt.Errorf("backup hash mismatch with current binary hash")
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	// Step 5: Install new binary atomically
-	if err := eeu.installBinaryAtomic(tempBinary); err != nil {
-		return fmt.Errorf("failed to install new binary: %w", err)
+	if !eeu.config.SkipValidation {
+		if err := eeu.runTransactionStep("validate_binary", "Validate newly built binary", func() error {
+			if validateErr := eeu.ValidateBinary(eeu.transaction.TempBinaryPath); validateErr != nil {
+				return fmt.Errorf("new binary validation failed: %w", validateErr)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+	} else {
+		eeu.skipTransactionStep("validate_binary", "Binary validation skipped by configuration")
 	}
-	eeu.transaction.BinaryInstalled = true
 
-	// Step 6: Verify installed binary
-	if err := eeu.Verify(); err != nil {
-		return fmt.Errorf("installed binary verification failed: %w", err)
+	if err := eeu.runTransactionStep("install_binary", "Install binary atomically", func() error {
+		if installErr := eeu.installBinaryAtomic(eeu.transaction.TempBinaryPath); installErr != nil {
+			return fmt.Errorf("failed to install new binary: %w", installErr)
+		}
+		eeu.transaction.BinaryInstalled = true
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := eeu.runTransactionStep("verify_install", "Verify installed binary", func() error {
+		if verifyErr := eeu.Verify(); verifyErr != nil {
+			return fmt.Errorf("installed binary verification failed: %w", verifyErr)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	eeu.logger.Info(" Update transaction completed successfully")
 	return nil
+}
+
+func (eeu *EnhancedEosUpdater) shouldBuildBinary() (bool, string) {
+	sourceCommit, err := git.GetCurrentCommit(eeu.rc, eeu.config.SourceDir)
+	if err != nil {
+		eeu.logger.Warn("Could not get source commit for comparison", zap.Error(err))
+		return true, "source commit unavailable; rebuilding defensively"
+	}
+
+	binaryCommit := shared.BuildCommit
+	eeu.logger.Info("Comparing binary vs source commit",
+		zap.String("event", "self_update.binary.compare"),
+		zap.String("binary_commit", truncateCommit(binaryCommit)),
+		zap.String("source_commit", truncateCommit(sourceCommit)))
+
+	if binaryCommit != "" && binaryCommit == sourceCommit {
+		return false, "installed binary already matches source commit"
+	}
+
+	if binaryCommit == "" {
+		eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
+			zap.String("source_commit", truncateCommit(sourceCommit)))
+	} else {
+		eeu.logger.Info(" Binary commit differs from source, rebuilding",
+			zap.String("binary_commit", truncateCommit(binaryCommit)),
+			zap.String("source_commit", truncateCommit(sourceCommit)))
+	}
+
+	return true, "installed binary commit differs from source commit"
 }
 
 // createTransactionBackup creates a backup with transaction metadata and returns current binary hash
@@ -912,27 +965,14 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 			currentSize, backupFdStat.Size())
 	}
 
-	// Phase 8: Verify backup hash by re-reading from the SAME FD
-	// P0 FIX: Check Seek() error - unchecked seek can cause silent data corruption
-	if _, err := backupFd.Seek(0, 0); err != nil {
+	// Phase 8: Verify backup hash using streaming hash (avoids double memory allocation)
+	// Close the FD first so HashFile can open it independently
+	backupFd.Close()
+	backupHash, err := crypto.HashFile(expectedBackupPath)
+	if err != nil {
 		_ = os.Remove(expectedBackupPath)
-		return "", fmt.Errorf("failed to rewind backup file for verification: %w\n"+
-			"This could indicate:\n"+
-			"  1. File descriptor corruption\n"+
-			"  2. Filesystem errors\n"+
-			"  3. File was deleted during write", err)
+		return "", fmt.Errorf("failed to hash backup for verification: %w", err)
 	}
-
-	backupData := make([]byte, currentSize)
-	defer func() { backupData = nil }() // P1 FIX: Explicit hint to GC for large allocations
-
-	n, err = backupFd.Read(backupData)
-	if err != nil || int64(n) != currentSize {
-		_ = os.Remove(expectedBackupPath)
-		return "", fmt.Errorf("failed to re-read backup for verification: %w", err)
-	}
-
-	backupHash := crypto.HashData(backupData)
 	if backupHash != currentHash {
 		_ = os.Remove(expectedBackupPath)
 		return "", fmt.Errorf("backup hash mismatch after write\n"+
@@ -946,9 +986,8 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 			currentHash[:16]+"...", backupHash[:16]+"...")
 	}
 
-	// Explicit memory cleanup - we've verified backup, don't need data anymore
+	// Release source data - backup is verified
 	binaryData = nil
-	backupData = nil
 
 	eeu.logger.Info("Transaction backup created and verified via FD operations",
 		zap.String("path", expectedBackupPath),
@@ -962,21 +1001,28 @@ func (eeu *EnhancedEosUpdater) createTransactionBackup() (string, error) {
 // P0-2 FIX: Uses manual stash management to track stash ref for rollback
 // Returns true if code changed, false if already up-to-date
 func (eeu *EnhancedEosUpdater) pullLatestCodeWithVerification() (bool, error) {
-	// Use stash tracking version for rollback safety
-	codeChanged, stashRef, err := git.PullWithStashTracking(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch)
+	result, err := git.PullRepository(eeu.rc, eeu.config.SourceDir, eeu.config.GitBranch, git.PullOptions{
+		VerifyRemote:                  true,
+		FailOnMissingHTTPSCredentials: true,
+		TrackRollbackStash:            true,
+		VerifyCommitSignatures:        true,
+		NormalizeOwnershipForSudo:     true,
+		RecoverMergeConflicts:         true,
+		FetchFirst:                    true,
+	})
 	if err != nil {
 		return false, err
 	}
 
 	// Store stash ref in transaction for rollback
-	eeu.transaction.GitStashRef = stashRef
+	eeu.transaction.GitStashRef = result.StashRef
 
-	if stashRef != "" {
+	if result.StashRef != "" {
 		eeu.logger.Info("Stash tracked in transaction for rollback",
-			zap.String("ref", stashRef[:8]+"..."))
+			zap.String("ref", truncateCommit(result.StashRef)))
 	}
 
-	return codeChanged, nil
+	return result.CodeChanged, nil
 }
 
 // installBinaryAtomic installs the binary atomically with flock-based locking
@@ -1169,7 +1215,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("Reverting git repository to previous commit",
-					zap.String("commit", eeu.transaction.GitCommitBefore[:8]))
+					zap.String("commit", truncateCommit(eeu.transaction.GitCommitBefore)))
 
 				// SAFETY: Only do hard reset if we have a stash OR working tree is clean
 				// This prevents destroying uncommitted work if stash creation failed
@@ -1242,7 +1288,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 				}
 
 				eeu.logger.Info("Restoring uncommitted changes from stash",
-					zap.String("ref", eeu.transaction.GitStashRef[:8]+"..."))
+					zap.String("ref", truncateCommit(eeu.transaction.GitStashRef)))
 
 				// Use helper function from git package
 				if err := git.RestoreStash(eeu.rc, eeu.config.SourceDir, eeu.transaction.GitStashRef); err != nil {
@@ -1250,7 +1296,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					// Stash is still preserved for manual recovery
 					eeu.logger.Warn("Failed to restore stash automatically",
 						zap.Error(err),
-						zap.String("stash_ref", eeu.transaction.GitStashRef[:8]+"..."))
+						zap.String("stash_ref", truncateCommit(eeu.transaction.GitStashRef)))
 					return fmt.Errorf("failed to restore stash (stash preserved): %w\n\n"+
 						"Your uncommitted changes are saved in stash.\n"+
 						"Manual recovery:\n"+
@@ -1395,6 +1441,14 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 	// Note: We no longer manually manage stash - git pull --autostash handles it automatically
 	// This prevents orphaned stashes and merge conflicts
 
+	for _, step := range eeu.transaction.Steps {
+		eeu.logger.Debug("Transaction step summary",
+			zap.String("step", step.Name),
+			zap.String("status", step.Status),
+			zap.String("message", step.Message),
+			zap.Duration("duration", step.Duration))
+	}
+
 	return nil
 }
 
@@ -1419,34 +1473,9 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	}
 
 	// Explain what will happen
-	eeu.logger.Info("System package update available")
-	fmt.Println("\nEos can update your system packages to ensure build dependencies are current.")
-	fmt.Println("")
-	fmt.Printf("Package manager: %s\n", packageManager)
-	fmt.Println("")
-	fmt.Println("This will run:")
-
-	switch packageManager {
-	case system.PackageManagerApt:
-		fmt.Println("  1. sudo apt update        (refresh package lists)")
-		fmt.Println("  2. sudo apt upgrade -y    (install updates)")
-		fmt.Println("  3. sudo apt autoremove -y (remove old packages)")
-	case system.PackageManagerYum:
-		fmt.Println("  1. sudo yum update -y     (update packages)")
-		fmt.Println("  2. sudo yum autoremove -y (remove old packages)")
-	case system.PackageManagerDnf:
-		fmt.Println("  1. sudo dnf update -y     (update packages)")
-		fmt.Println("  2. sudo dnf autoremove -y (remove old packages)")
-	case system.PackageManagerPacman:
-		fmt.Println("  1. sudo pacman -Syu       (update packages)")
-	}
-
-	fmt.Println("")
-	fmt.Println("IMPORTANT:")
-	fmt.Println("  • This may take 5-30 minutes depending on your system")
-	fmt.Println("  • Some updates may require a system reboot")
-	fmt.Println("  • You can skip this and update packages manually later")
-	fmt.Println("")
+	eeu.logger.Info("System package update available",
+		zap.String("manager", string(packageManager)))
+	eeu.logger.Info("System package updates ensure build dependencies are current. This may take 5-30 minutes. Some updates may require a reboot. You can skip and update manually later")
 
 	// Ask for consent
 	confirmed, err := interaction.PromptYesNoSafe(eeu.rc,
@@ -1458,27 +1487,12 @@ func (eeu *EnhancedEosUpdater) UpdateSystemPackages() error {
 	}
 
 	if !confirmed {
-		eeu.logger.Info("User declined system package updates")
-		fmt.Println("\nSkipping system package updates.")
-		fmt.Println("You can update manually with:")
-
-		switch packageManager {
-		case system.PackageManagerApt:
-			fmt.Println("  sudo apt update && sudo apt upgrade -y")
-		case system.PackageManagerYum:
-			fmt.Println("  sudo yum update -y")
-		case system.PackageManagerDnf:
-			fmt.Println("  sudo dnf update -y")
-		case system.PackageManagerPacman:
-			fmt.Println("  sudo pacman -Syu")
-		}
-
+		eeu.logger.Info("User declined system package updates. Update manually with your package manager when ready")
 		return nil
 	}
 
 	// User consented - proceed with update
-	eeu.logger.Info("User consented to system package updates")
-	fmt.Println("\nUpdating system packages...")
+	eeu.logger.Info("User consented to system package updates, proceeding")
 
 	return system.UpdateSystemPackages(eeu.rc, packageManager)
 }

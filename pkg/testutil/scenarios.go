@@ -191,7 +191,7 @@ func RuntimeContextLifecycleScenario() TestScenario {
 					// Test setting and getting attributes
 					testAttributes := map[string]string{
 						"test_key":   "test_value",
-						"vault_addr": "http://shared.GetInternalHostname:8200",
+						"vault_addr": "http://localhost:8200",
 						"log_level":  "debug",
 						"component":  "integration-test",
 					}

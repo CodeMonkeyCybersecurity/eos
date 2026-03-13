@@ -1,0 +1,58 @@
+name: CI Debug Parity
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  ci-debug:
+    runs-on: [self-hosted, general]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v5.0.2
+        with:
+          go-version-file: go.mod
+
+      - name: Verify ci:debug parity contract
+        run: |
+          set -euo pipefail
+          make ci-verify-parity
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Run npm ci:debug
+        env:
+          CI: "true"
+          GITEA_ACTIONS: "true"
+        run: |
+          set -euo pipefail
+          npm run ci:debug --silent
+
+      - name: Print ci:debug artifacts
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
+          test -f outputs/ci/debug/metrics.prom && cat outputs/ci/debug/metrics.prom || true
+          test -f outputs/ci/governance-propagation-coverage/coverage.txt && cat outputs/ci/governance-propagation-coverage/coverage.txt || true
+
+      - name: Alert on ci:debug failure details
+        if: always()
+        run: |
+          set -euo pipefail
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::warning::python3 unavailable; skipping ci:debug alert extraction"
+            exit 0
+          fi
+          python3 scripts/ci/report-alert.py ci-debug outputs/ci/debug/report.json

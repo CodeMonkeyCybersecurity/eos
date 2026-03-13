@@ -3,24 +3,31 @@
 package vault
 
 import (
-    "crypto/tls"
-    "crypto/x509"
-    "fmt"
-    "net"
-    "net/url"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "syscall"
-    "time"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"net"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+)
+
+var (
+	vaultPromptYesNo          = interaction.PromptYesNoSafe
+	vaultIsInteractive        = isInteractiveTerminal
+	vaultInsecureAuditLogPath = "/var/log/eos/vault-insecure-tls-audit.log"
 )
 
 //--------------------------------------------------------------------
@@ -284,6 +291,10 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 
 	// Check for development mode override
 	if os.Getenv("Eos_ALLOW_INSECURE_VAULT") == "true" {
+		if err := recordInsecureVaultTLSDecision(rc, addr, "dev_mode_environment_variable"); err != nil {
+			return "", fmt.Errorf("failed to persist insecure Vault TLS audit trail: %w", err)
+		}
+
 		log.Warn("⚠️  VAULT_SKIP_VERIFY enabled via Eos_ALLOW_INSECURE_VAULT (INSECURE - DEV MODE)",
 			zap.String("VAULT_SKIP_VERIFY", "1"),
 			zap.String("reason", "dev_mode_environment_variable"),
@@ -299,7 +310,7 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("reason", "CA certificate not found or connection failed"))
 
 	// Check if we're in non-interactive mode
-	if !isInteractiveTerminal() {
+	if !vaultIsInteractive() {
 		return "", fmt.Errorf("TLS validation failed and cannot prompt in non-interactive mode\n\n"+
 			"Remediation:\n"+
 			"  1. RECOMMENDED: Install proper CA certificate to /etc/vault/tls/ca.crt\n"+
@@ -314,33 +325,34 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 	}
 
 	// Interactive mode: Ask for informed consent
-	fmt.Println("\n⚠️  SECURITY WARNING: Vault TLS Certificate Validation Failed")
-	fmt.Println("────────────────────────────────────────────────────────────")
-	fmt.Println("Cannot verify Vault server identity. This could indicate:")
-	fmt.Println("  • Vault is using a self-signed certificate (expected during setup)")
-	fmt.Println("  • CA certificate is not in the system trust store")
-	fmt.Println("  • OR a man-in-the-middle attack is in progress")
-	fmt.Println()
-	fmt.Println("Proceeding WITHOUT certificate validation is INSECURE.")
-	fmt.Println("An attacker could intercept your connection and steal secrets.")
-	fmt.Println()
-	fmt.Println("Recommended actions:")
-	fmt.Println("  1. Install Vault's CA certificate to /etc/vault/tls/ca.crt")
-	fmt.Println("  2. Verify with: openssl s_client -connect", addr, "-CAfile /etc/vault/tls/ca.crt")
-	fmt.Println()
-	fmt.Print("Do you want to proceed WITHOUT certificate validation? (yes/NO): ")
-
-	var response string
-	fmt.Scanln(&response)
-
-	response = strings.ToLower(strings.TrimSpace(response))
-	if response != "yes" {
+	// NOTE: Security warning uses structured logging per P0 Rule #1.
+	// Each line is a separate log call for readability in both terminal and telemetry.
+	log.Warn("SECURITY WARNING: Vault TLS Certificate Validation Failed")
+	log.Warn("Cannot verify Vault server identity. This could indicate:",
+		zap.String("possibility_1", "Vault is using a self-signed certificate (expected during setup)"),
+		zap.String("possibility_2", "CA certificate is not in the system trust store"),
+		zap.String("possibility_3", "A man-in-the-middle attack is in progress"))
+	log.Warn("Proceeding WITHOUT certificate validation is INSECURE - an attacker could intercept your connection and steal secrets")
+	log.Info("Recommended actions",
+		zap.String("action_1", "Install Vault CA certificate to /etc/vault/tls/ca.crt"),
+		zap.String("action_2", "Verify with: openssl s_client -connect "+addr+" -CAfile /etc/vault/tls/ca.crt"))
+	response, err := vaultPromptYesNo(rc,
+		"Proceed WITHOUT certificate validation? (INSECURE)",
+		false)
+	if err != nil {
+		return "", fmt.Errorf("failed to get TLS consent: %w", err)
+	}
+	if !response {
 		log.Info("User declined to proceed without TLS validation (security-conscious choice)",
-			zap.String("response", response))
+			zap.Bool("response", false))
 		return "", fmt.Errorf("TLS validation failed and user declined to proceed insecurely")
 	}
 
 	// User explicitly consented - enable skip_verify with logging
+	if err := recordInsecureVaultTLSDecision(rc, addr, "user_consent_interactive"); err != nil {
+		return "", fmt.Errorf("failed to persist insecure Vault TLS audit trail: %w", err)
+	}
+
 	_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
 	_ = os.Setenv(shared.VaultAddrEnv, addr)
 
@@ -352,6 +364,42 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 		zap.String("vault_addr", addr))
 
 	return addr, nil
+}
+
+func recordInsecureVaultTLSDecision(rc *eos_io.RuntimeContext, addr, reason string) error {
+	entry := map[string]string{
+		"event":      "vault.insecure_tls_enabled",
+		"reason":     reason,
+		"vault_addr": addr,
+		"user":       os.Getenv("USER"),
+		"command":    rc.Command,
+		"component":  rc.Component,
+		"time":       time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if err := os.MkdirAll(filepath.Dir(vaultInsecureAuditLogPath), 0o750); err != nil {
+		return fmt.Errorf("create audit log directory: %w", err)
+	}
+
+	payload, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("marshal audit entry: %w", err)
+	}
+
+	f, err := os.OpenFile(vaultInsecureAuditLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open audit log: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(append(payload, '\n')); err != nil {
+		return fmt.Errorf("write audit log: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync audit log: %w", err)
+	}
+
+	return nil
 }
 
 // isInteractiveTerminal checks if stdin is connected to an interactive terminal

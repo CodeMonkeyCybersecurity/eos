@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# shellcheck source=lib/test-harness.sh
+source "${SCRIPT_DIR}/lib/test-harness.sh"
+# shellcheck source=../../scripts/lib/git-env.sh
+source "${REPO_ROOT}/scripts/lib/git-env.sh"
+export GIT_ALLOW_PROTOCOL="file:https:http:ssh"
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "${tmpdir}"' EXIT
+
+remote_bare="${tmpdir}/prompts-remote.git"
+remote_work="${tmpdir}/prompts-work"
+repo="${tmpdir}/eos-test"
+
+# Build the fixture inside a subshell to scope git env contamination.
+# This ensures GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE never leak to
+# the real repo even if ge_run_clean_git misses a command.
+(
+  # Simulate hook environment contamination.
+  export GIT_DIR="${REPO_ROOT}/.git"
+  export GIT_WORK_TREE="${REPO_ROOT}"
+  export GIT_INDEX_FILE="${REPO_ROOT}/.git/index"
+
+  ge_run_clean_git git init --bare "${remote_bare}" >/dev/null 2>&1
+  ge_run_clean_git git clone "${remote_bare}" "${remote_work}" >/dev/null 2>&1
+  ge_run_clean_git git -C "${remote_work}" config user.email "ci@example.com"
+  ge_run_clean_git git -C "${remote_work}" config user.name "CI"
+  echo "v1" > "${remote_work}/README.md"
+  ge_run_clean_git git -C "${remote_work}" add README.md
+  ge_run_clean_git git -C "${remote_work}" commit -m "v1" >/dev/null
+  ge_run_clean_git git -C "${remote_work}" push origin HEAD:main >/dev/null 2>&1
+  ge_run_clean_git git -C "${remote_bare}" symbolic-ref HEAD refs/heads/main >/dev/null 2>&1
+  echo "v2" > "${remote_work}/README.md"
+  ge_run_clean_git git -C "${remote_work}" add README.md
+  ge_run_clean_git git -C "${remote_work}" commit -m "v2" >/dev/null
+  ge_run_clean_git git -C "${remote_work}" push origin HEAD:main >/dev/null 2>&1
+
+  ge_run_clean_git git init "${repo}" >/dev/null 2>&1
+  ge_run_clean_git git -C "${repo}" config user.email "ci@example.com"
+  ge_run_clean_git git -C "${repo}" config user.name "CI"
+  ge_run_clean_git git -C "${repo}" -c protocol.file.allow=always submodule add "${remote_bare}" prompts
+)
+
+# Capture SHAs outside the contaminated subshell.
+v1_sha="$(git -C "${remote_work}" log --format='%H' --reverse | head -1)"
+v2_sha="$(git -C "${remote_work}" rev-parse HEAD)"
+
+git -C "${repo}/prompts" checkout --detach "${v1_sha}" >/dev/null 2>&1
+git -C "${repo}" add .gitmodules prompts
+git -C "${repo}" commit -m "add stale prompts submodule" >/dev/null
+
+# Copy library files into fixture using th_create_fixture as template source.
+fixture_src="$(th_create_fixture)"
+cp -r "${fixture_src}/scripts" "${repo}/scripts"
+rm -rf "${fixture_src}"
+
+th_assert_run "stale-fail-without-auto-update" 1 '"outcome":"fail_stale"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-stale.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-stale" "${repo}/report-stale.json" "outcome" "fail_stale"
+
+echo "local-only-change" > "${repo}/prompts/LOCAL_ONLY.txt"
+th_assert_run "auto-update-refuses-dirty-submodule" 1 '"outcome":"fail_dirty_worktree"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-dirty.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-dirty" "${repo}/report-dirty.json" "outcome" "fail_dirty_worktree"
+rm -f "${repo}/prompts/LOCAL_ONLY.txt"
+
+th_assert_run "auto-update-converges" 0 '"outcome":"pass_auto_updated"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-update.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-updated" "${repo}/report-update.json" "outcome" "pass_auto_updated"
+th_assert_json_field "report-remote-sha" "${repo}/report-update.json" "remote_sha" "${v2_sha}"
+th_assert_json_field "report-schema-updated" "${repo}/report-update.json" "schema_version" "2"
+
+git -C "${repo}/prompts" remote set-url origin "${tmpdir}/does-not-exist.git"
+th_assert_run "strict-remote-failure" 2 '"outcome":"fail_remote_unreachable"' \
+  env STRICT_REMOTE=true AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-strict.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-strict-failure" "${repo}/report-strict.json" "outcome" "fail_remote_unreachable"
+
+th_summary "integration"

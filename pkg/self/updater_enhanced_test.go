@@ -9,12 +9,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -383,4 +387,121 @@ func TestCreateTransactionBackup_FilesystemErrors(t *testing.T) {
 		_, err = updater.createTransactionBackup()
 		assert.Error(t, err, "should fail when backup directory is not writable")
 	})
+}
+
+func TestShouldBuildBinary(t *testing.T) {
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	repoDir := initSelfUpdateGitRepo(t)
+
+	origBuildCommit := shared.BuildCommit
+	t.Cleanup(func() {
+		shared.BuildCommit = origBuildCommit
+	})
+
+	config := &EnhancedUpdateConfig{
+		UpdateConfig: &UpdateConfig{
+			SourceDir:  repoDir,
+			BinaryPath: filepath.Join(t.TempDir(), "eos"),
+			BackupDir:  t.TempDir(),
+			GitBranch:  "main",
+		},
+	}
+
+	updater := NewEnhancedEosUpdater(rc, config)
+	headCommit := gitHead(t, repoDir)
+
+	t.Run("skip when installed binary matches source commit", func(t *testing.T) {
+		shared.BuildCommit = headCommit
+
+		buildNeeded, reason := updater.shouldBuildBinary()
+		assert.False(t, buildNeeded)
+		assert.Contains(t, reason, "already matches")
+	})
+
+	t.Run("rebuild when installed binary commit differs", func(t *testing.T) {
+		shared.BuildCommit = "deadbeef"
+
+		buildNeeded, reason := updater.shouldBuildBinary()
+		assert.True(t, buildNeeded)
+		assert.Contains(t, reason, "differs")
+	})
+
+	t.Run("rebuild when installed binary has no embedded commit", func(t *testing.T) {
+		shared.BuildCommit = ""
+
+		buildNeeded, reason := updater.shouldBuildBinary()
+		assert.True(t, buildNeeded)
+		assert.Contains(t, reason, "differs")
+	})
+
+	t.Run("rebuild when source commit cannot be determined", func(t *testing.T) {
+		shared.BuildCommit = headCommit
+
+		badConfig := &EnhancedUpdateConfig{
+			UpdateConfig: &UpdateConfig{
+				SourceDir:  filepath.Join(repoDir, "missing"),
+				BinaryPath: filepath.Join(t.TempDir(), "eos"),
+				BackupDir:  t.TempDir(),
+				GitBranch:  "main",
+			},
+		}
+		badUpdater := NewEnhancedEosUpdater(rc, badConfig)
+
+		buildNeeded, reason := badUpdater.shouldBuildBinary()
+		assert.True(t, buildNeeded)
+		assert.Contains(t, reason, "unavailable")
+	})
+}
+
+func TestRecordTransactionStep(t *testing.T) {
+	rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+	updater := NewEnhancedEosUpdater(rc, &EnhancedUpdateConfig{
+		UpdateConfig: &UpdateConfig{
+			SourceDir:  t.TempDir(),
+			BinaryPath: filepath.Join(t.TempDir(), "eos"),
+			BackupDir:  t.TempDir(),
+			GitBranch:  "main",
+		},
+	})
+
+	started := time.Now().Add(-25 * time.Millisecond)
+	updater.recordTransactionStep("build_binary", "completed", "Build new eos binary from source", started)
+
+	require.Len(t, updater.transaction.Steps, 1)
+	step := updater.transaction.Steps[0]
+	assert.Equal(t, "build_binary", step.Name)
+	assert.Equal(t, "completed", step.Status)
+	assert.Equal(t, "Build new eos binary from source", step.Message)
+	assert.False(t, step.OccurredAt.IsZero())
+	assert.GreaterOrEqual(t, step.Duration, 20*time.Millisecond)
+}
+
+func initSelfUpdateGitRepo(t *testing.T) string {
+	t.Helper()
+
+	repoDir := t.TempDir()
+	runSelfGitCmd(t, repoDir, "init")
+	runSelfGitCmd(t, repoDir, "config", "user.email", "eos-tests@example.com")
+	runSelfGitCmd(t, repoDir, "config", "user.name", "Eos Tests")
+	require.NoError(t, os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("eos\n"), 0o644))
+	runSelfGitCmd(t, repoDir, "add", "README.md")
+	runSelfGitCmd(t, repoDir, "commit", "-m", "initial commit")
+
+	return repoDir
+}
+
+func gitHead(t *testing.T, repoDir string) string {
+	t.Helper()
+
+	out, err := exec.Command("git", "-C", repoDir, "rev-parse", "HEAD").CombinedOutput()
+	require.NoError(t, err, "git rev-parse HEAD failed: %s", string(out))
+	return strings.TrimSpace(string(out))
+}
+
+func runSelfGitCmd(t *testing.T, repoDir string, args ...string) {
+	t.Helper()
+
+	cmd := exec.Command("git", append([]string{"-C", repoDir}, args...)...)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git %v failed: %s", args, string(out))
 }

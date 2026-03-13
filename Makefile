@@ -1,7 +1,9 @@
 # Eos Makefile
 # Last Updated: 2025-10-23
 
-.PHONY: all build test lint lint-fix clean install help
+.PHONY: all build test lint lint-fix clean install help \
+	ci-preflight ci-lint ci-unit ci-integration ci-e2e-smoke ci-fuzz ci-coverage-delta \
+	ci-debug ci-verify-parity governance-check submodule-freshness
 
 # Build configuration
 BINARY_NAME := eos
@@ -32,11 +34,11 @@ help: ## Display this help
 build: ## Build Eos binary with CGO support
 	@echo "[INFO] Building Eos with libvirt and Ceph support..."
 	@echo "[INFO] CGO_ENABLED=$(CGO_ENABLED)"
-	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/
+	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) .
 
 build-debug: ## Build with debug symbols and race detector
 	@echo "[INFO] Building Eos with debug symbols..."
-	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -race -o $(BUILD_DIR)/$(BINARY_NAME)-debug ./cmd/
+	CGO_ENABLED=$(CGO_ENABLED) go build $(BUILD_FLAGS) -race -o $(BUILD_DIR)/$(BINARY_NAME)-debug .
 
 install: build ## Build and install Eos to /usr/local/bin
 	@echo "[INFO] Installing Eos to $(INSTALL_DIR)..."
@@ -194,6 +196,58 @@ ci: deps fmt-check vet lint test build ## CI pipeline (no auto-fix)
 
 ci-cgo: deps fmt-check vet-cgo lint-cgo test-cgo build ## CI pipeline for CGO packages
 	@echo "[INFO] CGO CI pipeline complete"
+
+ci-preflight: ## Run CI preflight checks
+	@echo "[INFO] Running CI preflight..."
+	@scripts/ci/preflight.sh
+
+ci-lint: ## Run CI lint lane entrypoint
+	@echo "[INFO] Running CI lint lane..."
+	@scripts/ci/lint.sh all
+
+ci-unit: ## Run CI unit lane entrypoint
+	@echo "[INFO] Running CI unit lane..."
+	@scripts/ci/test.sh unit
+
+ci-integration: ## Run CI integration lane entrypoint
+	@echo "[INFO] Running CI integration lane..."
+	@scripts/ci/test.sh integration
+
+ci-e2e-smoke: ## Run CI smoke E2E lane entrypoint
+	@echo "[INFO] Running CI e2e smoke lane..."
+	@scripts/ci/test.sh e2e-smoke
+
+ci-fuzz: ## Run CI fuzz lane entrypoint
+	@echo "[INFO] Running CI fuzz lane..."
+	@scripts/ci/test.sh fuzz
+
+ci-coverage-delta: ## Run CI coverage delta check (PR context)
+	@echo "[INFO] Running CI coverage delta..."
+	@scripts/ci/coverage-delta.sh coverage.out
+
+ci-debug: ## Run local CI parity lane (same command as pre-commit and CI debug job)
+	@echo "[INFO] Running CI debug parity lane..."
+	@./magew ci:debug
+
+ci-verify-parity: ## Verify pre-commit, mage, and workflow ci:debug parity contract
+	@echo "[INFO] Verifying ci:debug parity contract..."
+	@bash scripts/ci/verify-parity.sh
+
+governance-check: ## Run governance wiring checks from prompts submodule
+	@echo "[INFO] Running governance checks..."
+	@scripts/check-governance.sh
+
+submodule-freshness: ## Verify prompts submodule is current with upstream main
+	@echo "[INFO] Checking prompts submodule freshness..."
+	@scripts/prompts-submodule-freshness.sh
+
+test-submodule-freshness: ## Run submodule freshness test pyramid (unit/integration/e2e)
+	@echo "[INFO] Running submodule freshness test pyramid..."
+	@bash test/ci/test-submodule-freshness.sh
+
+test-governance-check: ## Run governance wrapper tests
+	@echo "[INFO] Running governance wrapper tests..."
+	@bash test/ci/test-governance-check.sh
 
 ##@ Deployment
 

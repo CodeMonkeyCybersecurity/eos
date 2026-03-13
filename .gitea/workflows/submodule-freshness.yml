@@ -1,0 +1,85 @@
+name: Submodule Freshness Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_update:
+        description: "Automatically bump stale prompts submodule in workflow workspace"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "17 */6 * * *"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  submodule-freshness:
+    runs-on: [self-hosted, general]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Init submodules (HTTPS with token)
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Rewrite SSH URLs to HTTPS for CI runner auth.
+          # CI runners lack SSH keys but can use token-based HTTPS.
+          # See: https://forum.gitea.com/t/gitea-runner-recursive-checkout/10812
+          git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+
+          # Use available token for HTTPS auth
+          TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [[ -n "${TOKEN}" ]]; then
+            git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
+          fi
+
+          # Init submodules; continue even if clone fails (script handles gracefully)
+          if git submodule update --init --recursive 2>&1; then
+            echo "SUBMODULE_INIT=success"
+          else
+            echo "WARN: submodule init failed; freshness script will handle gracefully"
+            echo "SUBMODULE_INIT=failed"
+          fi
+
+      - name: Run submodule freshness unit tests (70%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-unit.sh
+
+      - name: Run submodule freshness integration tests (20%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-integration.sh
+
+      - name: Run submodule freshness e2e tests (10%)
+        run: |
+          set -euo pipefail
+          bash test/ci/test-submodule-freshness-e2e.sh
+
+      - name: Verify prompts freshness
+        env:
+          AUTO_UPDATE: ${{ inputs.auto_update || 'false' }}
+          STRICT_REMOTE: auto
+          SUBMODULE_REPORT_JSON: outputs/ci/submodule-freshness/report.json
+          SUBMODULE_METRICS_TEXTFILE: outputs/ci/submodule-freshness/metrics.prom
+        run: |
+          set -euo pipefail
+          chmod +x scripts/prompts-submodule-freshness.sh
+          ./scripts/prompts-submodule-freshness.sh
+
+      - name: Print freshness report and metrics
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f outputs/ci/submodule-freshness/report.json && cat outputs/ci/submodule-freshness/report.json || true
+          test -f outputs/ci/submodule-freshness/metrics.prom && cat outputs/ci/submodule-freshness/metrics.prom || true
+
+      - name: Alert on stale or failed freshness outcomes
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/report-alert.py submodule-freshness outputs/ci/submodule-freshness/report.json

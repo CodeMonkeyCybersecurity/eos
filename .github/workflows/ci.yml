@@ -1,3 +1,6 @@
+# ci.yml - Consolidated CI pipeline
+# Last Updated: 2026-02-22
+
 name: CI
 
 on:
@@ -9,180 +12,476 @@ on:
   schedule:
     - cron: "0 3 * * *"
 
-env:
-  GO_VERSION: "1.25.x"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  ci-debug-parity:
+    name: ci-debug-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Run npm ci:debug
+        env:
+          CI: "true"
+        run: npm run ci:debug --silent
+
+      - name: Print ci:debug report
+        if: always()
+        run: |
+          test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
+          test -f outputs/ci/governance/report.json && cat outputs/ci/governance/report.json || true
+          test -f outputs/ci/governance-propagation-coverage/coverage.json && cat outputs/ci/governance-propagation-coverage/coverage.json || true
+
+      - name: Alert on governance wrapper report
+        if: always()
+        run: |
+          python3 scripts/ci/report-alert.py governance outputs/ci/governance/report.json
+          python3 scripts/ci/report-alert.py shell-coverage outputs/ci/governance-propagation-coverage/coverage.json
+
+      - name: Upload ci:debug artifacts
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: ci-debug-artifacts
+          path: |
+            outputs/ci/debug/**
+            outputs/ci/governance/**
+            outputs/ci/governance-propagation-coverage/**
+          if-no-files-found: warn
+
+  ci-self-update-quality:
+    name: ci-self-update-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: Run self-update quality lane
+        run: npm run ci:self-update-quality --silent
+
+      - name: Summarize self-update quality lane
+        if: always()
+        env:
+          CI_LANE: self-update-quality
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/self-update-quality
+          CI_COVERAGE_FILE: outputs/ci/self-update-quality/coverage.out
+          CI_REPORT_FILE: outputs/ci/self-update-quality/report.json
+          CI_SUMMARY_FILE: outputs/ci/self-update-quality/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle self-update quality artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/self-update-quality-artifacts.tgz -C outputs/ci self-update-quality || true
+          ls -lh outputs/ci/self-update-quality-artifacts.tgz || true
+
+      - name: Print self-update quality report
+        if: always()
+        run: |
+          test -f outputs/ci/self-update-quality/report.json && cat outputs/ci/self-update-quality/report.json || true
+
+      - name: Alert on self-update quality failure details
+        if: always()
+        run: |
+          set -euo pipefail
+          report="outputs/ci/self-update-quality/report.json"
+          if [[ ! -f "${report}" ]]; then
+            echo "::warning::self-update-quality report missing"
+            exit 0
+          fi
+          python3 - <<'PY' "${report}"
+import json
+import sys
+from pathlib import Path
+
+report = Path(sys.argv[1])
+data = json.loads(report.read_text(encoding="utf-8"))
+status = data.get("status", "unknown")
+if status == "pass":
+    print("self-update-quality status=pass")
+    raise SystemExit(0)
+
+stage = data.get("stage", "unknown")
+failed_command = data.get("failed_command", "unknown")
+coverage = data.get("coverage_percent", "n/a")
+message = data.get("message", "unknown")
+print(f"::error::self-update-quality failed stage={stage} command={failed_command} coverage={coverage} message={message}")
+PY
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.0
+
+      - name: Run lint lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "${CI_EVENT_NAME}" = "pull_request" ]; then
+            scripts/ci/lint.sh changed
+          else
+            scripts/ci/lint.sh all
+          fi
+
+      - name: Summarize lint lane
+        if: always()
+        env:
+          CI_LANE: lint
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/lint
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/lint/report.json
+          CI_SUMMARY_FILE: outputs/ci/lint/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle lint artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/lint-artifacts.tgz -C outputs/ci lint || true
+          ls -lh outputs/ci/lint-artifacts.tgz || true
+
+      - name: Print lint report
+        if: always()
+        run: |
+          test -f outputs/ci/lint/report.json && cat outputs/ci/lint/report.json || true
+
   ci-unit:
     name: ci-unit
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 40
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          fetch-depth: 0
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
 
-      - name: Run unit tests with race and coverage
-        run: go test -short -race -coverprofile=unit.coverage.out -covermode=atomic ./pkg/...
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
-      - name: Run backup-focused unit tests with coverage
-        run: go test -short -race -coverprofile=backup.unit.coverage.out -covermode=atomic ./pkg/backup/...
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
 
-      - name: Enforce unit coverage >= 70%
-        run: |
-          COVERAGE=$(go tool cover -func=unit.coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
-          echo "Unit coverage: ${COVERAGE}%"
-          awk "BEGIN {exit !($COVERAGE >= 70)}" || (echo "Coverage below 70%" && exit 1)
+      - name: Run unit lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh unit
 
-      - name: Flaky retry summary
-        run: |
-          set +e
-          OUT=flaky-summary.txt
-          echo "Flakiness retry summary" > "$OUT"
-          echo "" >> "$OUT"
-          PACKAGES=(
-            "./pkg/httpclient"
-            "./pkg/apiclient"
-            "./pkg/hecate/api"
-          )
-          FAIL=0
-          for PKG in "${PACKAGES[@]}"; do
-            echo "Testing ${PKG} 3x..." | tee -a "$OUT"
-            if go test -count=3 -race "${PKG}" >> "$OUT" 2>&1; then
-              echo "  stable" | tee -a "$OUT"
-            else
-              echo "  flaky_or_failing" | tee -a "$OUT"
-              FAIL=1
-            fi
-            echo "" >> "$OUT"
-          done
-          if [ "$FAIL" -ne 0 ]; then
-            echo "Flaky retry summary found failures"
-            cat "$OUT"
-            exit 1
-          fi
-
-      - name: Upload unit artifacts
+      - name: Summarize unit lane
         if: always()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        env:
+          CI_LANE: unit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/unit
+          CI_COVERAGE_FILE: outputs/ci/unit/coverage.out
+          CI_REPORT_FILE: outputs/ci/unit/report.json
+          CI_SUMMARY_FILE: outputs/ci/unit/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle unit artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/unit-artifacts.tgz -C outputs/ci unit || true
+          ls -lh outputs/ci/unit-artifacts.tgz || true
+
+      - name: Print unit report
+        if: always()
+        run: |
+          test -f outputs/ci/unit/report.json && cat outputs/ci/unit/report.json || true
+
+  ci-deps-unit:
+    name: ci-deps-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          name: ci-unit-artifacts
-          path: |
-            unit.coverage.out
-            backup.unit.coverage.out
-            flaky-summary.txt
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run dependency-focused unit lane
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh deps-unit
+
+      - name: Summarize dependency-focused unit lane
+        if: always()
+        env:
+          CI_LANE: deps-unit
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/deps-unit
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/deps-unit/report.json
+          CI_SUMMARY_FILE: outputs/ci/deps-unit/summary.md
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/summary.sh
+
+      - name: Bundle dependency-focused unit artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/deps-unit-artifacts.tgz -C outputs/ci deps-unit || true
+          ls -lh outputs/ci/deps-unit-artifacts.tgz || true
+
+      - name: Print dependency-focused unit report
+        if: always()
+        run: |
+          test -f outputs/ci/deps-unit/report.json && cat outputs/ci/deps-unit/report.json || true
 
   ci-integration:
     name: ci-integration
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    services:
-      vault:
-        image: hashicorp/vault:1.16
-        env:
-          VAULT_DEV_ROOT_TOKEN_ID: test-token
-          VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-        ports:
-          - 8200:8200
-        options: >-
-          --cap-add=IPC_LOCK
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          fetch-depth: 0
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
 
-      - name: Wait for Vault
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8200/v1/sys/health >/dev/null; then
-              echo "Vault is ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Vault failed to start"
-          exit 1
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
-      - name: Run integration test suite
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run integration lane
         env:
-          VAULT_ADDR: http://127.0.0.1:8200
-          VAULT_TOKEN: test-token
-          POSTGRES_URL: postgres://postgres:testpass@localhost:5432/testdb?sslmode=disable
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_REF: ${{ github.base_ref }}
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh integration
+
+      - name: Summarize integration lane
+        if: always()
+        env:
+          CI_LANE: integration
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/integration
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/integration/report.json
+          CI_SUMMARY_FILE: outputs/ci/integration/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle integration artifacts
+        if: always()
         run: |
-          go test -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go
-          # Backup integration layer (20% test pyramid allocation for backup workflow)
-          go test -v -timeout=15m -run Integration ./pkg/backup/...
-          go test -v -timeout=15m -tags=integration ./pkg/vault/...
+          tar -czf outputs/ci/integration-artifacts.tgz -C outputs/ci integration || true
+          ls -lh outputs/ci/integration-artifacts.tgz || true
+
+      - name: Print integration report
+        if: always()
+        run: |
+          test -f outputs/ci/integration/report.json && cat outputs/ci/integration/report.json || true
 
   ci-e2e-smoke:
     name: ci-e2e-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          fetch-depth: 0
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
 
-      - name: Run smoke e2e tests
-        run: go test -v -tags=e2e_smoke -timeout=10m ./test/e2e/smoke/...
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
 
-      - name: Run backup e2e smoke tests
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run e2e smoke lane
+        env:
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh e2e-smoke
+
+      - name: Summarize e2e smoke lane
+        if: always()
+        env:
+          CI_LANE: e2e-smoke
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/e2e-smoke
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/e2e-smoke/report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-smoke/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle e2e smoke artifacts
+        if: always()
         run: |
-          # Backup e2e layer (10% test pyramid allocation for backup workflow)
-          go test -v -tags=e2e_smoke -timeout=10m -run Backup ./test/e2e/smoke/...
+          tar -czf outputs/ci/e2e-smoke-artifacts.tgz -C outputs/ci e2e-smoke || true
+          ls -lh outputs/ci/e2e-smoke-artifacts.tgz || true
+
+      - name: Print e2e smoke report
+        if: always()
+        run: |
+          test -f outputs/ci/e2e-smoke/report.json && cat outputs/ci/e2e-smoke/report.json || true
+
+  ci-fuzz:
+    name: ci-fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run fuzz lane
+        env:
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh fuzz
+
+      - name: Summarize fuzz lane
+        if: always()
+        env:
+          CI_LANE: fuzz
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/fuzz
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/fuzz/report.json
+          CI_SUMMARY_FILE: outputs/ci/fuzz/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle fuzz artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/fuzz-artifacts.tgz -C outputs/ci fuzz || true
+          ls -lh outputs/ci/fuzz-artifacts.tgz || true
+
+      - name: Print fuzz report
+        if: always()
+        run: |
+          test -f outputs/ci/fuzz/report.json && cat outputs/ci/fuzz/report.json || true
 
   ci-e2e-full:
     name: ci-e2e-full
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          fetch-depth: 0
 
-      - name: Run full e2e tests (guarded)
+      - name: Setup Go environment
+        uses: ./.github/actions/setup-go-env
+
+      - name: Validate CI policy
+        run: go run ./test/ci/tool policy-validate test/ci/suites.yaml
+
+      - name: CI preflight
+        run: scripts/ci/preflight.sh
+
+      - name: Run e2e full lane
         env:
-          EOS_E2E_FULL_APPROVED: "true"
-        run: go test -v -tags=e2e_full -timeout=60m ./test/e2e/full/...
+          CI_SUITE_FILE: test/ci/suites.yaml
+        run: scripts/ci/test.sh e2e-full
+
+      - name: Summarize e2e full lane
+        if: always()
+        env:
+          CI_LANE: e2e-full
+          CI_STATUS: ${{ job.status }}
+          CI_LOG_DIR: outputs/ci/e2e-full
+          CI_COVERAGE_FILE: "-"
+          CI_REPORT_FILE: outputs/ci/e2e-full/report.json
+          CI_SUMMARY_FILE: outputs/ci/e2e-full/summary.md
+        run: scripts/ci/summary.sh
+
+      - name: Bundle e2e full artifacts
+        if: always()
+        run: |
+          tar -czf outputs/ci/e2e-full-artifacts.tgz -C outputs/ci e2e-full || true
+          ls -lh outputs/ci/e2e-full-artifacts.tgz || true
+
+      - name: Print e2e full report
+        if: always()
+        run: |
+          test -f outputs/ci/e2e-full/report.json && cat outputs/ci/e2e-full/report.json || true

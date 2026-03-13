@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+target="${1:-}"
+
+usage() {
+  cat <<'USAGE'
+Usage: ./magew [target]
+
+Targets:
+  ci:debug       Run full CI debug parity lane
+  ci:preflight   Run CI preflight checks
+  launch:verify  Alias of ci:debug
+USAGE
+}
+
+case "${target}" in
+  -l|--list)
+    printf '%-20s %s\n' "ci:debug" "Run full CI debug parity lane"
+    printf '%-20s %s\n' "ci:preflight" "Run CI preflight checks"
+    printf '%-20s %s\n' "launch:verify" "Alias of ci:debug"
+    ;;
+  -h|--help|"")
+    usage
+    exit 2
+    ;;
+  ci:debug|launch:verify)
+    if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
+      exec npm run ci:debug --silent
+    fi
+    exec bash "${repo_root}/scripts/ci/debug.sh"
+    ;;
+  ci:preflight)
+    exec bash "${repo_root}/scripts/ci/preflight.sh"
+    ;;
+  *)
+    printf 'ERROR: unknown target: %s\n' "${target}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

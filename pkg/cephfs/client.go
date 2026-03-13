@@ -24,7 +24,7 @@ import (
 // CephClient provides high-level interface for Ceph operations using go-ceph SDK
 type CephClient struct {
 	conn          *rados.Conn
-	fsAdmin       *admin.FSAdmin
+	fsAdmin       fsAdminAPI
 	rc            *eos_io.RuntimeContext
 	config        *ClientConfig
 	secretManager *secrets.SecretManager
@@ -72,16 +72,16 @@ func NewCephClient(rc *eos_io.RuntimeContext, config *ClientConfig) (*CephClient
 
 	// Apply defaults
 	if config.ClusterName == "" {
-		config.ClusterName = "ceph"
+		config.ClusterName = DefaultClusterName
 	}
 	if config.User == "" {
-		config.User = "admin"
+		config.User = DefaultCephUser
 	}
 	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 30 * time.Second
+		config.ConnectTimeout = DefaultConnectTimeout
 	}
 	if config.OpTimeout == 0 {
-		config.OpTimeout = 60 * time.Second
+		config.OpTimeout = DefaultOpTimeout
 	}
 
 	// Discover Consul monitors if enabled
@@ -206,8 +206,7 @@ func (c *CephClient) connect() error {
 
 	// Initialize FSAdmin for CephFS operations
 	logger.Debug("Initializing FSAdmin client")
-	fsAdmin := admin.NewFromConn(conn)
-	c.fsAdmin = fsAdmin
+	c.fsAdmin = newFSAdminAdapter(admin.NewFromConn(conn))
 
 	return nil
 }
@@ -297,9 +296,15 @@ func (c *CephClient) GetConn() *rados.Conn {
 	return c.conn
 }
 
-// GetFSAdmin returns the FSAdmin client for CephFS operations
+// GetFSAdmin returns the FSAdmin client for CephFS operations.
+// Deprecated: Prefer using CephClient methods (VolumeExists, ListVolumes, etc.)
+// which route through the fsAdminAPI interface seam for testability.
 func (c *CephClient) GetFSAdmin() *admin.FSAdmin {
-	return c.fsAdmin
+	adapter, ok := c.fsAdmin.(*goCephFSAdminAdapter)
+	if !ok {
+		return nil
+	}
+	return adapter.inner
 }
 
 // GetClusterFSID returns the cluster FSID

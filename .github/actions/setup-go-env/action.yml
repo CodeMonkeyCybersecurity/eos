@@ -1,0 +1,44 @@
+# Reusable composite action: Set up Go + CGO dependencies
+# Last Updated: 2026-02-22
+
+name: "Setup Go Environment"
+description: "Set up Go toolchain and install CGO library dependencies"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Ensure /dev character devices before apt
+      shell: bash
+      run: |
+        set -euo pipefail
+        ensure_char_device() {
+          local path="$1" major="$2" minor="$3"
+          if [[ -c "${path}" ]] && echo "probe" > "${path}" 2>/dev/null; then
+            return 0
+          fi
+          echo "Repairing ${path} before dependency install"
+          sudo rm -f "${path}" 2>/dev/null || true
+          sudo mknod -m 666 "${path}" c "${major}" "${minor}"
+        }
+        ensure_char_device /dev/null 1 3
+        ensure_char_device /dev/zero 1 5
+
+    - name: Set up Go
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Install CGO library dependencies
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq \
+          librados-dev \
+          librbd-dev \
+          libcephfs-dev \
+          libvirt-dev
+
+    - name: Download Go module dependencies
+      shell: bash
+      run: go mod download

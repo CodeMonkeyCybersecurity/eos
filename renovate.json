@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "github.com/ceph/go-ceph"
+      ],
+      "groupName": "ceph-sdk-stack",
+      "labels": [
+        "deps",
+        "deps:ceph"
+      ],
+      "schedule": [
+        "after 6pm every weekday",
+        "every weekend",
+        "before 6am every weekday"
+      ]
+    }
+  ]
+}

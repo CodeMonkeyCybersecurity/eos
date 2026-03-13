@@ -321,8 +321,8 @@ func getVaultStatus(rc *eos_io.RuntimeContext) (*VaultStatusInfo, error) {
 		Address: shared.GetVaultAddr(),
 	}
 
-	// Check if Vault is running and reachable
-	client, err := GetVaultClient(rc)
+	// Check if Vault is running and reachable (unauthenticated - health is public)
+	client, err := GetUnauthenticatedVaultClient(rc)
 	if err != nil {
 		log.Debug("Vault client not available", zap.Error(err))
 		return status, nil

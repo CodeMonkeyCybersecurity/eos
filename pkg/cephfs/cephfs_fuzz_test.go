@@ -423,35 +423,18 @@ func FuzzHelperFunctionsSecurity(f *testing.F) {
 			}
 		}()
 
-		// Test contains function
-		result1 := contains(str, substr)
+		// Test stdlib string functions with arbitrary input (should not panic)
+		result1 := strings.Contains(str, substr)
+		result2 := strings.Index(str, substr)
 
-		// Test indexOf function
-		result2 := indexOf(str, substr)
-
-		// Basic consistency check
+		// Basic consistency check between Contains and Index
 		if substr != "" {
 			if result1 && result2 == -1 {
-				t.Errorf("contains() returned true but indexOf() returned -1 for str=%q substr=%q", str, substr)
+				t.Errorf("strings.Contains() returned true but strings.Index() returned -1 for str=%q substr=%q", str, substr)
 			}
 			if !result1 && result2 != -1 {
-				t.Errorf("contains() returned false but indexOf() found index %d for str=%q substr=%q", result2, str, substr)
+				t.Errorf("strings.Contains() returned false but strings.Index() found index %d for str=%q substr=%q", result2, str, substr)
 			}
-		}
-
-		// Check for dangerous patterns
-		if strings.Contains(str+substr, "\x00") {
-			t.Logf("Null byte detected in string operations")
-		}
-
-		// Verify indexOf bounds
-		if result2 != -1 && (result2 < 0 || result2 > len(str)) {
-			t.Errorf("indexOf returned out-of-bounds index %d for string length %d", result2, len(str))
-		}
-
-		// Empty substring should match (indexOf should return 0) except when string is empty
-		if substr == "" && str != "" && result2 != 0 {
-			t.Errorf("indexOf should return 0 for empty substring on non-empty string, got %d", result2)
 		}
 	})
 }

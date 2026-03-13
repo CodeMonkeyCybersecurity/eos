@@ -1,7 +1,8 @@
+// patch.go - .env file patching for Mattermost Docker Compose deployments.
+
 package mattermost
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bufio"
 	"fmt"
 	"os"
@@ -9,46 +10,47 @@ import (
 	"strings"
 )
 
-// PatchMattermostEnv copies and updates the .env file with Eos-standard values.
-func PatchMattermostEnv(cloneDir string) error {
-	src := filepath.Join(cloneDir, "env.example")
-	dst := filepath.Join(cloneDir, ".env")
+// PatchMattermostEnv copies env.example to .env and applies Eos-standard overrides.
+// Idempotent: only copies env.example if .env doesn't already exist.
+func PatchMattermostEnv(baseDir string) error {
+	src := filepath.Join(baseDir, EnvExampleFileName)
+	dst := filepath.Join(baseDir, EnvFileName)
 
 	// Only copy if not already present
 	if _, err := os.Stat(dst); os.IsNotExist(err) {
 		input, err := os.ReadFile(src)
 		if err != nil {
-			return fmt.Errorf("read env.example: %w", err)
+			return fmt.Errorf("read %s: %w", EnvExampleFileName, err)
 		}
-		if err := os.WriteFile(dst, input, shared.ConfigFilePerm); err != nil {
-			return fmt.Errorf("write .env: %w", err)
+		if err := os.WriteFile(dst, input, EnvFilePerm); err != nil {
+			return fmt.Errorf("write %s: %w", EnvFileName, err)
 		}
 	}
 
-	// Patch domain and port
-	return patchEnvInPlace(dst, DefaultEnvUpdates)
+	return patchEnvInPlace(dst, DefaultEnvOverrides)
 }
 
+// patchEnvInPlace reads an .env file and replaces matching key=value lines.
+// Both active (KEY=value) and commented (#KEY=value) lines are matched.
+// Keys not found in the file are appended at the end.
 func patchEnvInPlace(path string, updates map[string]string) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open %s: %w", path, err)
 	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			// Log silently as this is a file operation utility
-			_ = err
-		}
-	}()
+	defer file.Close()
 
 	var newLines []string
 	scanner := bufio.NewScanner(file)
 
+	// Track which keys were found and replaced
+	applied := make(map[string]bool, len(updates))
 	for scanner.Scan() {
 		line := scanner.Text()
 		for key, val := range updates {
 			if strings.HasPrefix(line, key+"=") || strings.HasPrefix(line, "#"+key+"=") {
 				line = fmt.Sprintf("%s=%s", key, val)
+				applied[key] = true
 				break
 			}
 		}
@@ -56,8 +58,15 @@ func patchEnvInPlace(path string, updates map[string]string) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return err
+		return fmt.Errorf("scan %s: %w", path, err)
 	}
 
-	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")+"\n"), shared.ConfigFilePerm)
+	// Append any keys that weren't found in the existing file
+	for key, val := range updates {
+		if !applied[key] {
+			newLines = append(newLines, fmt.Sprintf("%s=%s", key, val))
+		}
+	}
+
+	return os.WriteFile(path, []byte(strings.Join(newLines, "\n")+"\n"), EnvFilePerm)
 }
