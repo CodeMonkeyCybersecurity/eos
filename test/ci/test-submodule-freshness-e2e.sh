@@ -39,6 +39,27 @@ else
   th_fail=$((th_fail + 1))
 fi
 
+# Verify SUBMODULE_INIT is written to the env file (GITEA_ENV/GITHUB_ENV) and
+# not just echoed to stdout.  The naive 'echo VAR=val' pattern does NOT persist
+# across steps in Gitea or GitHub Actions.
+if grep -qE '\$\{GITEA_ENV:-\$\{GITHUB_ENV:-' "${WORKFLOW_FILE}" 2>/dev/null; then
+  echo "PASS: workflow-submodule-init-uses-env-file"
+  th_pass=$((th_pass + 1))
+else
+  echo "FAIL: workflow-submodule-init-uses-env-file (SUBMODULE_INIT must be written to GITEA_ENV/GITHUB_ENV, not stdout)"
+  th_fail=$((th_fail + 1))
+fi
+
+# Verify pull.rebase is configured after submodule init to prevent
+# 'fatal: Need to specify how to reconcile divergent branches' on Git >= 2.27.
+if grep -q 'pull.rebase true' "${WORKFLOW_FILE}" 2>/dev/null; then
+  echo "PASS: workflow-configures-pull-rebase"
+  th_pass=$((th_pass + 1))
+else
+  echo "FAIL: workflow-configures-pull-rebase (git config pull.rebase true must be set after submodule init)"
+  th_fail=$((th_fail + 1))
+fi
+
 # --- Smoke test with fixture ---
 tmpdir="$(th_create_fixture)"
 trap 'rm -rf "${tmpdir}"' EXIT

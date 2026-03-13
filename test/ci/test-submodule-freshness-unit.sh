@@ -1219,4 +1219,132 @@ th_assert_run "ge-run-clean-git-works" 0 "hello" bash -c '
   ge_run_clean_git bash -c "echo hello; [[ -z \${GIT_DIR:-} ]]"
 ' _ "${GIT_ENV_SCRIPT}"
 
+# --- NEW: ps_outcome_known includes fail_diverged ---
+th_assert_run "outcome-known-freshness-fail-diverged" 0 "" bash -c '
+  source "$1"
+  ps_outcome_known freshness fail_diverged
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: hook outcomes that were removed (pass_checked_direct / pass_checked_via_override)
+#     should now be UNKNOWN so spurious outcome codes are caught. ---
+th_assert_run "outcome-unknown-hook-pass-checked-direct" 1 "" bash -c '
+  source "$1"
+  ps_outcome_known hook pass_checked_direct
+' _ "${HELPER_SCRIPT}"
+
+th_assert_run "outcome-unknown-hook-pass-checked-via-override" 1 "" bash -c '
+  source "$1"
+  ps_outcome_known hook pass_checked_via_override
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_configure_submodule_pull_strategy sets pull.rebase = true ---
+th_assert_run "configure-pull-strategy-sets-rebase" 0 "true" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  git -C "${tmpdir}" init -q
+  git -C "${tmpdir}" config user.email "ci@example.com"
+  git -C "${tmpdir}" config user.name "CI"
+  ps_configure_submodule_pull_strategy "${tmpdir}"
+  git -C "${tmpdir}" config pull.rebase
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_submodule_is_diverged returns true when local has commits ahead ---
+th_assert_run "submodule-is-diverged-when-ahead" 0 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  repo="${tmpdir}/repo"
+  bare="${tmpdir}/bare.git"
+  git init --bare -q "${bare}"
+  git clone -q "${bare}" "${repo}"
+  git -C "${repo}" config user.email "ci@example.com"
+  git -C "${repo}" config user.name "CI"
+  echo "v1" > "${repo}/README.md"
+  git -C "${repo}" add README.md
+  git -C "${repo}" commit -q -m "v1"
+  git -C "${repo}" push -q origin HEAD:main
+  git -C "${bare}" symbolic-ref HEAD refs/heads/main >/dev/null
+  # Add a local commit that is NOT on the remote yet
+  echo "local-only" > "${repo}/LOCAL.md"
+  git -C "${repo}" add LOCAL.md
+  git -C "${repo}" commit -q -m "local-only"
+  # Fetch so origin/main is known but does not include local-only
+  git -C "${repo}" fetch -q origin main
+  # Create the parent-like structure: repo_root + submodule_path
+  parent="${tmpdir}/parent"
+  mkdir -p "${parent}"
+  ln -s "${repo}" "${parent}/prompts"
+  ps_submodule_is_diverged "${parent}" "prompts" "main"
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: ps_submodule_is_diverged returns false when local is only behind ---
+# The function exits 1 (not diverged); the subshell maps that to exit 0 via
+# "ps_submodule_is_diverged ... && exit 1 || exit 0", so we expect exit 0.
+th_assert_run "submodule-not-diverged-when-only-behind" 0 "" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  repo="${tmpdir}/repo"
+  bare="${tmpdir}/bare.git"
+  git init --bare -q "${bare}"
+  git clone -q "${bare}" "${repo}"
+  git -C "${repo}" config user.email "ci@example.com"
+  git -C "${repo}" config user.name "CI"
+  echo "v1" > "${repo}/README.md"
+  git -C "${repo}" add README.md
+  git -C "${repo}" commit -q -m "v1"
+  git -C "${repo}" push -q origin HEAD:main
+  git -C "${bare}" symbolic-ref HEAD refs/heads/main >/dev/null
+  # Add a remote commit that is NOT locally present
+  work="${tmpdir}/work"
+  git clone -q "${bare}" "${work}"
+  git -C "${work}" config user.email "ci@example.com"
+  git -C "${work}" config user.name "CI"
+  echo "remote-only" > "${work}/REMOTE.md"
+  git -C "${work}" add REMOTE.md
+  git -C "${work}" commit -q -m "remote-only"
+  git -C "${work}" push -q origin main
+  # Now fetch into repo — local is behind, not diverged
+  git -C "${repo}" fetch -q origin main
+  parent="${tmpdir}/parent"
+  mkdir -p "${parent}"
+  ln -s "${repo}" "${parent}/prompts"
+  # Should be 0 ahead, so NOT diverged (return 1)
+  ps_submodule_is_diverged "${parent}" "prompts" "main" && exit 1 || exit 0
+' _ "${HELPER_SCRIPT}"
+
+# --- NEW: freshness emits fail_diverged when submodule has local commits ahead ---
+th_assert_run "action-fail-diverged" 0 "fail_diverged" bash -c '
+  source "$1"
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf \"${tmpdir}\"" EXIT
+  mkdir -p "${tmpdir}/bin" "${tmpdir}/prompts"
+  # Stub git: rev-parse HEAD returns deadbeef, origin/main returns feedface,
+  # rev-list --count origin/main..HEAD returns 2 (local has 2 commits ahead),
+  # rev-list --count HEAD..origin/main returns 3 (remote has 3 ahead).
+  cat > "${tmpdir}/bin/git" <<'"'"'EOF_GIT'"'"'
+#!/usr/bin/env bash
+args=("$@")
+cmd="${args[*]}"
+if [[ "${cmd}" == *"rev-parse HEAD"* ]]; then echo deadbeef; exit 0; fi
+if [[ "${cmd}" == *"rev-parse origin/main"* ]]; then echo feedface; exit 0; fi
+if [[ "${cmd}" == *"rev-list --count origin/main..HEAD"* ]]; then echo 2; exit 0; fi
+if [[ "${cmd}" == *"rev-list --count HEAD..origin/main"* ]]; then echo 3; exit 0; fi
+exit 0
+EOF_GIT
+  chmod +x "${tmpdir}/bin/git"
+  ps_prompts_submodule_path() { printf "prompts\n"; }
+  ps_prompts_submodule_initialized() { return 0; }
+  ps_tracking_branch() { printf "main\n"; }
+  ps_git_fetch_remote_branch() { return 0; }
+  (
+    PATH="${tmpdir}/bin:${PATH}"
+    AUTO_UPDATE=false
+    SUBMODULE_REPORT_JSON="${tmpdir}/report.json"
+    ps_run_freshness "${tmpdir}"
+  ) >/dev/null 2>&1 || true
+  python3 -c "import json; print(json.load(open(${tmpdir@Q}+\"/report.json\"))[\"outcome\"])"
+' _ "${HELPER_SCRIPT}"
+
 th_summary "unit"

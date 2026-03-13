@@ -28,11 +28,17 @@ jobs:
             git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
           fi
 
+          # Write result to the runner env file so downstream steps can gate on
+          # SUBMODULE_INIT.  Gitea uses $GITEA_ENV; GitHub uses $GITHUB_ENV.
+          _ENV_FILE="${GITEA_ENV:-${GITHUB_ENV:-/dev/null}}"
           if git submodule update --init --recursive 2>&1; then
-            echo "SUBMODULE_INIT=success"
+            echo "SUBMODULE_INIT=success" >> "${_ENV_FILE}"
+            # Set pull.rebase so 'git pull' inside the submodule never requires
+            # interactive reconciliation on Git >= 2.27.
+            git -C prompts config pull.rebase true 2>/dev/null || true
           else
             echo "WARN: submodule init failed; governance wrapper will report actionable status"
-            echo "SUBMODULE_INIT=failed"
+            echo "SUBMODULE_INIT=failed" >> "${_ENV_FILE}"
           fi
 
       - name: Run governance unit tests (70%)

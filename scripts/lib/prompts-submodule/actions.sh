@@ -80,6 +80,20 @@ ps_run_freshness() {
     ps_finish_and_exit "pass_up_to_date" "PASS: prompts submodule is up to date" 0
   fi
 
+  # Detect diverged state: local branch has commits not present on remote.
+  # This is distinct from "stale" (behind only) and requires a rebase rather
+  # than a simple fast-forward.  Auto-update cannot safely resolve divergence
+  # without risking data loss, so we always fail-fast here and ask the human.
+  if ps_submodule_is_diverged "${repo_root}" "${PS_CTX_PROMPTS_PATH}" "${PS_CTX_REMOTE_BRANCH}"; then
+    local ahead_count behind_count
+    ahead_count="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" \
+      rev-list --count "origin/${PS_CTX_REMOTE_BRANCH}..HEAD" 2>/dev/null || echo "?")"
+    behind_count="$(git -C "${repo_root}/${PS_CTX_PROMPTS_PATH}" \
+      rev-list --count "HEAD..origin/${PS_CTX_REMOTE_BRANCH}" 2>/dev/null || echo "?")"
+    ps_finish_and_exit "fail_diverged" \
+      "FAIL: ${PS_CTX_PROMPTS_PATH} has diverged from origin/${PS_CTX_REMOTE_BRANCH} (${ahead_count} ahead, ${behind_count} behind). Resolve with: cd ${PS_CTX_PROMPTS_PATH} && git fetch origin && git rebase origin/${PS_CTX_REMOTE_BRANCH} && cd - && git add ${PS_CTX_PROMPTS_PATH} && git commit" 1
+  fi
+
   if [[ "${PS_CTX_AUTO_UPDATE}" != "true" ]]; then
     ps_finish_and_exit "fail_stale" "FAIL: prompts submodule is stale (${PS_CTX_LOCAL_SHA:0:7} != ${PS_CTX_REMOTE_SHA:0:7}). Run: git submodule update --remote -- ${PS_CTX_PROMPTS_PATH}" 1
   fi
@@ -171,15 +185,22 @@ ps_install_hook() {
     ps_finish_and_exit "fail_not_git_repo" "FAIL: not in a git repository" 1
   fi
 
-  mkdir -p "${repo_root}/.git/hooks"
-  install -m 0755 "${repo_root}/${hook_source}" "${repo_root}/${hook_dest}"
-
   local hook_path source_path hook_mode hook_sha source_sha
   hook_path="${repo_root}/${hook_dest}"
   source_path="${repo_root}/${hook_source}"
+
+  # Verify source exists and compute its SHA before installing, so a
+  # corrupted/missing source never reaches the hooks directory.
+  if [[ ! -f "${source_path}" ]]; then
+    ps_finish_and_exit "fail_install" "FAIL: hook source not found: ${source_path}" 1
+  fi
+  source_sha="$(sha256sum "${source_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${source_path}" | awk '{print $1}')"
+
+  mkdir -p "${repo_root}/.git/hooks"
+  install -m 0755 "${source_path}" "${hook_path}"
+
   hook_mode="$(stat -c '%a' "${hook_path}" 2>/dev/null || stat -f '%OLp' "${hook_path}")"
   hook_sha="$(sha256sum "${hook_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${hook_path}" | awk '{print $1}')"
-  source_sha="$(sha256sum "${source_path}" 2>/dev/null | awk '{print $1}' || shasum -a 256 "${source_path}" | awk '{print $1}')"
 
   # Structured output for both human and machine consumption.
   ps_log_json "INFO" "install_hook.install" "pending" "Installed pre-commit hook at ${hook_path}"

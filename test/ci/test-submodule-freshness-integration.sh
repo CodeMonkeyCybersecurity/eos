@@ -79,4 +79,36 @@ th_assert_run "strict-remote-failure" 2 '"outcome":"fail_remote_unreachable"' \
   env STRICT_REMOTE=true AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-strict.json" bash "${repo}/scripts/prompts-submodule-freshness.sh"
 th_assert_json_field "report-outcome-strict-failure" "${repo}/report-strict.json" "outcome" "fail_remote_unreachable"
 
+# --- Diverged branch scenario (P0 bug — the exact failure that broke VSCode) ---
+# Restore remote URL, then manufacture a diverged state:
+# local main = v1 + a local-only commit, remote = v2.
+# This means: local is 1 ahead AND 1 behind remote — cannot fast-forward.
+git -C "${repo}/prompts" remote set-url origin "${remote_bare}"
+
+# Checkout main at v1 and add a local commit that diverges from the remote.
+git -C "${repo}/prompts" -c protocol.file.allow=always checkout -B main "${v1_sha}" >/dev/null 2>&1
+git -C "${repo}/prompts" config user.email "ci@example.com"
+git -C "${repo}/prompts" config user.name "CI"
+echo "local-diverging" > "${repo}/prompts/DIVERGE.md"
+git -C "${repo}/prompts" add DIVERGE.md
+git -C "${repo}/prompts" commit -q -m "local diverging commit" >/dev/null
+
+# Fetch so origin/main is known (v2_sha) but HEAD (local-only) is not on remote.
+git -C "${repo}/prompts" -c protocol.file.allow=always fetch -q origin main >/dev/null 2>&1
+
+# Without auto-update: expect fail_diverged with remediation message.
+th_assert_run "diverged-detected-no-auto-update" 1 '"outcome":"fail_diverged"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=false SUBMODULE_REPORT_JSON="${repo}/report-diverged.json" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always \
+  bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-diverged" "${repo}/report-diverged.json" "outcome" "fail_diverged"
+
+# With auto-update=true: diverged state must STILL refuse — auto-update would
+# destroy the local commits by fast-forwarding to origin/main.
+th_assert_run "diverged-refused-even-with-auto-update" 1 '"outcome":"fail_diverged"' \
+  env STRICT_REMOTE=false AUTO_UPDATE=true SUBMODULE_REPORT_JSON="${repo}/report-diverged-auto.json" \
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=protocol.file.allow GIT_CONFIG_VALUE_0=always \
+  bash "${repo}/scripts/prompts-submodule-freshness.sh"
+th_assert_json_field "report-outcome-diverged-auto" "${repo}/report-diverged-auto.json" "outcome" "fail_diverged"
+
 th_summary "integration"

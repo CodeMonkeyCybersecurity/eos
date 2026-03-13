@@ -89,13 +89,13 @@ ps_outcome_known() {
   local kind="${1:?kind required}"
   local outcome="${2:?outcome required}"
   case "${kind}:${outcome}" in
-    freshness:pass_up_to_date|freshness:pass_auto_updated|freshness:pass_auto_updated_worktree_only|freshness:fail_stale|freshness:fail_remote_unreachable|freshness:fail_missing_remote_ref|freshness:fail_corrupt_submodule|freshness:fail_checkout|freshness:fail_dirty_worktree|freshness:fail_internal|freshness:skip_not_registered|freshness:skip_uninitialized|freshness:skip_remote_unreachable|freshness:skip_missing_remote_ref)
+    freshness:pass_up_to_date|freshness:pass_auto_updated|freshness:pass_auto_updated_worktree_only|freshness:fail_stale|freshness:fail_diverged|freshness:fail_remote_unreachable|freshness:fail_missing_remote_ref|freshness:fail_corrupt_submodule|freshness:fail_checkout|freshness:fail_dirty_worktree|freshness:fail_internal|freshness:skip_not_registered|freshness:skip_uninitialized|freshness:skip_remote_unreachable|freshness:skip_missing_remote_ref)
       return 0
       ;;
     governance:pass_checked_direct|governance:pass_checked_via_override|governance:fail_checker_error|governance:skip_not_registered|governance:skip_uninitialized)
       return 0
       ;;
-    hook:pass_checked_direct|hook:pass_checked_via_override|hook:pass_no_staged_changes|hook:pass_ci_debug|hook:pass_ci_debug_self_update|hook:fail_checker_error|hook:skip_not_registered|hook:skip_uninitialized)
+    hook:pass_no_staged_changes|hook:pass_ci_debug|hook:pass_ci_debug_self_update|hook:fail_checker_error|hook:skip_not_registered|hook:skip_uninitialized)
       return 0
       ;;
     hook_install:pass_installed|hook_install:fail_not_git_repo|hook_install:fail_install)
