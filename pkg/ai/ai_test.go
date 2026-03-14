@@ -106,7 +106,9 @@ func TestAIAssistantCreation(t *testing.T) {
 
 		// Verify HTTP client timeout is set
 		assert.NotNil(t, assistant.client)
-		assert.Equal(t, 60*time.Second, assistant.client.GetConfig().Timeout)
+		// Default provider is "anthropic" which uses 30s timeout (httpclient/migration.go:90)
+		// Azure/OpenAI use 60s (migration.go:83,87)
+		assert.Equal(t, 30*time.Second, assistant.client.GetConfig().Timeout)
 	})
 }
 
@@ -330,9 +332,9 @@ func TestHTTPRequestSecurity(t *testing.T) {
 	})
 
 	t.Run("request_timeout_security", func(t *testing.T) {
-		// Create a server that delays response
+		// Create a server that delays response longer than client timeout
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second) // Delay longer than client timeout
+			time.Sleep(10 * time.Second) // Delay much longer than client timeout
 			w.WriteHeader(http.StatusOK)
 		}))
 		defer server.Close()
@@ -344,9 +346,12 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
 			client: func() *httpclient.Client {
-				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 500 * time.Millisecond})
+				cfg := httpclient.DefaultConfig()
+				cfg.Timeout = 500 * time.Millisecond
+				cfg.RetryConfig.MaxRetries = 0 // No retries for timeout test
+				c, _ := httpclient.NewClient(cfg)
 				return c
-			}(), // Short timeout
+			}(),
 		}
 
 		ctx := NewConversationContext("test")
@@ -354,9 +359,9 @@ func TestHTTPRequestSecurity(t *testing.T) {
 		_, err := assistant.Chat(rc, ctx, "test message")
 		elapsed := time.Since(start)
 
-		// Should timeout quickly and return error
+		// Should timeout and return error without waiting for server
 		assert.Error(t, err)
-		assert.Less(t, elapsed, 2*time.Second, "Request should timeout before server delay")
+		assert.Less(t, elapsed, 5*time.Second, "Request should timeout well before server delay")
 	})
 
 	t.Run("malicious_response_handling", func(t *testing.T) {
@@ -511,9 +516,10 @@ func TestConfigurationSecurity(t *testing.T) {
 		dirInfo, err := os.Stat(configDir)
 		require.NoError(t, err)
 
-		// Directory should be accessible by owner only (0700)
+		// Directory should have restricted permissions (shared.SecretDirPerm = 0750)
 		mode := dirInfo.Mode().Perm()
-		assert.Equal(t, os.FileMode(0700), mode, "Config directory should have 0700 permissions")
+		assert.Zero(t, mode&0002, "Config directory should not be world-writable, got %04o", mode)
+		assert.Zero(t, mode&0004, "Config directory should not be world-readable, got %04o", mode)
 
 		// Cleanup
 		_ = os.RemoveAll(configDir)

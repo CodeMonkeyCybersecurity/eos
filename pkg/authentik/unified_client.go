@@ -224,15 +224,16 @@ func isTransientError(err error, statusCode int) bool {
 		return false
 	}
 
-	// FAIL FAST: Client errors are deterministic (bad request, auth failure, not found)
-	// DO NOT RETRY: 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 405 Method Not Allowed
-	if statusCode >= 400 && statusCode < 500 {
-		return false // Client errors - configuration/validation issue, won't fix with retry
-	}
-
-	// RETRY: Rate limiting (429) and server errors (5xx) are transient
+	// RETRY: Rate limiting (429) is transient - check BEFORE 4xx fail-fast
+	// 429 Too Many Requests is in the 4xx range but IS retryable (RFC 6585)
 	if statusCode == 429 || statusCode >= 500 {
 		return true // Transient failures - retry with backoff
+	}
+
+	// FAIL FAST: Client errors are deterministic (bad request, auth failure, not found)
+	// DO NOT RETRY: 400, 401, 403, 404, 405, etc. (excluding 429 handled above)
+	if statusCode >= 400 && statusCode < 500 {
+		return false // Client errors - configuration/validation issue, won't fix with retry
 	}
 
 	// Network errors (no status code) - check error string

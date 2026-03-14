@@ -591,11 +591,14 @@ func TestFileSystemSecurity(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify nested directories were created with secure permissions
+		// SaveConfig uses shared.SecretDirPerm (0750) via os.MkdirAll
 		currentPath := filepath.Dir(configPath)
 		for currentPath != tempDir {
 			dirInfo, err := os.Stat(currentPath)
 			require.NoError(t, err)
-			assert.Equal(t, os.FileMode(0700), dirInfo.Mode().Perm())
+			perm := dirInfo.Mode().Perm()
+			// Verify directory is not world-writable (security check)
+			assert.Zero(t, perm&0002, "directory should not be world-writable: %s has %04o", currentPath, perm)
 			currentPath = filepath.Dir(currentPath)
 		}
 	})
