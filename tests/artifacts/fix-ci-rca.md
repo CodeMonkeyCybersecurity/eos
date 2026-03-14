@@ -10,6 +10,7 @@
 | P1 | `lint_changed` times out: `Package 'libvirt', required by 'virtual:world', not found` | branch | job#113964 log: golangci-lint fails to compile pkg/kvm (imports libvirt.org/go/libvirt CGo) + pkg/cephfs (imports go-ceph/cephfs/admin CGo); lint times out after 8m fighting CGo errors |
 | P1 | `propagation_pyramid` fails: `FAIL: propagate-script-exists - expected exit 0, got 1` | branch | job#114240 log: `test -f prompts/scripts/propagate.sh` fails because prompts submodule not initialized in ci-debug-parity workflow (fresh CI checkout does not init submodules) |
 | P0 (INFRA BLOCKER) | `cybermonkey/prompts` returns HTTP 403 for all available CI tokens | CI only | Confirmed: `github.token` is repo-scoped to `cybermonkey/eos` only; `GITEA_TOKEN` secret is for a user without read access to `cybermonkey/prompts`; anonymous access returns 401. Henry's personal token (`henry:TOKEN`) works. Requires admin action to fix. |
+| P1 | `verify_parity_contract_tests` fails: `rg: command not found` — ripgrep not in CI Docker image | CI only | job#116985: `FAIL: npm-debug-script-mapping - expected exit 0, got 127 / output: rg: command not found`; fix: replace `rg -F` with `grep -F` in test-verify-parity.sh (portable, equivalent for fixed-string search) |
 | P1 | `governance_propagation_shell_coverage` reports 0.00% (threshold 90%): `BASH_XTRACEFD=9` trace unavailable in CI Docker env | CI only | `catthehacker/ubuntu:act-latest` does not propagate fd 9 through subshell invocations; trace file written but produces 0 matching lines; locally 92.08% (pass). Fix: detect `executed==0 and coverable>0` as measurement failure; emit `::warning::` and exit 0 instead of failing. |
 
 ## Root Cause (5-whys)
@@ -68,7 +69,14 @@
    before running. If the submodule is not cloned (file absent), it prints SKIP and exits 0 — CI
    does not fail the `propagation_pyramid` stage when the submodule is unavailable.
 
-### P1-D: BASH_XTRACEFD=9 trace unavailable in CI Docker environment
+### P1-D: ripgrep (rg) not installed in CI Docker image
+1. Why did CI fail? `verify_parity_contract_tests` exits 1
+2. Why? `rg: command not found` — exit 127
+3. Why? `test-verify-parity.sh` used `rg -F` (ripgrep) instead of portable `grep -F`
+4. Why was it not detected earlier? Dev machine has ripgrep installed; locally the test passes
+5. Durable fix: replace `rg -F` with `grep -F` in test-verify-parity.sh — functionally equivalent for fixed-string file search, universally available
+
+### P1-E: BASH_XTRACEFD=9 trace unavailable in CI Docker environment
 1. Why did CI fail? `governance_propagation_shell_coverage` exits 1: 0.00% < 90% threshold
 2. Why? `shell-coverage.sh` reported `executed 0 / coverable 568`
 3. Why? `BASH_XTRACEFD=9` wrote the fd but subshell invocations of the target scripts (sourced via `bash test/ci/...`) did not inherit xtrace to fd 9 in the `catthehacker/ubuntu:act-latest` container
