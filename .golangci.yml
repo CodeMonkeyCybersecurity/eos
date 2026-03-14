@@ -12,11 +12,15 @@ version: "2"
 
 # Run Configuration
 run:
-  timeout: 10m
+  timeout: 20m
   tests: true
   build-tags:
     - integration
     - unit
+    # noceph excludes pkg/ceph/diagnostics_sdk.go (CGo, requires librados-dev).
+    # Without this tag the build tag !noceph selects the real SDK file which
+    # needs Ceph C headers not present in CI containers.
+    - noceph
 
 # Linter Selection and Settings
 linters:

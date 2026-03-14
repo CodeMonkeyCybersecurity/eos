@@ -21,6 +21,69 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install CGo dependencies
+        run: |
+          set -euo pipefail
+          # libvirt-dev: pkg/kvm imports libvirt.org/go/libvirt (CGo)
+          # librados-dev: pkg/cephfs imports go-ceph/cephfs/admin and go-ceph/rados (CGo)
+          # Note: pkg/ceph diagnostics_sdk.go is handled by the noceph build tag in
+          # .golangci.yml (routes to pure-Go stub), so librados is only needed for pkg/cephfs.
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libvirt-dev librados-dev 2>/dev/null \
+            || echo "::warning::CGo deps install failed; golangci-lint may fail on pkg/kvm or pkg/cephfs"
+
+      - name: Init prompts submodule (HTTPS with token)
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The CI container cannot resolve 'vhost7' hostname but CAN reach the
+          # IP-based Gitea URL that the checkout action configured credentials for.
+          #
+          # Strategy: detect that IP URL, then:
+          #   1. git submodule init   → registers hostname URL in .git/config
+          #   2. git config override  → replace registered URL with IP URL
+          #   3. Configure auth in GLOBAL git config (local config is NOT inherited
+          #      by the git-clone subprocess spawned by git submodule update)
+          #   4. git submodule update → clones via IP with auth from global config
+
+          # Step 1: Detect the IP-based URL from checkout's extraheader config
+          _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
+            | sed -n 's|^http\.\(http://[^/]*:[0-9][^/]*/\)\.extraheader.*|\1|p' | head -1 || true)
+
+          # Step 2: Get the prompts submodule URL from .gitmodules
+          _sub_url=$(git config -f .gitmodules submodule.prompts.url 2>/dev/null || true)
+
+          if [[ -n "${_ip_base}" && -n "${_sub_url}" ]]; then
+            # Rewrite scheme+host to the reachable IP URL
+            _sub_path=$(echo "${_sub_url}" | sed 's|.*://[^/]*||')
+            _ip_sub_url="${_ip_base%/}${_sub_path}"
+            echo "Overriding prompts URL to IP-based server"
+
+            # Configure auth in GLOBAL git config so it propagates to subprocesses.
+            # The checkout action sets auth only in LOCAL config, which git-clone
+            # subprocesses (spawned by git submodule update) do NOT inherit.
+            _auth_b64=$(printf ":%s" "${GITEA_TOKEN}" | base64 -w0)
+            git config --global "http.${_ip_base}.extraheader" "AUTHORIZATION: basic ${_auth_b64}"
+
+            # Register submodule (writes hostname URL to .git/config), then override
+            git submodule init prompts 2>/dev/null || true
+            git config submodule.prompts.url "${_ip_sub_url}"
+
+            # Clone without --init (URL already registered and overridden above).
+            # GIT_TERMINAL_PROMPT=0 prevents interactive credential prompts.
+            if GIT_TERMINAL_PROMPT=0 git submodule update prompts 2>&1; then
+              git -C prompts config pull.rebase true 2>/dev/null || true
+              echo "prompts submodule initialized successfully"
+            else
+              echo "::warning::prompts submodule clone failed; propagation_pyramid tests will fail"
+            fi
+          else
+            echo "::warning::Could not detect IP server URL; propagation_pyramid tests will fail"
+            echo "  ip_base='${_ip_base}' sub_url='${_sub_url}'"
+          fi
+
       - name: Verify ci:debug parity contract
         run: |
           set -euo pipefail

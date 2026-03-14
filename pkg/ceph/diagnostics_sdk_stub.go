@@ -1,5 +1,5 @@
-//go:build darwin
-// +build darwin
+//go:build darwin || noceph
+// +build darwin noceph
 
 // pkg/ceph/diagnostics_sdk_stub.go
 // Stub implementation for Mac (Darwin) platform

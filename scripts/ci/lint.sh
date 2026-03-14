@@ -34,7 +34,7 @@ run_emoji_check() {
 
 run_all() {
   echo "Running full lint checks"
-  golangci-lint run --timeout=8m --config=.golangci.yml
+  golangci-lint run --config=.golangci.yml
 
   unformatted="$(gofmt -s -l . | grep -v '^vendor/' || true)"
   if [[ -n "${unformatted}" ]]; then
@@ -56,7 +56,7 @@ run_changed() {
   fi
 
   echo "Running changed-file lint checks against ${base_ref} (${base_rev})"
-  golangci-lint run --timeout=8m --config=.golangci.yml --new-from-rev="${base_rev}"
+  golangci-lint run --config=.golangci.yml --new-from-rev="${base_rev}"
 
   changed_go="$(git diff --name-only "${base_rev}"...HEAD -- '*.go' | grep -v '^vendor/' || true)"
   if [[ -n "${changed_go}" ]]; then

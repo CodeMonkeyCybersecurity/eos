@@ -9,6 +9,14 @@ source "${SCRIPT_DIR}/lib/test-harness.sh"
 GOV_SCRIPT="${REPO_ROOT}/scripts/check-governance.sh"
 WORKFLOW_FILE="${REPO_ROOT}/.gitea/workflows/governance-check.yml"
 
+# Ensure pyyaml is available — catthehacker/ubuntu:act-latest does not pre-install it.
+# pip install is idempotent; --break-system-packages required on Ubuntu 23+ externally-managed envs.
+if ! python3 -c "import yaml" 2>/dev/null; then
+  python3 -m pip install --quiet pyyaml --break-system-packages 2>/dev/null \
+    || python3 -m pip install --quiet pyyaml 2>/dev/null \
+    || true
+fi
+
 th_assert_run "governance-workflow-yaml-valid" 0 "" python3 -c "
 import yaml
 with open(${WORKFLOW_FILE@Q}, 'r', encoding='utf-8') as f:
