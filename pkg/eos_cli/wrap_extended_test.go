@@ -224,8 +224,7 @@ func TestSanitizeCommandInputsExtended(t *testing.T) {
 			sanitized, err := sanitizeCommandInputs(ctx, cmd, tt.args)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				if tt.errorMsg != "" {
+				if assert.Error(t, err) && tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {

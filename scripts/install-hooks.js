@@ -82,6 +82,10 @@ fi
 echo_status "Running go vet on staged files..."
 STAGED_PACKAGES=$(echo "$STAGED_GO_FILES" | xargs -I{} dirname {} | sort -u | sed 's|^|./|')
 for pkg in $STAGED_PACKAGES; do
+    # Skip packages that require build tags (e2e, integration tests)
+    if echo "$pkg" | grep -qE '(test/e2e|test/integration)'; then
+        continue
+    fi
     if ! go vet "$pkg" 2>/dev/null; then
         echo_fail "go vet failed on $pkg"
         exit 1
