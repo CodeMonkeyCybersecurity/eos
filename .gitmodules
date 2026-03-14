@@ -1,4 +1,4 @@
 [submodule "prompts"]
 	path = prompts
-	url = http://vhost7:8167/cybermonkey/prompts.git
+	url = https://gitea.cybermonkey.sh/cybermonkey/prompts.git
 	branch = main
