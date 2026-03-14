@@ -987,8 +987,14 @@ EOF
 # --- NEW: ps_repo_root ---
 th_assert_run "repo-root-from-script-path" 0 "" bash -c '
   source "$1"
-  result="$(ps_repo_root "/opt/eos/scripts/check-governance.sh")"
-  [[ "${result}" == "/opt/eos" ]] || { echo "got: ${result}"; exit 1; }
+  # Use a temp dir so this test works in CI (runner root != /opt/eos).
+  tmpdir="$(mktemp -d)"
+  trap "rm -rf ${tmpdir}" EXIT
+  mkdir -p "${tmpdir}/scripts"
+  touch "${tmpdir}/scripts/check-governance.sh"
+  result="$(ps_repo_root "${tmpdir}/scripts/check-governance.sh")"
+  expected="${tmpdir}"
+  [[ "${result}" == "${expected}" ]] || { echo "got: ${result}, expected: ${expected}"; exit 1; }
 ' _ "${HELPER_SCRIPT}"
 
 # --- NEW: ps_schema_version ---
