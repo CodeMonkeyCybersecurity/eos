@@ -21,6 +21,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install CGo dependencies
+        run: |
+          set -euo pipefail
+          # libvirt-dev: pkg/kvm imports libvirt.org/go/libvirt (CGo)
+          # librados-dev: pkg/cephfs imports go-ceph/cephfs/admin and go-ceph/rados (CGo)
+          # Note: pkg/ceph diagnostics_sdk.go is handled by the noceph build tag in
+          # .golangci.yml (routes to pure-Go stub), so librados is only needed for pkg/cephfs.
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libvirt-dev librados-dev 2>/dev/null \
+            || echo "::warning::CGo deps install failed; golangci-lint may fail on pkg/kvm or pkg/cephfs"
+
       - name: Verify ci:debug parity contract
         run: |
           set -euo pipefail
