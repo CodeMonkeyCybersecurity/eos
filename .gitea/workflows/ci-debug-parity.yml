@@ -32,6 +32,30 @@ jobs:
           apt-get install -y --no-install-recommends libvirt-dev librados-dev 2>/dev/null \
             || echo "::warning::CGo deps install failed; golangci-lint may fail on pkg/kvm or pkg/cephfs"
 
+      - name: Init prompts submodule (HTTPS with token)
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Rewrite SSH URLs to HTTPS for CI runner auth.
+          # CI runners lack SSH keys but can use token-based HTTPS.
+          git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+
+          # Use available token for HTTPS auth
+          TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
+          if [[ -n "${TOKEN}" ]]; then
+            git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
+          fi
+
+          # Init only the prompts submodule (propagation_pyramid tests require it).
+          # Soft failure: emit warning so propagate-script-exists gives a clear signal.
+          if git submodule update --init prompts 2>&1; then
+            git -C prompts config pull.rebase true 2>/dev/null || true
+          else
+            echo "::warning::prompts submodule init failed; propagation_pyramid tests will fail"
+          fi
+
       - name: Verify ci:debug parity contract
         run: |
           set -euo pipefail
