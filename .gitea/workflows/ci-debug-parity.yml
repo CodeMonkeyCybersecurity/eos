@@ -38,9 +38,19 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Rewrite SSH URLs to HTTPS for CI runner auth.
-          # CI runners lack SSH keys but can use token-based HTTPS.
+          # SSH→HTTPS rewrite for CI runner auth (no SSH keys in container)
           git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+
+          # The container cannot resolve 'vhost7' hostname but CAN reach the IP-based
+          # URL that the checkout action configured git credentials for.
+          # Detect that IP URL from git config and add a rewrite: vhost7→IP.
+          # This lets 'git submodule update' reach the Gitea server via the reachable route.
+          _ip_url=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
+            | sed -n 's|^http\.\(http://[0-9.]*:[0-9]*/\)\.extraheader.*|\1|p' | head -1 || true)
+          if [[ -n "${_ip_url}" && "${_ip_url}" != "http://vhost7:8167/" ]]; then
+            git config --local url."${_ip_url}".insteadOf "http://vhost7:8167/"
+            echo "Rewriting http://vhost7:8167/ → ${_ip_url}"
+          fi
 
           # Use available token for HTTPS auth
           TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
