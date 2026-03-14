@@ -39,12 +39,15 @@ jobs:
         run: |
           set -euo pipefail
           # The CI container cannot resolve 'vhost7' hostname but CAN reach the
-          # IP-based Gitea URL. git submodule update spawns git-clone as a subprocess
-          # that does NOT inherit the parent repo's local git config (where checkout
-          # stored auth). Instead: detect the reachable IP URL and use git clone
-          # directly with credentials embedded in the URL (Gitea accepts x:TOKEN).
+          # IP-based Gitea URL. actions/checkout stores its auth in LOCAL git
+          # config (http.<ip-url>.extraheader). git-clone subprocesses spawned by
+          # git submodule update do NOT inherit LOCAL config — only GLOBAL/SYSTEM.
+          #
+          # Strategy: copy the checkout action's auth from LOCAL to GLOBAL git
+          # config, then run git clone --depth=1 directly.
+          # This reuses the same github.token that successfully fetched this repo.
 
-          # Step 1: Detect the IP-based URL from checkout's extraheader config
+          # Step 1: Detect the IP-based URL from checkout's local extraheader config
           _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
             | sed -n 's|^http\.\(http://[^/]*:[0-9][^/]*/\)\.extraheader.*|\1|p' | head -1 || true)
 
@@ -52,17 +55,25 @@ jobs:
           _sub_url=$(git config -f .gitmodules submodule.prompts.url 2>/dev/null || true)
 
           if [[ -n "${_ip_base}" && -n "${_sub_url}" ]]; then
-            # Rewrite scheme+host to IP URL with credentials embedded in the URL.
-            # git submodule update spawns git-clone as a subprocess that does NOT
-            # inherit the parent's local git config. Using credentials in the URL
-            # avoids all credential-helper and config-inheritance issues.
-            # Gitea's git HTTP endpoint accepts Basic auth as: anyuser:TOKEN.
             _sub_path=$(echo "${_sub_url}" | sed 's|.*://[^/]*||')
-            _ip_host="${_ip_base#http://}"  # strip scheme → 192.168.7.169:8167/
-            _authed_url="http://x:${GITEA_TOKEN}@${_ip_host%/}${_sub_path}"
+            _ip_sub_url="${_ip_base%/}${_sub_path}"
 
-            echo "Cloning prompts submodule via IP-based server"
-            if GIT_TERMINAL_PROMPT=0 git clone --depth=1 "${_authed_url}" prompts 2>&1; then
+            # Copy the checkout action's auth to global config so git-clone subprocess
+            # can read it. Also fall back to GITEA_TOKEN secret if needed.
+            _auth_header=$(git config --local "http.${_ip_base}.extraheader" 2>/dev/null || true)
+            if [[ -n "${_auth_header}" ]]; then
+              echo "Propagating checkout action auth (github.token) to global config"
+              git config --global "http.${_ip_base}.extraHeader" "${_auth_header}"
+            elif [[ -n "${GITEA_TOKEN:-}" ]]; then
+              echo "Falling back to GITEA_TOKEN secret (x:TOKEN format)"
+              _auth_b64=$(printf "x:%s" "${GITEA_TOKEN}" | base64 -w0)
+              git config --global "http.${_ip_base}.extraHeader" "AUTHORIZATION: basic ${_auth_b64}"
+            else
+              echo "::warning::No auth available; clone may fail if prompts repo requires auth"
+            fi
+
+            echo "Cloning prompts submodule from IP-based server"
+            if GIT_TERMINAL_PROMPT=0 git clone --depth=1 "${_ip_sub_url}" prompts 2>&1; then
               git -C prompts config pull.rebase true 2>/dev/null || true
               echo "prompts submodule initialized successfully"
             else
