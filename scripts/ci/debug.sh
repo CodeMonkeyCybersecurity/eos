@@ -81,6 +81,7 @@ lane_run_step "compile_smoke" go test -run '^$' ./cmd/...
 lane_run_step "lane_runtime_unit_tests" bash test/ci/test-lane-runtime-unit.sh
 lane_run_step "submodule_freshness_pyramid" bash test/ci/test-submodule-freshness.sh
 lane_run_step "governance_wrapper_tests" bash test/ci/test-governance-check.sh
+lane_run_step "propagation_pyramid" bash test/ci/test-propagate.sh
 lane_run_step "governance_propagation_shell_coverage" \
   bash scripts/ci/shell-coverage.sh outputs/ci/governance-propagation-coverage 90 \
     scripts/ci/lib/lane-runtime.sh \
