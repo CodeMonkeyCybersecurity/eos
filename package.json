@@ -1,0 +1,36 @@
+{
+  "name": "eos",
+  "version": "1.0.0",
+  "description": "Eos - Ubuntu server administration CLI by Code Monkey Cybersecurity",
+  "private": true,
+  "scripts": {
+    "build": "CGO_ENABLED=1 go build -v -ldflags '-s -w' -o /tmp/eos ./cmd/",
+    "build:debug": "CGO_ENABLED=1 go build -v -race -o /tmp/eos-debug ./cmd/",
+    "test": "go test -v -race -short -timeout=5m ./pkg/...",
+    "test:cover": "go test -v -race -short -timeout=5m -coverprofile=coverage.out -covermode=atomic ./pkg/... && go tool cover -func=coverage.out",
+    "test:cover:html": "npm run test:cover && go tool cover -html=coverage.out -o coverage.html && echo 'Coverage report: coverage.html'",
+    "test:integration": "go test -v -race -tags=integration -timeout=10m ./pkg/...",
+    "test:e2e:smoke": "go test -v -tags=e2e_smoke -timeout=5m ./test/e2e/smoke/...",
+    "lint": "golangci-lint run --config .golangci.yml ./...",
+    "lint:fix": "golangci-lint run --config .golangci.yml --fix ./...",
+    "fmt": "gofmt -l -s -w .",
+    "fmt:check": "test -z \"$(gofmt -l .)\" || (echo 'Files not formatted:' && gofmt -l . && exit 1)",
+    "vet": "CGO_ENABLED=1 go vet ./...",
+    "ci": "npm run fmt:check && npm run vet && npm run lint && npm run test && npm run build",
+    "ci:full": "npm run fmt:check && npm run vet && npm run lint && npm run test:cover && npm run build",
+    "precommit": "npm run repo:check && npm run fmt:check && npm run vet && npm run build",
+    "repo:check": "node scripts/repo-ownership-check.js",
+    "repo:fix": "echo 'Run: sudo chown -R $(whoami):$(whoami) /opt/eos/' && sudo chown -R $(whoami):$(whoami) .",
+    "hooks:install": "node scripts/install-hooks.js",
+    "postinstall": "npm run hooks:install",
+    "deps": "go mod download && go mod verify",
+    "deps:tidy": "go mod tidy",
+    "clean": "rm -f /tmp/eos /tmp/eos-debug coverage.out coverage.html coverage.svg"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodeMonkeyCybersecurity/eos.git"
+  },
+  "author": "Code Monkey Cybersecurity (ABN 77 177 673 061)",
+  "license": "AGPL-3.0-or-later"
+}

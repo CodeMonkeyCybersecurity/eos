@@ -35,7 +35,13 @@ go.work.sum
 *.env
 *.ini
 *.venv
-*.json
+
+# JSON secrets (but not package.json or config files)
+# NOTE: Don't use *.json blanket - it excludes package.json, tsconfig.json, etc.
+credentials.json
+service-account.json
+*_secret.json
+*_secrets.json
 
 # python 
 __pycache__
@@ -73,8 +79,14 @@ gosec-report.*
 
 *.aider*
 
-#claude
+# Claude session files
 *this-session-is-being-continued-from-a-previous-co.txt
-*.txt
 
+# Build artifacts
 *.bootstrapped
+
+# Node.js (npm scripts for build tooling)
+node_modules/
+
+# Coverage badge
+coverage.svg
