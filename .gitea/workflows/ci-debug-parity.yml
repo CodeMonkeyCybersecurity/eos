@@ -44,7 +44,9 @@ jobs:
           # Strategy: detect that IP URL, then:
           #   1. git submodule init   → registers hostname URL in .git/config
           #   2. git config override  → replace registered URL with IP URL
-          #   3. git submodule update → clones via IP (url.insteadOf is unreliable here)
+          #   3. Configure auth in GLOBAL git config (local config is NOT inherited
+          #      by the git-clone subprocess spawned by git submodule update)
+          #   4. git submodule update → clones via IP with auth from global config
 
           # Step 1: Detect the IP-based URL from checkout's extraheader config
           _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
@@ -59,12 +61,19 @@ jobs:
             _ip_sub_url="${_ip_base%/}${_sub_path}"
             echo "Overriding prompts URL to IP-based server"
 
+            # Configure auth in GLOBAL git config so it propagates to subprocesses.
+            # The checkout action sets auth only in LOCAL config, which git-clone
+            # subprocesses (spawned by git submodule update) do NOT inherit.
+            _auth_b64=$(printf ":%s" "${GITEA_TOKEN}" | base64 -w0)
+            git config --global "http.${_ip_base}.extraheader" "AUTHORIZATION: basic ${_auth_b64}"
+
             # Register submodule (writes hostname URL to .git/config), then override
             git submodule init prompts 2>/dev/null || true
             git config submodule.prompts.url "${_ip_sub_url}"
 
-            # Clone without --init (URL already registered and overridden above)
-            if git submodule update prompts 2>&1; then
+            # Clone without --init (URL already registered and overridden above).
+            # GIT_TERMINAL_PROMPT=0 prevents interactive credential prompts.
+            if GIT_TERMINAL_PROMPT=0 git submodule update prompts 2>&1; then
               git -C prompts config pull.rebase true 2>/dev/null || true
               echo "prompts submodule initialized successfully"
             else

@@ -45,11 +45,17 @@
 2. Why? `test -f prompts/scripts/propagate.sh` fails — file not found
 3. Why? `git checkout` in CI does NOT initialize submodules by default; `prompts` is a submodule
 4. Why was it not detected earlier? Local dev always has the submodule initialized (`/opt/eos/prompts/scripts/propagate.sh` exists)
-5. Durable fix: add "Init prompts submodule (HTTPS with token)" step to `ci-debug-parity.yml`, using same pattern as `submodule-freshness.yml`
+5. Durable fix: add "Init prompts submodule (HTTPS with token)" step to `ci-debug-parity.yml` that:
+   - Detects the reachable IP URL from the checkout action's local extraheader config
+   - Sets auth in GLOBAL git config (local config is NOT inherited by git-clone subprocesses)
+   - Overrides the submodule URL in local config to use the IP URL
+   - Runs `GIT_TERMINAL_PROMPT=0 git submodule update prompts`
+
+   **Root sub-cause**: `actions/checkout` configures auth via `http.<ip-url>.extraheader` in LOCAL git config only. When `git submodule update` spawns `git clone` as a subprocess, that subprocess reads GLOBAL/SYSTEM configs but NOT the parent repo's local config. Result: clone gets HTTP 401, git tries interactive credential prompt, fails with `No such device or address` (no TTY in container).
 
 ## Fix Plan
 
-- **Smallest change**: 5 targeted edits — 2 e2e test scripts, golangci.yml (noceph tag + timeout), CI workflow (apt-get install + submodule init), lint.sh (remove hardcoded --timeout=8m)
-- **Idempotency**: all fixes are re-entrant; `pip install` is idempotent, `apt-get install` is idempotent, `git submodule update --init` is idempotent, build tags are additive
-- **Risk + rollback**: low risk; test changes make tests more portable; CGo lib install adds ~30s to CI; submodule init adds ~5s and is the correct root-cause fix for propagation_pyramid
+- **Smallest change**: 5 targeted edits — 2 e2e test scripts, golangci.yml (noceph tag + timeout), CI workflow (apt-get install + submodule init with global auth), lint.sh (remove hardcoded --timeout=8m)
+- **Idempotency**: all fixes are re-entrant; `pip install` is idempotent, `apt-get install` is idempotent, global git config is overwritten (not appended), build tags are additive
+- **Risk + rollback**: low risk; test changes make tests more portable; CGo lib install adds ~30s to CI; global git config change is scoped to the CI container lifecycle only
 
