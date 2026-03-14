@@ -38,32 +38,41 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # SSH→HTTPS rewrite for CI runner auth (no SSH keys in container)
-          git config --local url."http://vhost7:8167/".insteadOf "ssh://git@vhost7:9001/"
+          # The CI container cannot resolve 'vhost7' hostname but CAN reach the
+          # IP-based Gitea URL that the checkout action configured credentials for.
+          #
+          # Strategy: detect that IP URL, then:
+          #   1. git submodule init   → registers hostname URL in .git/config
+          #   2. git config override  → replace registered URL with IP URL
+          #   3. git submodule update → clones via IP (url.insteadOf is unreliable here)
 
-          # The container cannot resolve 'vhost7' hostname but CAN reach the IP-based
-          # URL that the checkout action configured git credentials for.
-          # Detect that IP URL from git config and add a rewrite: vhost7→IP.
-          # This lets 'git submodule update' reach the Gitea server via the reachable route.
-          _ip_url=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
-            | sed -n 's|^http\.\(http://[0-9.]*:[0-9]*/\)\.extraheader.*|\1|p' | head -1 || true)
-          if [[ -n "${_ip_url}" && "${_ip_url}" != "http://vhost7:8167/" ]]; then
-            git config --local url."${_ip_url}".insteadOf "http://vhost7:8167/"
-            echo "Rewriting http://vhost7:8167/ → ${_ip_url}"
-          fi
+          # Step 1: Detect the IP-based URL from checkout's extraheader config
+          _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
+            | sed -n 's|^http\.\(http://[^/]*:[0-9][^/]*/\)\.extraheader.*|\1|p' | head -1 || true)
 
-          # Use available token for HTTPS auth
-          TOKEN="${GITEA_TOKEN:-${GITHUB_TOKEN:-}}"
-          if [[ -n "${TOKEN}" ]]; then
-            git config --local http.http://vhost7:8167/.extraheader "Authorization: token ${TOKEN}"
-          fi
+          # Step 2: Get the prompts submodule URL from .gitmodules
+          _sub_url=$(git config -f .gitmodules submodule.prompts.url 2>/dev/null || true)
 
-          # Init only the prompts submodule (propagation_pyramid tests require it).
-          # Soft failure: emit warning so propagate-script-exists gives a clear signal.
-          if git submodule update --init prompts 2>&1; then
-            git -C prompts config pull.rebase true 2>/dev/null || true
+          if [[ -n "${_ip_base}" && -n "${_sub_url}" ]]; then
+            # Rewrite scheme+host to the reachable IP URL
+            _sub_path=$(echo "${_sub_url}" | sed 's|.*://[^/]*||')
+            _ip_sub_url="${_ip_base%/}${_sub_path}"
+            echo "Overriding prompts URL to IP-based server"
+
+            # Register submodule (writes hostname URL to .git/config), then override
+            git submodule init prompts 2>/dev/null || true
+            git config submodule.prompts.url "${_ip_sub_url}"
+
+            # Clone without --init (URL already registered and overridden above)
+            if git submodule update prompts 2>&1; then
+              git -C prompts config pull.rebase true 2>/dev/null || true
+              echo "prompts submodule initialized successfully"
+            else
+              echo "::warning::prompts submodule clone failed; propagation_pyramid tests will fail"
+            fi
           else
-            echo "::warning::prompts submodule init failed; propagation_pyramid tests will fail"
+            echo "::warning::Could not detect IP server URL; propagation_pyramid tests will fail"
+            echo "  ip_base='${_ip_base}' sub_url='${_sub_url}'"
           fi
 
       - name: Verify ci:debug parity contract
