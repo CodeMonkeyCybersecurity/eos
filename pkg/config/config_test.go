@@ -261,12 +261,11 @@ func TestBindEnvs(t *testing.T) {
 }
 
 // TestWatchConfig tests configuration file watching
+// Uses a local viper instance to avoid data races with background goroutines
 func TestWatchConfig(t *testing.T) {
-
-	// Create a new viper instance for isolation
-	oldConfig := Config
-	Config = viper.New()
-	defer func() { Config = oldConfig }()
+	// WatchConfig spawns background goroutines that race on the global Config.
+	// Use a local viper instance to avoid races with other tests.
+	localConfig := viper.New()
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
@@ -276,17 +275,17 @@ func TestWatchConfig(t *testing.T) {
 	err := os.WriteFile(configFile, []byte(initialData), 0644)
 	require.NoError(t, err)
 
-	// Load config
-	err = LoadConfig(configFile)
+	localConfig.SetConfigFile(configFile)
+	err = localConfig.ReadInConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "initial_value", Config.GetString("test_key"))
+	assert.Equal(t, "initial_value", localConfig.GetString("test_key"))
 
 	// Set up watcher
 	changeChan := make(chan bool, 1)
-	Config.OnConfigChange(func(e fsnotify.Event) {
+	localConfig.OnConfigChange(func(e fsnotify.Event) {
 		changeChan <- true
 	})
-	Config.WatchConfig()
+	localConfig.WatchConfig()
 
 	// Update config file
 	time.Sleep(100 * time.Millisecond) // Give watcher time to start
@@ -298,7 +297,7 @@ func TestWatchConfig(t *testing.T) {
 	select {
 	case <-changeChan:
 		// Config change detected
-		assert.Equal(t, "updated_value", Config.GetString("test_key"))
+		assert.Equal(t, "updated_value", localConfig.GetString("test_key"))
 	case <-time.After(2 * time.Second):
 		t.Skip("Config watcher not triggered - may be filesystem dependent")
 	}
@@ -570,7 +569,6 @@ func TestWatchAndHotReload(t *testing.T) {
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
-	defer func() { Config = oldConfig }()
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
@@ -589,7 +587,12 @@ func TestWatchAndHotReload(t *testing.T) {
 		// Callback would be called on config change
 	})
 	require.NoError(t, err)
-	defer cleanup()
+
+	// Stop watcher BEFORE restoring Config to prevent race
+	t.Cleanup(func() {
+		cleanup()
+		Config = oldConfig
+	})
 
 	// Give watcher time to start
 	time.Sleep(100 * time.Millisecond)
