@@ -17,6 +17,10 @@ run:
   build-tags:
     - integration
     - unit
+    # noceph excludes pkg/ceph/diagnostics_sdk.go (CGo, requires librados-dev).
+    # Without this tag the build tag !noceph selects the real SDK file which
+    # needs Ceph C headers not present in CI containers.
+    - noceph
 
 # Linter Selection and Settings
 linters:
@@ -100,10 +104,6 @@ linters:
       - third_party$
       - ".*\\.pb\\.go$"
       - ".*_gen\\.go$"
-      # pkg/ceph uses CGo (go-ceph/rados) which requires librados-dev C headers.
-      # These headers are not installed in the CI container (catthehacker/ubuntu:act-latest).
-      # Lint pkg/ceph locally with librados-dev installed: golangci-lint run ./pkg/ceph/...
-      - "^pkg/ceph/"
 
     # Rule-based exclusions (replaces issues.exclude-rules)
     rules:
