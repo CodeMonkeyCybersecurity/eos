@@ -35,17 +35,22 @@ go.work.sum
 *.env
 *.ini
 *.venv
-*.json
-!package.json
 
-# python 
+# JSON secrets (but not package.json or config files)
+# NOTE: Don't use *.json blanket - it excludes package.json, tsconfig.json, etc.
+credentials.json
+service-account.json
+*_secret.json
+*_secrets.json
+
+# python
 __pycache__
 
 # MacOS
 *.DS_Store
 *desktop.ini
 
-# Backups 
+# Backups
 *.bak
 
 # Apps
@@ -58,10 +63,9 @@ apps/mattermost/docker*
 
 # Logs and output
 *.log
-*.out
 outputs/
 
-# Other 
+# Other
 *.deb
 *.rpm
 /eos
@@ -69,14 +73,19 @@ eos.exe
 
 # tests
 coverage.*
-*.out
 gosec-report.*
 *eos-test*
 
 *.aider*
 
-#claude
+# Claude session files
 *this-session-is-being-continued-from-a-previous-co.txt
-*.txt
 
+# Build artifacts
 *.bootstrapped
+
+# Node.js (npm scripts for build tooling)
+node_modules/
+
+# Coverage badge
+coverage.svg

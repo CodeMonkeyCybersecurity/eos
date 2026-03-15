@@ -31,8 +31,6 @@
     "test:governance-check": "bash test/ci/test-governance-check.sh",
     "test:submodule-bootstrap": "bash test/ci/test-submodule-bootstrap.sh",
     "test:verify-parity": "bash test/ci/test-verify-parity.sh",
-    "propagate:prompts": "bash prompts/scripts/propagate.sh",
-    "propagate:prompts:dry-run": "bash prompts/scripts/propagate.sh --dry-run",
     "test:propagate": "bash test/ci/test-propagate.sh",
     "quality:self-update": "npm run ci:self-update-quality --silent",
     "build": "go build -o /tmp/eos-build .",
@@ -41,8 +39,18 @@
     "test": "go test -short ./pkg/...",
     "test:verbose": "go test -v -short ./pkg/...",
     "test:race": "go test -race -short ./pkg/crypto ./pkg/interaction ./pkg/parse ./pkg/verify",
+    "test:cover": "go test -short -coverprofile=coverage.out -covermode=atomic ./pkg/... && go tool cover -func=coverage.out",
     "fmt": "gofmt -s -w .",
     "fmt:check": "test -z \"$(gofmt -s -l .)\"",
-    "vet": "go vet ./..."
-  }
+    "vet": "go vet ./...",
+    "clean": "rm -f /tmp/eos /tmp/eos-build coverage.out coverage.html coverage.svg",
+    "deps": "go mod download && go mod verify",
+    "deps:tidy": "go mod tidy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CodeMonkeyCybersecurity/eos.git"
+  },
+  "author": "Code Monkey Cybersecurity (ABN 77 177 673 061)",
+  "license": "AGPL-3.0-or-later"
 }

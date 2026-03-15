@@ -18,7 +18,7 @@ import (
 
 // TestLoadConfig tests configuratosn loading from various file formats
 func TestLoadConfig(t *testing.T) {
-	t.Parallel()
+
 	tests := []struct {
 		name        string
 		configData  string
@@ -81,7 +81,7 @@ user = "testuser"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+
 			// Create a new viper instance for isolation
 			oldConfig := Config
 			Config = viper.New()
@@ -106,7 +106,7 @@ user = "testuser"
 
 // TestMustLoadConfig tests panic behavior
 func TestMustLoadConfig(t *testing.T) {
-	t.Parallel()
+
 	t.Run("valid config", func(t *testing.T) {
 		// Create a new viper instance for isolation
 		oldConfig := Config
@@ -124,7 +124,7 @@ func TestMustLoadConfig(t *testing.T) {
 	})
 
 	t.Run("invalid config path", func(t *testing.T) {
-		t.Parallel()
+
 		// Create a new viper instance for isolation
 		oldConfig := Config
 		Config = viper.New()
@@ -138,7 +138,7 @@ func TestMustLoadConfig(t *testing.T) {
 
 // TestLoadWithDefaults tests loading with default values
 func TestLoadWithDefaults(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -182,7 +182,7 @@ database:
 
 // TestBindEnv tests environment variable binding
 func TestBindEnv(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -213,7 +213,7 @@ func TestBindEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+
 			// Set environment variable
 			_ = os.Setenv(tt.envVar, tt.value)
 			defer func() { _ = os.Unsetenv(tt.envVar) }()
@@ -228,7 +228,7 @@ func TestBindEnv(t *testing.T) {
 
 // TestBindEnvs tests batch environment variable binding
 func TestBindEnvs(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -261,12 +261,11 @@ func TestBindEnvs(t *testing.T) {
 }
 
 // TestWatchConfig tests configuration file watching
+// Uses a local viper instance to avoid data races with background goroutines
 func TestWatchConfig(t *testing.T) {
-	t.Parallel()
-	// Create a new viper instance for isolation
-	oldConfig := Config
-	Config = viper.New()
-	defer func() { Config = oldConfig }()
+	// WatchConfig spawns background goroutines that race on the global Config.
+	// Use a local viper instance to avoid races with other tests.
+	localConfig := viper.New()
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
@@ -276,17 +275,17 @@ func TestWatchConfig(t *testing.T) {
 	err := os.WriteFile(configFile, []byte(initialData), 0644)
 	require.NoError(t, err)
 
-	// Load config
-	err = LoadConfig(configFile)
+	localConfig.SetConfigFile(configFile)
+	err = localConfig.ReadInConfig()
 	require.NoError(t, err)
-	assert.Equal(t, "initial_value", Config.GetString("test_key"))
+	assert.Equal(t, "initial_value", localConfig.GetString("test_key"))
 
 	// Set up watcher
 	changeChan := make(chan bool, 1)
-	Config.OnConfigChange(func(e fsnotify.Event) {
+	localConfig.OnConfigChange(func(e fsnotify.Event) {
 		changeChan <- true
 	})
-	Config.WatchConfig()
+	localConfig.WatchConfig()
 
 	// Update config file
 	time.Sleep(100 * time.Millisecond) // Give watcher time to start
@@ -298,7 +297,7 @@ func TestWatchConfig(t *testing.T) {
 	select {
 	case <-changeChan:
 		// Config change detected
-		assert.Equal(t, "updated_value", Config.GetString("test_key"))
+		assert.Equal(t, "updated_value", localConfig.GetString("test_key"))
 	case <-time.After(2 * time.Second):
 		t.Skip("Config watcher not triggered - may be filesystem dependent")
 	}
@@ -306,7 +305,7 @@ func TestWatchConfig(t *testing.T) {
 
 // TestGetConfigHelpers tests the various getter helper functions
 func TestGetConfigHelpers(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -314,7 +313,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test GetString with required flag
 	t.Run("GetString", func(t *testing.T) {
-		t.Parallel()
+
 		Config.Set("test.string", "value")
 		assert.Equal(t, "value", GetString("test.string", false))
 		assert.Equal(t, "", GetString("nonexistent", false))
@@ -327,7 +326,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test GetDuration
 	t.Run("GetDuration", func(t *testing.T) {
-		t.Parallel()
+
 		Config.Set("test.duration", "5m")
 		assert.Equal(t, 5*time.Minute, GetDuration("test.duration", 0))
 		assert.Equal(t, 10*time.Second, GetDuration("nonexistent", 10*time.Second))
@@ -336,7 +335,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 	// Test viper's built-in getters
 	t.Run("ViperGetters", func(t *testing.T) {
-		t.Parallel()
+
 		Config.Set("test.bool", true)
 		Config.Set("test.int", 42)
 		Config.Set("test.slice", []string{"a", "b", "c"})
@@ -349,7 +348,7 @@ func TestGetConfigHelpers(t *testing.T) {
 
 // TestRequiredConfig tests required configuration validation
 func TestRequiredConfig(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -358,7 +357,7 @@ func TestRequiredConfig(t *testing.T) {
 	Config.Set("existing.key", "value")
 
 	t.Run("Require", func(t *testing.T) {
-		t.Parallel()
+
 		err := Require("existing.key")
 		assert.NoError(t, err)
 
@@ -373,7 +372,7 @@ func TestRequiredConfig(t *testing.T) {
 	})
 
 	t.Run("MustRequire", func(t *testing.T) {
-		t.Parallel()
+
 		Config.Set("test.key", "value")
 
 		// Should not panic
@@ -390,7 +389,7 @@ func TestRequiredConfig(t *testing.T) {
 
 // TestGetAllSettings tests retrieving all configuration
 func TestGetAllSettings(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -413,7 +412,7 @@ func TestGetAllSettings(t *testing.T) {
 
 // TestIsSet tests configuration key existence checks
 func TestIsSet(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -435,7 +434,7 @@ func TestIsSet(t *testing.T) {
 // TestConcurrentAccess tests thread-safe configuration access
 // NOTE: Viper doesn't support concurrent writes without external synchronization
 func TestConcurrentAccess(t *testing.T) {
-	t.Parallel()
+
 	t.Skip("Viper doesn't support concurrent writes without external synchronization")
 	// Create a new viper instance for isolation
 	oldConfig := Config
@@ -488,7 +487,7 @@ func TestConcurrentAccess(t *testing.T) {
 
 // TestConfigPriority tests configuration source priority
 func TestConfigPriority(t *testing.T) {
-	t.Parallel()
+
 	t.Skip("Viper's environment binding behavior is complex and varies by version")
 
 	// Create a new viper instance for isolation
@@ -510,7 +509,7 @@ func TestConfigPriority(t *testing.T) {
 
 // TestUnmarshalKey tests unmarshaling specific config sections
 func TestUnmarshalKey(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -539,7 +538,7 @@ func TestUnmarshalKey(t *testing.T) {
 
 // TestSubConfig tests working with configuration sub-trees
 func TestSubConfig(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -566,11 +565,10 @@ func TestSubConfig(t *testing.T) {
 // TestConfigValidation tests configuration validation scenarios
 // TestWatchAndHotReload tests the configuration hot reload functionality
 func TestWatchAndHotReload(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
-	defer func() { Config = oldConfig }()
 
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.yaml")
@@ -589,7 +587,12 @@ func TestWatchAndHotReload(t *testing.T) {
 		// Callback would be called on config change
 	})
 	require.NoError(t, err)
-	defer cleanup()
+
+	// Stop watcher BEFORE restoring Config to prevent race
+	t.Cleanup(func() {
+		cleanup()
+		Config = oldConfig
+	})
 
 	// Give watcher time to start
 	time.Sleep(100 * time.Millisecond)
@@ -608,7 +611,7 @@ func TestWatchAndHotReload(t *testing.T) {
 
 // TestReload tests the configuration reload functionality
 func TestReload(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -640,7 +643,7 @@ func TestReload(t *testing.T) {
 
 // TestSetDefaultEnvPrefix tests environment variable prefix configuration
 func TestSetDefaultEnvPrefix(t *testing.T) {
-	t.Parallel()
+
 	// Create a new viper instance for isolation
 	oldConfig := Config
 	Config = viper.New()
@@ -658,7 +661,7 @@ func TestSetDefaultEnvPrefix(t *testing.T) {
 }
 
 func TestConfigValidation(t *testing.T) {
-	t.Parallel()
+
 	tests := []struct {
 		name      string
 		setupFunc func()
@@ -716,7 +719,7 @@ func TestConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+
 			// Create a new viper instance for isolation
 			oldConfig := Config
 			Config = viper.New()
