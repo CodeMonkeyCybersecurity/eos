@@ -196,6 +196,36 @@ PY
         run: |
           test -f outputs/ci/lint/report.json && cat outputs/ci/lint/report.json || true
 
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          set -euo pipefail
+          mapfile -t shell_files < <(
+            git ls-files '*.sh' | sort
+          )
+          if [[ ${#shell_files[@]} -eq 0 ]]; then
+            echo "No shell files found"
+            exit 0
+          fi
+          echo "Checking ${#shell_files[@]} shell file(s)..."
+          shellcheck -x "${shell_files[@]}"
+          echo "shellcheck: all files passed"
+
   ci-unit:
     name: ci-unit
     runs-on: ubuntu-latest

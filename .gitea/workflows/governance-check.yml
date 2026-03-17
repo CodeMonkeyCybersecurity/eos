@@ -41,6 +41,21 @@ jobs:
             echo "SUBMODULE_INIT=failed" >> "${_ENV_FILE}"
           fi
 
+      - name: Run shellcheck on all shell scripts
+        run: |
+          set -euo pipefail
+          if ! command -v shellcheck &>/dev/null; then
+            apt-get update -qq && apt-get install -y shellcheck
+          fi
+          mapfile -t shell_files < <(git ls-files '*.sh' | sort)
+          if [[ ${#shell_files[@]} -eq 0 ]]; then
+            echo "No shell files found"
+            exit 0
+          fi
+          echo "Checking ${#shell_files[@]} shell file(s)..."
+          shellcheck -x "${shell_files[@]}"
+          echo "shellcheck: all files passed"
+
       - name: Run governance unit tests (70%)
         run: |
           set -euo pipefail

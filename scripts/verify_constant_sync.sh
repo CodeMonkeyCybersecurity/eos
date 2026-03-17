@@ -66,7 +66,8 @@ check_constant() {
 
     # Handle case where constant might have lowercase variant
     if [ -z "$duplicate_value" ]; then
-        local lowercase_name=$(echo "$const_name" | sed 's/Consul/consul/')
+        local lowercase_name
+        lowercase_name=$(echo "$const_name" | sed 's/Consul/consul/')
         duplicate_value=$(extract_const "$lowercase_name" "$duplicate_file" || echo "")
     fi
 
@@ -161,8 +162,9 @@ echo ""
 # ============================================================================
 # SHARED PACKAGE - Permission Constants Used in Consul
 # ============================================================================
-echo "=== Shared Permission Constants (used in consul/validation/datadir.go) ==="
 SOURCE_SHARED="pkg/shared/permissions.go"
+echo "=== Shared Permission Constants (used in consul/validation/datadir.go) ==="
+echo "File: ${SOURCE_SHARED}"
 
 # pkg/consul/validation/datadir.go uses shared.SecretFilePerm
 # This is NOT a duplicate, it's proper usage of shared constants

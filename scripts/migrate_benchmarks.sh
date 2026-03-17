@@ -24,8 +24,6 @@ TOTAL_PATTERNS=0
 # Function to migrate a single file
 migrate_file() {
     local file=$1
-    local temp_file="${file}.tmp"
-
     echo -e "${YELLOW}Processing:${NC} $file"
 
     # Check if file contains deprecated pattern
@@ -37,7 +35,8 @@ migrate_file() {
     fi
 
     # Count patterns in this file
-    local count=$(grep -c 'for.*b\.N' "$file" || true)
+    local count
+    count=$(grep -c 'for.*b\.N' "$file" || true)
     TOTAL_PATTERNS=$((TOTAL_PATTERNS + count))
 
     # Create backup

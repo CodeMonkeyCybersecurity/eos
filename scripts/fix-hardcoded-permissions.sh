@@ -27,10 +27,8 @@ CREATE_CONSTANTS_ONLY=false
 BACKUP_EXT=".permissions.bak"
 CONSTANTS_FILE="pkg/shared/permissions.go"
 REPLACED_COUNT=0
-SKIPPED_COUNT=0
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -243,7 +241,7 @@ for file in $FILES; do
 
     # Check each replacement pattern
     for replacement in "${REPLACEMENTS[@]}"; do
-        IFS=':' read -r octal_value constant_name usage <<< "$replacement"
+        IFS=':' read -r octal_value constant_name _usage <<< "$replacement"
 
         # Check if file contains this hardcoded value
         if grep -q "$octal_value" "$file"; then

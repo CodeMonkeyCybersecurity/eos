@@ -38,7 +38,8 @@ lane_run_step "preflight" scripts/ci/preflight.sh
 lane_run_step "sanitize_git_env" ge_unset_git_local_env
 lane_run_step "git_conflict_guard" ensure_no_merge_conflicts
 
-export PATH="$(go env GOPATH)/bin:${PATH}"
+_gopath="$(go env GOPATH)"
+export PATH="${_gopath}/bin:${PATH}"
 if ! command -v golangci-lint >/dev/null 2>&1; then
   lane_log "INFO" "ci_debug.bootstrap" "golangci-lint missing; installing pinned v2.0.0" "bootstrap"
   lane_run_step "install_golangci_lint" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.0
@@ -100,9 +101,9 @@ lane_run_step "governance_propagation_shell_coverage" \
     -- bash -c 'bash test/ci/test-lane-runtime-unit.sh && bash test/ci/test-submodule-freshness.sh && bash test/ci/test-governance-check.sh'
 lane_run_step "verify_parity_contract_tests" bash test/ci/test-verify-parity.sh
 
-CI_LANE_FAILED_STAGE="none"
-CI_LANE_FAILED_COMMAND=""
-CI_LANE_FAILED_LINE=0
-CI_LANE_FAILED_EXIT=0
-CI_LANE_STAGE="complete"
+export CI_LANE_FAILED_STAGE="none"
+export CI_LANE_FAILED_COMMAND=""
+export CI_LANE_FAILED_LINE=0
+export CI_LANE_FAILED_EXIT=0
+export CI_LANE_STAGE="complete"
 lane_finish "pass" "ci:debug completed successfully" 0
