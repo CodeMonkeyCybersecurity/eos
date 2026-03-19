@@ -36,6 +36,86 @@ th_assert_run() {
   return 0
 }
 
+th_assert_contains() {
+  local name="${1:?name required}"
+  local haystack="${2:-}"
+  local needle="${3:?needle required}"
+
+  if grep -qF "${needle}" <<< "${haystack}"; then
+    echo "PASS: ${name}"
+    th_pass=$((th_pass + 1))
+    return 0
+  fi
+
+  echo "FAIL: ${name} - expected output containing '${needle}'"
+  echo "  output: ${haystack}"
+  th_fail=$((th_fail + 1))
+  return 0
+}
+
+th_assert_not_contains() {
+  local name="${1:?name required}"
+  local haystack="${2:-}"
+  local needle="${3:?needle required}"
+
+  if grep -qF "${needle}" <<< "${haystack}"; then
+    echo "FAIL: ${name} - did not expect output containing '${needle}'"
+    echo "  output: ${haystack}"
+    th_fail=$((th_fail + 1))
+    return 0
+  fi
+
+  echo "PASS: ${name}"
+  th_pass=$((th_pass + 1))
+  return 0
+}
+
+th_assert_file_exists() {
+  local name="${1:?name required}"
+  local path="${2:?path required}"
+
+  if [[ -e "${path}" ]]; then
+    echo "PASS: ${name}"
+    th_pass=$((th_pass + 1))
+    return 0
+  fi
+
+  echo "FAIL: ${name} - expected file to exist at ${path}"
+  th_fail=$((th_fail + 1))
+  return 0
+}
+
+th_assert_exit_code() {
+  local name="${1:?name required}"
+  local got="${2:?exit code required}"
+  local want="${3:?expected exit required}"
+
+  if [[ "${got}" -eq "${want}" ]]; then
+    echo "PASS: ${name}"
+    th_pass=$((th_pass + 1))
+    return 0
+  fi
+
+  echo "FAIL: ${name} - expected exit ${want}, got ${got}"
+  th_fail=$((th_fail + 1))
+  return 0
+}
+
+th_assert_nonzero_exit() {
+  local name="${1:?name required}"
+  local got="${2:?exit code required}"
+
+  if [[ "${got}" -ne 0 ]]; then
+    echo "PASS: ${name}"
+    th_pass=$((th_pass + 1))
+    return 0
+  fi
+
+  echo "FAIL: ${name} - expected non-zero exit, got 0"
+  th_fail=$((th_fail + 1))
+  return 0
+}
+
 th_assert_json_field() {
   local name="${1:?name required}"
   local path="${2:?path required}"
@@ -108,4 +188,3 @@ th_create_fixture() {
 
   printf '%s\n' "${dest}"
 }
-

@@ -42,25 +42,12 @@ th_assert_run "dry-run-no-files-modified-message" 0 "No files were modified" \
 # Confirm nothing from the structured log leaks onto stdout
 _stdout_only=""
 _stdout_only="$(bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" 2>/dev/null)"
-if echo "${_stdout_only}" | grep -qF '[propagate] ts='; then
-  echo "FAIL: structured-log-must-not-appear-on-stdout (log contaminated stdout)"
-  th_fail=$((th_fail + 1))
-else
-  echo "PASS: structured-log-must-not-appear-on-stdout"
-  th_pass=$((th_pass + 1))
-fi
+th_assert_not_contains "structured-log-must-not-appear-on-stdout" "${_stdout_only}" "[propagate] ts="
 
 # Confirm structured log IS on stderr
 _stderr_only=""
 _stderr_only="$(bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" 2>&1 >/dev/null)"
-if echo "${_stderr_only}" | grep -qF '[propagate]'; then
-  echo "PASS: structured-log-on-stderr"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: structured-log-on-stderr (no [propagate] prefix found in stderr)"
-  echo "  stderr sample: ${_stderr_only:0:200}"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_contains "structured-log-on-stderr" "${_stderr_only}" "[propagate]"
 
 # --- --only filtering: single step ---
 # --only submodule should produce a summary with submodule step and skip others
@@ -70,23 +57,10 @@ th_assert_run "only-submodule-exits-0" 0 "" \
   bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" --only submodule
 
 # submodule step should appear in summary
-if echo "${_only_out}" | grep -q 'submodule'; then
-  echo "PASS: only-submodule-step-in-summary"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: only-submodule-step-in-summary"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_contains "only-submodule-step-in-summary" "${_only_out}" "submodule"
 
-# skills step should be absent (skipped entirely, not even SKIP line)
-# When --only is used, other steps are excluded, not just skipped
-if echo "${_only_out}" | grep -qv 'skills'; then
-  echo "PASS: only-submodule-excludes-skills"
-  th_pass=$((th_pass + 1))
-else
-  echo "WARN: only-submodule-output-contains-skills-reference (may be skip notation)"
-  th_pass=$((th_pass + 1))
-fi
+# Non-selected steps remain visible as SKIP in the human summary.
+th_assert_contains "only-submodule-marks-skills-skip" "${_only_out}" "skills       SKIP"
 
 # --- --skip filtering ---
 th_assert_run "skip-skills-exits-0" 0 "" \
@@ -96,13 +70,7 @@ th_assert_run "skip-skills-exits-0" 0 "" \
 _skip_out=""
 _skip_out="$(bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" --skip skills 2>/dev/null)"
 for step in submodule mcp settings stage; do
-  if echo "${_skip_out}" | grep -q "${step}"; then
-    echo "PASS: skip-skills-shows-${step}"
-    th_pass=$((th_pass + 1))
-  else
-    echo "FAIL: skip-skills-shows-${step} (step ${step} missing from summary when skipping skills)"
-    th_fail=$((th_fail + 1))
-  fi
+  th_assert_contains "skip-skills-shows-${step}" "${_skip_out}" "${step}"
 done
 
 # --- Multiple --only flags ---

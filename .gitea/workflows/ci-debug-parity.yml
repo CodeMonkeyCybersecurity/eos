@@ -112,6 +112,10 @@ jobs:
           set -euo pipefail
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
           test -f outputs/ci/debug/metrics.prom && cat outputs/ci/debug/metrics.prom || true
+          test -f outputs/ci/propagate/report.json && cat outputs/ci/propagate/report.json || true
+          test -f outputs/ci/propagate/metrics.prom && cat outputs/ci/propagate/metrics.prom || true
+          test -f outputs/ci/propagate/events.jsonl && cat outputs/ci/propagate/events.jsonl || true
+          test -f outputs/ci/propagate-coverage/coverage.txt && cat outputs/ci/propagate-coverage/coverage.txt || true
           test -f outputs/ci/governance-propagation-coverage/coverage.txt && cat outputs/ci/governance-propagation-coverage/coverage.txt || true
 
       - name: Alert on ci:debug failure details
@@ -123,3 +127,4 @@ jobs:
             exit 0
           fi
           python3 scripts/ci/report-alert.py ci-debug outputs/ci/debug/report.json
+          python3 scripts/ci/report-alert.py propagate outputs/ci/propagate/report.json

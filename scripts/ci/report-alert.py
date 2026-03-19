@@ -68,6 +68,35 @@ def main(argv: list[str]) -> int:
             return annotation("error", f"ci:debug failed stage={stage} command={failed_command} message={message}")
         return annotation("notice", "ci:debug status=pass")
 
+    if profile == "propagate":
+        outcome = str(data.get("outcome", "unknown"))
+        tiers_failed = data.get("tiers_failed", "unknown")
+        tiers_skipped = data.get("tiers_skipped", "unknown")
+        unit_status = str(data.get("unit_status", "unknown"))
+        integration_status = str(data.get("integration_status", "unknown"))
+        e2e_status = str(data.get("e2e_status", "unknown"))
+        if status == "fail":
+            return annotation(
+                "error",
+                "propagation pyramid failed "
+                f"outcome={outcome} tiers_failed={tiers_failed} "
+                f"unit={unit_status} integration={integration_status} e2e={e2e_status} "
+                f"message={message}",
+            )
+        if status == "skip":
+            return annotation(
+                "warning",
+                "propagation pyramid skipped "
+                f"outcome={outcome} tiers_skipped={tiers_skipped} "
+                f"unit={unit_status} integration={integration_status} e2e={e2e_status} "
+                f"message={message}",
+            )
+        return annotation(
+            "notice",
+            "propagation pyramid passed "
+            f"outcome={outcome} unit={unit_status} integration={integration_status} e2e={e2e_status}",
+        )
+
     return annotation("warning", f"unknown report-alert profile={profile} report={report_path}")
 
 

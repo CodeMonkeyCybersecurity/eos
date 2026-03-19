@@ -337,6 +337,27 @@ th_assert_run "report-alert-ci-debug-fail" 0 "::error::ci:debug failed" bash -c 
   python3 "$1" ci-debug "${tmpf}"
 ' _ "${REPORT_ALERT_SCRIPT}"
 
+th_assert_run "report-alert-propagate-pass" 0 "::notice::propagation pyramid passed" bash -c '
+  tmpf="$(mktemp)"
+  trap "rm -f \"${tmpf}\"" EXIT
+  echo "{\"status\":\"pass\",\"outcome\":\"pass_all_tiers\",\"unit_status\":\"pass\",\"integration_status\":\"pass\",\"e2e_status\":\"pass\"}" > "${tmpf}"
+  python3 "$1" propagate "${tmpf}"
+' _ "${REPORT_ALERT_SCRIPT}"
+
+th_assert_run "report-alert-propagate-skip" 0 "::warning::propagation pyramid skipped" bash -c '
+  tmpf="$(mktemp)"
+  trap "rm -f \"${tmpf}\"" EXIT
+  echo "{\"status\":\"skip\",\"outcome\":\"skip_submodule_unavailable\",\"tiers_skipped\":3,\"unit_status\":\"skip\",\"integration_status\":\"skip\",\"e2e_status\":\"skip\",\"message\":\"missing prompts\"}" > "${tmpf}"
+  python3 "$1" propagate "${tmpf}"
+' _ "${REPORT_ALERT_SCRIPT}"
+
+th_assert_run "report-alert-propagate-fail" 0 "::error::propagation pyramid failed" bash -c '
+  tmpf="$(mktemp)"
+  trap "rm -f \"${tmpf}\"" EXIT
+  echo "{\"status\":\"fail\",\"outcome\":\"fail_tier_failures\",\"tiers_failed\":1,\"unit_status\":\"fail\",\"integration_status\":\"pass\",\"e2e_status\":\"pass\",\"message\":\"unit failed\"}" > "${tmpf}"
+  python3 "$1" propagate "${tmpf}"
+' _ "${REPORT_ALERT_SCRIPT}"
+
 th_assert_run "report-alert-unknown-profile" 0 "::warning::unknown report-alert profile" bash -c '
   tmpf="$(mktemp)"
   trap "rm -f \"${tmpf}\"" EXIT

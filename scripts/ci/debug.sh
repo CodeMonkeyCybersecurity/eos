@@ -82,6 +82,13 @@ lane_run_step "lane_runtime_unit_tests" bash test/ci/test-lane-runtime-unit.sh
 lane_run_step "submodule_freshness_pyramid" bash test/ci/test-submodule-freshness.sh
 lane_run_step "governance_wrapper_tests" bash test/ci/test-governance-check.sh
 lane_run_step "propagation_pyramid" bash test/ci/test-propagate.sh
+lane_run_step "propagation_pyramid_shell_coverage" \
+  bash scripts/ci/shell-coverage.sh outputs/ci/propagate-coverage 90 \
+    test/ci/test-propagate.sh \
+    test/ci/test-propagate-unit.sh \
+    test/ci/test-propagate-integration.sh \
+    test/ci/test-propagate-e2e.sh \
+    -- bash test/ci/test-propagate.sh
 lane_run_step "governance_propagation_shell_coverage" \
   bash scripts/ci/shell-coverage.sh outputs/ci/governance-propagation-coverage 90 \
     scripts/ci/lib/lane-runtime.sh \

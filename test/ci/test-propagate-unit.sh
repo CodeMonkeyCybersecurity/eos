@@ -16,6 +16,7 @@ source "${SCRIPT_DIR}/lib/test-harness.sh"
 
 PROPAGATE_SCRIPT="${REPO_ROOT}/prompts/scripts/propagate.sh"
 PACKAGE_JSON="${REPO_ROOT}/package.json"
+DISPATCHER_SCRIPT="${REPO_ROOT}/test/ci/test-propagate.sh"
 
 # --- Syntax checks ---
 th_assert_run "propagate-script-syntax" 0 "" bash -n "${PROPAGATE_SCRIPT}"
@@ -65,24 +66,12 @@ done
 # Unknown flag must exit non-zero
 _unknown_exit=0
 bash "${PROPAGATE_SCRIPT}" --no-such-flag >/dev/null 2>&1 || _unknown_exit=$?
-if [[ "${_unknown_exit}" -ne 0 ]]; then
-  echo "PASS: unknown-flag-nonzero-exit"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: unknown-flag-nonzero-exit (expected non-zero, got ${_unknown_exit})"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_nonzero_exit "unknown-flag-nonzero-exit" "${_unknown_exit}"
 
 # Invalid step name with valid repo root must exit non-zero
 _invalid_exit=0
 bash "${PROPAGATE_SCRIPT}" --only "no-such-step" --repo-root "${REPO_ROOT}" --dry-run >/dev/null 2>&1 || _invalid_exit=$?
-if [[ "${_invalid_exit}" -ne 0 ]]; then
-  echo "PASS: invalid-step-name-nonzero-exit"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: invalid-step-name-nonzero-exit (expected non-zero, got ${_invalid_exit})"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_nonzero_exit "invalid-step-name-nonzero-exit" "${_invalid_exit}"
 
 # NOTE: The no-repo-root-exits-2 scenario (exit 2 from auto-detection) cannot be tested
 # from within the eos repo. propagate.sh detects REPO_ROOT by walking up from its own
@@ -92,62 +81,117 @@ fi
 # explicitly nonexistent --repo-root causes a non-zero exit (error path coverage).
 _badroot_exit=0
 bash "${PROPAGATE_SCRIPT}" --repo-root "/tmp/no-such-repo-root-$$" >/dev/null 2>&1 || _badroot_exit=$?
-if [[ "${_badroot_exit}" -ne 0 ]]; then
-  echo "PASS: bad-repo-root-nonzero-exit"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: bad-repo-root-nonzero-exit (expected non-zero, got ${_badroot_exit})"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_nonzero_exit "bad-repo-root-nonzero-exit" "${_badroot_exit}"
 
 # --- Structured logging format (stderr) ---
 # With --dry-run and valid repo-root, stderr should contain [propagate] structured lines
 _log_output=""
 _log_output="$(bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" 2>&1 >/dev/null)" || true
-if echo "${_log_output}" | grep -qF '[propagate]'; then
-  echo "PASS: structured-log-prefix-on-stderr"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: structured-log-prefix-on-stderr (expected [propagate] prefix in stderr)"
-  echo "  stderr sample: ${_log_output:0:200}"
-  th_fail=$((th_fail + 1))
-fi
-
-if echo "${_log_output}" | grep -q 'ts='; then
-  echo "PASS: structured-log-has-ts-field"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: structured-log-has-ts-field (expected ts= in structured log)"
-  th_fail=$((th_fail + 1))
-fi
-
-if echo "${_log_output}" | grep -q 'level='; then
-  echo "PASS: structured-log-has-level-field"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: structured-log-has-level-field (expected level= in structured log)"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_contains "structured-log-prefix-on-stderr" "${_log_output}" "[propagate]"
+th_assert_contains "structured-log-has-ts-field" "${_log_output}" "ts="
+th_assert_contains "structured-log-has-level-field" "${_log_output}" "level="
 
 # --- Summary output (stdout) ---
 # With --dry-run, stdout should contain the propagation summary header
 _stdout_output=""
 _stdout_output="$(bash "${PROPAGATE_SCRIPT}" --dry-run --repo-root "${REPO_ROOT}" 2>/dev/null)" || true
-if echo "${_stdout_output}" | grep -qF '=== Propagation Summary ==='; then
-  echo "PASS: summary-header-on-stdout"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: summary-header-on-stdout (expected '=== Propagation Summary ===' in stdout)"
-  echo "  stdout sample: ${_stdout_output:0:200}"
-  th_fail=$((th_fail + 1))
-fi
+th_assert_contains "summary-header-on-stdout" "${_stdout_output}" "=== Propagation Summary ==="
+th_assert_contains "dry-run-complete-message-on-stdout" "${_stdout_output}" "Dry run complete"
 
-if echo "${_stdout_output}" | grep -q 'Dry run complete'; then
-  echo "PASS: dry-run-complete-message-on-stdout"
-  th_pass=$((th_pass + 1))
-else
-  echo "FAIL: dry-run-complete-message-on-stdout (expected 'Dry run complete' in stdout)"
-  th_fail=$((th_fail + 1))
-fi
+# --- Dispatcher regression: missing prompts submodule skips with durable artifacts ---
+_dispatcher_skip_tmp="$(mktemp -d)"
+trap 'rm -rf "${_dispatcher_skip_tmp}" "${_dispatcher_fail_tmp:-}"' EXIT
+mkdir -p "${_dispatcher_skip_tmp}/repo"
+_dispatcher_skip_report="${_dispatcher_skip_tmp}/artifacts/skip-report.json"
+_dispatcher_skip_metrics="${_dispatcher_skip_tmp}/artifacts/skip-metrics.prom"
+_dispatcher_skip_events="${_dispatcher_skip_tmp}/artifacts/skip-events.jsonl"
+
+_dispatcher_skip_output=""
+_dispatcher_skip_exit=0
+_dispatcher_skip_output="$(
+  env \
+    PROPAGATE_TEST_REPO_ROOT="${_dispatcher_skip_tmp}/repo" \
+    PROPAGATE_REPORT_JSON="${_dispatcher_skip_report}" \
+    PROPAGATE_METRICS_TEXTFILE="${_dispatcher_skip_metrics}" \
+    PROPAGATE_EVENTS_JSONL="${_dispatcher_skip_events}" \
+    bash "${DISPATCHER_SCRIPT}" 2>&1
+)" || _dispatcher_skip_exit=$?
+
+th_assert_exit_code "dispatcher-skip-exits-0" "${_dispatcher_skip_exit}" 0
+th_assert_contains "dispatcher-skip-announces-submodule-missing" "${_dispatcher_skip_output}" "SKIP: prompts submodule not initialized"
+th_assert_contains "dispatcher-skip-completes-cleanly" "${_dispatcher_skip_output}" "all tiers skipped"
+th_assert_file_exists "dispatcher-skip-report-written" "${_dispatcher_skip_report}"
+th_assert_file_exists "dispatcher-skip-metrics-written" "${_dispatcher_skip_metrics}"
+th_assert_file_exists "dispatcher-skip-events-written" "${_dispatcher_skip_events}"
+th_assert_json_field "dispatcher-skip-report-kind" "${_dispatcher_skip_report}" "kind" "propagate"
+th_assert_json_field "dispatcher-skip-report-status" "${_dispatcher_skip_report}" "status" "skip"
+th_assert_json_field "dispatcher-skip-report-outcome" "${_dispatcher_skip_report}" "outcome" "skip_submodule_unavailable"
+th_assert_json_field "dispatcher-skip-unit-status" "${_dispatcher_skip_report}" "unit_status" "skip"
+th_assert_json_field "dispatcher-skip-integration-status" "${_dispatcher_skip_report}" "integration_status" "skip"
+th_assert_json_field "dispatcher-skip-e2e-status" "${_dispatcher_skip_report}" "e2e_status" "skip"
+th_assert_run "dispatcher-skip-metrics-status" 0 'propagate_pyramid_status{status="skip"} 1' \
+  grep -F 'propagate_pyramid_status{status="skip"} 1' "${_dispatcher_skip_metrics}"
+th_assert_run "dispatcher-skip-events-have-reason" 0 '"reason":"prompts_submodule_unavailable"' \
+  grep -F '"reason":"prompts_submodule_unavailable"' "${_dispatcher_skip_events}"
+
+# --- Dispatcher regression: failing tier must not short-circuit later tiers ---
+_dispatcher_fail_tmp="$(mktemp -d)"
+mkdir -p "${_dispatcher_fail_tmp}/repo/prompts/scripts" "${_dispatcher_fail_tmp}/tiers" "${_dispatcher_fail_tmp}/artifacts"
+cat > "${_dispatcher_fail_tmp}/repo/prompts/scripts/propagate.sh" <<'EOF_PROPAGATE'
+#!/usr/bin/env bash
+exit 0
+EOF_PROPAGATE
+chmod +x "${_dispatcher_fail_tmp}/repo/prompts/scripts/propagate.sh"
+
+cat > "${_dispatcher_fail_tmp}/tiers/test-propagate-unit.sh" <<'EOF_UNIT'
+#!/usr/bin/env bash
+echo "[unit] Results: 0 passed, 1 failed, 1 total"
+exit 1
+EOF_UNIT
+cat > "${_dispatcher_fail_tmp}/tiers/test-propagate-integration.sh" <<'EOF_INTEGRATION'
+#!/usr/bin/env bash
+echo "[integration] Results: 1 passed, 0 failed, 1 total"
+exit 0
+EOF_INTEGRATION
+cat > "${_dispatcher_fail_tmp}/tiers/test-propagate-e2e.sh" <<'EOF_E2E'
+#!/usr/bin/env bash
+echo "[e2e] Results: 1 passed, 0 failed, 1 total"
+exit 0
+EOF_E2E
+chmod +x \
+  "${_dispatcher_fail_tmp}/tiers/test-propagate-unit.sh" \
+  "${_dispatcher_fail_tmp}/tiers/test-propagate-integration.sh" \
+  "${_dispatcher_fail_tmp}/tiers/test-propagate-e2e.sh"
+
+_dispatcher_fail_report="${_dispatcher_fail_tmp}/artifacts/fail-report.json"
+_dispatcher_fail_metrics="${_dispatcher_fail_tmp}/artifacts/fail-metrics.prom"
+_dispatcher_fail_events="${_dispatcher_fail_tmp}/artifacts/fail-events.jsonl"
+_dispatcher_fail_output=""
+_dispatcher_fail_exit=0
+_dispatcher_fail_output="$(
+  env \
+    PROPAGATE_TEST_REPO_ROOT="${_dispatcher_fail_tmp}/repo" \
+    PROPAGATE_TEST_TIERS_DIR="${_dispatcher_fail_tmp}/tiers" \
+    PROPAGATE_REPORT_JSON="${_dispatcher_fail_report}" \
+    PROPAGATE_METRICS_TEXTFILE="${_dispatcher_fail_metrics}" \
+    PROPAGATE_EVENTS_JSONL="${_dispatcher_fail_events}" \
+    bash "${DISPATCHER_SCRIPT}" 2>&1
+)" || _dispatcher_fail_exit=$?
+
+th_assert_nonzero_exit "dispatcher-tier-failure-exits-nonzero" "${_dispatcher_fail_exit}"
+th_assert_contains "dispatcher-tier-failure-runs-unit" "${_dispatcher_fail_output}" "[propagate] unit (70%)"
+th_assert_contains "dispatcher-tier-failure-runs-integration" "${_dispatcher_fail_output}" "[propagate] integration (20%)"
+th_assert_contains "dispatcher-tier-failure-runs-e2e" "${_dispatcher_fail_output}" "[propagate] e2e (10%)"
+th_assert_contains "dispatcher-tier-failure-summarises-final-state" "${_dispatcher_fail_output}" "test pyramid complete (1 tier(s) failed)"
+th_assert_file_exists "dispatcher-tier-failure-report-written" "${_dispatcher_fail_report}"
+th_assert_json_field "dispatcher-tier-failure-status" "${_dispatcher_fail_report}" "status" "fail"
+th_assert_json_field "dispatcher-tier-failure-outcome" "${_dispatcher_fail_report}" "outcome" "fail_tier_failures"
+th_assert_json_field "dispatcher-tier-failure-unit-status" "${_dispatcher_fail_report}" "unit_status" "fail"
+th_assert_json_field "dispatcher-tier-failure-integration-status" "${_dispatcher_fail_report}" "integration_status" "pass"
+th_assert_json_field "dispatcher-tier-failure-e2e-status" "${_dispatcher_fail_report}" "e2e_status" "pass"
+th_assert_run "dispatcher-tier-failure-metrics-count" 0 "propagate_pyramid_tiers_failed_total 1" \
+  grep -F "propagate_pyramid_tiers_failed_total 1" "${_dispatcher_fail_metrics}"
+th_assert_run "dispatcher-tier-failure-events-finish" 0 '"event":"propagate.finish"' \
+  grep -F '"event":"propagate.finish"' "${_dispatcher_fail_events}"
 
 th_summary "unit"
