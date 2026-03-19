@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
 )
 
 // ResolveOptions applies defaults, expands home directories, converts
@@ -57,7 +55,7 @@ func ResolveOptions(opts Options) (Options, error) {
 }
 
 func resolvePath(path string) (string, error) {
-	expanded := parse.ExpandHome(strings.TrimSpace(path))
+	expanded := expandUserPath(strings.TrimSpace(path))
 	cleaned := filepath.Clean(expanded)
 	absolute, err := filepath.Abs(cleaned)
 	if err != nil {

@@ -30,6 +30,11 @@ type Options struct {
 
 // Result contains the outcome of an archive operation.
 type Result struct {
+	SourcesRequested      int           // Number of source roots requested
+	SourcesScanned        int           // Number of source roots that existed and were scanned
+	MissingSources        []string      // Source roots that were unavailable or not directories
+	SkippedSymlinks       int           // Number of symlink entries skipped during discovery
+	UnreadableEntries     int           // Number of unreadable paths skipped during discovery
 	UniqueFiles           int           // Number of unique files copied (or would be copied)
 	Duplicates            int           // Number of duplicate files detected within the current run
 	Skipped               int           // Number of files already represented by the existing manifest
@@ -90,17 +95,22 @@ func Archive(rc *eos_io.RuntimeContext, opts Options) (*Result, error) {
 	existingHashes := ExistingHashes(existing)
 
 	// ASSESS: discover transcript files
-	files, err := DiscoverTranscriptFiles(rc, resolvedOpts.Sources, resolvedOpts.Dest, resolvedOpts.Excludes)
+	discovery, err := DiscoverTranscriptFilesDetailed(rc, resolvedOpts.Sources, resolvedOpts.Dest, resolvedOpts.Excludes)
 	if err != nil {
 		return nil, fmt.Errorf("discover transcripts: %w", err)
 	}
-	logger.Info("Discovered candidate files", zap.Int("count", len(files)))
+	result.SourcesRequested = discovery.RootsRequested
+	result.SourcesScanned = discovery.RootsScanned
+	result.MissingSources = append(result.MissingSources, discovery.MissingRoots...)
+	result.SkippedSymlinks = discovery.SkippedSymlinks
+	result.UnreadableEntries = discovery.UnreadableEntries
+	logger.Info("Discovered candidate files", zap.Int("count", len(discovery.Files)))
 
 	// INTERVENE: hash, deduplicate, copy
 	var newEntries []Entry
-	newHashes := make(map[string]string, len(files))
+	newHashes := make(map[string]string, len(discovery.Files))
 
-	for _, src := range files {
+	for _, src := range discovery.Files {
 		hash, size, err := FileSHA256(src)
 		if err != nil {
 			logger.Warn("Skipping file after hash failure",
@@ -180,6 +190,11 @@ func Archive(rc *eos_io.RuntimeContext, opts Options) (*Result, error) {
 
 	result.Duration = time.Since(startedAt)
 	logger.Info("Chat archive complete",
+		zap.Int("sources_requested", result.SourcesRequested),
+		zap.Int("sources_scanned", result.SourcesScanned),
+		zap.Int("sources_missing", len(result.MissingSources)),
+		zap.Int("skipped_symlinks", result.SkippedSymlinks),
+		zap.Int("unreadable_entries", result.UnreadableEntries),
 		zap.Int("unique_copied", result.UniqueFiles),
 		zap.Int("duplicates", result.Duplicates),
 		zap.Int("already_archived", result.Skipped),

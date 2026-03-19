@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
@@ -17,7 +16,21 @@ var userHomeDir = os.UserHomeDir
 // chat transcript discovery. These cover Claude Code, Codex, OpenClaw,
 // Windsurf, and Cursor session directories.
 func DefaultSources() []string {
-	return []string{
+	return defaultSourcesWithProvider(
+		runtime.GOOS,
+		userHomeDir,
+		os.Getenv("APPDATA"),
+		os.Getenv("LOCALAPPDATA"),
+	)
+}
+
+// DefaultDest returns the platform-aware default destination directory.
+func DefaultDest() string {
+	return defaultDestWithProvider(runtime.GOOS, userHomeDir, os.Getenv("LOCALAPPDATA"), os.Getenv("XDG_DATA_HOME"))
+}
+
+func defaultSourcesForPlatform(goos, homeDir, appData, localAppData string) []string {
+	common := []string{
 		"~/.claude",
 		"~/.openclaw/agents/main/sessions",
 		"~/.codex",
@@ -26,15 +39,49 @@ func DefaultSources() []string {
 		"~/Dev",
 		"~/dev",
 	}
+
+	var platformSpecific []string
+	switch goos {
+	case "windows":
+		platformSpecific = append(platformSpecific,
+			userProfileJoin(homeDir, "AppData", "Roaming", "Cursor"),
+			userProfileJoin(homeDir, "AppData", "Roaming", "Windsurf"),
+			userProfileJoin(homeDir, "AppData", "Local", "Cursor"),
+			userProfileJoin(homeDir, "AppData", "Local", "Windsurf"),
+		)
+		if appData != "" {
+			platformSpecific = append(platformSpecific,
+				filepath.Join(appData, "Cursor"),
+				filepath.Join(appData, "Windsurf"),
+			)
+		}
+		if localAppData != "" {
+			platformSpecific = append(platformSpecific,
+				filepath.Join(localAppData, "Cursor"),
+				filepath.Join(localAppData, "Windsurf"),
+			)
+		}
+	case "darwin":
+		platformSpecific = append(platformSpecific,
+			userProfileJoin(homeDir, "Library", "Application Support", "Cursor"),
+			userProfileJoin(homeDir, "Library", "Application Support", "Windsurf"),
+		)
+	default:
+		platformSpecific = append(platformSpecific,
+			"~/.config/Cursor",
+			"~/.config/Windsurf",
+		)
+	}
+
+	return uniqueNonEmptyStrings(append(common, platformSpecific...))
 }
 
-// DefaultDest returns the platform-aware default destination directory.
-func DefaultDest() string {
-	homeDir, err := userHomeDir()
+func defaultSourcesWithProvider(goos string, homeProvider func() (string, error), appData, localAppData string) []string {
+	homeDir, err := homeProvider()
 	if err != nil {
-		return filepath.Join(".", "chat-archive")
+		homeDir = ""
 	}
-	return defaultDestForPlatform(runtime.GOOS, homeDir, os.Getenv("LOCALAPPDATA"), os.Getenv("XDG_DATA_HOME"))
+	return defaultSourcesForPlatform(goos, homeDir, appData, localAppData)
 }
 
 func defaultDestForPlatform(goos, homeDir, localAppData, xdgDataHome string) string {
@@ -61,7 +108,69 @@ func defaultDestForPlatform(goos, homeDir, localAppData, xdgDataHome string) str
 func ExpandSources(sources []string) []string {
 	expanded := make([]string, 0, len(sources))
 	for _, source := range sources {
-		expanded = append(expanded, parse.ExpandHome(source))
+		expanded = append(expanded, expandUserPath(source))
 	}
 	return expanded
+}
+
+func expandUserPath(path string) string {
+	home, err := userHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return expandUserPathWithHome(path, home)
+}
+
+func expandUserPathWithHome(path, home string) string {
+	trimmed := path
+	switch {
+	case trimmed == "~":
+		if home == "" {
+			return trimmed
+		}
+		return home
+	case len(trimmed) >= 2 && trimmed[0] == '~' && (trimmed[1] == '/' || trimmed[1] == '\\'):
+		if home == "" {
+			return trimmed
+		}
+		relative := trimmed[2:]
+		if relative == "" {
+			return home
+		}
+		return filepath.Join(home, relative)
+	default:
+		return trimmed
+	}
+}
+
+func defaultDestWithProvider(goos string, homeProvider func() (string, error), localAppData, xdgDataHome string) string {
+	homeDir, err := homeProvider()
+	if err != nil {
+		return filepath.Join(".", "chat-archive")
+	}
+	return defaultDestForPlatform(goos, homeDir, localAppData, xdgDataHome)
+}
+
+func userProfileJoin(homeDir string, parts ...string) string {
+	if homeDir == "" {
+		return ""
+	}
+	all := append([]string{homeDir}, parts...)
+	return filepath.Join(all...)
+}
+
+func uniqueNonEmptyStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }

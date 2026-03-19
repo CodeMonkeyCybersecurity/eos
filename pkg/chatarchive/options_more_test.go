@@ -1,6 +1,7 @@
 package chatarchive
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,4 +30,14 @@ func TestResolvePath_ExpandsAndAbsolutizes(t *testing.T) {
 	path, err := resolvePath(".")
 	require.NoError(t, err)
 	assert.True(t, filepath.IsAbs(path))
+}
+
+func TestResolvePath_ExpandsTildePrefix(t *testing.T) {
+	t.Parallel()
+
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	path, err := resolvePath("~/chat-archive")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(home, "chat-archive"), path)
 }

@@ -17,12 +17,6 @@ func TestDefaultSources(t *testing.T) {
 	sources := DefaultSources()
 	assert.NotEmpty(t, sources, "should return at least one default source")
 
-	// All sources should start with ~
-	for _, s := range sources {
-		assert.True(t, len(s) > 0, "source path should not be empty")
-		assert.Equal(t, "~", string(s[0]), "source paths should start with ~")
-	}
-
 	// Should include common AI coding tool directories
 	found := map[string]bool{}
 	for _, s := range sources {
@@ -77,6 +71,37 @@ func TestDefaultSources_PlatformSpecific(t *testing.T) {
 		assert.GreaterOrEqual(t, len(sources), 5,
 			"should have at least 5 default sources on %s", runtime.GOOS)
 	}
+}
+
+func TestDefaultSourcesForPlatform(t *testing.T) {
+	t.Parallel()
+
+	home := filepath.Join(string(filepath.Separator), "home", "henry")
+
+	windowsSources := defaultSourcesForPlatform("windows", home, `C:\Users\Henry\AppData\Roaming`, `C:\Users\Henry\AppData\Local`)
+	assert.Contains(t, windowsSources, "~/.claude")
+	assert.Contains(t, windowsSources, filepath.Join(`C:\Users\Henry\AppData\Roaming`, "Cursor"))
+	assert.Contains(t, windowsSources, filepath.Join(`C:\Users\Henry\AppData\Local`, "Windsurf"))
+
+	darwinSources := defaultSourcesForPlatform("darwin", home, "", "")
+	assert.Contains(t, darwinSources, filepath.Join(home, "Library", "Application Support", "Cursor"))
+	assert.Contains(t, darwinSources, filepath.Join(home, "Library", "Application Support", "Windsurf"))
+
+	linuxSources := defaultSourcesForPlatform("linux", home, "", "")
+	assert.Contains(t, linuxSources, "~/.config/Cursor")
+	assert.Contains(t, linuxSources, "~/.config/Windsurf")
+}
+
+func TestDefaultSourcesWithProvider_HomeError(t *testing.T) {
+	t.Parallel()
+
+	sources := defaultSourcesWithProvider("windows", func() (string, error) {
+		return "", errors.New("boom")
+	}, `C:\Users\Henry\AppData\Roaming`, "")
+
+	assert.Contains(t, sources, "~/.claude")
+	assert.Contains(t, sources, filepath.Join(`C:\Users\Henry\AppData\Roaming`, "Cursor"))
+	assert.NotContains(t, sources, "")
 }
 
 func TestResolveOptions(t *testing.T) {
@@ -153,13 +178,36 @@ func TestDefaultDestForPlatform(t *testing.T) {
 func TestDefaultDest_HomeFallback(t *testing.T) {
 	t.Parallel()
 
-	original := userHomeDir
-	userHomeDir = func() (string, error) {
+	dest := defaultDestWithProvider(runtime.GOOS, func() (string, error) {
 		return "", errors.New("boom")
-	}
-	t.Cleanup(func() {
-		userHomeDir = original
-	})
+	}, "", "")
 
-	assert.Equal(t, filepath.Join(".", "chat-archive"), DefaultDest())
+	assert.Equal(t, filepath.Join(".", "chat-archive"), dest)
+}
+
+func TestExpandUserPath(t *testing.T) {
+	t.Parallel()
+
+	home := filepath.Join(string(filepath.Separator), "home", "henry")
+	assert.Equal(t, home, expandUserPathWithHome("~", home))
+	assert.Equal(t, filepath.Join(home, "Dev"), expandUserPathWithHome("~/Dev", home))
+	assert.Equal(t, filepath.Join(home, "projects"), expandUserPathWithHome(`~\projects`, home))
+	assert.Equal(t, "/tmp/plain", expandUserPathWithHome("/tmp/plain", home))
+}
+
+func TestExpandUserPathWithEmptyHome(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "~", expandUserPathWithHome("~", ""))
+	assert.Equal(t, "~/Dev", expandUserPathWithHome("~/Dev", ""))
+}
+
+func TestUserProfileJoinAndUniqueNonEmptyStrings(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, userProfileJoin("", "Cursor"))
+	assert.Equal(t,
+		[]string{"a", "b"},
+		uniqueNonEmptyStrings([]string{"a", "", "b", "a"}),
+	)
 }

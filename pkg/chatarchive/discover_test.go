@@ -259,6 +259,39 @@ func TestDiscoverTranscriptFiles_EmptyRoots(t *testing.T) {
 	assert.Empty(t, files)
 }
 
+func TestDiscoverTranscriptFilesDetailed_ReportsMissingRoots(t *testing.T) {
+	t.Parallel()
+
+	rc := testutil.TestRuntimeContext(t)
+	dir := t.TempDir()
+	sessionsDir := filepath.Join(dir, "sessions")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(sessionsDir, "chat.jsonl"), []byte(`{"role":"user"}`), 0644))
+
+	missing := filepath.Join(dir, "missing")
+	result, err := DiscoverTranscriptFilesDetailed(rc, []string{dir, missing}, filepath.Join(dir, "archive"), nil)
+	require.NoError(t, err)
+
+	assert.Len(t, result.Files, 1)
+	assert.Equal(t, 2, result.RootsRequested)
+	assert.Equal(t, 1, result.RootsScanned)
+	assert.Equal(t, []string{missing}, result.MissingRoots)
+}
+
+func TestDiscoverTranscriptFiles_WrapperReturnsFiles(t *testing.T) {
+	t.Parallel()
+
+	rc := testutil.TestRuntimeContext(t)
+	dir := t.TempDir()
+	sessionsDir := filepath.Join(dir, "sessions")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(sessionsDir, "chat.jsonl"), []byte(`{"role":"user"}`), 0644))
+
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"), nil)
+	require.NoError(t, err)
+	assert.Len(t, files, 1)
+}
+
 func TestIsJSONTranscript(t *testing.T) {
 	t.Parallel()
 

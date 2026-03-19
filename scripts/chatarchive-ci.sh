@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+#
 # Chat archive CI pipeline: unit + integration + race + e2e + coverage gates.
-# No external dependencies beyond Go — coverage thresholds checked in bash.
+# Uses the same npm-backed entrypoint as the pre-commit hook to avoid drift.
 
 set -euo pipefail
 
@@ -13,6 +14,13 @@ mkdir -p "$OUT_DIR"
 UNIT_COVERAGE_FILE="$OUT_DIR/unit.cover.out"
 COMBINED_COVERAGE_FILE="$OUT_DIR/combined.cover.out"
 SUMMARY_FILE="$OUT_DIR/summary.txt"
+SUMMARY_JSON_FILE="$OUT_DIR/summary.json"
+
+echo "==> Hook and script parity checks"
+bash -n .github/hooks/pre-commit
+bash -n .github/hooks/setup-hooks.sh
+bash -n scripts/install-git-hooks.sh
+grep -q "npm run ci" .github/hooks/pre-commit
 
 echo "==> Unit tests"
 go test ./pkg/chatarchive/... -coverprofile="$UNIT_COVERAGE_FILE" -covermode=atomic
@@ -28,15 +36,9 @@ go test -race ./pkg/chatarchive/...
 echo "==> Command compile checks"
 go test ./internal/chatarchivecmd/... ./cmd/create ./cmd/backup
 
-if [[ "${CHATARCHIVE_SKIP_E2E:-0}" != "1" ]]; then
-  echo "==> E2E smoke tests"
-  go test -tags=e2e_smoke ./test/e2e/smoke -run 'TestSmoke_(ChatArchive|BackupChats)' -count=1
-else
-  echo "==> E2E smoke tests skipped"
-fi
+echo "==> E2E smoke tests"
+go test -tags=e2e_smoke ./test/e2e/smoke -run 'TestSmoke_(ChatArchive|BackupChats)' -count=1
 
-# Coverage thresholds — pure bash, no Node.js dependency.
-# Beyonce Rule: unit ≥70%, combined ≥90%.
 SUMMARY="Chat archive verification summary
 Unit coverage: ${UNIT_COVERAGE}%
 Combined unit+integration coverage: ${COMBINED_COVERAGE}%
@@ -46,6 +48,21 @@ Test pyramid:
 - E2E: go test -tags=e2e_smoke ./test/e2e/smoke -run TestSmoke_(ChatArchive|BackupChats)"
 
 echo "$SUMMARY" | tee "$SUMMARY_FILE"
+cat > "$SUMMARY_JSON_FILE" <<EOF
+{
+  "unit_coverage": ${UNIT_COVERAGE},
+  "combined_coverage": ${COMBINED_COVERAGE},
+  "e2e_enabled": true,
+  "checks": {
+    "unit": "passed",
+    "integration": "passed",
+    "race": "passed",
+    "compile": "passed",
+    "e2e": "passed",
+    "hook_parity": "passed"
+  }
+}
+EOF
 
 check_threshold() {
   local actual="$1" threshold="$2" label="$3"

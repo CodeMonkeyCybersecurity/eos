@@ -19,6 +19,17 @@ import (
 // to check for chat-like structure. Bounded to prevent OOM on large files.
 const jsonValidationBufSize = 4096
 
+// DiscoveryResult captures transcript discovery outputs and telemetry so
+// callers can expose both operator-friendly summaries and structured logs.
+type DiscoveryResult struct {
+	Files             []string
+	RootsRequested    int
+	RootsScanned      int
+	MissingRoots      []string
+	SkippedSymlinks   int
+	UnreadableEntries int
+}
+
 // skipDirs are directory names skipped during recursive walks.
 var skipDirs = map[string]struct{}{
 	".git":         {},
@@ -38,11 +49,22 @@ var skipDirs = map[string]struct{}{
 // All path comparisons use forward-slash normalisation via filepath.ToSlash
 // so pattern matching works identically on Windows, macOS, and Linux.
 func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest string, excludes []string) ([]string, error) {
+	result, err := DiscoverTranscriptFilesDetailed(rc, roots, dest, excludes)
+	if err != nil {
+		return nil, err
+	}
+	return result.Files, nil
+}
+
+// DiscoverTranscriptFilesDetailed behaves like DiscoverTranscriptFiles but
+// also returns telemetry about scanned and unavailable roots.
+func DiscoverTranscriptFilesDetailed(rc *eos_io.RuntimeContext, roots []string, dest string, excludes []string) (*DiscoveryResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	var out []string
 	seen := make(map[string]struct{})
-	skippedSymlinks := 0
-	unreadableEntries := 0
+	result := &DiscoveryResult{
+		RootsRequested: len(roots),
+	}
 
 	// Normalise dest for cross-platform comparison
 	destNorm := normalise(filepath.Clean(dest))
@@ -50,15 +72,17 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 	for _, root := range roots {
 		info, err := os.Stat(root)
 		if err != nil || !info.IsDir() {
+			result.MissingRoots = append(result.MissingRoots, root)
 			logger.Warn("Skipping source directory",
 				zap.String("root", root),
 				zap.Error(err))
 			continue
 		}
+		result.RootsScanned++
 
 		err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				unreadableEntries++
+				result.UnreadableEntries++
 				logger.Debug("Skipping unreadable path",
 					zap.String("path", path),
 					zap.Error(err))
@@ -69,7 +93,7 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 			normPath := normalise(cleanPath)
 
 			if d.Type()&os.ModeSymlink != 0 {
-				skippedSymlinks++
+				result.SkippedSymlinks++
 				if d.IsDir() {
 					return filepath.SkipDir
 				}
@@ -119,12 +143,15 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 	}
 
 	sort.Strings(out)
+	result.Files = out
 	logger.Info("Transcript discovery complete",
 		zap.Int("files_found", len(out)),
-		zap.Int("roots_scanned", len(roots)),
-		zap.Int("skipped_symlinks", skippedSymlinks),
-		zap.Int("unreadable_entries", unreadableEntries))
-	return out, nil
+		zap.Int("roots_requested", result.RootsRequested),
+		zap.Int("roots_scanned", result.RootsScanned),
+		zap.Int("roots_missing", len(result.MissingRoots)),
+		zap.Int("skipped_symlinks", result.SkippedSymlinks),
+		zap.Int("unreadable_entries", result.UnreadableEntries))
+	return result, nil
 }
 
 // normalise converts a path to lowercase forward-slash form for
@@ -156,9 +183,13 @@ func isExcludedArchiveDir(normPath string) bool {
 // (e.g. ~/dev/, ~/Dev/) to avoid false positives on system /dev/ paths
 // or paths like /opt/development/.
 func isHomeDevPath(normPath string) bool {
-	// Match patterns: /users/<name>/dev/, /home/<name>/dev/, c:/users/<name>/dev/
+	// Match patterns: /users/<name>/dev/, /home/<name>/dev/, <drive>:/users/<name>/dev/
 	// These are the normalised (lowercase, forward-slash) forms.
-	for _, prefix := range []string{"/users/", "/home/", "c:/users/"} {
+	prefixes := []string{"/users/", "/home/"}
+	if len(normPath) >= 9 && normPath[1:9] == ":/users/" && normPath[0] >= 'a' && normPath[0] <= 'z' {
+		prefixes = append(prefixes, normPath[:9])
+	}
+	for _, prefix := range prefixes {
 		idx := strings.Index(normPath, prefix)
 		if idx < 0 {
 			continue
