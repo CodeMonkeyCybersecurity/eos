@@ -11,6 +11,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
 	selfpkg "github.com/CodeMonkeyCybersecurity/eos/pkg/self"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -213,12 +214,23 @@ func updateEos(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Starting Eos self-update with enhanced safety features")
 
+	repoState, err := git.CheckRepositoryState(rc, "/opt/eos")
+	if err != nil {
+		return fmt.Errorf("failed to inspect self-update repository state: %w", err)
+	}
+	if repoState.Branch == "" || repoState.Branch == "HEAD" {
+		return fmt.Errorf("cannot self-update from detached HEAD in /opt/eos; check out a branch and retry")
+	}
+	logger.Info("Resolved self-update branch from checked-out repository state",
+		zap.String("branch", repoState.Branch),
+		zap.String("commit", repoState.CurrentCommit))
+
 	// Create enhanced updater configuration with safety features
 	config := &selfpkg.EnhancedUpdateConfig{
 		UpdateConfig: &selfpkg.UpdateConfig{
 			SourceDir:  "/opt/eos",
 			BinaryPath: "/usr/local/bin/eos",
-			GitBranch:  "main",
+			GitBranch:  repoState.Branch,
 			MaxBackups: 3,
 		},
 		RequireCleanWorkingTree: false, // Allow stashing

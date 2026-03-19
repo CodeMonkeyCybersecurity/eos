@@ -341,6 +341,21 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		return fmt.Errorf("failed to check git status: %w", err)
 	}
 
+	if state.Branch == "" || state.Branch == "HEAD" {
+		return fmt.Errorf("cannot self-update from detached HEAD in %s; check out a branch and retry", eeu.config.SourceDir)
+	}
+	if eeu.config.GitBranch == "" {
+		eeu.config.GitBranch = state.Branch
+	}
+	if eeu.config.GitBranch != state.Branch {
+		return fmt.Errorf("configured update branch %s does not match checked-out branch %s in %s",
+			eeu.config.GitBranch, state.Branch, eeu.config.SourceDir)
+	}
+
+	eeu.logger.Info("Self-update will operate on the checked-out branch",
+		zap.String("branch", state.Branch),
+		zap.String("commit", truncateCommit(state.CurrentCommit)))
+
 	if state.HasChanges {
 		// P0-3 FIX: If RequireCleanWorkingTree is explicitly set, fail immediately
 		if eeu.enhancedConfig.RequireCleanWorkingTree {
@@ -531,7 +546,9 @@ func (eeu *EnhancedEosUpdater) recordGitState() error {
 	}
 
 	eeu.transaction.GitCommitBefore = commitHash
-	eeu.logger.Info("Git state recorded", zap.String("commit", truncateCommit(commitHash)))
+	eeu.logger.Info("Git state recorded",
+		zap.String("branch", eeu.config.GitBranch),
+		zap.String("commit", truncateCommit(commitHash)))
 
 	return nil
 }

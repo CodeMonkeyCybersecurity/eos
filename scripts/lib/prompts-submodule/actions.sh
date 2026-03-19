@@ -253,13 +253,10 @@ ps_run_pre_commit() {
   fi
 
   ps_log_json "INFO" "pre_commit.ci_debug.start" "pending" "Running ci:debug"
-  if [[ -x "${repo_root}/magew" ]]; then
-    "${repo_root}/magew" ci:debug
-  elif [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
-    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "pending" "magew missing; using npm fallback"
+  if [[ -f "${repo_root}/package.json" ]] && command -v npm >/dev/null 2>&1; then
     npm run ci:debug --silent
   else
-    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "pending" "magew/npm missing; using script fallback"
+    ps_log_json "WARN" "pre_commit.ci_debug.fallback" "pending" "npm missing; using script fallback"
     bash "${repo_root}/scripts/ci/debug.sh"
   fi
 
