@@ -12,9 +12,10 @@ import (
 // paths to absolute form, and removes duplicate source roots.
 func ResolveOptions(opts Options) (Options, error) {
 	resolved := Options{
-		Sources: opts.Sources,
-		Dest:    opts.Dest,
-		DryRun:  opts.DryRun,
+		Sources:  opts.Sources,
+		Dest:     opts.Dest,
+		Excludes: opts.Excludes,
+		DryRun:   opts.DryRun,
 	}
 
 	if len(resolved.Sources) == 0 {

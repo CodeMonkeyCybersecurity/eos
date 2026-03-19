@@ -23,8 +23,13 @@ type Entry struct {
 	Conversation string `json:"conversation,omitempty"`
 }
 
+// ManifestVersion is the current schema version. Increment on breaking changes
+// to enable forward-compatible manifest migration.
+const ManifestVersion = 1
+
 // Manifest is the top-level archive manifest written to dest/manifest.json.
 type Manifest struct {
+	Version     int      `json:"version"`
 	GeneratedAt string   `json:"generated_at"`
 	Sources     []string `json:"sources"`
 	DestDir     string   `json:"dest_dir"`
@@ -130,12 +135,16 @@ func ExistingHashes(m *Manifest) map[string]string {
 	return hashes
 }
 
-// MergeEntries merges new entries into an existing manifest, preserving
-// existing entries and only adding new unique files.
+// MergeEntries merges new entries into a copy of the existing manifest,
+// preserving existing entries and only adding new unique files.
+// The input manifest is never mutated.
 func MergeEntries(existing *Manifest, newEntries []Entry) *Manifest {
+	now := time.Now().UTC().Format(time.RFC3339)
+
 	if existing == nil {
 		return &Manifest{
-			GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+			Version:     ManifestVersion,
+			GeneratedAt: now,
 			Entries:     newEntries,
 		}
 	}
@@ -148,7 +157,7 @@ func MergeEntries(existing *Manifest, newEntries []Entry) *Manifest {
 		seen[e.SHA256] = struct{}{}
 	}
 
-	merged := make([]Entry, len(existing.Entries))
+	merged := make([]Entry, len(existing.Entries), len(existing.Entries)+len(newEntries))
 	copy(merged, existing.Entries)
 
 	for _, ne := range newEntries {
@@ -158,7 +167,11 @@ func MergeEntries(existing *Manifest, newEntries []Entry) *Manifest {
 		}
 	}
 
-	existing.Entries = merged
-	existing.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
-	return existing
+	return &Manifest{
+		Version:     ManifestVersion,
+		GeneratedAt: now,
+		Sources:     existing.Sources,
+		DestDir:     existing.DestDir,
+		Entries:     merged,
+	}
 }

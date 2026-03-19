@@ -22,9 +22,10 @@ import (
 
 // Options configures the archive operation.
 type Options struct {
-	Sources []string // Expanded absolute source directories
-	Dest    string   // Expanded absolute destination directory
-	DryRun  bool     // If true, do not copy files or write manifest
+	Sources  []string // Expanded absolute source directories
+	Dest     string   // Expanded absolute destination directory
+	Excludes []string // Path substrings to exclude from discovery (operator escape hatch)
+	DryRun   bool     // If true, do not copy files or write manifest
 }
 
 // Result contains the outcome of an archive operation.
@@ -89,7 +90,7 @@ func Archive(rc *eos_io.RuntimeContext, opts Options) (*Result, error) {
 	existingHashes := ExistingHashes(existing)
 
 	// ASSESS: discover transcript files
-	files, err := DiscoverTranscriptFiles(rc, resolvedOpts.Sources, resolvedOpts.Dest)
+	files, err := DiscoverTranscriptFiles(rc, resolvedOpts.Sources, resolvedOpts.Dest, resolvedOpts.Excludes)
 	if err != nil {
 		return nil, fmt.Errorf("discover transcripts: %w", err)
 	}
@@ -227,8 +228,15 @@ func copyFile(src, dst string) error {
 		}
 	}()
 
-	if _, err := io.Copy(out, in); err != nil {
+	written, err := io.Copy(out, in)
+	if err != nil {
 		return fmt.Errorf("copy data: %w", err)
+	}
+
+	// Verify byte count matches source to detect short writes (defense-in-depth
+	// for NFS/FUSE mounts where io.Copy may silently truncate).
+	if srcInfo, statErr := os.Stat(src); statErr == nil && written != srcInfo.Size() {
+		return fmt.Errorf("copy verification: wrote %d bytes, source is %d bytes", written, srcInfo.Size())
 	}
 	if err := out.Sync(); err != nil {
 		return fmt.Errorf("sync temp file: %w", err)

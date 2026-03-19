@@ -21,10 +21,10 @@ and write an index manifest with duplicate mappings.
 This is a convenience alias for 'eos create chat-archive'.
 Works across Ubuntu, macOS, and Windows.
 
-	Examples:
+Examples:
   eos backup chats
   eos backup chats --source ~/.claude --source ~/dev
-  eos backup chats --dry-run`,
+  eos backup chats --exclude conversation-api --dry-run`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, _ []string) error {
 		return chatarchivecmd.Run(rc, cmd)
 	}),

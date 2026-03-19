@@ -140,7 +140,7 @@ func TestDiscoverTranscriptFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(gitDir, "chat.jsonl"), []byte("should be skipped"), 0644))
 
 	dest := filepath.Join(dir, "archive-output")
-	files, err := DiscoverTranscriptFiles(rc, []string{dir}, dest)
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, dest, nil)
 	require.NoError(t, err)
 
 	// Should find chat.jsonl in sessions dir and memory.md but not notes.txt or .git/chat.jsonl
@@ -178,7 +178,7 @@ func TestDiscoverTranscriptFiles_SkipsDestDir(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(sessionsDir, "new-chat.jsonl"), []byte(`{"role":"user"}`), 0644))
 
-	files, err := DiscoverTranscriptFiles(rc, []string{dir}, destDir)
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, destDir, nil)
 	require.NoError(t, err)
 
 	for _, f := range files {
@@ -190,7 +190,7 @@ func TestDiscoverTranscriptFiles_NonexistentRoot(t *testing.T) {
 	t.Parallel()
 	rc := testutil.TestRuntimeContext(t)
 
-	files, err := DiscoverTranscriptFiles(rc, []string{"/nonexistent/path"}, "/tmp/dest")
+	files, err := DiscoverTranscriptFiles(rc, []string{"/nonexistent/path"}, "/tmp/dest", nil)
 	require.NoError(t, err, "nonexistent root should be skipped, not error")
 	assert.Empty(t, files)
 }
@@ -202,7 +202,7 @@ func TestDiscoverTranscriptFiles_FileRootIsSkipped(t *testing.T) {
 	rootFile := filepath.Join(t.TempDir(), "root.jsonl")
 	require.NoError(t, os.WriteFile(rootFile, []byte(`{"role":"user"}`), 0644))
 
-	files, err := DiscoverTranscriptFiles(rc, []string{rootFile}, filepath.Join(t.TempDir(), "archive"))
+	files, err := DiscoverTranscriptFiles(rc, []string{rootFile}, filepath.Join(t.TempDir(), "archive"), nil)
 	require.NoError(t, err)
 	assert.Empty(t, files)
 }
@@ -223,7 +223,7 @@ func TestDiscoverTranscriptFiles_SkipsSymlinks(t *testing.T) {
 	symlinkPath := filepath.Join(dir, "sessions-link")
 	require.NoError(t, os.Symlink(targetDir, symlinkPath))
 
-	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"))
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"), nil)
 	require.NoError(t, err)
 
 	for _, file := range files {
@@ -245,7 +245,7 @@ func TestDiscoverTranscriptFiles_SkipsUnreadableSubdir(t *testing.T) {
 	require.NoError(t, os.Chmod(unreadableDir, 0000))
 	defer func() { _ = os.Chmod(unreadableDir, 0755) }()
 
-	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"))
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"), nil)
 	require.NoError(t, err)
 	assert.Empty(t, files)
 }
@@ -254,7 +254,7 @@ func TestDiscoverTranscriptFiles_EmptyRoots(t *testing.T) {
 	t.Parallel()
 	rc := testutil.TestRuntimeContext(t)
 
-	files, err := DiscoverTranscriptFiles(rc, []string{}, "/tmp/dest")
+	files, err := DiscoverTranscriptFiles(rc, []string{}, "/tmp/dest", nil)
 	require.NoError(t, err)
 	assert.Empty(t, files)
 }
@@ -343,6 +343,87 @@ func TestIsCandidate_JSONWithPathClue(t *testing.T) {
 func TestIsJSONTranscript_NonexistentFile(t *testing.T) {
 	t.Parallel()
 	assert.False(t, isJSONTranscript("/nonexistent/file.json"))
+}
+
+func TestIsHomeDevPath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		normPath string
+		expected bool
+	}{
+		{name: "home dev unix", normPath: "/home/henry/dev/project/chat.jsonl", expected: true},
+		{name: "users dev mac", normPath: "/users/henry/dev/project/chat.jsonl", expected: true},
+		{name: "windows dev", normPath: "c:/users/henry/dev/project/chat.jsonl", expected: true},
+		{name: "system dev path rejected", normPath: "/usr/local/dev/chat.jsonl", expected: false},
+		{name: "opt development rejected", normPath: "/opt/development/chat.jsonl", expected: false},
+		{name: "bare /dev/ rejected", normPath: "/dev/project/chat.jsonl", expected: false},
+		{name: "nested deep dev", normPath: "/home/user/dev/deep/nested/file.jsonl", expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := isHomeDevPath(tt.normPath)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestMatchesExclude(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		normPath string
+		excludes []string
+		expected bool
+	}{
+		{name: "matches exclude", normPath: "/home/user/conversation-api/config.json", excludes: []string{"conversation-api"}, expected: true},
+		{name: "no match", normPath: "/home/user/.claude/sessions/chat.jsonl", excludes: []string{"conversation-api"}, expected: false},
+		{name: "case insensitive", normPath: "/home/user/myapp/logs/chat.jsonl", excludes: []string{"MyApp"}, expected: true},
+		{name: "multiple excludes first match", normPath: "/home/user/.cache/data.jsonl", excludes: []string{".cache", "vendor"}, expected: true},
+		{name: "empty excludes", normPath: "/home/user/dev/chat.jsonl", excludes: nil, expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := matchesExclude(tt.normPath, tt.excludes)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestDiscoverTranscriptFiles_ExcludeFlag(t *testing.T) {
+	t.Parallel()
+	rc := testutil.TestRuntimeContext(t)
+
+	dir := t.TempDir()
+	sessionsDir := filepath.Join(dir, "sessions")
+	excludedDir := filepath.Join(dir, "conversation-api")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+	require.NoError(t, os.MkdirAll(excludedDir, 0755))
+
+	require.NoError(t, os.WriteFile(filepath.Join(sessionsDir, "chat.jsonl"), []byte(`{"role":"user"}`), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(excludedDir, "conversation.jsonl"), []byte(`{"role":"user"}`), 0644))
+
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"), []string{"conversation-api"})
+	require.NoError(t, err)
+
+	for _, f := range files {
+		assert.NotContains(t, f, "conversation-api", "excluded path should not appear in results")
+	}
+	assert.GreaterOrEqual(t, len(files), 1, "should still find non-excluded files")
+}
+
+func TestIsCandidate_SystemDevPathRejected(t *testing.T) {
+	t.Parallel()
+	// Tightened boundary: /usr/local/dev/ should NOT match as a home dev path.
+	// This was a false positive in the previous implementation.
+	got := isCandidate("/usr/local/dev/random.jsonl", "/usr/local/dev/random.jsonl")
+	assert.False(t, got, "system /dev/ path without home prefix should not match")
 }
 
 // isSubpath checks if child is under parent directory.

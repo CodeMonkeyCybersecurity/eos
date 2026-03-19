@@ -13,16 +13,15 @@ func TestFileSHA256(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		content     string
-		wantHash    string
-		wantSize    int64
-		wantErr     bool
+		name     string
+		content  string
+		wantHash string
+		wantSize int64
 	}{
 		{
 			name:     "known content",
 			content:  "hello world\n",
-			wantHash: "a948904f2f0f479b8f8564e9c7a8f7b5f6e7c5d2a6c1b0e9d8c7f6a5b4c3d2e1",
+			wantHash: "a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447",
 			wantSize: 12,
 		},
 		{
@@ -43,12 +42,7 @@ func TestFileSHA256(t *testing.T) {
 			hash, size, err := FileSHA256(path)
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSize, size)
-			// Verify hash is a valid 64-char hex string
-			assert.Len(t, hash, 64)
-			// For empty file, the hash is deterministic
-			if tt.content == "" {
-				assert.Equal(t, tt.wantHash, hash)
-			}
+			assert.Equal(t, tt.wantHash, hash, "SHA-256 hash mismatch for %q", tt.name)
 		})
 	}
 }

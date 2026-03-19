@@ -75,3 +75,24 @@ func TestCopyFile_RenameFailure(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "replace destination")
 }
+
+func TestCopyFile_PreservesContent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	content := "integrity verification test content"
+	src := filepath.Join(dir, "src.jsonl")
+	dst := filepath.Join(dir, "dst.jsonl")
+	require.NoError(t, os.WriteFile(src, []byte(content), 0644))
+
+	require.NoError(t, copyFile(src, dst))
+
+	// Verify byte-for-byte integrity
+	srcHash, srcSize, err := FileSHA256(src)
+	require.NoError(t, err)
+	dstHash, dstSize, err := FileSHA256(dst)
+	require.NoError(t, err)
+
+	assert.Equal(t, srcHash, dstHash, "destination hash must match source")
+	assert.Equal(t, srcSize, dstSize, "destination size must match source")
+}

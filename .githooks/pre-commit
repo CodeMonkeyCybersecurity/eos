@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
+# Pre-commit hook: fast gate (build + unit tests + race detection).
+# Full CI (integration, e2e, coverage thresholds) runs in CI pipeline.
+# Per DORA research: pre-commit should be <10s for fast feedback loops.
 
 set -euo pipefail
 
-echo "Running chat archive validation"
-npm run ci
+echo "==> Pre-commit: build check"
+go build -o /dev/null ./cmd/
+
+echo "==> Pre-commit: unit tests with race detection"
+go test -race ./pkg/chatarchive/... ./internal/chatarchivecmd/...
+
+echo "Pre-commit checks passed."

@@ -15,18 +15,21 @@ import (
 func BindFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("source", chatarchive.DefaultSources(), "Source directories to scan")
 	cmd.Flags().String("dest", chatarchive.DefaultDest(), "Destination archive directory")
+	cmd.Flags().StringSlice("exclude", nil, "Path substrings to exclude from discovery (e.g. --exclude conversation-api)")
 	cmd.Flags().Bool("dry-run", false, "Show what would be archived without copying files")
 }
 
 func Run(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	sources, _ := cmd.Flags().GetStringSlice("source")
 	dest, _ := cmd.Flags().GetString("dest")
+	excludes, _ := cmd.Flags().GetStringSlice("exclude")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 	result, err := chatarchive.Archive(rc, chatarchive.Options{
-		Sources: sources,
-		Dest:    dest,
-		DryRun:  dryRun,
+		Sources:  sources,
+		Dest:     dest,
+		Excludes: excludes,
+		DryRun:   dryRun,
 	})
 	if err != nil {
 		return err

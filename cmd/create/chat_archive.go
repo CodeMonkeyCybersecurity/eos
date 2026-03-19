@@ -22,7 +22,8 @@ and write an index manifest with duplicate mappings.
 Examples:
   eos create chat-archive
   eos create chat-archive --source ~/.claude --source ~/dev
-  eos create chat-archive --dest ~/Dev/eos/outputs/chat-archive --dry-run
+  eos create chat-archive --exclude conversation-api --exclude .cache
+  eos create chat-archive --dry-run
   eos backup chats  (alias)`,
 	RunE: eos.Wrap(runCreateChatArchive),
 }

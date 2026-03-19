@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Chat archive CI pipeline: unit + integration + race + e2e + coverage gates.
+# No external dependencies beyond Go — coverage thresholds checked in bash.
 
 set -euo pipefail
 
@@ -33,31 +35,25 @@ else
   echo "==> E2E smoke tests skipped"
 fi
 
-node - "$UNIT_COVERAGE" "$COMBINED_COVERAGE" "$SUMMARY_FILE" <<'NODE'
-const fs = require("node:fs");
-
-const unit = Number(process.argv[2]);
-const combined = Number(process.argv[3]);
-const summaryPath = process.argv[4];
-
-const summary = `Chat archive verification summary
-Unit coverage: ${unit.toFixed(1)}%
-Combined unit+integration coverage: ${combined.toFixed(1)}%
+# Coverage thresholds — pure bash, no Node.js dependency.
+# Beyonce Rule: unit ≥70%, combined ≥90%.
+SUMMARY="Chat archive verification summary
+Unit coverage: ${UNIT_COVERAGE}%
+Combined unit+integration coverage: ${COMBINED_COVERAGE}%
 Test pyramid:
 - Unit: go test ./pkg/chatarchive/...
 - Integration: go test -tags=integration ./pkg/chatarchive/...
-- E2E: go test -tags=e2e_smoke ./test/e2e/smoke -run TestSmoke_(ChatArchive|BackupChats)
-`;
+- E2E: go test -tags=e2e_smoke ./test/e2e/smoke -run TestSmoke_(ChatArchive|BackupChats)"
 
-fs.writeFileSync(summaryPath, summary, "utf8");
-process.stdout.write(summary);
+echo "$SUMMARY" | tee "$SUMMARY_FILE"
 
-if (unit < 70.0) {
-  console.error(`Unit coverage ${unit.toFixed(1)}% is below the 70% floor.`);
-  process.exit(1);
+check_threshold() {
+  local actual="$1" threshold="$2" label="$3"
+  if awk "BEGIN {exit !($actual < $threshold)}"; then
+    echo "FAIL: $label coverage ${actual}% is below the ${threshold}% floor." >&2
+    exit 1
+  fi
 }
-if (combined < 90.0) {
-  console.error(`Combined coverage ${combined.toFixed(1)}% is below the 90% floor.`);
-  process.exit(1);
-}
-NODE
+
+check_threshold "$UNIT_COVERAGE" 70.0 "Unit"
+check_threshold "$COMBINED_COVERAGE" 90.0 "Combined"

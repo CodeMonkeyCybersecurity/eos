@@ -32,12 +32,12 @@ var skipDirs = map[string]struct{}{
 }
 
 // DiscoverTranscriptFiles walks the given roots and returns file paths
-// that look like chat transcripts. The dest directory and known archive
-// locations are excluded to prevent self-referencing.
+// that look like chat transcripts. The dest directory, known archive
+// locations, and operator-specified excludes are all skipped.
 //
 // All path comparisons use forward-slash normalisation via filepath.ToSlash
 // so pattern matching works identically on Windows, macOS, and Linux.
-func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest string) ([]string, error) {
+func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest string, excludes []string) ([]string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	var out []string
 	seen := make(map[string]struct{})
@@ -89,6 +89,14 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 				return filepath.SkipDir
 			}
 
+			// Skip operator-specified excludes (--exclude flag)
+			if len(excludes) > 0 && matchesExclude(normPath, excludes) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
 			// Skip common non-interesting directories
 			if d.IsDir() {
 				if _, skip := skipDirs[strings.ToLower(d.Name())]; skip {
@@ -125,11 +133,48 @@ func normalise(path string) string {
 	return strings.ToLower(filepath.ToSlash(path))
 }
 
-// isExcludedArchiveDir checks if a normalised path is a known
+// excludedArchiveDirs are normalised path substrings for known archive
+// output directories that should never be scanned. Data-driven to avoid
+// hardcoding individual paths in code.
+var excludedArchiveDirs = []string{
+	"/outputs/chat-archive",
+	"/desktop/conversationarchive",
+}
+
+// isExcludedArchiveDir checks if a normalised path matches a known
 // self-archive directory that should be skipped.
 func isExcludedArchiveDir(normPath string) bool {
-	return strings.Contains(normPath, "/dev/eos/outputs/chat-archive") ||
-		strings.Contains(normPath, "/desktop/conversationarchive")
+	for _, excl := range excludedArchiveDirs {
+		if strings.Contains(normPath, excl) {
+			return true
+		}
+	}
+	return false
+}
+
+// isHomeDevPath checks if normPath is under a home-rooted dev directory
+// (e.g. ~/dev/, ~/Dev/) to avoid false positives on system /dev/ paths
+// or paths like /opt/development/.
+func isHomeDevPath(normPath string) bool {
+	// Match patterns: /users/<name>/dev/, /home/<name>/dev/, c:/users/<name>/dev/
+	// These are the normalised (lowercase, forward-slash) forms.
+	for _, prefix := range []string{"/users/", "/home/", "c:/users/"} {
+		idx := strings.Index(normPath, prefix)
+		if idx < 0 {
+			continue
+		}
+		rest := normPath[idx+len(prefix):]
+		// Skip the username segment
+		slashIdx := strings.Index(rest, "/")
+		if slashIdx < 0 {
+			continue
+		}
+		afterUser := rest[slashIdx:]
+		if strings.HasPrefix(afterUser, "/dev/") {
+			return true
+		}
+	}
+	return false
 }
 
 // isCandidate determines if a file path looks like a chat transcript.
@@ -153,8 +198,10 @@ func isCandidate(normPath, osPath string) bool {
 		return true
 	}
 	if strings.HasSuffix(normPath, ".jsonl") {
-		// Archive all JSONL under ~/Dev recursively
-		if strings.Contains(normPath, "/dev/") {
+		// Archive JSONL under ~/dev or ~/Dev (home-rooted dev directories only).
+		// Match "/dev/" only when preceded by the home directory pattern to avoid
+		// false positives on paths like /usr/local/dev/ or /opt/development/.
+		if isHomeDevPath(normPath) {
 			return true
 		}
 		return hasPathClue ||
@@ -208,4 +255,15 @@ func isJSONTranscript(path string) bool {
 
 	return (hasMessages && (hasRole || hasContent)) ||
 		(hasConversation && hasContent)
+}
+
+// matchesExclude checks if a normalised path matches any operator-specified
+// exclude substring.
+func matchesExclude(normPath string, excludes []string) bool {
+	for _, excl := range excludes {
+		if strings.Contains(normPath, strings.ToLower(excl)) {
+			return true
+		}
+	}
+	return false
 }
