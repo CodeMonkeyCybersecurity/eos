@@ -24,6 +24,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const envValueTrue = "true"
+
 var (
 	vaultPromptYesNo          = interaction.PromptYesNoSafe
 	vaultIsInteractive        = isInteractiveTerminal
@@ -62,6 +64,54 @@ func PrepareEnvironment(rc *eos_io.RuntimeContext) error {
 		return err
 	}
 	return nil
+}
+
+// TrySetVaultAddr is a best-effort, non-interactive version of EnsureVaultEnv.
+// It sets VAULT_ADDR if possible (CA cert found or VAULT_SKIP_VERIFY already set),
+// but NEVER prompts the user. Safe for use in Wrap() where every command passes through.
+//
+// Commands that actually need authenticated Vault access should call EnsureVaultEnv
+// directly, which will prompt if necessary.
+func TrySetVaultAddr(rc *eos_io.RuntimeContext) (string, error) {
+	const testTimeout = 500 * time.Millisecond
+	log := otelzap.Ctx(rc.Ctx)
+
+	// 1. Return if already set
+	if cur := os.Getenv(shared.VaultAddrEnv); cur != "" {
+		log.Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
+		return cur, nil
+	}
+
+	// 2. Resolve address
+	host := shared.GetInternalHostname()
+	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
+
+	// 3. Try CA certificate path (secure, no prompt needed)
+	caPath, err := locateVaultCACertificate(rc)
+	if err == nil {
+		_ = os.Setenv("VAULT_CACERT", caPath)
+		if canConnectTLS(rc, addr, testTimeout) {
+			_ = os.Setenv(shared.VaultAddrEnv, addr)
+			log.Debug("VAULT_ADDR set with TLS validation",
+				zap.String(shared.VaultAddrEnv, addr))
+			return addr, nil
+		}
+	}
+
+	// 4. Check if VAULT_SKIP_VERIFY or Eos_ALLOW_INSECURE_VAULT already set
+	if os.Getenv("VAULT_SKIP_VERIFY") == "1" || os.Getenv("Eos_ALLOW_INSECURE_VAULT") == envValueTrue {
+		_ = os.Setenv("VAULT_SKIP_VERIFY", "1")
+		_ = os.Setenv(shared.VaultAddrEnv, addr)
+		log.Debug("VAULT_ADDR set with pre-existing skip-verify",
+			zap.String(shared.VaultAddrEnv, addr))
+		return addr, nil
+	}
+
+	// 5. Cannot set safely without user interaction — return empty, don't block
+	log.Debug("VAULT_ADDR not set (no CA cert and no skip-verify consent)",
+		zap.String("addr", addr),
+		zap.String("fix", "Run a Vault command to trigger TLS consent, or set Eos_ALLOW_INSECURE_VAULT=true"))
+	return "", nil
 }
 
 func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
@@ -129,7 +179,7 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 	}
 
 	// Only skip verification in development/testing environments
-	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+	if os.Getenv("Eos_INSECURE_TLS") == envValueTrue || os.Getenv("GO_ENV") == "test" {
 		tlsConfig.InsecureSkipVerify = true
 		otelzap.Ctx(rc.Ctx).Debug("Using insecure TLS for development/testing", zap.String("host", u.Host))
 	} else {
@@ -290,7 +340,7 @@ func handleTLSValidationFailure(rc *eos_io.RuntimeContext, addr string) (string,
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Check for development mode override
-	if os.Getenv("Eos_ALLOW_INSECURE_VAULT") == "true" {
+	if os.Getenv("Eos_ALLOW_INSECURE_VAULT") == envValueTrue {
 		if err := recordInsecureVaultTLSDecision(rc, addr, "dev_mode_environment_variable"); err != nil {
 			return "", fmt.Errorf("failed to persist insecure Vault TLS audit trail: %w", err)
 		}

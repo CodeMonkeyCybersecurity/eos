@@ -47,10 +47,10 @@ repos:
   # Local hooks for custom checks
   - repo: local
     hooks:
-      # Enforce local/CI parity lane via mage-compatible entrypoint
+      # Enforce local/CI parity lane via the npm entrypoint used in CI
       - id: ci-debug-parity
-        name: CI debug parity gate (magew ci:debug)
-        entry: ./magew ci:debug
+        name: CI debug parity gate (npm run ci:debug)
+        entry: npm run ci:debug --silent
         language: system
         pass_filenames: false
         require_serial: true

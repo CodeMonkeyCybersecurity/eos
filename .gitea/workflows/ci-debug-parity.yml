@@ -32,56 +32,60 @@ jobs:
           apt-get install -y --no-install-recommends libvirt-dev librados-dev 2>/dev/null \
             || echo "::warning::CGo deps install failed; golangci-lint may fail on pkg/kvm or pkg/cephfs"
 
-      - name: Init prompts submodule (HTTPS with token)
+      - name: Init prompts submodule
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # The CI container cannot resolve 'vhost7' hostname but CAN reach the
-          # IP-based Gitea URL that the checkout action configured credentials for.
+          # CI containers cannot resolve 'gitea.cybermonkey.sh' hostname but CAN
+          # reach the IP-based Gitea URL. actions/checkout stores auth in LOCAL git
+          # config; submodule clone subprocesses only inherit GLOBAL/SYSTEM config.
           #
-          # Strategy: detect that IP URL, then:
-          #   1. git submodule init   → registers hostname URL in .git/config
-          #   2. git config override  → replace registered URL with IP URL
-          #   3. Configure auth in GLOBAL git config (local config is NOT inherited
-          #      by the git-clone subprocess spawned by git submodule update)
-          #   4. git submodule update → clones via IP with auth from global config
+          # Strategy:
+          #   1. Detect IP-based URL from checkout's local extraheader config
+          #   2. Set up url.*.insteadOf so hostname URLs rewrite to IP URLs
+          #   3. Copy auth from local to global config
+          #   4. Remove empty prompts/ dir if present (actions/checkout creates it)
+          #   5. Run git submodule update --init (uses rewritten URL + global auth)
+          #
+          # If init fails, propagation tests skip gracefully via dispatcher guard.
 
-          # Step 1: Detect the IP-based URL from checkout's extraheader config
           _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
             | sed -n 's|^http\.\(http://[^/]*:[0-9][^/]*/\)\.extraheader.*|\1|p' | head -1 || true)
 
-          # Step 2: Get the prompts submodule URL from .gitmodules
-          _sub_url=$(git config -f .gitmodules submodule.prompts.url 2>/dev/null || true)
+          if [[ -n "${_ip_base}" ]]; then
+            echo "Detected IP-based server: ${_ip_base}"
 
-          if [[ -n "${_ip_base}" && -n "${_sub_url}" ]]; then
-            # Rewrite scheme+host to the reachable IP URL
-            _sub_path=$(echo "${_sub_url}" | sed 's|.*://[^/]*||')
-            _ip_sub_url="${_ip_base%/}${_sub_path}"
-            echo "Overriding prompts URL to IP-based server"
+            # Rewrite hostname URLs to IP URLs (git built-in URL substitution)
+            git config --global url."${_ip_base}".insteadOf "https://gitea.cybermonkey.sh/"
 
-            # Configure auth in GLOBAL git config so it propagates to subprocesses.
-            # The checkout action sets auth only in LOCAL config, which git-clone
-            # subprocesses (spawned by git submodule update) do NOT inherit.
-            _auth_b64=$(printf ":%s" "${GITEA_TOKEN}" | base64 -w0)
-            git config --global "http.${_ip_base}.extraheader" "AUTHORIZATION: basic ${_auth_b64}"
-
-            # Register submodule (writes hostname URL to .git/config), then override
-            git submodule init prompts 2>/dev/null || true
-            git config submodule.prompts.url "${_ip_sub_url}"
-
-            # Clone without --init (URL already registered and overridden above).
-            # GIT_TERMINAL_PROMPT=0 prevents interactive credential prompts.
-            if GIT_TERMINAL_PROMPT=0 git submodule update prompts 2>&1; then
-              git -C prompts config pull.rebase true 2>/dev/null || true
-              echo "prompts submodule initialized successfully"
+            # Copy checkout action's auth to global config so submodule clone inherits it
+            _auth_header=$(git config --local "http.${_ip_base}.extraheader" 2>/dev/null || true)
+            if [[ -n "${_auth_header}" ]]; then
+              echo "Propagating checkout auth to global config"
+              git config --global "http.${_ip_base}.extraHeader" "${_auth_header}"
+            elif [[ -n "${GITEA_TOKEN:-}" ]]; then
+              echo "Using GITEA_TOKEN secret for auth"
+              _auth_b64=$(printf "x:%s" "${GITEA_TOKEN}" | base64 -w0)
+              git config --global "http.${_ip_base}.extraHeader" "AUTHORIZATION: basic ${_auth_b64}"
             else
-              echo "::warning::prompts submodule clone failed; propagation_pyramid tests will fail"
+              echo "::warning::No auth available for submodule clone"
             fi
           else
-            echo "::warning::Could not detect IP server URL; propagation_pyramid tests will fail"
-            echo "  ip_base='${_ip_base}' sub_url='${_sub_url}'"
+            echo "::warning::Could not detect IP-based server URL from checkout config"
+          fi
+
+          # actions/checkout creates empty prompts/ for registered submodules.
+          # git submodule update --init needs it empty OR properly initialized.
+          if [[ -d prompts && ! -f prompts/.git && ! -d prompts/.git ]]; then
+            rmdir prompts 2>/dev/null || true
+          fi
+
+          echo "Initializing prompts submodule..."
+          if GIT_TERMINAL_PROMPT=0 git submodule update --init --depth=1 prompts 2>&1; then
+            echo "prompts submodule initialized successfully"
+          else
+            echo "::warning::prompts submodule init failed; propagation tests will skip gracefully"
           fi
 
       - name: Verify ci:debug parity contract
@@ -108,6 +112,10 @@ jobs:
           set -euo pipefail
           test -f outputs/ci/debug/report.json && cat outputs/ci/debug/report.json || true
           test -f outputs/ci/debug/metrics.prom && cat outputs/ci/debug/metrics.prom || true
+          test -f outputs/ci/propagate/report.json && cat outputs/ci/propagate/report.json || true
+          test -f outputs/ci/propagate/metrics.prom && cat outputs/ci/propagate/metrics.prom || true
+          test -f outputs/ci/propagate/events.jsonl && cat outputs/ci/propagate/events.jsonl || true
+          test -f outputs/ci/propagate-coverage/coverage.txt && cat outputs/ci/propagate-coverage/coverage.txt || true
           test -f outputs/ci/governance-propagation-coverage/coverage.txt && cat outputs/ci/governance-propagation-coverage/coverage.txt || true
 
       - name: Alert on ci:debug failure details
@@ -119,3 +127,4 @@ jobs:
             exit 0
           fi
           python3 scripts/ci/report-alert.py ci-debug outputs/ci/debug/report.json
+          python3 scripts/ci/report-alert.py propagate outputs/ci/propagate/report.json

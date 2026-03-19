@@ -8,6 +8,7 @@ package git
 import (
 	"bytes"
 	cryptorand "crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -32,7 +33,7 @@ var (
 	// but without the internal conflict). When interactive, also tee stdin.
 	// Reference: https://pkg.go.dev/os/exec#Cmd.CombinedOutput
 	runGitPullAttempt = func(repoDir, branch string, autostash bool, interactive bool, extraEnv []string) ([]byte, error) {
-		args := []string{"-C", repoDir, "pull"}
+		args := []string{"-C", repoDir, "pull", "--ff-only"}
 		if autostash {
 			args = append(args, "--autostash")
 		}
@@ -329,6 +330,136 @@ func firstOwnershipMismatch(rootPath, wantUID, wantGID string) (bool, error) {
 	return mismatch, nil
 }
 
+const (
+	pullRelationUpToDate    = "up_to_date"
+	pullRelationLocalAhead  = "local_ahead"
+	pullRelationRemoteAhead = "remote_ahead"
+	pullRelationDiverged    = "diverged"
+)
+
+type pullAssessment struct {
+	currentBranch string
+	targetBranch  string
+	commitBefore  string
+	remoteCommit  string
+	relation      string
+}
+
+func currentBranch(repoDir string) (string, error) {
+	branchOutput, err := runGitOutput(repoDir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve current branch: %w", err)
+	}
+	return strings.TrimSpace(string(branchOutput)), nil
+}
+
+func assessPullTarget(rc *eos_io.RuntimeContext, repoDir, requestedBranch string) (*pullAssessment, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	current, err := currentBranch(repoDir)
+	if err != nil {
+		return nil, err
+	}
+	if current == "" || current == "HEAD" {
+		return nil, fmt.Errorf("cannot self-update from detached HEAD in %s\n\n"+
+			"Check out a branch and retry:\n"+
+			"  git -C %s switch main",
+			repoDir, repoDir)
+	}
+
+	target := strings.TrimSpace(requestedBranch)
+	if target == "" {
+		target = current
+	}
+	if target != current {
+		logger.Error("Refusing unsafe cross-branch self-update",
+			zap.String("event", "self_update.git.pull.branch_mismatch"),
+			zap.String("repo", repoDir),
+			zap.String("current_branch", current),
+			zap.String("target_branch", target))
+		return nil, fmt.Errorf("refusing to pull origin/%s while checked out on %s\n\n"+
+			"Self-update only fast-forwards the checked-out branch.\n"+
+			"Either:\n"+
+			"  1. Check out %s and re-run the update\n"+
+			"  2. Re-run self-update from the current branch %s",
+			target, current, target, current)
+	}
+
+	commitBefore, err := GetCurrentCommit(rc, repoDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit before pull: %w", err)
+	}
+
+	remoteCommit, err := fetchRemoteBranch(rc, repoDir, target)
+	if err != nil {
+		return nil, err
+	}
+
+	relation, err := classifyCommitRelation(repoDir, commitBefore, remoteCommit)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info("Assessed git pull target",
+		zap.String("event", "self_update.git.pull.assessed"),
+		zap.String("repo", repoDir),
+		zap.String("current_branch", current),
+		zap.String("target_branch", target),
+		zap.String("local_commit", shortRef(commitBefore)),
+		zap.String("remote_commit", shortRef(remoteCommit)),
+		zap.String("relation", relation))
+
+	return &pullAssessment{
+		currentBranch: current,
+		targetBranch:  target,
+		commitBefore:  commitBefore,
+		remoteCommit:  remoteCommit,
+		relation:      relation,
+	}, nil
+}
+
+func classifyCommitRelation(repoDir, localCommit, remoteCommit string) (string, error) {
+	if localCommit == remoteCommit {
+		return pullRelationUpToDate, nil
+	}
+
+	remoteIsAncestor, err := isAncestorCommit(repoDir, remoteCommit, localCommit)
+	if err != nil {
+		return "", err
+	}
+	localIsAncestor, err := isAncestorCommit(repoDir, localCommit, remoteCommit)
+	if err != nil {
+		return "", err
+	}
+
+	switch {
+	case localIsAncestor && remoteIsAncestor:
+		return pullRelationUpToDate, nil
+	case localIsAncestor:
+		return pullRelationRemoteAhead, nil
+	case remoteIsAncestor:
+		return pullRelationLocalAhead, nil
+	default:
+		return pullRelationDiverged, nil
+	}
+}
+
+func isAncestorCommit(repoDir, maybeAncestor, commit string) (bool, error) {
+	// #nosec G204 -- args are assembled from validated commit refs.
+	cmd := exec.Command("git", "-C", repoDir, "merge-base", "--is-ancestor", maybeAncestor, commit)
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+
+	return false, fmt.Errorf("failed to compare commits %s and %s: %w", shortRef(maybeAncestor), shortRef(commit), err)
+}
+
 // PullOptions controls pull behavior for self-update and other git consumers.
 type PullOptions struct {
 	VerifyRemote                  bool
@@ -343,12 +474,15 @@ type PullOptions struct {
 
 // PullResult captures the state transition of a pull operation.
 type PullResult struct {
-	CodeChanged  bool
-	StashRef     string
-	CommitBefore string
-	CommitAfter  string
-	RemoteCommit string
-	PullOutput   string
+	CodeChanged   bool
+	StashRef      string
+	CommitBefore  string
+	CommitAfter   string
+	RemoteCommit  string
+	PullOutput    string
+	CurrentBranch string
+	TargetBranch  string
+	Relation      string
 }
 
 // PullRepository is the single pull engine used by self-update and tests.
@@ -417,25 +551,50 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 		}
 	}
 
-	commitBefore, err := GetCurrentCommit(rc, repoDir)
+	assessment, err := assessPullTarget(rc, repoDir, branch)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit before pull: %w", err)
+		return nil, err
 	}
-	result.CommitBefore = commitBefore
+	result.CommitBefore = assessment.commitBefore
+	result.CommitAfter = assessment.commitBefore
+	result.RemoteCommit = assessment.remoteCommit
+	result.CurrentBranch = assessment.currentBranch
+	result.TargetBranch = assessment.targetBranch
+	result.Relation = assessment.relation
 
-	if options.FetchFirst {
-		remoteCommit, err := fetchRemoteBranch(rc, repoDir, branch)
-		if err != nil {
-			return nil, err
-		}
-		result.RemoteCommit = remoteCommit
-		if remoteCommit == commitBefore {
-			result.CommitAfter = commitBefore
-			logger.Info("Already on latest version",
-				zap.String("event", "self_update.git.pull.up_to_date_after_fetch"),
-				zap.String("commit", shortRef(commitBefore)))
-			return result, nil
-		}
+	switch assessment.relation {
+	case pullRelationUpToDate:
+		logger.Info("Already on latest version",
+			zap.String("event", "self_update.git.pull.up_to_date_after_fetch"),
+			zap.String("branch", assessment.targetBranch),
+			zap.String("commit", shortRef(assessment.commitBefore)))
+		return result, nil
+	case pullRelationLocalAhead:
+		logger.Info("Skipping self-update because local branch is already ahead of origin",
+			zap.String("event", "self_update.git.pull.local_ahead"),
+			zap.String("branch", assessment.targetBranch),
+			zap.String("local_commit", shortRef(assessment.commitBefore)),
+			zap.String("remote_commit", shortRef(assessment.remoteCommit)))
+		return result, nil
+	case pullRelationDiverged:
+		logger.Error("Refusing self-update because local and remote branches have diverged",
+			zap.String("event", "self_update.git.pull.diverged"),
+			zap.String("branch", assessment.targetBranch),
+			zap.String("local_commit", shortRef(assessment.commitBefore)),
+			zap.String("remote_commit", shortRef(assessment.remoteCommit)))
+		return nil, fmt.Errorf("local branch %s has diverged from origin/%s\n\n"+
+			"Local commit:  %s\n"+
+			"Remote commit: %s\n\n"+
+			"Self-update only performs fast-forward updates.\n"+
+			"Resolve the branch divergence first, then re-run:\n"+
+			"  git -C %s status\n"+
+			"  git -C %s log --oneline --decorate --graph --max-count=12 --all",
+			assessment.targetBranch,
+			assessment.targetBranch,
+			shortRef(assessment.commitBefore),
+			shortRef(assessment.remoteCommit),
+			repoDir,
+			repoDir)
 	}
 
 	if options.TrackRollbackStash {
@@ -446,7 +605,7 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 	}
 
 	autostash := options.Autostash && !options.TrackRollbackStash
-	pullOutput, err := runGitPullWithRetry(rc, repoDir, branch, autostash)
+	pullOutput, err := runGitPullWithRetry(rc, repoDir, assessment.targetBranch, autostash)
 	result.PullOutput = strings.TrimSpace(string(pullOutput))
 	if err != nil {
 		if result.StashRef != "" {
@@ -485,7 +644,7 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 		return nil, fmt.Errorf("failed to get commit after pull: %w", err)
 	}
 	result.CommitAfter = commitAfter
-	result.CodeChanged = commitBefore != commitAfter
+	result.CodeChanged = assessment.commitBefore != commitAfter
 
 	if !result.CodeChanged {
 		logger.Info("Already on latest version",
@@ -505,11 +664,12 @@ func PullRepository(rc *eos_io.RuntimeContext, repoDir, branch string, options P
 
 	logger.Info("Updates pulled",
 		zap.String("event", "self_update.git.pull.updated"),
-		zap.String("from", shortRef(commitBefore)),
+		zap.String("branch", assessment.targetBranch),
+		zap.String("from", shortRef(assessment.commitBefore)),
 		zap.String("to", shortRef(commitAfter)))
 
 	if options.VerifyCommitSignatures {
-		results, err := VerifyCommitChain(rc, repoDir, commitBefore, commitAfter)
+		results, err := VerifyCommitChain(rc, repoDir, assessment.commitBefore, commitAfter)
 		if err != nil {
 			logger.Error("Commit signature verification failed", zap.Error(err))
 		}
@@ -767,6 +927,21 @@ func RestoreStash(rc *eos_io.RuntimeContext, repoDir, stashRef string) error {
 	}
 
 	outputStr := strings.TrimSpace(string(applyOutput))
+
+	hasConflicts, conflictedFiles, conflictErr := HasMergeConflicts(rc, repoDir)
+	if conflictErr == nil && hasConflicts {
+		logger.Error("Stash restore produced merge conflicts",
+			zap.String("event", "self_update.git.stash_restore_conflict"),
+			zap.String("ref", shortRef(stashRef)),
+			zap.Strings("files", conflictedFiles))
+		return fmt.Errorf("stash restore produced merge conflicts in %v\n"+
+			"Output: %s\n\n"+
+			"Manual recovery:\n"+
+			"  git -C %s status\n"+
+			"  git -C %s reset --hard HEAD   # clears the partial apply\n"+
+			"  git -C %s stash apply %s      # re-apply once ready",
+			conflictedFiles, outputStr, repoDir, repoDir, repoDir, stashRef)
+	}
 
 	// Handle "could not restore untracked files from stash":
 	// This happens when untracked files that were in the stash already exist

@@ -2,6 +2,10 @@
 # E2E tests for the propagate:prompts npm script.
 # Runs the full npm entrypoint from the eos repo root.
 # 10% tier — full user-facing flow, safe because we only invoke --dry-run variant.
+#
+# GUARD: The dispatcher (test-propagate.sh) checks for submodule presence
+# before calling this file. If you run this file directly, ensure
+# prompts/scripts/propagate.sh exists.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

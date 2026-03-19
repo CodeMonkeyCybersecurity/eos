@@ -107,11 +107,15 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 		result.CronConfigured = true
 	}
 
-	// INTERVENE: Fix ownership if running as root for another user
+	// INTERVENE: Fix ownership if running as root for another user.
+	// CRITICAL: Must chown the .eos/ parent directory too, not just .eos/restic/.
+	// Without this, the user cannot traverse .eos/ (root:root 0700) to reach their
+	// own files in .eos/restic/ — causing permission denied on all subsequent access.
 	if os.Geteuid() == 0 && config.User != "" && config.User != "root" {
-		if err := chownToUser(resticDir, config.User); err != nil {
-			logger.Warn("Failed to change ownership",
-				zap.String("path", resticDir),
+		eosDir := filepath.Join(homeDir, ".eos")
+		if err := chownToUser(eosDir, config.User); err != nil {
+			logger.Warn("Failed to change ownership of .eos directory",
+				zap.String("path", eosDir),
 				zap.Error(err))
 		}
 	}
