@@ -4,6 +4,9 @@ set -euo pipefail
 th_pass=0
 th_fail=0
 
+# th_assert_run runs a command and checks exit code + optional output pattern.
+# IMPORTANT: Always returns 0 so set -e callers accumulate all results.
+# Failures are tracked via th_fail counter; th_summary exits non-zero if any failed.
 th_assert_run() {
   local name="${1:?name required}"
   local expected_exit="${2:?expected exit required}"
@@ -18,14 +21,14 @@ th_assert_run() {
     echo "FAIL: ${name} - expected exit ${expected_exit}, got ${exit_code}"
     echo "  output: ${output}"
     th_fail=$((th_fail + 1))
-    return 1
+    return 0
   fi
 
   if [[ -n "${expected_output}" ]] && ! grep -qF "${expected_output}" <<< "${output}"; then
     echo "FAIL: ${name} - expected output containing '${expected_output}'"
     echo "  output: ${output}"
     th_fail=$((th_fail + 1))
-    return 1
+    return 0
   fi
 
   echo "PASS: ${name}"
@@ -54,7 +57,7 @@ PY
 
   echo "FAIL: ${name}"
   th_fail=$((th_fail + 1))
-  return 1
+  return 0
 }
 
 th_summary() {

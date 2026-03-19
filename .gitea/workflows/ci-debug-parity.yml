@@ -32,56 +32,60 @@ jobs:
           apt-get install -y --no-install-recommends libvirt-dev librados-dev 2>/dev/null \
             || echo "::warning::CGo deps install failed; golangci-lint may fail on pkg/kvm or pkg/cephfs"
 
-      - name: Init prompts submodule (HTTPS with token)
+      - name: Init prompts submodule
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # The CI container cannot resolve 'vhost7' hostname but CAN reach the
-          # IP-based Gitea URL. actions/checkout stores its auth in LOCAL git
-          # config (http.<ip-url>.extraheader). git-clone subprocesses spawned by
-          # git submodule update do NOT inherit LOCAL config — only GLOBAL/SYSTEM.
+          # CI containers cannot resolve 'gitea.cybermonkey.sh' hostname but CAN
+          # reach the IP-based Gitea URL. actions/checkout stores auth in LOCAL git
+          # config; submodule clone subprocesses only inherit GLOBAL/SYSTEM config.
           #
-          # Strategy: copy the checkout action's auth from LOCAL to GLOBAL git
-          # config, then run git clone --depth=1 directly.
-          # This reuses the same github.token that successfully fetched this repo.
+          # Strategy:
+          #   1. Detect IP-based URL from checkout's local extraheader config
+          #   2. Set up url.*.insteadOf so hostname URLs rewrite to IP URLs
+          #   3. Copy auth from local to global config
+          #   4. Remove empty prompts/ dir if present (actions/checkout creates it)
+          #   5. Run git submodule update --init (uses rewritten URL + global auth)
+          #
+          # If init fails, propagation tests skip gracefully via dispatcher guard.
 
-          # Step 1: Detect the IP-based URL from checkout's local extraheader config
           _ip_base=$(git config --local --get-regexp 'http\..*\.extraheader' 2>/dev/null \
             | sed -n 's|^http\.\(http://[^/]*:[0-9][^/]*/\)\.extraheader.*|\1|p' | head -1 || true)
 
-          # Step 2: Get the prompts submodule URL from .gitmodules
-          _sub_url=$(git config -f .gitmodules submodule.prompts.url 2>/dev/null || true)
+          if [[ -n "${_ip_base}" ]]; then
+            echo "Detected IP-based server: ${_ip_base}"
 
-          if [[ -n "${_ip_base}" && -n "${_sub_url}" ]]; then
-            _sub_path=$(echo "${_sub_url}" | sed 's|.*://[^/]*||')
-            _ip_sub_url="${_ip_base%/}${_sub_path}"
+            # Rewrite hostname URLs to IP URLs (git built-in URL substitution)
+            git config --global url."${_ip_base}".insteadOf "https://gitea.cybermonkey.sh/"
 
-            # Copy the checkout action's auth to global config so git-clone subprocess
-            # can read it. Also fall back to GITEA_TOKEN secret if needed.
+            # Copy checkout action's auth to global config so submodule clone inherits it
             _auth_header=$(git config --local "http.${_ip_base}.extraheader" 2>/dev/null || true)
             if [[ -n "${_auth_header}" ]]; then
-              echo "Propagating checkout action auth (github.token) to global config"
+              echo "Propagating checkout auth to global config"
               git config --global "http.${_ip_base}.extraHeader" "${_auth_header}"
             elif [[ -n "${GITEA_TOKEN:-}" ]]; then
-              echo "Falling back to GITEA_TOKEN secret (x:TOKEN format)"
+              echo "Using GITEA_TOKEN secret for auth"
               _auth_b64=$(printf "x:%s" "${GITEA_TOKEN}" | base64 -w0)
               git config --global "http.${_ip_base}.extraHeader" "AUTHORIZATION: basic ${_auth_b64}"
             else
-              echo "::warning::No auth available; clone may fail if prompts repo requires auth"
-            fi
-
-            echo "Cloning prompts submodule from IP-based server"
-            if GIT_TERMINAL_PROMPT=0 git clone --depth=1 "${_ip_sub_url}" prompts 2>&1; then
-              git -C prompts config pull.rebase true 2>/dev/null || true
-              echo "prompts submodule initialized successfully"
-            else
-              echo "::warning::prompts submodule clone failed; propagation_pyramid tests will fail"
+              echo "::warning::No auth available for submodule clone"
             fi
           else
-            echo "::warning::Could not detect IP server URL; propagation_pyramid tests will fail"
-            echo "  ip_base='${_ip_base}' sub_url='${_sub_url}'"
+            echo "::warning::Could not detect IP-based server URL from checkout config"
+          fi
+
+          # actions/checkout creates empty prompts/ for registered submodules.
+          # git submodule update --init needs it empty OR properly initialized.
+          if [[ -d prompts && ! -f prompts/.git && ! -d prompts/.git ]]; then
+            rmdir prompts 2>/dev/null || true
+          fi
+
+          echo "Initializing prompts submodule..."
+          if GIT_TERMINAL_PROMPT=0 git submodule update --init --depth=1 prompts 2>&1; then
+            echo "prompts submodule initialized successfully"
+          else
+            echo "::warning::prompts submodule init failed; propagation tests will skip gracefully"
           fi
 
       - name: Verify ci:debug parity contract
