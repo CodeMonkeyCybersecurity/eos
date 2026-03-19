@@ -42,7 +42,7 @@ require_test() {
 
 verify_tests_exist() {
   lane_run_step "test_discovery" require_test "./pkg/git" 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*|PullRepository_.*|PullLatestCode_FailsEarlyWithoutHTTPSCredentials)' "git retry/pull unit suite"
-  lane_run_step "test_discovery" require_test "./pkg/self" 'Test(ShouldBuildBinary|RecordTransactionStep|CreateTransactionBackup_.*|CheckGitRepositoryState_.*)' "self-update transaction unit suite"
+  lane_run_step "test_discovery" require_test "./pkg/self" 'Test(ShouldBuildBinary|RecordTransactionStep|CreateTransactionBackup_.*|CheckGitRepositoryState_.*|CheckDiskSpace_.*|InstallBinaryAtomic_.*|UpdateWithRollback_LockSpans.*|Rollback_.*)' "self-update transaction unit suite"
   lane_run_step "test_discovery" require_test "./pkg/vault" 'TestHandleTLSValidationFailure_.*' "vault TLS consent unit suite"
   lane_run_step "test_discovery" require_test "./cmd/self" 'TestBackupRunCommandIntegration' "self backup integration test"
   lane_run_step "test_discovery" require_test "./pkg/git" 'Test(CheckRepositoryState_WithTrustedRemote|IntegrationPullWithStashTracking_PreservesUntrackedChanges|IntegrationPullWithStashTracking_SkipsWhenLocalBranchIsAhead|IntegrationPullWithStashTracking_RefusesDivergedBranch)' "git trusted remote integration test"
@@ -53,7 +53,7 @@ run_unit() {
   log_human "running unit tests (${unit_weight}%)"
   go test -count=1 -short -coverprofile="${coverage_file}" -covermode=atomic \
     ./pkg/git ./pkg/self ./pkg/vault \
-    -run 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*|VerifyTrustedRemote_.*|PullRepository_.*|PullLatestCode_FailsEarlyWithoutHTTPSCredentials|ShouldBuildBinary|RecordTransactionStep|CreateTransactionBackup_.*|CheckGitRepositoryState_.*|HandleTLSValidationFailure_.*)'
+    -run 'Test(IsTransientGitPullFailure|RunGitPullWithRetry_.*|RetryBackoff_.*|VerifyTrustedRemote_.*|PullRepository_.*|PullLatestCode_FailsEarlyWithoutHTTPSCredentials|ShouldBuildBinary|RecordTransactionStep|CreateTransactionBackup_.*|CheckGitRepositoryState_.*|HandleTLSValidationFailure_.*|CheckDiskSpace_.*|InstallBinaryAtomic_.*|UpdateWithRollback_LockSpans.*|Rollback_.*|NewEosUpdater_NoDefault.*)'
 }
 
 run_integration() {

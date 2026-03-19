@@ -7,10 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -61,9 +59,9 @@ func NewEosUpdater(rc *eos_io.RuntimeContext, config *UpdateConfig) *EosUpdater 
 	if config.MaxBackups == 0 {
 		config.MaxBackups = 3
 	}
-	if config.GitBranch == "" {
-		config.GitBranch = "main"
-	}
+	// NOTE: GitBranch intentionally has NO default. Callers must resolve
+	// the checked-out branch explicitly (see cmd/self/self.go) to prevent
+	// cross-branch updates. checkGitRepositoryState enforces this at runtime.
 
 	return &EosUpdater{
 		rc:     rc,
@@ -108,78 +106,10 @@ func (eu *EosUpdater) Assess() (*UpdateState, error) {
 	return eu.state, nil
 }
 
-// Update performs the complete Eos self-update following Assess→Intervene→Evaluate
-func (eu *EosUpdater) Update() error {
-	eu.logger.Info("Starting Eos self-update")
-
-	// ASSESS
-	if _, err := eu.Assess(); err != nil {
-		return fmt.Errorf("assessment failed: %w", err)
-	}
-
-	// Create backup
-	if !eu.config.SkipBackup && eu.state.BinaryExists {
-		if err := eu.CreateBackup(); err != nil {
-			eu.logger.Warn("Failed to create backup", zap.Error(err))
-		} else {
-			eu.CleanupOldBackups()
-		}
-	}
-
-	// INTERVENE - Pull latest code
-	if err := eu.PullLatestCode(); err != nil {
-		return fmt.Errorf("failed to pull latest code: %w", err)
-	}
-
-	// Build new binary
-	tempBinary, err := eu.BuildBinary()
-	if err != nil {
-		return fmt.Errorf("failed to build binary: %w", err)
-	}
-	defer func() { _ = os.Remove(tempBinary) }()
-
-	// EVALUATE - Validate and install
-	if !eu.config.SkipValidation {
-		if err := eu.ValidateBinary(tempBinary); err != nil {
-			return fmt.Errorf("binary validation failed: %w", err)
-		}
-	}
-
-	// Install new binary
-	if err := eu.InstallBinary(tempBinary); err != nil {
-		return fmt.Errorf("failed to install new binary: %w", err)
-	}
-
-	// Final verification
-	if err := eu.Verify(); err != nil {
-		eu.logger.Warn("Post-install verification failed", zap.Error(err))
-	}
-
-	eu.logger.Info("Eos self-update completed successfully")
-	return nil
-}
-
-// CreateBackup creates a backup of the current binary
-func (eu *EosUpdater) CreateBackup() error {
-	backupPath := fmt.Sprintf("%s/eos.backup.%d", eu.config.BackupDir, time.Now().Unix())
-
-	eu.logger.Info("Creating backup of current binary", zap.String("backup_path", backupPath))
-
-	currentBinary, err := os.ReadFile(eu.config.BinaryPath)
-	if err != nil {
-		return fmt.Errorf("failed to read current binary: %w", err)
-	}
-
-	if err := os.WriteFile(backupPath, currentBinary, shared.ExecutablePerm); err != nil {
-		return fmt.Errorf("failed to write backup: %w", err)
-	}
-
-	eu.logger.Info("Backup created successfully",
-		zap.String("backup_path", backupPath),
-		zap.Int("size_bytes", len(currentBinary)))
-
-	return nil
-}
+// NOTE: The simple Update() and CreateBackup() methods were removed.
+// Production code uses EnhancedEosUpdater.UpdateWithRollback() which provides
+// transaction tracking, atomic rollback, and the flock-based locking lifecycle.
+// See pkg/self/updater_enhanced.go.
 
 // CleanupOldBackups removes old backup files, keeping only the most recent N
 func (eu *EosUpdater) CleanupOldBackups() {
@@ -199,96 +129,10 @@ func (eu *EosUpdater) CleanupOldBackups() {
 	}
 }
 
-// PullLatestCode pulls the latest code from git.
-// Delegates to pkg/git.PullLatestCode which includes:
-//   - Trusted remote verification (security)
-//   - Credential checking (UX)
-//   - GIT_TERMINAL_PROMPT safety (non-interactive safety)
-func (eu *EosUpdater) PullLatestCode() error {
-	return git.PullLatestCode(eu.rc, eu.config.SourceDir, eu.config.GitBranch)
-}
-
-// BuildBinary builds the new Eos binary to a temporary location
-func (eu *EosUpdater) BuildBinary() (string, error) {
-	tempBinary := fmt.Sprintf("/tmp/eos-update-%d", time.Now().Unix())
-
-	eu.logger.Info("Building Eos binary",
-		zap.String("temp_path", tempBinary),
-		zap.String("source_dir", eu.config.SourceDir))
-
-	// Verify pkg-config and libvirt are available
-	pkgConfigPath, err := exec.LookPath("pkg-config")
-	if err != nil {
-		return "", fmt.Errorf("pkg-config not found in PATH - required for building Eos with libvirt: %w", err)
-	}
-
-	pkgConfigCmd := exec.Command(pkgConfigPath, "--exists", "libvirt")
-	if err := pkgConfigCmd.Run(); err != nil {
-		return "", fmt.Errorf("libvirt development libraries not found - install libvirt-dev/libvirt-devel: %w", err)
-	}
-
-	eu.logger.Info("Libvirt development libraries detected",
-		zap.String("pkg_config_path", pkgConfigPath))
-
-	// Build command - CGO is required for libvirt
-	buildArgs := []string{"build", "-o", tempBinary, "."}
-	buildCmd := exec.Command("go", buildArgs...)
-	buildCmd.Dir = eu.config.SourceDir
-
-	// Set build environment - CGO must be enabled for libvirt
-	buildCmd.Env = append(os.Environ(),
-		"CGO_ENABLED=1",
-		"GO111MODULE=on",
-	)
-
-	// Detect and log architecture
-	if detectCmd := exec.Command("go", "env", "GOOS", "GOARCH"); detectCmd != nil {
-		if detectOutput, err := detectCmd.Output(); err == nil {
-			arch := strings.TrimSpace(string(detectOutput))
-			parts := strings.Split(arch, "\n")
-			if len(parts) >= 2 {
-				eu.logger.Info("Building for architecture",
-					zap.String("os", strings.TrimSpace(parts[0])),
-					zap.String("arch", strings.TrimSpace(parts[1])))
-			}
-		}
-	}
-
-	buildOutput, err := buildCmd.CombinedOutput()
-	if err != nil {
-		eu.logger.Error("Build failed",
-			zap.Error(err),
-			zap.String("output", string(buildOutput)))
-		_ = os.Remove(tempBinary)
-		return "", fmt.Errorf("build failed: %w", err)
-	}
-
-	// Validate the binary was created and is valid
-	binaryInfo, err := os.Stat(tempBinary)
-	if err != nil {
-		return "", fmt.Errorf("built binary does not exist at %s: %w", tempBinary, err)
-	}
-
-	// Check the file size is reasonable (at least 1MB for a Go binary)
-	const minBinarySize = 1024 * 1024 // 1MB
-	if binaryInfo.Size() < minBinarySize {
-		_ = os.Remove(tempBinary)
-		return "", fmt.Errorf("built binary is too small (%d bytes), expected at least %d bytes",
-			binaryInfo.Size(), minBinarySize)
-	}
-
-	eu.logger.Info("Binary built successfully",
-		zap.Int64("size_bytes", binaryInfo.Size()),
-		zap.String("size_human", fmt.Sprintf("%.2f MB", float64(binaryInfo.Size())/(1024*1024))))
-
-	// Set execute permissions
-	if err := os.Chmod(tempBinary, shared.ExecutablePerm); err != nil {
-		_ = os.Remove(tempBinary)
-		return "", fmt.Errorf("failed to set execute permissions: %w", err)
-	}
-
-	return tempBinary, nil
-}
+// NOTE: PullLatestCode() and the base BuildBinary() were removed.
+// Production code uses EnhancedEosUpdater.pullLatestCodeWithVerification() and
+// EnhancedEosUpdater.BuildBinary() which include branch safety, stash tracking,
+// build integrity checks, and commit embedding.
 
 // ValidateBinary validates that the binary is executable and works correctly
 func (eu *EosUpdater) ValidateBinary(binaryPath string) error {

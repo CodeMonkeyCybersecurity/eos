@@ -7,13 +7,15 @@ package self
 
 import (
 	"fmt"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/build"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -126,29 +128,52 @@ func (eeu *EnhancedEosUpdater) skipTransactionStep(name, message string) {
 	eeu.recordTransactionStep(name, "skipped", message, started)
 }
 
-// UpdateWithRollback performs update with automatic rollback on failure
+// UpdateWithRollback performs update with automatic rollback on failure.
+//
+// CRITICAL (P0 #8 fix): The update lock is acquired HERE, not inside
+// executeUpdateTransaction. This ensures the lock spans both the transaction
+// AND any rollback, eliminating the race window where another process could
+// start an update between transaction failure and rollback start.
+//
+// Previous bug: executeUpdateTransaction acquired the lock via defer, which
+// released it on return. Rollback then re-acquired it, but the gap between
+// the two acquisitions was exploitable by a concurrent updater.
 func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
-	eeu.logger.Info(" Starting enhanced self-update with rollback capability")
+	eeu.logger.Info("Starting enhanced self-update with rollback capability")
 
 	// Phase 1: ASSESS - Pre-update safety checks
 	if err := eeu.PreUpdateSafetyChecks(); err != nil {
 		return fmt.Errorf("pre-update safety checks failed: %w", err)
 	}
 
+	// Acquire exclusive update lock BEFORE any mutation.
+	// Held for the entire transaction+rollback lifecycle.
+	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if releaseErr := updateLock.Release(); releaseErr != nil {
+			eeu.logger.Warn("Failed to release update lock", zap.Error(releaseErr))
+		}
+	}()
+	eeu.logger.Debug("Update lock acquired for transaction+rollback lifecycle")
+
 	// Phase 2: INTERVENE - Perform update with transaction tracking
 	updateErr := eeu.executeUpdateTransaction()
 
 	// Phase 3: EVALUATE - Handle success or trigger rollback
+	// NOTE: Lock is still held here, preventing concurrent updates during rollback
 	if updateErr != nil {
-		eeu.logger.Error(" Update failed, initiating rollback", zap.Error(updateErr))
+		eeu.logger.Error("Update failed, initiating rollback", zap.Error(updateErr))
 
-		if rollbackErr := eeu.Rollback(); rollbackErr != nil {
+		if rollbackErr := eeu.rollbackUnlocked(); rollbackErr != nil {
 			eeu.logger.Error("CRITICAL: Rollback failed", zap.Error(rollbackErr))
 			return fmt.Errorf("update failed and rollback failed: update error: %w, rollback error: %v",
 				updateErr, rollbackErr)
 		}
 
-		eeu.logger.Info(" Rollback successful, system restored to previous state")
+		eeu.logger.Info("Rollback successful, system restored to previous state")
 		return fmt.Errorf("update failed but rolled back successfully: %w", updateErr)
 	}
 
@@ -161,22 +186,21 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	if eeu.enhancedConfig.UpdateSystemPackages {
 		eeu.logger.Info("System package updates enabled (use --system-packages=false to skip)")
 		if err := eeu.UpdateSystemPackages(); err != nil {
-			// P0 FIX: System package errors are now FATAL by default
-			// Broken packages can prevent eos build and leave system in inconsistent state
+			// System package errors are FATAL by default.
+			// Broken packages can prevent eos build and leave system in inconsistent state.
 			if !eeu.enhancedConfig.ForcePackageErrors {
 				eeu.logger.Error("System package update failed", zap.Error(err))
 				return fmt.Errorf("system package update failed: %w\n\n"+
 					"This is a fatal error because broken packages can prevent eos from building.\n"+
 					"To force update despite package errors, use: --force-package-errors\n"+
 					"(Not recommended - may leave system with broken packages)", err)
-			} else {
-				// User explicitly forced continuation despite errors
-				eeu.logger.Warn("System package update failed but continuing due to --force-package-errors",
-					zap.Error(err))
-				eeu.logger.Warn("⚠️  WARNING: System may have broken packages")
 			}
+			// User explicitly forced continuation despite errors
+			eeu.logger.Warn("System package update failed but continuing due to --force-package-errors",
+				zap.Error(err))
+			eeu.logger.Warn("WARNING: System may have broken packages")
 		} else {
-			eeu.logger.Info("✓ System packages updated successfully")
+			eeu.logger.Info("System packages updated successfully")
 		}
 	}
 
@@ -189,7 +213,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 	}
 
 	eeu.transaction.Success = true
-	eeu.logger.Info(" Enhanced self-update completed successfully",
+	eeu.logger.Info("Enhanced self-update completed successfully",
 		zap.Duration("duration", time.Since(eeu.transaction.StartTime)))
 
 	// Display clear success summary to user via structured logging
@@ -225,7 +249,7 @@ func (eeu *EnhancedEosUpdater) UpdateWithRollback() error {
 
 // PreUpdateSafetyChecks performs comprehensive safety checks before updating
 func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
-	eeu.logger.Info(" Phase 1: ASSESS - Running pre-update safety checks")
+	eeu.logger.Info("Phase 1: ASSESS - Running pre-update safety checks")
 
 	// 1. Check if we're in the source directory
 	if err := eeu.verifySourceDirectory(); err != nil {
@@ -268,7 +292,7 @@ func (eeu *EnhancedEosUpdater) PreUpdateSafetyChecks() error {
 		return err
 	}
 
-	eeu.logger.Info(" All pre-update safety checks passed")
+	eeu.logger.Info("All pre-update safety checks passed")
 	return nil
 }
 
@@ -292,13 +316,25 @@ func (eeu *EnhancedEosUpdater) forceCleanRepository() error {
 		eeu.logger.Info("Aborted in-progress merge")
 	}
 
-	// Step 2: Drop all stashes (they're likely causing issues)
-	eeu.logger.Info("Clearing stash...")
-	stashClearCmd := exec.Command("git", "-C", repoDir, "stash", "clear")
-	if output, err := stashClearCmd.CombinedOutput(); err != nil {
-		eeu.logger.Warn("Failed to clear stash",
-			zap.Error(err),
-			zap.String("output", string(output)))
+	// Step 2: Drop stashes only if they exist and user consents (P1 fix: human-centric)
+	// #nosec G204 -- repoDir is the already-validated local repository path.
+	stashListCmd := exec.Command("git", "-C", repoDir, "stash", "list")
+	if stashListOutput, err := stashListCmd.Output(); err == nil && len(stashListOutput) > 0 {
+		stashCount := strings.Count(string(stashListOutput), "\n")
+		eeu.logger.Warn("Stash entries found that will be permanently deleted",
+			zap.Int("count", stashCount))
+		// In force-clean mode, the user already opted into the nuclear option,
+		// so we log the action but proceed without a second prompt.
+		eeu.logger.Info("Clearing stash entries (--force-clean implies consent)")
+		// #nosec G204 -- repoDir is the already-validated local repository path.
+		stashClearCmd := exec.Command("git", "-C", repoDir, "stash", "clear")
+		if output, err := stashClearCmd.CombinedOutput(); err != nil {
+			eeu.logger.Warn("Failed to clear stash",
+				zap.Error(err),
+				zap.String("output", string(output)))
+		}
+	} else {
+		eeu.logger.Debug("No stash entries to clear")
 	}
 
 	// Step 3: Fetch latest from origin
@@ -415,7 +451,7 @@ func (eeu *EnhancedEosUpdater) checkGitRepositoryState() error {
 		// Note: P0-2 already implemented stash tracking, so this is now safe
 		// Changes will be stashed before pull and restored if rollback needed
 	} else {
-		eeu.logger.Info(" Working tree is clean")
+		eeu.logger.Info("Working tree is clean")
 	}
 
 	return nil
@@ -476,31 +512,39 @@ func (eeu *EnhancedEosUpdater) verifyBuildDependencies() error {
 			"This check runs BEFORE pulling updates to prevent build failures.", err)
 	}
 
-	eeu.logger.Info("✓ Go toolchain verified",
+	eeu.logger.Info("Go toolchain verified",
 		zap.String("required_version", requiredVer),
 		zap.String("current_version", currentVer))
 
-	eeu.logger.Info(" Build dependencies verified and ready")
+	eeu.logger.Info("Build dependencies verified and ready")
 	return nil
 }
 
-// checkDiskSpace ensures we have enough space for the update
-// SECURITY CRITICAL: Prevents partial updates that corrupt system
-// P0 FIX (Adversarial #4): Dynamically calculates space based on actual binary size
+// checkDiskSpace ensures we have enough space for the update.
+// SECURITY CRITICAL: Prevents partial updates that corrupt system.
+// Uses actual binary size when available, falls back to estimate for first install.
 func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 	eeu.logger.Info("Verifying disk space requirements")
 
-	// P0 FIX: Get actual binary size for accurate space calculation
+	// Get actual binary size for accurate space calculation.
+	// On first install the binary may not exist yet; use a conservative estimate.
+	var binarySize int64
 	binaryInfo, err := os.Stat(eeu.config.BinaryPath)
 	if err != nil {
-		return fmt.Errorf("failed to stat binary for disk space calculation: %w", err)
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to stat binary for disk space calculation: %w", err)
+		}
+		// First install: estimate 150 MB (typical eos binary with CGO/Ceph/libvirt)
+		binarySize = 150 * 1024 * 1024
+		eeu.logger.Info("Binary not found (first install), using estimated size for disk space check",
+			zap.Int64("estimated_bytes", binarySize))
+	} else {
+		binarySize = binaryInfo.Size()
 	}
-	binarySize := binaryInfo.Size()
-	binarySizeMB := float64(binarySize) / (1024 * 1024)
 
 	eeu.logger.Debug("Binary size for disk space calculation",
 		zap.Int64("bytes", binarySize),
-		zap.Float64("mb", binarySizeMB))
+		zap.Float64("mb", float64(binarySize)/(1024*1024)))
 
 	// Define space requirements based on ACTUAL binary size
 	// This prevents underestimation that would cause "no space left on device" errors
@@ -524,11 +568,11 @@ func (eeu *EnhancedEosUpdater) checkDiskSpace() error {
 		eeu.logger.Warn("Disk space below recommended levels",
 			zap.Strings("warnings", result.Warnings))
 		for _, warning := range result.Warnings {
-			eeu.logger.Warn("⚠️  " + warning)
+			eeu.logger.Warn("Low disk space", zap.String("warning", warning))
 		}
 	}
 
-	eeu.logger.Info("✓ Disk space verification passed",
+	eeu.logger.Info("Disk space verification passed",
 		zap.String("temp", system.FormatBytes(result.TempAvailable)),
 		zap.String("binary", system.FormatBytes(result.BinaryAvailable)),
 		zap.String("source", system.FormatBytes(result.SourceAvailable)))
@@ -698,20 +742,10 @@ func (eeu *EnhancedEosUpdater) BuildBinary() (string, error) {
 	return tempBinary, nil
 }
 
-// executeUpdateTransaction performs the actual update with transaction tracking
-// P0 FIX (Adversarial NEW #5): Acquire flock BEFORE any operations to prevent concurrent updates
+// executeUpdateTransaction performs the actual update with transaction tracking.
+// IMPORTANT: Caller (UpdateWithRollback) must hold the update lock.
 func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
-	eeu.logger.Info(" Phase 2: INTERVENE - Executing update transaction")
-
-	// P0 FIX: Acquire exclusive update lock BEFORE backup creation
-	// This prevents concurrent updates during backup, build, and install
-	// Lock is held for entire transaction and automatically released on return
-	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
-	if err != nil {
-		return err // Error already includes detailed message
-	}
-	defer updateLock.Release()
-	eeu.logger.Debug("Update lock acquired - safe to proceed with transaction")
+	eeu.logger.Info("Phase 2: INTERVENE - Executing update transaction")
 
 	var currentHash string
 	if err := eeu.runTransactionStep("pull_source", "Pull latest source changes", func() error {
@@ -729,7 +763,7 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 	if !buildNeeded {
 		eeu.transaction.SkipReason = reason
 		eeu.skipTransactionStep("build_binary", reason)
-		eeu.logger.Info("terminal prompt: ✓ Already on latest version - no rebuild needed")
+		eeu.logger.Info("Already on latest version - no rebuild needed")
 		return nil
 	}
 
@@ -765,16 +799,16 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 
 	if newHash == currentHash {
 		eeu.transaction.SkipReason = "built binary matches installed binary"
-		eeu.logger.Info(" New binary is identical to current binary (SHA256 match)",
+		eeu.logger.Info("New binary is identical to current binary (SHA256 match)",
 			zap.String("sha256", newHash[:16]+"..."))
-		eeu.logger.Info("terminal prompt: ✓ Binary unchanged - no update needed")
+		eeu.logger.Info("Binary unchanged - no update needed")
 		_ = os.Remove(eeu.transaction.TempBinaryPath)
 		eeu.skipTransactionStep("backup_binary", "Skipped backup because install was not required")
 		eeu.skipTransactionStep("install_binary", eeu.transaction.SkipReason)
 		return nil
 	}
 
-	eeu.logger.Info(" Binary has changed, proceeding with installation",
+	eeu.logger.Info("Binary has changed, proceeding with installation",
 		zap.String("old_sha256", currentHash[:16]+"..."),
 		zap.String("new_sha256", newHash[:16]+"..."))
 
@@ -823,7 +857,7 @@ func (eeu *EnhancedEosUpdater) executeUpdateTransaction() error {
 		return err
 	}
 
-	eeu.logger.Info(" Update transaction completed successfully")
+	eeu.logger.Info("Update transaction completed successfully")
 	return nil
 }
 
@@ -845,7 +879,7 @@ func (eeu *EnhancedEosUpdater) shouldBuildBinary() (bool, string) {
 	}
 
 	if binaryCommit == "" {
-		eeu.logger.Info(" Binary has no embedded commit (development build), rebuilding",
+		eeu.logger.Info("Binary has no embedded commit (development build), rebuilding",
 			zap.String("source_commit", truncateCommit(sourceCommit)))
 	} else {
 		eeu.logger.Info(" Binary commit differs from source, rebuilding",
@@ -1069,31 +1103,46 @@ func (eeu *EnhancedEosUpdater) installBinaryAtomic(sourcePath string) error {
 	}
 	eeu.logger.Debug("Disk space re-verification passed")
 
-	// NOTE: Update lock already acquired in executeUpdateTransaction()
-	// No need to acquire again here - lock is held for entire transaction
+	// NOTE: Update lock held by caller (UpdateWithRollback) for entire lifecycle.
 
 	if eeu.enhancedConfig.AtomicInstall {
-		// Atomic rename (same filesystem)
+		// Atomic rename (same filesystem).
+		// Stream the binary via io.Copy to avoid loading the entire binary into memory.
 		tempName := eeu.config.BinaryPath + ".new"
 
-		// Copy to temp location first
-		input, err := os.ReadFile(sourcePath)
+		srcFile, err := os.Open(sourcePath)
 		if err != nil {
-			return fmt.Errorf("failed to read new binary: %w", err)
+			return fmt.Errorf("failed to open new binary for install: %w", err)
 		}
 
-		if err := os.WriteFile(tempName, input, shared.ExecutablePerm); err != nil {
-			return fmt.Errorf("failed to write temp binary: %w", err)
+		dstFile, err := os.OpenFile(tempName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, shared.ExecutablePerm)
+		if err != nil {
+			srcFile.Close()
+			return fmt.Errorf("failed to create temp install target: %w", err)
 		}
 
-		// Atomic rename - this is the critical operation
-		// Lock ensures no other process is updating simultaneously
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			dstFile.Close()
+			srcFile.Close()
+			_ = os.Remove(tempName)
+			return fmt.Errorf("failed to copy binary to install target: %w", err)
+		}
+		srcFile.Close()
+
+		if err := dstFile.Sync(); err != nil {
+			dstFile.Close()
+			_ = os.Remove(tempName)
+			return fmt.Errorf("failed to sync binary to disk: %w", err)
+		}
+		dstFile.Close()
+
+		// Atomic rename - the critical operation.
 		if err := os.Rename(tempName, eeu.config.BinaryPath); err != nil {
-			_ = os.Remove(tempName) // Cleanup
+			_ = os.Remove(tempName)
 			return fmt.Errorf("atomic rename failed: %w", err)
 		}
 
-		eeu.logger.Info(" Binary installed atomically")
+		eeu.logger.Info("Binary installed atomically")
 	} else {
 		// Standard installation
 		if err := eeu.InstallBinary(sourcePath); err != nil {
@@ -1114,14 +1163,10 @@ type RollbackStep struct {
 	Error       error
 }
 
-// Rollback reverts all changes made during the update with all-or-nothing semantics
-// SECURITY CRITICAL: Ensures system never left in inconsistent state
+// Rollback reverts all changes made during the update with all-or-nothing semantics.
+// Acquires the update lock if not already held. Use rollbackUnlocked() when the
+// caller already holds the lock (e.g., from UpdateWithRollback).
 func (eeu *EnhancedEosUpdater) Rollback() error {
-	eeu.logger.Warn("Initiating atomic rollback procedure")
-
-	// P0 FIX (Adversarial #1): Acquire flock BEFORE rollback operations
-	// This prevents race condition where concurrent update could run during rollback
-	// Without this, two processes could fight over the binary during restore
 	updateLock, err := AcquireUpdateLock(eeu.rc, eeu.config.BinaryPath)
 	if err != nil {
 		eeu.logger.Error("Cannot acquire lock for rollback - another update may be in progress",
@@ -1132,8 +1177,13 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 			"If stuck, check: ps aux | grep eos", err)
 	}
 	defer updateLock.Release()
+	return eeu.rollbackUnlocked()
+}
 
-	eeu.logger.Debug("Rollback lock acquired - safe to proceed")
+// rollbackUnlocked performs rollback operations. Caller MUST hold the update lock.
+// SECURITY CRITICAL: Ensures system never left in inconsistent state.
+func (eeu *EnhancedEosUpdater) rollbackUnlocked() error {
+	eeu.logger.Warn("Initiating atomic rollback procedure")
 
 	// Define rollback steps in reverse order of operations
 	steps := []RollbackStep{
@@ -1150,7 +1200,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					if err := os.Remove(tempNewPath); err != nil {
 						return fmt.Errorf("failed to remove .new temp file: %w", err)
 					}
-					eeu.logger.Info("✓ Removed stale .new temp file")
+					eeu.logger.Info("Removed stale .new temp file")
 				}
 
 				// Also check for .restore temp file from previous rollback
@@ -1161,7 +1211,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					if err := os.Remove(tempRestorePath); err != nil {
 						return fmt.Errorf("failed to remove .restore temp file: %w", err)
 					}
-					eeu.logger.Info("✓ Removed stale .restore temp file")
+					eeu.logger.Info("Removed stale .restore temp file")
 				}
 
 				return nil
@@ -1218,7 +1268,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 						err, string(output), eeu.transaction.BackupBinaryPath)
 				}
 
-				eeu.logger.Info("✓ Binary restored from backup and verified executable")
+				eeu.logger.Info("Binary restored from backup and verified executable")
 				return nil
 			},
 		},
@@ -1283,7 +1333,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 					}
 				}
 
-				eeu.logger.Info("✓ Git repository reset to previous commit")
+				eeu.logger.Info("Git repository reset to previous commit")
 				return nil
 			},
 		},
@@ -1322,7 +1372,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 						err, eeu.config.SourceDir, eeu.config.SourceDir, eeu.transaction.GitStashRef)
 				}
 
-				eeu.logger.Info("✓ Uncommitted changes restored from stash")
+				eeu.logger.Info("Uncommitted changes restored from stash")
 				return nil
 			},
 		},
@@ -1436,7 +1486,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 		}
 	}
 
-	eeu.logger.Info("✓ Atomic rollback completed successfully",
+	eeu.logger.Info("Atomic rollback completed successfully",
 		zap.Int("steps_completed", successCount),
 		zap.Int("total_required", requiredCount))
 
@@ -1445,7 +1495,7 @@ func (eeu *EnhancedEosUpdater) Rollback() error {
 
 // PostUpdateCleanup performs cleanup after successful update
 func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
-	eeu.logger.Info(" Phase 3: EVALUATE - Post-update cleanup")
+	eeu.logger.Info("Phase 3: EVALUATE - Post-update cleanup")
 
 	// Cleanup temp binary if it still exists
 	if eeu.transaction.TempBinaryPath != "" {
@@ -1455,8 +1505,10 @@ func (eeu *EnhancedEosUpdater) PostUpdateCleanup() error {
 	// Cleanup old backups
 	eeu.CleanupOldBackups()
 
-	// Note: We no longer manually manage stash - git pull --autostash handles it automatically
-	// This prevents orphaned stashes and merge conflicts
+	// Stash lifecycle: PullRepository creates a rollback stash when TrackRollbackStash
+	// is set. The stash ref is stored in the transaction for rollback recovery.
+	// On success, stash is restored during post-update cleanup if no code changed,
+	// or left tracked for potential rollback if code did change.
 
 	for _, step := range eeu.transaction.Steps {
 		eeu.logger.Debug("Transaction step summary",
