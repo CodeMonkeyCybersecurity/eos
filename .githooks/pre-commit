@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "Running chat archive validation"
+npm run ci

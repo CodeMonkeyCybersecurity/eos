@@ -35,6 +35,16 @@ func TestReadManifest_InvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "parse manifest")
 }
 
+func TestReadManifest_ReadError(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	m, err := ReadManifest(dir)
+	assert.Error(t, err)
+	assert.Nil(t, m)
+	assert.Contains(t, err.Error(), "read manifest")
+}
+
 func TestWriteAndReadManifest_RoundTrip(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -158,7 +168,18 @@ func TestWriteManifest_InvalidPath(t *testing.T) {
 	m := &Manifest{GeneratedAt: "2026-01-01T00:00:00Z"}
 	err := WriteManifest("/nonexistent/dir/manifest.json", m)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "write manifest")
+	assert.Contains(t, err.Error(), "manifest")
+}
+
+func TestWriteManifest_ReplaceFailure(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	m := &Manifest{GeneratedAt: "2026-01-01T00:00:00Z"}
+
+	err := WriteManifest(dir, m)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "replace manifest")
 }
 
 func TestMergeEntries_UpdatesTimestamp(t *testing.T) {
@@ -171,4 +192,26 @@ func TestMergeEntries_UpdatesTimestamp(t *testing.T) {
 	merged := MergeEntries(existing, []Entry{})
 	assert.NotEqual(t, "2025-01-01T00:00:00Z", merged.GeneratedAt,
 		"should update GeneratedAt timestamp")
+}
+
+func TestRecoverManifest(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "manifest.json")
+	require.NoError(t, os.WriteFile(path, []byte("{bad json"), 0644))
+
+	recovered, err := RecoverManifest(path)
+	require.NoError(t, err)
+	assert.FileExists(t, recovered)
+	_, statErr := os.Stat(path)
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestRecoverManifest_MissingFile(t *testing.T) {
+	t.Parallel()
+
+	recovered, err := RecoverManifest(filepath.Join(t.TempDir(), "missing.json"))
+	assert.Error(t, err)
+	assert.Empty(t, recovered)
 }

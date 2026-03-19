@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
@@ -62,7 +63,7 @@ func TestArchive_Integration_FullFlow(t *testing.T) {
 
 	var manifest Manifest
 	require.NoError(t, json.Unmarshal(data, &manifest))
-	assert.Len(t, manifest.Entries, 4, "manifest should have 4 entries (3 unique + 1 dup)")
+	assert.Len(t, manifest.Entries, 4, "manifest should include unique and duplicate rows from the initial run")
 }
 
 func TestArchive_Integration_Idempotent(t *testing.T) {
@@ -93,7 +94,8 @@ func TestArchive_Integration_Idempotent(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 0, result2.UniqueFiles, "second run should copy 0 new files")
-	assert.Equal(t, 1, result2.Duplicates, "second run should detect 1 duplicate")
+	assert.Equal(t, 0, result2.Duplicates, "second run should not count manifest hits as in-run duplicates")
+	assert.Equal(t, 1, result2.Skipped, "second run should count existing manifest entries as skipped")
 
 	// Manifest should not grow unboundedly — MergeEntries skips
 	// entries whose hash already exists in the manifest.
@@ -134,14 +136,16 @@ func TestArchive_Integration_EmptySources(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 
 	destDir := filepath.Join(t.TempDir(), "archive")
+	missingSource := filepath.Join(t.TempDir(), "missing")
 
 	result, err := Archive(rc, Options{
-		Sources: []string{},
+		Sources: []string{missingSource},
 		Dest:    destDir,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.UniqueFiles)
 	assert.Equal(t, 0, result.Duplicates)
+	assert.Equal(t, 0, result.Skipped)
 }
 
 func TestArchive_Integration_CopyError(t *testing.T) {
@@ -149,24 +153,19 @@ func TestArchive_Integration_CopyError(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 
 	srcDir := t.TempDir()
-	// Create dest dir as a file (not directory) to force copy error
 	destDir := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.MkdirAll(destDir, 0755))
+	require.NoError(t, os.WriteFile(destDir, []byte("not-a-directory"), 0644))
 
 	sessionsDir := filepath.Join(srcDir, "sessions")
 	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
 	chatFile := filepath.Join(sessionsDir, "chat.jsonl")
 	require.NoError(t, os.WriteFile(chatFile, []byte(`{"role":"user"}`), 0644))
 
-	// Make dest dir read-only so file creation fails
-	require.NoError(t, os.Chmod(destDir, 0555))
-	defer func() { _ = os.Chmod(destDir, 0755) }() // restore for cleanup
-
 	_, err := Archive(rc, Options{
 		Sources: []string{srcDir},
 		Dest:    destDir,
 	})
-	assert.Error(t, err, "should fail when dest dir is read-only")
+	assert.Error(t, err, "should fail when destination path is not a directory")
 }
 
 func TestArchive_Integration_SkipsEmptyFiles(t *testing.T) {
@@ -189,4 +188,70 @@ func TestArchive_Integration_SkipsEmptyFiles(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.UniqueFiles, "should only copy non-empty file")
+	assert.Equal(t, 1, result.EmptyFiles, "should report empty candidate files")
+}
+
+func TestArchive_Integration_RecoversCorruptManifest(t *testing.T) {
+	t.Parallel()
+	rc := testutil.TestRuntimeContext(t)
+
+	srcDir := t.TempDir()
+	destDir := filepath.Join(t.TempDir(), "archive")
+
+	sessionsDir := filepath.Join(srcDir, "sessions")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(sessionsDir, "chat.jsonl"),
+		[]byte(`{"role":"user","content":"recover"}`), 0644))
+
+	require.NoError(t, os.MkdirAll(destDir, 0755))
+	require.NoError(t, os.WriteFile(ManifestPath(destDir), []byte("{not json"), 0644))
+
+	result, err := Archive(rc, Options{
+		Sources: []string{srcDir},
+		Dest:    destDir,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.UniqueFiles)
+	assert.NotEmpty(t, result.RecoveredManifestPath)
+	assert.FileExists(t, result.RecoveredManifestPath)
+
+	manifest, readErr := ReadManifest(ManifestPath(destDir))
+	require.NoError(t, readErr)
+	require.NotNil(t, manifest)
+	assert.Len(t, manifest.Entries, 1)
+}
+
+func TestArchive_Integration_ContinuesAfterSourceFailure(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based unreadable file test is not reliable on Windows")
+	}
+
+	rc := testutil.TestRuntimeContext(t)
+
+	srcDir := t.TempDir()
+	destDir := filepath.Join(t.TempDir(), "archive")
+
+	sessionsDir := filepath.Join(srcDir, "sessions")
+	require.NoError(t, os.MkdirAll(sessionsDir, 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(sessionsDir, "good-chat.jsonl"),
+		[]byte(`{"role":"user","content":"good"}`), 0644))
+	badPath := filepath.Join(sessionsDir, "bad-chat.jsonl")
+	require.NoError(t, os.WriteFile(
+		badPath,
+		[]byte(`{"role":"user","content":"bad"}`), 0644))
+	require.NoError(t, os.Chmod(badPath, 0000))
+	defer func() { _ = os.Chmod(badPath, 0644) }()
+
+	result, err := Archive(rc, Options{
+		Sources: []string{srcDir},
+		Dest:    destDir,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.UniqueFiles)
+	assert.Equal(t, 1, result.FailureCount)
+	assert.Len(t, result.Failures, 1)
+	assert.Equal(t, "hash", result.Failures[0].Stage)
 }

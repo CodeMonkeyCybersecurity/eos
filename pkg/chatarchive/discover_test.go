@@ -195,6 +195,61 @@ func TestDiscoverTranscriptFiles_NonexistentRoot(t *testing.T) {
 	assert.Empty(t, files)
 }
 
+func TestDiscoverTranscriptFiles_FileRootIsSkipped(t *testing.T) {
+	t.Parallel()
+	rc := testutil.TestRuntimeContext(t)
+
+	rootFile := filepath.Join(t.TempDir(), "root.jsonl")
+	require.NoError(t, os.WriteFile(rootFile, []byte(`{"role":"user"}`), 0644))
+
+	files, err := DiscoverTranscriptFiles(rc, []string{rootFile}, filepath.Join(t.TempDir(), "archive"))
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+func TestDiscoverTranscriptFiles_SkipsSymlinks(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation is environment-dependent on Windows")
+	}
+
+	rc := testutil.TestRuntimeContext(t)
+
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "sessions")
+	require.NoError(t, os.MkdirAll(targetDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(targetDir, "chat.jsonl"), []byte(`{"role":"user"}`), 0644))
+
+	symlinkPath := filepath.Join(dir, "sessions-link")
+	require.NoError(t, os.Symlink(targetDir, symlinkPath))
+
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"))
+	require.NoError(t, err)
+
+	for _, file := range files {
+		assert.NotContains(t, file, symlinkPath)
+	}
+}
+
+func TestDiscoverTranscriptFiles_SkipsUnreadableSubdir(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based unreadable directory test is not reliable on Windows")
+	}
+
+	rc := testutil.TestRuntimeContext(t)
+	dir := t.TempDir()
+	unreadableDir := filepath.Join(dir, "private")
+	require.NoError(t, os.MkdirAll(unreadableDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(unreadableDir, "chat.jsonl"), []byte(`{"role":"user"}`), 0644))
+	require.NoError(t, os.Chmod(unreadableDir, 0000))
+	defer func() { _ = os.Chmod(unreadableDir, 0755) }()
+
+	files, err := DiscoverTranscriptFiles(rc, []string{dir}, filepath.Join(dir, "archive"))
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
 func TestDiscoverTranscriptFiles_EmptyRoots(t *testing.T) {
 	t.Parallel()
 	rc := testutil.TestRuntimeContext(t)

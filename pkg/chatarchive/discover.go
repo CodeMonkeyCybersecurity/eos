@@ -41,6 +41,8 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 	logger := otelzap.Ctx(rc.Ctx)
 	var out []string
 	seen := make(map[string]struct{})
+	skippedSymlinks := 0
+	unreadableEntries := 0
 
 	// Normalise dest for cross-platform comparison
 	destNorm := normalise(filepath.Clean(dest))
@@ -48,7 +50,7 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 	for _, root := range roots {
 		info, err := os.Stat(root)
 		if err != nil || !info.IsDir() {
-			logger.Debug("Skipping source directory",
+			logger.Warn("Skipping source directory",
 				zap.String("root", root),
 				zap.Error(err))
 			continue
@@ -56,11 +58,23 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 
 		err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
+				unreadableEntries++
+				logger.Debug("Skipping unreadable path",
+					zap.String("path", path),
+					zap.Error(err))
 				return nil // skip unreadable entries
 			}
 
 			cleanPath := filepath.Clean(path)
 			normPath := normalise(cleanPath)
+
+			if d.Type()&os.ModeSymlink != 0 {
+				skippedSymlinks++
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
 
 			// Skip destination directory
 			if normPath == destNorm || strings.HasPrefix(normPath, destNorm+"/") {
@@ -99,7 +113,9 @@ func DiscoverTranscriptFiles(rc *eos_io.RuntimeContext, roots []string, dest str
 	sort.Strings(out)
 	logger.Info("Transcript discovery complete",
 		zap.Int("files_found", len(out)),
-		zap.Int("roots_scanned", len(roots)))
+		zap.Int("roots_scanned", len(roots)),
+		zap.Int("skipped_symlinks", skippedSymlinks),
+		zap.Int("unreadable_entries", unreadableEntries))
 	return out, nil
 }
 
