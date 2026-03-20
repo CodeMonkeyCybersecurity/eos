@@ -3,6 +3,7 @@
 package chatarchive
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -274,7 +275,7 @@ func isJSONTranscript(path string) bool {
 
 	buf := make([]byte, jsonValidationBufSize)
 	n, err := f.Read(buf)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return false
 	}
 	h := strings.ToLower(string(buf[:n]))

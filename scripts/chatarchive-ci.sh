@@ -39,6 +39,17 @@ go test ./internal/chatarchivecmd/... ./cmd/create ./cmd/backup
 echo "==> E2E smoke tests"
 go test -tags=e2e_smoke ./test/e2e/smoke -run 'TestSmoke_(ChatArchive|BackupChats)' -count=1
 
+check_threshold() {
+  local actual="$1" threshold="$2" label="$3"
+  if awk "BEGIN {exit !($actual < $threshold)}"; then
+    echo "FAIL: $label coverage ${actual}% is below the ${threshold}% floor." >&2
+    exit 1
+  fi
+}
+
+check_threshold "$UNIT_COVERAGE" 70.0 "Unit"
+check_threshold "$COMBINED_COVERAGE" 90.0 "Combined"
+
 SUMMARY="Chat archive verification summary
 Unit coverage: ${UNIT_COVERAGE}%
 Combined unit+integration coverage: ${COMBINED_COVERAGE}%
@@ -63,14 +74,3 @@ cat > "$SUMMARY_JSON_FILE" <<EOF
   }
 }
 EOF
-
-check_threshold() {
-  local actual="$1" threshold="$2" label="$3"
-  if awk "BEGIN {exit !($actual < $threshold)}"; then
-    echo "FAIL: $label coverage ${actual}% is below the ${threshold}% floor." >&2
-    exit 1
-  fi
-}
-
-check_threshold "$UNIT_COVERAGE" 70.0 "Unit"
-check_threshold "$COMBINED_COVERAGE" 90.0 "Combined"
