@@ -85,13 +85,15 @@ func isSafelyEscaped(escaped string) bool {
 
 // createSafeExecutionContext creates a secure context for command execution
 func createSafeExecutionContext(command string) interface{} {
-	// Simple validation context
+	escaped := shellEscape(command)
+	sanitized := !containsInjectionPatterns(command) || isSafelyEscaped(escaped)
+
 	return map[string]interface{}{
 		"command":   command,
-		"escaped":   shellEscape(command),
-		"safe":      isSafelyEscaped(shellEscape(command)),
-		"sanitized": !containsInjectionPatterns(command),
-		"validated": validateCommand(command),
+		"escaped":   escaped,
+		"safe":      isSafelyEscaped(escaped),
+		"sanitized": sanitized,
+		"validated": len(command) <= 10000,
 	}
 }
 

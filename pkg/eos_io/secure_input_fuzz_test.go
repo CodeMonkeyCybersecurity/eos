@@ -306,8 +306,21 @@ func parseYesNoInputTest(input string) (bool, bool) {
 }
 
 func normalizeYesNoInput(input string) string {
-	// TODO: Implement yes/no input normalization
-	return strings.TrimSpace(strings.ToLower(input))
+	normalized := strings.ToLower(strings.TrimSpace(input))
+	normalized = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		default:
+			return -1
+		}
+	}, normalized)
+	if len(normalized) > 10 {
+		return normalized[:10]
+	}
+	return normalized
 }
 
 func validateEmailInput(input string) error {

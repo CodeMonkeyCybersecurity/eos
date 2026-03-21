@@ -161,7 +161,7 @@ PY
         run: scripts/ci/preflight.sh
 
       - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.0
+        run: bash scripts/ci/install-golangci-lint.sh
 
       - name: Run lint lane
         env:
@@ -245,6 +245,10 @@ PY
         run: |
           test -f outputs/ci/unit/report.json && cat outputs/ci/unit/report.json || true
 
+      - name: Alert on unit lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-unit outputs/ci/unit/report.json
+
   ci-deps-unit:
     name: ci-deps-unit
     runs-on: ubuntu-latest
@@ -295,6 +299,10 @@ PY
         run: |
           test -f outputs/ci/deps-unit/report.json && cat outputs/ci/deps-unit/report.json || true
 
+      - name: Alert on dependency-focused unit lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-deps-unit outputs/ci/deps-unit/report.json
+
   ci-integration:
     name: ci-integration
     runs-on: ubuntu-latest
@@ -344,6 +352,10 @@ PY
         run: |
           test -f outputs/ci/integration/report.json && cat outputs/ci/integration/report.json || true
 
+      - name: Alert on integration lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-integration outputs/ci/integration/report.json
+
   ci-e2e-smoke:
     name: ci-e2e-smoke
     runs-on: ubuntu-latest
@@ -390,6 +402,10 @@ PY
         if: always()
         run: |
           test -f outputs/ci/e2e-smoke/report.json && cat outputs/ci/e2e-smoke/report.json || true
+
+      - name: Alert on e2e smoke lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-e2e-smoke outputs/ci/e2e-smoke/report.json
 
   ci-fuzz:
     name: ci-fuzz
@@ -438,6 +454,10 @@ PY
         run: |
           test -f outputs/ci/fuzz/report.json && cat outputs/ci/fuzz/report.json || true
 
+      - name: Alert on fuzz lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-fuzz outputs/ci/fuzz/report.json
+
   ci-e2e-full:
     name: ci-e2e-full
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -485,3 +505,7 @@ PY
         if: always()
         run: |
           test -f outputs/ci/e2e-full/report.json && cat outputs/ci/e2e-full/report.json || true
+
+      - name: Alert on e2e full lane report
+        if: always()
+        run: python3 scripts/ci/report-alert.py ci-e2e-full outputs/ci/e2e-full/report.json

@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 // Integration tests for Eos CLI - End-to-end workflow testing
 package test
 

@@ -12,7 +12,7 @@ import (
 // DiscoverHetzner gathers Hetzner Cloud infrastructure information
 func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Info("☁️ Starting Hetzner Cloud discovery")
+	logger.Info("Starting Hetzner Cloud discovery")
 
 	// Check if hcloud CLI is installed
 	if !i.commandExists("hcloud") {
@@ -55,7 +55,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("Failed to discover Hetzner load balancers", zap.Error(err))
 	} else {
 		info.LoadBalancers = lbs
-		logger.Info("⚖️ Discovered Hetzner load balancers", zap.Int("count", len(lbs)))
+		logger.Info("Discovered Hetzner load balancers", zap.Int("count", len(lbs)))
 	}
 
 	// Discover volumes

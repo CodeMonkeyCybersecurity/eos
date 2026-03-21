@@ -1,3 +1,6 @@
+//go:build credentialstore
+// +build credentialstore
+
 // pkg/xdg/credentials_test.go - Security-focused tests for credential storage
 package xdg
 

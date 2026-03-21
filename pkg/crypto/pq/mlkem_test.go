@@ -36,7 +36,7 @@ func TestGenerateMLKEMKeypair(t *testing.T) {
 
 		// Verify key sizes
 		assert.Equal(t, 1184, len(keypair.PublicKey), "Public key should be 1184 bytes")
-		assert.Equal(t, 2400, len(keypair.PrivateKey), "Private key should be 2400 bytes")
+		assert.Equal(t, 64, len(keypair.PrivateKey), "Private key should be 64 bytes")
 
 		// Verify metadata
 		assert.Equal(t, "ML-KEM-768", keypair.Algorithm)
@@ -45,7 +45,7 @@ func TestGenerateMLKEMKeypair(t *testing.T) {
 
 		// Keys should not be zero
 		assert.NotEqual(t, make([]byte, 1184), keypair.PublicKey)
-		assert.NotEqual(t, make([]byte, 2400), keypair.PrivateKey)
+		assert.NotEqual(t, make([]byte, 64), keypair.PrivateKey)
 	})
 
 	t.Run("multiple_generations_unique", func(t *testing.T) {
@@ -176,17 +176,19 @@ func TestDecapsulateSecret(t *testing.T) {
 	rc := createTestContext(t)
 
 	t.Run("api_limitation_acknowledged", func(t *testing.T) {
-		// Test acknowledges current API limitation
-		privateKey := make([]byte, 2400)
-		ciphertext := make([]byte, 1088)
+		keypair, err := GenerateMLKEMKeypair(rc)
+		require.NoError(t, err)
 
-		_, err := DecapsulateSecret(rc, privateKey, ciphertext)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "not yet implemented")
+		encapsulated, err := EncapsulateSecret(rc, keypair.PublicKey)
+		require.NoError(t, err)
+
+		sharedSecret, err := DecapsulateSecret(rc, keypair.PrivateKey, encapsulated.Ciphertext)
+		require.NoError(t, err)
+		assert.Equal(t, encapsulated.SharedSecret, sharedSecret)
 	})
 
 	t.Run("validates_private_key_size", func(t *testing.T) {
-		invalidSizes := []int{0, 2399, 2401, 1184}
+		invalidSizes := []int{0, 63, 65, 1184}
 
 		for _, size := range invalidSizes {
 			privateKey := make([]byte, size)
@@ -258,7 +260,7 @@ func TestValidateMLKEMPrivateKey(t *testing.T) {
 	})
 
 	t.Run("invalid_sizes", func(t *testing.T) {
-		invalidSizes := []int{0, 2399, 2401, 1184, 100, 10000}
+		invalidSizes := []int{0, 63, 65, 1184, 100, 10000}
 
 		for _, size := range invalidSizes {
 			key := make([]byte, size)
@@ -288,7 +290,7 @@ func TestGenerateHybridKeypair(t *testing.T) {
 
 			// Verify post-quantum component
 			assert.Equal(t, 1184, len(hybrid.PostQuantum.PublicKey))
-			assert.Equal(t, 2400, len(hybrid.PostQuantum.PrivateKey))
+			assert.Equal(t, 64, len(hybrid.PostQuantum.PrivateKey))
 
 			// Classical component is TODO
 			assert.Nil(t, hybrid.Classical)
@@ -305,11 +307,11 @@ func TestGetMLKEMInfo(t *testing.T) {
 	assert.Equal(t, "NIST FIPS 203", info["standard"])
 	assert.Equal(t, 128, info["security_level"])
 	assert.Equal(t, 1184, info["public_key_size"])
-	assert.Equal(t, 2400, info["private_key_size"])
+	assert.Equal(t, 64, info["private_key_size"])
 	assert.Equal(t, 1088, info["ciphertext_size"])
 	assert.Equal(t, 32, info["shared_secret_size"])
 	assert.Equal(t, true, info["quantum_resistant"])
-	assert.Equal(t, "crypto/mlkem768", info["library"])
+	assert.Equal(t, "filippo.io/mlkem768", info["library"])
 	assert.Equal(t, "1.24", info["go_version_min"])
 }
 

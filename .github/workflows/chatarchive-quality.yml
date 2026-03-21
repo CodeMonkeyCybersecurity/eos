@@ -1,0 +1,78 @@
+name: Chat Archive Quality
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/chatarchive/**'
+      - 'internal/chatarchivecmd/**'
+      - 'cmd/create/chat_archive.go'
+      - 'cmd/backup/chats.go'
+      - 'test/e2e/**'
+      - 'scripts/chatarchive-ci.sh'
+      - 'package.json'
+      - '.github/hooks/pre-commit'
+      - '.github/hooks/setup-hooks.sh'
+      - 'scripts/install-git-hooks.sh'
+      - '.github/workflows/chatarchive-quality.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'pkg/chatarchive/**'
+      - 'internal/chatarchivecmd/**'
+      - 'cmd/create/chat_archive.go'
+      - 'cmd/backup/chats.go'
+      - 'test/e2e/**'
+      - 'scripts/chatarchive-ci.sh'
+      - 'package.json'
+      - '.github/hooks/pre-commit'
+      - '.github/hooks/setup-hooks.sh'
+      - 'scripts/install-git-hooks.sh'
+      - '.github/workflows/chatarchive-quality.yml'
+
+jobs:
+  chatarchive-ci:
+    name: Chat Archive CI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download Go modules
+        run: go mod download
+        shell: bash
+
+      - name: Run chat archive CI
+        run: npm run ci
+        shell: bash
+
+      - name: Upload verification summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatarchive-summary-${{ matrix.os }}
+          path: outputs/chatarchive-ci/
+
+      - name: Publish job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f outputs/chatarchive-ci/summary.txt ]]; then
+            cat outputs/chatarchive-ci/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi

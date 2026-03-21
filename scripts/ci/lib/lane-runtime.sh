@@ -143,19 +143,34 @@ lane_finish() {
     done <<< "${CI_LANE_EXTRA_REPORT_FIELDS}"
   fi
 
-  report_json="$(ci_json_obj \
-    ts               "$(ci_now_utc)" \
-    run_id           "${CI_LANE_RUN_ID}" \
-    lane             "${CI_LANE_NAME}" \
-    status           "${status}" \
-    exit_code        "#int:${exit_code}" \
-    stage            "${CI_LANE_FAILED_STAGE}" \
-    line             "#int:${CI_LANE_FAILED_LINE}" \
-    failed_command   "${CI_LANE_FAILED_COMMAND}" \
-    duration_seconds "#int:${duration}" \
-    steps_executed   "#int:${CI_LANE_STEP_SEQ}" \
-    message          "${message}" \
-    "${extra_args[@]}")"
+  if ((${#extra_args[@]} > 0)); then
+    report_json="$(ci_json_obj \
+      ts               "$(ci_now_utc)" \
+      run_id           "${CI_LANE_RUN_ID}" \
+      lane             "${CI_LANE_NAME}" \
+      status           "${status}" \
+      exit_code        "#int:${exit_code}" \
+      stage            "${CI_LANE_FAILED_STAGE}" \
+      line             "#int:${CI_LANE_FAILED_LINE}" \
+      failed_command   "${CI_LANE_FAILED_COMMAND}" \
+      duration_seconds "#int:${duration}" \
+      steps_executed   "#int:${CI_LANE_STEP_SEQ}" \
+      message          "${message}" \
+      "${extra_args[@]}")"
+  else
+    report_json="$(ci_json_obj \
+      ts               "$(ci_now_utc)" \
+      run_id           "${CI_LANE_RUN_ID}" \
+      lane             "${CI_LANE_NAME}" \
+      status           "${status}" \
+      exit_code        "#int:${exit_code}" \
+      stage            "${CI_LANE_FAILED_STAGE}" \
+      line             "#int:${CI_LANE_FAILED_LINE}" \
+      failed_command   "${CI_LANE_FAILED_COMMAND}" \
+      duration_seconds "#int:${duration}" \
+      steps_executed   "#int:${CI_LANE_STEP_SEQ}" \
+      message          "${message}")"
+  fi
 
   printf '%s\n' "${report_json}" > "${CI_LANE_REPORT}"
 

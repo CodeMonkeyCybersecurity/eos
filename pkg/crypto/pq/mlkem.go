@@ -52,9 +52,12 @@ func GenerateMLKEMKeypair(rc *eos_io.RuntimeContext) (*MLKEMKeypair, error) {
 		return nil, fmt.Errorf("ML-KEM keypair generation failed: %w", err)
 	}
 
+	privateKey := decapsulationKey.Bytes()
+	publicKey := decapsulationKey.EncapsulationKey()
+
 	keypair := &MLKEMKeypair{
-		PublicKey:     decapsulationKey.EncapsulationKey(),
-		PrivateKey:    decapsulationKey.Bytes(),
+		PublicKey:     publicKey,
+		PrivateKey:    privateKey,
 		GeneratedAt:   time.Now(),
 		Algorithm:     "ML-KEM-768",
 		SecurityLevel: 128, // Equivalent to AES-128
@@ -113,22 +116,32 @@ func DecapsulateSecret(rc *eos_io.RuntimeContext, privateKey, ciphertext []byte)
 
 	logger.Info(" Performing ML-KEM decapsulation")
 
-	// Validate private key size
-	if len(privateKey) != 2400 {
-		logger.Error(" Invalid ML-KEM private key size", zap.Int("expected", 2400), zap.Int("got", len(privateKey)))
-		return nil, fmt.Errorf("invalid private key size: expected 2400, got %d", len(privateKey))
+	// ML-KEM uses a 64-byte seed representation for private key storage.
+	if len(privateKey) != 64 {
+		logger.Error(" Invalid ML-KEM private key size", zap.Int("expected", 64), zap.Int("got", len(privateKey)))
+		return nil, fmt.Errorf("invalid private key size: expected 64, got %d", len(privateKey))
 	}
 
-	// Note: We can't easily reconstruct a DecapsulationKey from raw bytes
-	// with the current API. For a production implementation, we would need
-	// to store the key differently or use a different approach.
-	// For now, we'll demonstrate with a simpler approach:
+	if len(ciphertext) != 1088 {
+		logger.Error(" Invalid ML-KEM ciphertext size", zap.Int("expected", 1088), zap.Int("got", len(ciphertext)))
+		return nil, fmt.Errorf("invalid ciphertext size: expected 1088, got %d", len(ciphertext))
+	}
 
-	// This is a limitation of the current API demonstration
-	// In a real implementation, you would store the DecapsulationKey object
-	// or use the seed-based approach for key storage
-	logger.Error(" DecapsulationKey reconstruction from bytes not supported in current API")
-	return nil, fmt.Errorf("decapsulation from stored bytes not yet implemented - use in-memory keys only")
+	decapsulationKey, err := mlkem768.NewKeyFromSeed(privateKey)
+	if err != nil {
+		logger.Error(" Failed to reconstruct ML-KEM private key", zap.Error(err))
+		return nil, fmt.Errorf("failed to reconstruct decapsulation key: %w", err)
+	}
+
+	sharedSecret, err := mlkem768.Decapsulate(decapsulationKey, ciphertext)
+	if err != nil {
+		logger.Error(" ML-KEM decapsulation failed", zap.Error(err))
+		return nil, fmt.Errorf("decapsulation failed: %w", err)
+	}
+
+	logger.Info(" ML-KEM decapsulation completed",
+		zap.Int("shared_secret_size", len(sharedSecret)))
+	return sharedSecret, nil
 }
 
 // ValidateMLKEMPublicKey validates that a byte slice represents a valid ML-KEM public key
@@ -159,19 +172,19 @@ func ValidateMLKEMPublicKey(rc *eos_io.RuntimeContext, publicKey []byte) error {
 func ValidateMLKEMPrivateKey(rc *eos_io.RuntimeContext, privateKey []byte) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// ML-KEM-768 private key should be exactly 2400 bytes
-	if len(privateKey) != 2400 {
+	// ML-KEM-768 private key storage uses a 64-byte seed.
+	if len(privateKey) != 64 {
 		logger.Error(" Invalid ML-KEM private key size",
-			zap.Int("expected_size", 2400),
+			zap.Int("expected_size", 64),
 			zap.Int("actual_size", len(privateKey)),
 		)
-		return fmt.Errorf("invalid ML-KEM-768 private key size: expected 2400 bytes, got %d", len(privateKey))
+		return fmt.Errorf("invalid ML-KEM-768 private key size: expected 64 bytes, got %d", len(privateKey))
 	}
 
-	// Note: With the current API, we can only validate the size
-	// Full validation would require reconstructing the DecapsulationKey
-	// which isn't easily possible from raw bytes with this API
-	logger.Info(" ML-KEM private key size validation only (API limitation)")
+	if _, err := mlkem768.NewKeyFromSeed(privateKey); err != nil {
+		logger.Error(" ML-KEM private key validation failed", zap.Error(err))
+		return fmt.Errorf("invalid ML-KEM private key: %w", err)
+	}
 
 	logger.Info(" ML-KEM private key validation passed")
 	return nil
@@ -216,11 +229,11 @@ func GetMLKEMInfo() map[string]interface{} {
 		"standard":           "NIST FIPS 203",
 		"security_level":     128,
 		"public_key_size":    1184,
-		"private_key_size":   2400,
+		"private_key_size":   64,
 		"ciphertext_size":    1088,
 		"shared_secret_size": 32,
 		"quantum_resistant":  true,
-		"library":            "crypto/mlkem768",
+		"library":            "filippo.io/mlkem768",
 		"go_version_min":     "1.24",
 	}
 }
