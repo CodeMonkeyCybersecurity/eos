@@ -213,8 +213,21 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 	}
 }
 
+// vaultBootstrapSkipSuffixes lists command path suffixes that do NOT need
+// Vault environment setup. These commands operate on local restic repos or
+// perform read-only listing; Vault latency and failure would slow or block them.
+var vaultBootstrapSkipSuffixes = []string{
+	"backup chats",
+}
+
 func shouldSkipVaultBootstrap(cmd *cobra.Command) bool {
-	return strings.TrimSpace(cmd.CommandPath()) == "backup chats"
+	path := strings.TrimSpace(cmd.CommandPath())
+	for _, suffix := range vaultBootstrapSkipSuffixes {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // WrapDebug is DEPRECATED: Use eos_cli.Wrap() and cmd/debug.saveDebugOutput() instead.

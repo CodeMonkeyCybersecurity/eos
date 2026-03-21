@@ -79,10 +79,8 @@ func DefaultToolRegistry() []ToolSource {
 					Path:        "~/.claude/config.json",
 					Description: "CLI configuration (model preferences, features)",
 				},
-				{
-					Path:        "~/.claude/.credentials.json",
-					Description: "Claude Code credentials metadata",
-				},
+				// NOTE: ~/.claude/.credentials.json is intentionally excluded
+				// (listed in DefaultExcludes) — it contains auth secrets.
 				{
 					Path:        "~/.claude/history.jsonl",
 					Description: "Command history across sessions",
@@ -282,10 +280,8 @@ func DefaultToolRegistry() []ToolSource {
 					Path:        "~/.gemini/google_accounts.json",
 					Description: "Google account association metadata",
 				},
-				{
-					Path:        "~/.gemini/oauth_creds.json",
-					Description: "Gemini CLI OAuth credentials",
-				},
+				// NOTE: ~/.gemini/oauth_creds.json is intentionally excluded
+				// (listed in DefaultExcludes) — it contains OAuth secrets.
 			},
 		},
 		// ─── ChatGPT Desktop (Third-Party) ────────────────────────
