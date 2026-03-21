@@ -5,7 +5,9 @@ package inspect
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +24,10 @@ const (
 	// RATIONALE: Prevents OOM from accidentally discovered multi-GB files.
 	// SECURITY: Mitigates DoS via malicious symlinks to large files.
 	MaxComposeFileSize = 10 * 1024 * 1024
+
+	// ComposeSearchMaxDepth limits how deep filepath.WalkDir recurses.
+	// RATIONALE: Prevents traversal of deeply nested directories (e.g. node_modules).
+	ComposeSearchMaxDepth = 5
 
 	// ContainerStateRunning is the canonical "running" state string.
 	ContainerStateRunning = "running"
@@ -62,6 +68,15 @@ var sensitiveEnvKeywords = []string{
 	"private",
 }
 
+// composeFileNameSet is a pre-computed lookup set for O(1) compose file matching.
+var composeFileNameSet = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(ComposeFileNames))
+	for _, name := range ComposeFileNames {
+		m[name] = struct{}{}
+	}
+	return m
+}()
+
 // DiscoverDocker gathers Docker infrastructure information.
 func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
@@ -95,7 +110,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Info("Discovered images", zap.Int("count", len(images)))
 	}
 
-	// Discover networks
+	// Discover networks (batched inspect for performance)
 	if networks, err := i.discoverNetworks(); err != nil {
 		logger.Warn("Failed to discover networks", zap.Error(err))
 	} else {
@@ -103,7 +118,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Info("Discovered networks", zap.Int("count", len(networks)))
 	}
 
-	// Discover volumes
+	// Discover volumes (batched inspect for performance)
 	if volumes, err := i.discoverVolumes(); err != nil {
 		logger.Warn("Failed to discover volumes", zap.Error(err))
 	} else {
@@ -111,7 +126,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Info("Discovered volumes", zap.Int("count", len(volumes)))
 	}
 
-	// Discover compose files
+	// Discover compose files (uses filepath.WalkDir, no shell dependency)
 	if composeFiles, err := i.discoverComposeFiles(); err != nil {
 		logger.Warn("Failed to discover compose files", zap.Error(err))
 	} else {
@@ -124,7 +139,6 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 }
 
 // containerInspectData is the struct for unmarshalling docker inspect JSON output.
-// Extracted as a package-level type for testability and reuse.
 type containerInspectData struct {
 	ID      string `json:"Id"`
 	Name    string `json:"Name"`
@@ -159,37 +173,31 @@ type containerInspectData struct {
 }
 
 // discoverContainers discovers all Docker containers using batched inspect.
-// This runs exactly 2 commands (ps + inspect) instead of N+1.
+// Runs exactly 2 commands (ps + inspect) instead of N+1.
 func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
 
-	// Get all container IDs in a single call
-	output, err := i.runCommand("docker", "ps", "-aq")
+	output, err := i.runCommand("docker", "ps", "-aq", "--no-trunc")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list container IDs: %w", err)
 	}
-
 	if output == "" {
 		return nil, nil
 	}
 
-	// Collect IDs, filtering empties
-	var ids []string
-	for _, id := range strings.Split(output, "\n") {
-		if trimmed := strings.TrimSpace(id); trimmed != "" {
-			ids = append(ids, trimmed)
-		}
-	}
-
+	ids := splitNonEmpty(output)
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
 	// Batch inspect: "docker inspect id1 id2 id3 ..." in one exec
-	args := append([]string{"inspect"}, ids...)
+	args := make([]string, 0, 1+len(ids))
+	args = append(args, "inspect")
+	args = append(args, ids...)
+
 	inspectOutput, err := i.runCommand("docker", args...)
 	if err != nil {
-		logger.Warn("Failed to batch inspect containers, falling back to individual inspect",
+		logger.Warn("Batched container inspect failed, falling back to individual inspect",
 			zap.Int("container_count", len(ids)),
 			zap.Error(err))
 		return i.discoverContainersFallback(ids)
@@ -197,8 +205,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 
 	containers, parseErr := parseContainerInspectJSON(inspectOutput)
 	if parseErr != nil {
-		logger.Warn("Failed to parse batched container inspect data",
-			zap.Error(parseErr))
+		logger.Warn("Failed to parse batched container inspect data", zap.Error(parseErr))
 		return i.discoverContainersFallback(ids)
 	}
 
@@ -214,16 +221,13 @@ func (i *Inspector) discoverContainersFallback(ids []string) ([]DockerContainer,
 		inspectOutput, err := i.runCommand("docker", "inspect", id)
 		if err != nil {
 			logger.Warn("Failed to inspect container",
-				zap.String("id", id),
-				zap.Error(err))
+				zap.String("id", id), zap.Error(err))
 			continue
 		}
-
 		parsed, parseErr := parseContainerInspectJSON(inspectOutput)
 		if parseErr != nil {
 			logger.Warn("Failed to parse container inspect data",
-				zap.String("id", id),
-				zap.Error(parseErr))
+				zap.String("id", id), zap.Error(parseErr))
 			continue
 		}
 		containers = append(containers, parsed...)
@@ -233,7 +237,7 @@ func (i *Inspector) discoverContainersFallback(ids []string) ([]DockerContainer,
 }
 
 // parseContainerInspectJSON parses the JSON output from docker inspect into
-// DockerContainer structs. This is a pure function for testability.
+// DockerContainer structs. Pure function for testability.
 func parseContainerInspectJSON(jsonData string) ([]DockerContainer, error) {
 	var inspectData []containerInspectData
 	if err := json.Unmarshal([]byte(jsonData), &inspectData); err != nil {
@@ -257,26 +261,21 @@ func parseContainerInspectJSON(jsonData string) ([]DockerContainer, error) {
 			Restart: data.HostConfig.RestartPolicy.Name,
 		}
 
-		// Parse created time
 		if t, err := time.Parse(time.RFC3339Nano, data.Created); err == nil {
 			container.Created = t
 		}
 
-		// Parse environment variables with secret redaction
 		container.Environment = parseEnvVars(data.Config.Env)
 
-		// Parse command
 		if len(data.Config.Cmd) > 0 {
 			container.Command = strings.Join(data.Config.Cmd, " ")
 		}
 
-		// Parse networks (sorted for deterministic output)
 		for network := range data.NetworkSettings.Networks {
 			container.Networks = append(container.Networks, network)
 		}
 		sort.Strings(container.Networks)
 
-		// Parse ports (sorted for deterministic output)
 		for port, bindings := range data.NetworkSettings.Ports {
 			for _, binding := range bindings {
 				portStr := fmt.Sprintf("%s:%s->%s", binding.HostIP, binding.HostPort, port)
@@ -285,7 +284,6 @@ func parseContainerInspectJSON(jsonData string) ([]DockerContainer, error) {
 		}
 		sort.Strings(container.Ports)
 
-		// Parse volumes (sorted for deterministic output)
 		for _, mount := range data.Mounts {
 			volStr := fmt.Sprintf("%s:%s:%s", mount.Source, mount.Destination, mount.Mode)
 			container.Volumes = append(container.Volumes, volStr)
@@ -299,7 +297,7 @@ func parseContainerInspectJSON(jsonData string) ([]DockerContainer, error) {
 }
 
 // parseEnvVars converts a slice of KEY=VALUE strings to a map, redacting
-// sensitive values. This is a pure function for testability.
+// sensitive values. Pure function for testability.
 func parseEnvVars(envSlice []string) map[string]string {
 	result := make(map[string]string, len(envSlice))
 	for _, env := range envSlice {
@@ -352,16 +350,12 @@ func (i *Inspector) discoverImages() ([]DockerImage, error) {
 
 		if err := json.Unmarshal([]byte(line), &imageData); err != nil {
 			logger.Warn("Failed to parse image data",
-				zap.String("line", line),
-				zap.Error(err))
+				zap.String("line", line), zap.Error(err))
 			continue
 		}
 
-		image := DockerImage{
-			ID: imageData.ID,
-		}
+		image := DockerImage{ID: imageData.ID}
 
-		// Build repo tags
 		if imageData.Repository != "<none>" {
 			tag := imageData.Tag
 			if tag == "<none>" {
@@ -370,12 +364,10 @@ func (i *Inspector) discoverImages() ([]DockerImage, error) {
 			image.RepoTags = []string{fmt.Sprintf("%s:%s", imageData.Repository, tag)}
 		}
 
-		// Parse size (Docker uses SI/decimal units)
 		if sizeBytes, err := ParseDockerSize(imageData.Size); err == nil {
 			image.Size = sizeBytes
 		}
 
-		// Parse created time
 		if t, err := time.Parse("2006-01-02 15:04:05 -0700 MST", imageData.CreatedAt); err == nil {
 			image.Created = t
 		}
@@ -386,111 +378,105 @@ func (i *Inspector) discoverImages() ([]DockerImage, error) {
 	return images, nil
 }
 
-// discoverNetworks discovers Docker networks.
+// networkInspectData is the struct for unmarshalling docker network inspect JSON.
+type networkInspectData struct {
+	ID     string            `json:"Id"`
+	Name   string            `json:"Name"`
+	Driver string            `json:"Driver"`
+	Scope  string            `json:"Scope"`
+	Labels map[string]string `json:"Labels"`
+}
+
+// discoverNetworks discovers Docker networks using batched inspect.
+// Runs exactly 2 commands (ls + inspect) instead of N+1.
 func (i *Inspector) discoverNetworks() ([]DockerNetwork, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
 
-	output, err := i.runCommand("docker", "network", "ls", "--format", "{{json .}}")
+	output, err := i.runCommand("docker", "network", "ls", "--format", "{{.ID}}")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Docker networks: %w", err)
 	}
 
-	var networks []DockerNetwork
-	for _, line := range strings.Split(output, "\n") {
-		if line == "" {
-			continue
-		}
-
-		var netData struct {
-			ID     string `json:"ID"`
-			Name   string `json:"Name"`
-			Driver string `json:"Driver"`
-			Scope  string `json:"Scope"`
-		}
-
-		if err := json.Unmarshal([]byte(line), &netData); err != nil {
-			logger.Warn("Failed to parse network data",
-				zap.String("line", line),
-				zap.Error(err))
-			continue
-		}
-
-		network := DockerNetwork{
-			ID:     netData.ID,
-			Name:   netData.Name,
-			Driver: netData.Driver,
-			Scope:  netData.Scope,
-		}
-
-		// Get detailed network info for labels
-		inspectOutput, err := i.runCommand("docker", "network", "inspect", netData.ID, "--format", "{{json .Labels}}")
-		if err == nil && inspectOutput != "null" {
-			var labels map[string]string
-			if err := json.Unmarshal([]byte(inspectOutput), &labels); err == nil {
-				network.Labels = labels
-			}
-		}
-
-		networks = append(networks, network)
+	ids := splitNonEmpty(output)
+	if len(ids) == 0 {
+		return nil, nil
 	}
 
+	args := make([]string, 0, 2+len(ids))
+	args = append(args, "network", "inspect")
+	args = append(args, ids...)
+
+	inspectOutput, err := i.runCommand("docker", args...)
+	if err != nil {
+		logger.Warn("Batched network inspect failed", zap.Error(err))
+		return nil, fmt.Errorf("failed to inspect networks: %w", err)
+	}
+
+	var inspectData []networkInspectData
+	if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err != nil {
+		return nil, fmt.Errorf("failed to parse network inspect JSON: %w", err)
+	}
+
+	networks := make([]DockerNetwork, 0, len(inspectData))
+	for _, data := range inspectData {
+		networks = append(networks, DockerNetwork(data))
+	}
 	return networks, nil
 }
 
-// discoverVolumes discovers Docker volumes.
+// volumeInspectData is the struct for unmarshalling docker volume inspect JSON.
+type volumeInspectData struct {
+	Name       string            `json:"Name"`
+	Driver     string            `json:"Driver"`
+	Mountpoint string            `json:"Mountpoint"`
+	Labels     map[string]string `json:"Labels"`
+}
+
+// discoverVolumes discovers Docker volumes using batched inspect.
+// Runs exactly 2 commands (ls + inspect) instead of N+1.
 func (i *Inspector) discoverVolumes() ([]DockerVolume, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
 
-	output, err := i.runCommand("docker", "volume", "ls", "--format", "{{json .}}")
+	output, err := i.runCommand("docker", "volume", "ls", "--format", "{{.Name}}")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Docker volumes: %w", err)
 	}
 
-	var volumes []DockerVolume
-	for _, line := range strings.Split(output, "\n") {
-		if line == "" {
-			continue
-		}
-
-		var volData struct {
-			Name       string `json:"Name"`
-			Driver     string `json:"Driver"`
-			Mountpoint string `json:"Mountpoint"`
-		}
-
-		if err := json.Unmarshal([]byte(line), &volData); err != nil {
-			logger.Warn("Failed to parse volume data",
-				zap.String("line", line),
-				zap.Error(err))
-			continue
-		}
-
-		volume := DockerVolume{
-			Name:   volData.Name,
-			Driver: volData.Driver,
-		}
-
-		// Get detailed volume info
-		inspectOutput, err := i.runCommand("docker", "volume", "inspect", volData.Name)
-		if err == nil {
-			var inspectData []struct {
-				Mountpoint string            `json:"Mountpoint"`
-				Labels     map[string]string `json:"Labels"`
-			}
-			if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err == nil && len(inspectData) > 0 {
-				volume.MountPoint = inspectData[0].Mountpoint
-				volume.Labels = inspectData[0].Labels
-			}
-		}
-
-		volumes = append(volumes, volume)
+	names := splitNonEmpty(output)
+	if len(names) == 0 {
+		return nil, nil
 	}
 
+	args := make([]string, 0, 2+len(names))
+	args = append(args, "volume", "inspect")
+	args = append(args, names...)
+
+	inspectOutput, err := i.runCommand("docker", args...)
+	if err != nil {
+		logger.Warn("Batched volume inspect failed", zap.Error(err))
+		return nil, fmt.Errorf("failed to inspect volumes: %w", err)
+	}
+
+	var inspectData []volumeInspectData
+	if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err != nil {
+		return nil, fmt.Errorf("failed to parse volume inspect JSON: %w", err)
+	}
+
+	volumes := make([]DockerVolume, 0, len(inspectData))
+	for _, data := range inspectData {
+		volumes = append(volumes, DockerVolume{
+			Name:       data.Name,
+			Driver:     data.Driver,
+			MountPoint: data.Mountpoint,
+			Labels:     data.Labels,
+		})
+	}
 	return volumes, nil
 }
 
-// discoverComposeFiles finds docker compose files in standard locations.
-// Uses properly grouped find arguments and guards against oversized files.
+// discoverComposeFiles finds docker compose files using filepath.WalkDir.
+// This replaces the previous shell `find` approach for portability and testability.
+// Depth is limited to ComposeSearchMaxDepth to avoid traversing node_modules etc.
 //
 //nolint:unparam // error return maintains consistent interface with other discover* methods
 func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
@@ -498,45 +484,50 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 	var composeFiles []ComposeFile
 
 	for _, basePath := range ComposeSearchPaths {
-		// Check the search path exists before running find
 		if _, err := os.Stat(basePath); os.IsNotExist(err) {
 			continue
 		}
 
-		// Build find arguments with proper grouping:
-		//   find /path -type f \( -name "X" -o -name "Y" \)
-		// The -type f BEFORE the group ensures only files are matched.
-		// Shell redirection (2>/dev/null) is NOT passed as an argument.
-		args := []string{basePath, "-type", "f", "("}
-		for idx, name := range ComposeFileNames {
-			if idx > 0 {
-				args = append(args, "-o")
-			}
-			args = append(args, "-name", name)
-		}
-		args = append(args, ")")
+		baseDepth := strings.Count(filepath.Clean(basePath), string(os.PathSeparator))
 
-		output, err := i.runCommand("find", args...)
-		if err != nil {
-			logger.Debug("Compose file search failed for path",
-				zap.String("path", basePath),
-				zap.Error(err))
-			continue
-		}
-
-		for _, path := range strings.Split(output, "\n") {
-			if path == "" {
-				continue
-			}
-
-			cf, err := i.readComposeFile(path)
+		err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
+				// Permission denied or similar — skip this subtree
+				return filepath.SkipDir
+			}
+
+			// Enforce max depth
+			currentDepth := strings.Count(filepath.Clean(path), string(os.PathSeparator))
+			if d.IsDir() && (currentDepth-baseDepth) >= ComposeSearchMaxDepth {
+				return filepath.SkipDir
+			}
+
+			if d.IsDir() {
+				return nil
+			}
+
+			// Skip symlinks to avoid traversal into unexpected locations
+			if d.Type()&fs.ModeSymlink != 0 {
+				return nil
+			}
+
+			if _, ok := composeFileNameSet[d.Name()]; !ok {
+				return nil
+			}
+
+			cf, readErr := readComposeFile(path)
+			if readErr != nil {
 				logger.Warn("Failed to read compose file",
-					zap.String("path", path),
-					zap.Error(err))
-				continue
+					zap.String("path", path), zap.Error(readErr))
+				return nil
 			}
 			composeFiles = append(composeFiles, *cf)
+			return nil
+		})
+
+		if err != nil {
+			logger.Debug("Compose file search failed for path",
+				zap.String("path", basePath), zap.Error(err))
 		}
 	}
 
@@ -544,11 +535,15 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 }
 
 // readComposeFile reads and parses a single compose file with size guard.
-func (i *Inspector) readComposeFile(path string) (*ComposeFile, error) {
-	// Guard: check file size before reading to prevent OOM
-	info, err := os.Stat(path)
+// Pure function (no Inspector receiver) for testability.
+func readComposeFile(path string) (*ComposeFile, error) {
+	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat compose file %s: %w", path, err)
+	}
+	// Reject symlinks at read time as an additional safety measure
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return nil, fmt.Errorf("compose file %s is a symlink (rejected for security)", path)
 	}
 	if info.Size() > MaxComposeFileSize {
 		return nil, fmt.Errorf("compose file %s exceeds maximum size (%d bytes > %d bytes)",
@@ -560,9 +555,7 @@ func (i *Inspector) readComposeFile(path string) (*ComposeFile, error) {
 		return nil, fmt.Errorf("failed to read compose file %s: %w", path, err)
 	}
 
-	composeFile := &ComposeFile{
-		Path: path,
-	}
+	composeFile := &ComposeFile{Path: path}
 
 	var composeData map[string]any
 	if err := yaml.Unmarshal(content, &composeData); err != nil {
@@ -579,7 +572,7 @@ func (i *Inspector) readComposeFile(path string) (*ComposeFile, error) {
 // ParseDockerSize converts Docker's human-readable sizes to bytes.
 // Docker uses SI/decimal units (1 kB = 1000 B, 1 MB = 1000 kB, etc.)
 // per the Docker source: github.com/docker/go-units.
-// This is a pure function exported for testability.
+// Pure function exported for testability.
 func ParseDockerSize(size string) (int64, error) {
 	size = strings.TrimSpace(size)
 	if size == "" {
@@ -621,8 +614,7 @@ func ParseDockerSize(size string) (int64, error) {
 		}
 	}
 
-	// No recognised unit suffix — assume raw bytes, but require
-	// the entire string to be a valid number (reject trailing garbage).
+	// No recognised unit suffix — assume raw bytes
 	num, err := strconv.ParseFloat(size, 64)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse size %q: %w", size, err)
@@ -631,4 +623,16 @@ func ParseDockerSize(size string) (int64, error) {
 		return 0, fmt.Errorf("negative size not allowed: %q", size)
 	}
 	return int64(num), nil
+}
+
+// splitNonEmpty splits output by newlines and returns non-empty trimmed lines.
+// DRY helper used by container, network, and volume discovery.
+func splitNonEmpty(output string) []string {
+	var result []string
+	for _, line := range strings.Split(output, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
