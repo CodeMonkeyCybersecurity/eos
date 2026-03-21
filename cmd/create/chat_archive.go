@@ -23,8 +23,7 @@ Examples:
   eos create chat-archive
   eos create chat-archive --source ~/.claude --source ~/dev
   eos create chat-archive --exclude conversation-api --exclude .cache
-  eos create chat-archive --dry-run
-  eos backup chats  (alias)`,
+  eos create chat-archive --dry-run`,
 	RunE: eos.Wrap(runCreateChatArchive),
 }
 
