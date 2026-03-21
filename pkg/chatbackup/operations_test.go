@@ -645,7 +645,7 @@ func TestConfigureCron_RemovesExistingMarker(t *testing.T) {
 		BackupConfig: BackupConfig{User: "test user"},
 		BackupCron:   "0 * * * *",
 		PruneCron:    "5 3 * * *",
-	}, tmp)
+	})
 	require.NoError(t, err)
 
 	data, readErr := os.ReadFile(cronFile)
@@ -766,7 +766,7 @@ func TestSetup_InitRepoFailure(t *testing.T) {
 
 func TestConfigureCron_NoCrontabBinary(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	err := configureCron(newRuntimeContext(), ScheduleConfig{}, t.TempDir())
+	err := configureCron(newRuntimeContext(), ScheduleConfig{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "crontab not found")
 }

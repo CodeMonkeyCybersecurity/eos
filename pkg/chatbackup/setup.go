@@ -127,7 +127,7 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 		}
 	} else {
 		homeDir := users[0].HomeDir
-		if err := configureCron(rc, config, homeDir); err != nil {
+		if err := configureCron(rc, config); err != nil {
 			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("Failed to configure cron: %v", err))
 			logger.Warn("Cron configuration failed", zap.Error(err))
@@ -136,7 +136,7 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 		}
 
 		// INTERVENE: Fix ownership if running as root for another user.
-		if osGeteuid() == 0 && config.User != "" && config.User != "root" {
+		if osGeteuid() == 0 && config.User != "" && config.User != RootUsername {
 			eosDir := filepath.Join(homeDir, ".eos")
 			if err := chownToUser(eosDir, config.User); err != nil {
 				logger.Warn("Failed to change ownership of .eos directory",
@@ -231,7 +231,7 @@ func initRepo(rc *eos_io.RuntimeContext, repoPath, passwordFile string) error {
 }
 
 // configureCron sets up cron jobs for backup and prune.
-func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir string) error {
+func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if _, err := exec.LookPath("crontab"); err != nil {
@@ -241,8 +241,8 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 	// Get current crontab
 	var existingCron string
 	crontabCmd := exec.Command("crontab", "-l")
-	if config.User != "" && config.User != "root" && osGeteuid() == 0 {
-		crontabCmd = exec.Command("crontab", "-u", config.User, "-l")
+	if config.User != "" && config.User != RootUsername && osGeteuid() == 0 {
+		crontabCmd = exec.Command("crontab", "-u", config.User, "-l") //nolint:gosec // config.User is from validated internal config, not raw user input
 	}
 	if output, err := crontabCmd.Output(); err == nil {
 		existingCron = string(output)
@@ -250,7 +250,7 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 
 	// Remove existing chat-archive entries (idempotent reconfiguration)
 	lines := strings.Split(existingCron, "\n")
-	var cleanedLines []string
+	cleanedLines := make([]string, 0, len(lines))
 	for _, line := range lines {
 		if strings.Contains(line, CronMarker) {
 			continue
@@ -285,8 +285,8 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 
 	// Install crontab
 	installCmd := exec.Command("crontab", "-")
-	if config.User != "" && config.User != "root" && osGeteuid() == 0 {
-		installCmd = exec.Command("crontab", "-u", config.User, "-")
+	if config.User != "" && config.User != RootUsername && osGeteuid() == 0 {
+		installCmd = exec.Command("crontab", "-u", config.User, "-") //nolint:gosec // config.User is from validated internal config, not raw user input
 	}
 	installCmd.Stdin = strings.NewReader(newCron)
 
@@ -436,7 +436,7 @@ func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 	pruneCtx, cancel := context.WithTimeout(rc.Ctx, PruneTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(pruneCtx, "restic", args...)
+	cmd := exec.CommandContext(pruneCtx, "restic", args...) //nolint:gosec // args are built internally from validated retention config, not user-supplied
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if pruneCtx.Err() == context.DeadlineExceeded {
@@ -583,7 +583,7 @@ func repoHasTaggedSnapshots(rc *eos_io.RuntimeContext, repoPath, passwordFile st
 func cleanupLegacyCronEntries(_ *eos_io.RuntimeContext, users []scannedUser) error {
 	var errs []string
 	for _, scanned := range users {
-		if scanned.Username == "" || scanned.Username == "root" {
+		if scanned.Username == "" || scanned.Username == RootUsername {
 			continue
 		}
 		if err := removeCronMarkerForUser(scanned.Username); err != nil {

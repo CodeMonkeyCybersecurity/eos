@@ -39,6 +39,10 @@ const (
 
 	// CronMarker is the identifier used to find/replace cron entries
 	CronMarker = "eos-chat-archive"
+
+	// RootUsername is the system root user name.
+	// Used to detect root context and resolve /root home directory.
+	RootUsername = "root"
 )
 
 const (

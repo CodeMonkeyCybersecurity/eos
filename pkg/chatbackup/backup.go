@@ -281,11 +281,14 @@ func discoverProjectContext(logger otelzap.LoggerWithCtx, scanDirs []string) []s
 		// Walk up to 4 levels deep looking for project context files
 		err := filepath.WalkDir(scanDir, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				return nil // Skip errors, continue walking
+				return nil //nolint:nilerr // WalkDir callback intentionally skips inaccessible paths
 			}
 
 			// Limit depth to 4 levels from scanDir
-			rel, _ := filepath.Rel(scanDir, path)
+			rel, relErr := filepath.Rel(scanDir, path)
+			if relErr != nil {
+				return nil //nolint:nilerr // Skip entries we cannot compute relative path for
+			}
 			depth := strings.Count(rel, string(filepath.Separator))
 			if depth > 4 {
 				if d.IsDir() {
@@ -358,7 +361,7 @@ func runResticBackup(ctx context.Context, logger otelzap.LoggerWithCtx, repoPath
 	backupCtx, cancel := context.WithTimeout(ctx, BackupTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(backupCtx, "restic", args...)
+	cmd := exec.CommandContext(backupCtx, "restic", args...) //nolint:gosec // args are built internally from validated config, not user-supplied
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -427,10 +430,14 @@ func updateStatus(logger otelzap.LoggerWithCtx, statusFile string, result *Backu
 		return
 	}
 
-	// Read existing status
+	// Read existing status (unmarshal errors are non-fatal: start from empty status)
 	status := &BackupStatus{}
 	if data, err := os.ReadFile(statusFile); err == nil {
-		_ = json.Unmarshal(data, status)
+		if jsonErr := json.Unmarshal(data, status); jsonErr != nil {
+			logger.Debug("Could not parse existing status file, starting fresh",
+				zap.String("path", statusFile),
+				zap.Error(jsonErr))
+		}
 	}
 
 	now := time.Now().Format(time.RFC3339)
@@ -552,7 +559,7 @@ func resolveHomeDir(username string) (string, error) {
 		return home, nil
 	}
 
-	if username == "root" {
+	if username == RootUsername {
 		return "/root", nil
 	}
 
@@ -599,9 +606,9 @@ func discoverSourcePath(logger otelzap.LoggerWithCtx, homeDir string, sp SourceP
 
 func collectMatchingFiles(root string, includes, excludes []string) []string {
 	var out []string
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error { //nolint:errcheck // Best-effort file collection; walk errors are non-fatal
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // Intentionally skip inaccessible paths
 		}
 
 		if d.IsDir() {
@@ -613,7 +620,7 @@ func collectMatchingFiles(root string, includes, excludes []string) []string {
 
 		rel, relErr := filepath.Rel(root, path)
 		if relErr != nil {
-			return nil
+			return nil //nolint:nilerr // Skip entries where relative path cannot be computed
 		}
 
 		if !shouldIncludeFile(rel, includes, excludes) {
@@ -853,7 +860,7 @@ func dedupeStrings(values []string) []string {
 }
 
 func ownershipUser(config BackupConfig) string {
-	if config.AllUsers || osGeteuid() != 0 || config.User == "" || config.User == "root" {
+	if config.AllUsers || osGeteuid() != 0 || config.User == "" || config.User == RootUsername {
 		return ""
 	}
 	return config.User
