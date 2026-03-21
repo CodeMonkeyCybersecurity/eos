@@ -41,6 +41,38 @@ const (
 	CronMarker = "eos-chat-archive"
 )
 
+const (
+	// DefaultMachineRepoPath is the machine-wide restic repository for chat backups.
+	DefaultMachineRepoPath = "/var/backups/eos/restic/chat-archive"
+
+	// DefaultMachinePasswordFile is the machine-wide restic password file.
+	DefaultMachinePasswordFile = "/etc/eos/restic/chat-archive-password"
+
+	// DefaultMachineStatusFile is the machine-wide backup status file.
+	DefaultMachineStatusFile = "/var/lib/eos/chat-archive-status.json"
+
+	// DefaultMachineManifestFile is the machine-wide backup manifest file.
+	DefaultMachineManifestFile = "/var/lib/eos/chat-archive-manifest.json"
+
+	// DefaultMachineLockFile is the machine-wide backup lock file.
+	DefaultMachineLockFile = "/run/lock/eos-chat-archive.lock"
+
+	// DefaultSystemdUnitDir is where chat-backup service and timer units are written.
+	DefaultSystemdUnitDir = "/etc/systemd/system"
+
+	// BackupServiceName is the systemd service name for machine-wide chat backups.
+	BackupServiceName = "eos-chat-archive-backup.service"
+
+	// BackupTimerName is the systemd timer name for machine-wide chat backups.
+	BackupTimerName = "eos-chat-archive-backup.timer"
+
+	// PruneServiceName is the systemd service name for machine-wide chat prune runs.
+	PruneServiceName = "eos-chat-archive-prune.service"
+
+	// PruneTimerName is the systemd timer name for machine-wide chat prune runs.
+	PruneTimerName = "eos-chat-archive-prune.timer"
+)
+
 // ═══════════════════════════════════════════════════════════════════════════
 // File Permissions - Security Critical
 // ═══════════════════════════════════════════════════════════════════════════
@@ -75,6 +107,9 @@ const (
 	// SECURITY: Logs may contain paths but no secrets
 	// THREAT MODEL: Information disclosure via paths is acceptable
 	LogFilePerm = os.FileMode(0644)
+
+	// SystemdUnitPerm is the permission for generated systemd units.
+	SystemdUnitPerm = os.FileMode(0644)
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -130,6 +165,26 @@ const (
 	// DefaultPruneCron is the default prune schedule (daily at 3:05am)
 	// RATIONALE: Offset 5 minutes from backup to avoid lock contention
 	DefaultPruneCron = "5 3 * * *"
+)
+
+var (
+	// MachineRepoPath is overrideable in tests.
+	MachineRepoPath = DefaultMachineRepoPath
+
+	// MachinePasswordFile is overrideable in tests.
+	MachinePasswordFile = DefaultMachinePasswordFile
+
+	// MachineStatusFile is overrideable in tests.
+	MachineStatusFile = DefaultMachineStatusFile
+
+	// MachineManifestFile is overrideable in tests.
+	MachineManifestFile = DefaultMachineManifestFile
+
+	// MachineLockFile is overrideable in tests.
+	MachineLockFile = DefaultMachineLockFile
+
+	// SystemdUnitDir is overrideable in tests.
+	SystemdUnitDir = DefaultSystemdUnitDir
 )
 
 // ═══════════════════════════════════════════════════════════════════════════

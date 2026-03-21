@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,6 +67,44 @@ func TestResolveHomeDir_NonexistentUser(t *testing.T) {
 	_, err := resolveHomeDir("nonexistent_user_xyz_12345")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "home directory not found")
+}
+
+func TestResolveBackupUsers_AllUsersFromPasswd(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home", "henry")
+	require.NoError(t, os.MkdirAll(homeDir, 0755))
+
+	passwd := filepath.Join(tmpDir, "passwd")
+	require.NoError(t, os.WriteFile(passwd, []byte(strings.Join([]string{
+		"henry:x:1000:1000::" + homeDir + ":/bin/bash",
+		"nobody:x:65534:65534::/nonexistent:/usr/sbin/nologin",
+		"",
+	}, "\n")), 0644))
+
+	oldGeteuid := osGeteuid
+	oldPasswd := passwdFilePath
+	osGeteuid = func() int { return 0 }
+	passwdFilePath = passwd
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+		passwdFilePath = oldPasswd
+	})
+
+	users, err := resolveBackupUsers(BackupConfig{AllUsers: true})
+	require.NoError(t, err)
+	require.Len(t, users, 1)
+	assert.Equal(t, "henry", users[0].Username)
+	assert.Equal(t, homeDir, users[0].HomeDir)
+}
+
+func TestResolveStoragePaths_AllUsers(t *testing.T) {
+	got, err := resolveStoragePaths(BackupConfig{AllUsers: true}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, MachineRepoPath, got.Repo)
+	assert.Equal(t, MachinePasswordFile, got.PasswordFile)
+	assert.Equal(t, MachineStatusFile, got.StatusFile)
+	assert.Equal(t, MachineManifestFile, got.ManifestFile)
+	assert.Equal(t, MachineLockFile, got.LockFile)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -251,6 +290,33 @@ func TestDiscoverPaths_MultipleTools(t *testing.T) {
 	assert.Contains(t, tools, "codex")
 }
 
+func TestDefaultToolRegistry_CoversHostMetadataPaths(t *testing.T) {
+	registry := DefaultToolRegistry()
+
+	assertToolPath := func(toolName, path string) {
+		t.Helper()
+		for _, tool := range registry {
+			if tool.Name != toolName {
+				continue
+			}
+			for _, sp := range tool.Paths {
+				if sp.Path == path {
+					return
+				}
+			}
+		}
+		t.Fatalf("expected %s to include path %s", toolName, path)
+	}
+
+	assertToolPath("claude-code", "~/.claude/.credentials.json")
+	assertToolPath("codex", "~/.codex/auth.json")
+	assertToolPath("codex", "~/.codex/session_index.jsonl")
+	assertToolPath("gemini-cli", "~/.gemini/oauth_creds.json")
+	assertToolPath("windsurf", "~/.config/Windsurf/User")
+	assert.Contains(t, ProjectContextPatterns(), "MEMORY.md")
+	assert.Contains(t, ProjectContextPatterns(), "memory.mds")
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // discoverProjectContext Tests
 // ═══════════════════════════════════════════════════════════════════════════
@@ -386,7 +452,7 @@ func TestUpdateStatus_Success(t *testing.T) {
 		BytesAdded: 1024,
 	}
 
-	updateStatus(logger, statusFile, result, []string{"claude-code"})
+	updateStatus(logger, statusFile, result, []string{"claude-code"}, "")
 
 	// Read and verify
 	data, err := os.ReadFile(statusFile)
@@ -408,7 +474,7 @@ func TestUpdateStatus_Failure(t *testing.T) {
 	statusFile := filepath.Join(tmpDir, "status.json")
 	logger := newSilentLogger()
 
-	updateStatus(logger, statusFile, nil, []string{"claude-code"})
+	updateStatus(logger, statusFile, nil, []string{"claude-code"}, "")
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -428,10 +494,10 @@ func TestUpdateStatus_IncrementalCounts(t *testing.T) {
 
 	// Two successes then a failure
 	result := &BackupResult{SnapshotID: "snap1"}
-	updateStatus(logger, statusFile, result, nil)
+	updateStatus(logger, statusFile, result, nil, "")
 	result2 := &BackupResult{SnapshotID: "snap2"}
-	updateStatus(logger, statusFile, result2, nil)
-	updateStatus(logger, statusFile, nil, nil) // failure
+	updateStatus(logger, statusFile, result2, nil, "")
+	updateStatus(logger, statusFile, nil, nil, "") // failure
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -450,7 +516,7 @@ func TestUpdateStatus_PreservesFirstBackup(t *testing.T) {
 	logger := newSilentLogger()
 
 	result := &BackupResult{SnapshotID: "first"}
-	updateStatus(logger, statusFile, result, nil)
+	updateStatus(logger, statusFile, result, nil, "")
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -460,7 +526,7 @@ func TestUpdateStatus_PreservesFirstBackup(t *testing.T) {
 
 	// Second backup should NOT overwrite FirstBackup
 	result2 := &BackupResult{SnapshotID: "second"}
-	updateStatus(logger, statusFile, result2, nil)
+	updateStatus(logger, statusFile, result2, nil, "")
 
 	data2, err := os.ReadFile(statusFile)
 	require.NoError(t, err)

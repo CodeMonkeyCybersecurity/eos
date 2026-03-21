@@ -28,10 +28,10 @@ case "${command}" in
     ps_install_hook "${repo_root}" "$@"
     ;;
   pre-commit)
-    PS_CTX_KIND="hook"
-    PS_CTX_ACTION="pre-commit"
-    PS_CTX_REPORT_PATH="${PRE_COMMIT_REPORT_JSON:-${repo_root}/outputs/ci/pre-commit/report.json}"
-    PS_CTX_REPO_ROOT="${repo_root}"
+    export PS_CTX_KIND="hook"
+    export PS_CTX_ACTION="pre-commit"
+    export PS_CTX_REPORT_PATH="${PRE_COMMIT_REPORT_JSON:-${repo_root}/outputs/ci/pre-commit/report.json}"
+    export PS_CTX_REPO_ROOT="${repo_root}"
     ps_ctx_init
     ps_run_pre_commit "${repo_root}" "$@"
     ;;

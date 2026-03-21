@@ -155,6 +155,35 @@ func TestWrap(t *testing.T) {
 		}
 	})
 
+	t.Run("backup_chats_skips_vault_bootstrap", func(t *testing.T) {
+		orig := vaultTrySetVaultAddr
+		called := false
+		vaultTrySetVaultAddr = func(*eos_io.RuntimeContext) (string, error) {
+			called = true
+			return "", nil
+		}
+		t.Cleanup(func() {
+			vaultTrySetVaultAddr = orig
+		})
+
+		backupCmd := &cobra.Command{Use: "backup"}
+		chatsCmd := &cobra.Command{
+			Use: "chats",
+			RunE: Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+				return nil
+			}),
+		}
+		backupCmd.AddCommand(chatsCmd)
+
+		err := chatsCmd.RunE(chatsCmd, []string{})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if called {
+			t.Fatal("expected backup chats to skip Vault bootstrap")
+		}
+	})
+
 	// Note: Validation test skipped as it depends on external CUE/OPA validation
 	// which may not be configured in test environment
 	t.Run("validation_skipped", func(t *testing.T) {
