@@ -83,7 +83,7 @@ type BackupConfig struct {
 	// ExtraScanDirs are additional directories to scan for project-level
 	// AI context files (CLAUDE.md, AGENTS.md, .claude/ dirs)
 	// Default per-user: ["/opt"]
-	// Default all-users: ["/opt", "/home"]
+	// Default all-users: [DefaultProjectScanDir, DefaultHomeScanDir]
 	ExtraScanDirs []string
 
 	// Retention configures snapshot retention policy

@@ -743,7 +743,7 @@ func TestNormalizeScanDirs_AllUsersIncludesHomes(t *testing.T) {
 		{Username: "alice", HomeDir: "/home/alice"},
 		{Username: "bob", HomeDir: "/srv/bob"},
 	})
-	assert.Equal(t, []string{"/home", "/home/alice", "/opt", "/srv/bob"}, got)
+	assert.Equal(t, []string{DefaultHomeScanDir, "/home/alice", "/opt", "/srv/bob"}, got)
 }
 
 func TestNormalizeScanDirs_ExplicitOverrideWins(t *testing.T) {
@@ -751,7 +751,7 @@ func TestNormalizeScanDirs_ExplicitOverrideWins(t *testing.T) {
 		AllUsers:      true,
 		ExtraScanDirs: []string{"/srv", "/srv", "/opt/custom"},
 	}, nil)
-	assert.Equal(t, []string{"/home", "/opt/custom", "/srv"}, got)
+	assert.Equal(t, []string{DefaultHomeScanDir, "/opt/custom", "/srv"}, got)
 }
 
 func TestOwnershipUser(t *testing.T) {

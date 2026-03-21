@@ -884,7 +884,7 @@ func normalizeScanDirs(config BackupConfig, users []scannedUser) []string {
 	// In all-users mode, also scan /home and each user's home directory
 	// so that project-level context files (CLAUDE.md, AGENTS.md) are found.
 	if config.AllUsers {
-		scanDirs = append(scanDirs, "/home")
+		scanDirs = append(scanDirs, DefaultHomeScanDir)
 		for _, u := range users {
 			scanDirs = append(scanDirs, u.HomeDir)
 		}

@@ -51,6 +51,10 @@ const (
 	// DefaultProjectScanDir is the default filesystem root scanned for
 	// project-level AI context files when callers do not provide overrides.
 	DefaultProjectScanDir = "/opt"
+
+	// DefaultHomeScanDir is the /home directory added to scan dirs in
+	// all-users mode so project context files are found across user homes.
+	DefaultHomeScanDir = "/home"
 )
 
 const (
