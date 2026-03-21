@@ -174,7 +174,7 @@ func TestIntegration_Backup_StatusFileUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update status
-	updateStatus(logger, statusFile, result, []string{"claude-code"})
+	updateStatus(logger, statusFile, result, []string{"claude-code"}, "")
 
 	// Verify status file
 	data, err := os.ReadFile(statusFile)

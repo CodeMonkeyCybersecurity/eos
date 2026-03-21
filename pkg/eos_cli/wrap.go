@@ -18,6 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var vaultTrySetVaultAddr = vault.TrySetVaultAddr
+
 // Wrap ensures panic recovery, telemetry, logging, and validation
 func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) (err error) {
@@ -61,14 +63,19 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		// Replace original args with sanitized version
 		args = sanitizedArgs
 
-		// Vault environment (best-effort, non-interactive).
-		// Commands that need Vault will call EnsureVaultEnv themselves with interactive consent.
-		vaultAddr, vaultErr := vault.TrySetVaultAddr(ctx)
-		if vaultErr != nil {
-			ctx.Log.Debug("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
-		} else if vaultAddr != "" {
-			ctx.Log.Info("VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
-			ctx.Attributes["vault_addr"] = vaultAddr
+		if shouldSkipVaultBootstrap(cmd) {
+			ctx.Log.Debug("Skipping Vault environment bootstrap for command",
+				zap.String("command_path", cmd.CommandPath()))
+		} else {
+			// Vault environment (best-effort, non-interactive).
+			// Commands that need Vault will call EnsureVaultEnv themselves with interactive consent.
+			vaultAddr, vaultErr := vaultTrySetVaultAddr(ctx)
+			if vaultErr != nil {
+				ctx.Log.Debug("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
+			} else if vaultAddr != "" {
+				ctx.Log.Info("VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
+				ctx.Attributes["vault_addr"] = vaultAddr
+			}
 		}
 
 		// Unified validation logic
@@ -148,14 +155,19 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		// Replace original args with sanitized version
 		args = sanitizedArgs
 
-		// Vault environment (best-effort, non-interactive).
-		// Commands that need Vault will call EnsureVaultEnv themselves with interactive consent.
-		vaultAddr, vaultErr := vault.TrySetVaultAddr(ctx)
-		if vaultErr != nil {
-			ctx.Log.Debug("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
-		} else if vaultAddr != "" {
-			ctx.Log.Info("VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
-			ctx.Attributes["vault_addr"] = vaultAddr
+		if shouldSkipVaultBootstrap(cmd) {
+			ctx.Log.Debug("Skipping Vault environment bootstrap for command",
+				zap.String("command_path", cmd.CommandPath()))
+		} else {
+			// Vault environment (best-effort, non-interactive).
+			// Commands that need Vault will call EnsureVaultEnv themselves with interactive consent.
+			vaultAddr, vaultErr := vaultTrySetVaultAddr(ctx)
+			if vaultErr != nil {
+				ctx.Log.Debug("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
+			} else if vaultAddr != "" {
+				ctx.Log.Info("VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
+				ctx.Attributes["vault_addr"] = vaultAddr
+			}
 		}
 
 		// Unified validation logic
@@ -199,6 +211,10 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		}
 		return err
 	}
+}
+
+func shouldSkipVaultBootstrap(cmd *cobra.Command) bool {
+	return strings.TrimSpace(cmd.CommandPath()) == "backup chats"
 }
 
 // WrapDebug is DEPRECATED: Use eos_cli.Wrap() and cmd/debug.saveDebugOutput() instead.

@@ -13,17 +13,24 @@ package chatbackup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	backup_schedule "github.com/CodeMonkeyCybersecurity/eos/pkg/backup/schedule"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/systemd"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+var findLegacyRepositoriesFn = findLegacyRepositories
 
 // Setup initializes the chat archive infrastructure: restic repo, password, and cron.
 //
@@ -37,36 +44,32 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 		Warnings: []string{},
 	}
 
-	// ASSESS: Resolve home directory
-	homeDir := config.HomeDir
-	if homeDir == "" {
-		var err error
-		homeDir, err = resolveHomeDir(config.User)
-		if err != nil {
-			return nil, &opError{Op: "resolve home directory", Err: err}
-		}
+	users, err := resolveBackupUsers(config.BackupConfig)
+	if err != nil {
+		return nil, &opError{Op: "resolve backup users", Err: err}
+	}
+	pathsCfg, err := resolveStoragePaths(config.BackupConfig, users)
+	if err != nil {
+		return nil, &opError{Op: "resolve storage paths", Err: err}
 	}
 
-	repoPath := filepath.Join(homeDir, ResticRepoSubdir)
-	passwordFile := filepath.Join(homeDir, ResticPasswordSubdir)
-	resticDir := filepath.Dir(repoPath)
-
-	result.RepoPath = repoPath
-	result.PasswordFile = passwordFile
+	result.RepoPath = pathsCfg.Repo
+	result.PasswordFile = pathsCfg.PasswordFile
 	result.BackupCron = config.BackupCron
 	result.PruneCron = config.PruneCron
 
 	logger.Info("Setting up chat archive backup",
 		zap.String("user", config.User),
-		zap.String("repo", repoPath),
+		zap.Bool("all_users", config.AllUsers),
+		zap.String("repo", pathsCfg.Repo),
 		zap.String("backup_cron", config.BackupCron),
 		zap.String("prune_cron", config.PruneCron),
 		zap.Bool("dry_run", config.DryRun))
 
 	if config.DryRun {
 		logger.Info("DRY RUN: Would set up chat archive backup",
-			zap.String("repo", repoPath),
-			zap.String("password_file", passwordFile))
+			zap.String("repo", pathsCfg.Repo),
+			zap.String("password_file", pathsCfg.PasswordFile))
 		return result, nil
 	}
 
@@ -76,47 +79,70 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 	}
 
 	// INTERVENE: Create directories
-	if err := os.MkdirAll(resticDir, ResticDirPerm); err != nil {
-		return nil, fmt.Errorf("failed to create directory %s: %w", resticDir, err)
+	for _, dir := range []string{
+		filepath.Dir(pathsCfg.Repo),
+		filepath.Dir(pathsCfg.PasswordFile),
+		filepath.Dir(pathsCfg.StatusFile),
+		filepath.Dir(pathsCfg.ManifestFile),
+		filepath.Dir(pathsCfg.LockFile),
+	} {
+		if err := os.MkdirAll(dir, ResticDirPerm); err != nil {
+			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
 	}
 
 	// INTERVENE: Generate password if needed (only on first setup)
-	if _, err := os.Stat(passwordFile); os.IsNotExist(err) {
-		if err := generatePassword(passwordFile); err != nil {
+	if _, err := os.Stat(pathsCfg.PasswordFile); os.IsNotExist(err) {
+		if err := generatePassword(pathsCfg.PasswordFile); err != nil {
 			return nil, fmt.Errorf("failed to generate repository password: %w", err)
 		}
 		result.PasswordGenerated = true
 		logger.Info("Generated restic repository password",
-			zap.String("file", passwordFile))
+			zap.String("file", pathsCfg.PasswordFile))
 	} else {
 		logger.Info("Password file already exists, reusing",
-			zap.String("file", passwordFile))
+			zap.String("file", pathsCfg.PasswordFile))
 	}
 
 	// INTERVENE: Initialize restic repository (idempotent)
-	if err := initRepo(rc, repoPath, passwordFile); err != nil {
+	if err := initRepo(rc, pathsCfg.Repo, pathsCfg.PasswordFile); err != nil {
 		return nil, fmt.Errorf("failed to initialize restic repository: %w", err)
 	}
 
-	// INTERVENE: Configure cron
-	if err := configureCron(rc, config, homeDir); err != nil {
-		result.Warnings = append(result.Warnings,
-			fmt.Sprintf("Failed to configure cron: %v", err))
-		logger.Warn("Cron configuration failed", zap.Error(err))
+	if config.AllUsers {
+		if err := migrateLegacyRepositories(rc, pathsCfg); err != nil {
+			return nil, fmt.Errorf("failed to migrate legacy chat archive repository: %w", err)
+		}
+		if err := configureSystemdTimers(rc, config); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to configure systemd timers: %v", err))
+			logger.Warn("Systemd timer configuration failed", zap.Error(err))
+		} else {
+			result.CronConfigured = true
+		}
+		if err := cleanupLegacyCronEntries(rc, users); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to clean legacy cron entries: %v", err))
+			logger.Warn("Legacy cron cleanup failed", zap.Error(err))
+		}
 	} else {
-		result.CronConfigured = true
-	}
+		homeDir := users[0].HomeDir
+		if err := configureCron(rc, config, homeDir); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to configure cron: %v", err))
+			logger.Warn("Cron configuration failed", zap.Error(err))
+		} else {
+			result.CronConfigured = true
+		}
 
-	// INTERVENE: Fix ownership if running as root for another user.
-	// CRITICAL: Must chown the .eos/ parent directory too, not just .eos/restic/.
-	// Without this, the user cannot traverse .eos/ (root:root 0700) to reach their
-	// own files in .eos/restic/ — causing permission denied on all subsequent access.
-	if os.Geteuid() == 0 && config.User != "" && config.User != "root" {
-		eosDir := filepath.Join(homeDir, ".eos")
-		if err := chownToUser(eosDir, config.User); err != nil {
-			logger.Warn("Failed to change ownership of .eos directory",
-				zap.String("path", eosDir),
-				zap.Error(err))
+		// INTERVENE: Fix ownership if running as root for another user.
+		if osGeteuid() == 0 && config.User != "" && config.User != "root" {
+			eosDir := filepath.Join(homeDir, ".eos")
+			if err := chownToUser(eosDir, config.User); err != nil {
+				logger.Warn("Failed to change ownership of .eos directory",
+					zap.String("path", eosDir),
+					zap.Error(err))
+			}
 		}
 	}
 
@@ -124,11 +150,11 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 	logger.Info("Chat archive setup completed",
 		zap.Bool("cron_configured", result.CronConfigured),
 		zap.Bool("password_generated", result.PasswordGenerated),
-		zap.String("repo", repoPath))
+		zap.String("repo", pathsCfg.Repo))
 
 	if result.PasswordGenerated {
-		logger.Info("IMPORTANT: Your restic password is stored at: " + passwordFile)
-		logger.Info("View it with: cat " + passwordFile)
+		logger.Info("IMPORTANT: Your restic password is stored at: " + pathsCfg.PasswordFile)
+		logger.Info("View it with: cat " + pathsCfg.PasswordFile)
 		logger.Info("If lost, your backups will be UNRECOVERABLE")
 	}
 
@@ -215,7 +241,7 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 	// Get current crontab
 	var existingCron string
 	crontabCmd := exec.Command("crontab", "-l")
-	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
+	if config.User != "" && config.User != "root" && osGeteuid() == 0 {
 		crontabCmd = exec.Command("crontab", "-u", config.User, "-l")
 	}
 	if output, err := crontabCmd.Output(); err == nil {
@@ -259,7 +285,7 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 
 	// Install crontab
 	installCmd := exec.Command("crontab", "-")
-	if config.User != "" && config.User != "root" && os.Geteuid() == 0 {
+	if config.User != "" && config.User != "root" && osGeteuid() == 0 {
 		installCmd = exec.Command("crontab", "-u", config.User, "-")
 	}
 	installCmd.Stdin = strings.NewReader(newCron)
@@ -275,24 +301,110 @@ func configureCron(rc *eos_io.RuntimeContext, config ScheduleConfig, homeDir str
 	return nil
 }
 
+func configureSystemdTimers(rc *eos_io.RuntimeContext, config ScheduleConfig) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	eosBin, err := os.Executable()
+	if err != nil {
+		eosBin = "/usr/local/bin/eos"
+	}
+
+	backupService := fmt.Sprintf(`[Unit]
+Description=Eos Chat Archive Backup
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=%s backup chats --all-users
+User=root
+StandardOutput=journal
+StandardError=journal
+`, eosBin)
+
+	backupTimer := fmt.Sprintf(`[Unit]
+Description=Eos Chat Archive Backup Timer
+
+[Timer]
+OnCalendar=%s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`, backupCronToOnCalendar(rc, config.BackupCron))
+
+	pruneService := fmt.Sprintf(`[Unit]
+Description=Eos Chat Archive Prune
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=%s backup chats --all-users --prune
+User=root
+StandardOutput=journal
+StandardError=journal
+`, eosBin)
+
+	pruneTimer := fmt.Sprintf(`[Unit]
+Description=Eos Chat Archive Prune Timer
+
+[Timer]
+OnCalendar=%s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`, backupCronToOnCalendar(rc, config.PruneCron))
+
+	units := map[string]string{
+		BackupServiceName: backupService,
+		BackupTimerName:   backupTimer,
+		PruneServiceName:  pruneService,
+		PruneTimerName:    pruneTimer,
+	}
+
+	for name, content := range units {
+		path := filepath.Join(SystemdUnitDir, name)
+		if err := os.MkdirAll(filepath.Dir(path), ResticDirPerm); err != nil {
+			return fmt.Errorf("create unit directory: %w", err)
+		}
+		if err := os.WriteFile(path, []byte(content), SystemdUnitPerm); err != nil {
+			return fmt.Errorf("write unit %s: %w", name, err)
+		}
+	}
+
+	for _, args := range [][]string{
+		{"systemctl", "daemon-reload"},
+		{"systemctl", "enable", BackupTimerName},
+		{"systemctl", "start", BackupTimerName},
+		{"systemctl", "enable", PruneTimerName},
+		{"systemctl", "start", PruneTimerName},
+	} {
+		if err := systemd.RunSystemctl(rc, args...); err != nil {
+			return err
+		}
+	}
+
+	logger.Info("Configured machine-wide chat backup timers",
+		zap.String("backup_timer", BackupTimerName),
+		zap.String("prune_timer", PruneTimerName))
+	return nil
+}
+
 // RunPrune applies the retention policy to the restic repository.
 func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	homeDir, err := resolveHomeDir(config.User)
-	if config.HomeDir != "" {
-		homeDir = config.HomeDir
-		err = nil
-	}
+	users, err := resolveBackupUsers(config)
 	if err != nil {
-		return &opError{Op: "resolve home directory", Err: err}
+		return &opError{Op: "resolve backup users", Err: err}
 	}
-
-	repoPath := filepath.Join(homeDir, ResticRepoSubdir)
-	passwordFile := filepath.Join(homeDir, ResticPasswordSubdir)
+	pathsCfg, err := resolveStoragePaths(config, users)
+	if err != nil {
+		return &opError{Op: "resolve storage paths", Err: err}
+	}
 
 	logger.Info("Running chat archive prune",
-		zap.String("repo", repoPath),
+		zap.String("repo", pathsCfg.Repo),
 		zap.String("keep_within", config.Retention.KeepWithin),
 		zap.Int("keep_hourly", config.Retention.KeepHourly),
 		zap.Int("keep_daily", config.Retention.KeepDaily))
@@ -303,14 +415,14 @@ func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 		return nil
 	}
 
-	if err := checkRepoInitialized(rc.Ctx, repoPath, passwordFile); err != nil {
+	if err := checkRepoInitialized(rc.Ctx, pathsCfg.Repo, pathsCfg.PasswordFile); err != nil {
 		return fmt.Errorf("%w at %s: %v\n"+
-			"Run 'eos backup chats --setup' to initialize", ErrRepositoryNotInitialized, repoPath, err)
+			"Run 'eos backup chats --setup' to initialize", ErrRepositoryNotInitialized, pathsCfg.Repo, err)
 	}
 
 	args := []string{
-		"-r", repoPath,
-		"--password-file", passwordFile,
+		"-r", pathsCfg.Repo,
+		"--password-file", pathsCfg.PasswordFile,
 		"forget",
 		"--tag", BackupTag,
 		"--keep-within", config.Retention.KeepWithin,
@@ -341,8 +453,24 @@ func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 
 // chownToUser changes ownership of a path to a user.
 func chownToUser(path, username string) error {
-	cmd := exec.Command("chown", "-R", username+":"+username, path)
-	return cmd.Run()
+	u, err := user.Lookup(username)
+	if err != nil {
+		return err
+	}
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return err
+	}
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return err
+	}
+	return filepath.Walk(path, func(current string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		return os.Chown(current, uid, gid)
+	})
 }
 
 func shellQuote(s string) string {
@@ -350,4 +478,149 @@ func shellQuote(s string) string {
 		return "''"
 	}
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+func backupCronToOnCalendar(rc *eos_io.RuntimeContext, cron string) string {
+	if cron == "" {
+		return "hourly"
+	}
+	return backup_schedule.CronToOnCalendar(rc, cron)
+}
+
+func migrateLegacyRepositories(rc *eos_io.RuntimeContext, destination storagePaths) error {
+	hasSnapshots, err := repoHasTaggedSnapshots(rc, destination.Repo, destination.PasswordFile)
+	if err != nil {
+		return err
+	}
+	if hasSnapshots {
+		return nil
+	}
+
+	sources := findLegacyRepositoriesFn()
+	for _, source := range sources {
+		if source.Repo == destination.Repo {
+			continue
+		}
+		if err := copySnapshots(rc, source, destination); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func findLegacyRepositories() []storagePaths {
+	users, err := listScannedUsers()
+	if err != nil {
+		return nil
+	}
+	sources := make([]storagePaths, 0, len(users))
+	for _, scanned := range users {
+		homeDir := scanned.HomeDir
+		repo := filepath.Join(homeDir, ResticRepoSubdir)
+		password := filepath.Join(homeDir, ResticPasswordSubdir)
+		if _, err := os.Stat(repo); err != nil {
+			continue
+		}
+		if _, err := os.Stat(password); err != nil {
+			continue
+		}
+		sources = append(sources, storagePaths{
+			Repo:         repo,
+			PasswordFile: password,
+			StatusFile:   filepath.Join(homeDir, ResticStatusSubdir),
+			ManifestFile: filepath.Join(homeDir, ".eos/restic/chat-archive-manifest.json"),
+			LockFile:     filepath.Join(homeDir, ResticLockSubdir),
+		})
+	}
+	return sources
+}
+
+func copySnapshots(rc *eos_io.RuntimeContext, source, destination storagePaths) error {
+	copyCtx, cancel := context.WithTimeout(rc.Ctx, PruneTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(copyCtx, "restic", //nolint:gosec // args are validated constants and repo paths, not user input
+		"-r", destination.Repo,
+		"--password-file", destination.PasswordFile,
+		"copy",
+		"--from-repo", source.Repo,
+		"--from-password-file", source.PasswordFile,
+		"--tag", BackupTag,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("restic copy failed from %s: %w\nOutput: %s", source.Repo, err, string(output))
+	}
+	return nil
+}
+
+func repoHasTaggedSnapshots(rc *eos_io.RuntimeContext, repoPath, passwordFile string) (bool, error) {
+	cmdCtx, cancel := context.WithTimeout(rc.Ctx, ResticCommandTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(cmdCtx, "restic",
+		"-r", repoPath,
+		"--password-file", passwordFile,
+		"snapshots",
+		"--tag", BackupTag,
+		"--json",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(output), "no such file or directory") {
+			return false, nil
+		}
+		return false, fmt.Errorf("check snapshots: %w\nOutput: %s", err, string(output))
+	}
+
+	var snapshots []map[string]any
+	if err := json.Unmarshal(output, &snapshots); err != nil {
+		return false, nil
+	}
+	return len(snapshots) > 0, nil
+}
+
+func cleanupLegacyCronEntries(_ *eos_io.RuntimeContext, users []scannedUser) error {
+	var errs []string
+	for _, scanned := range users {
+		if scanned.Username == "" || scanned.Username == "root" {
+			continue
+		}
+		if err := removeCronMarkerForUser(scanned.Username); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", scanned.Username, err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func removeCronMarkerForUser(username string) error {
+	if _, err := exec.LookPath("crontab"); err != nil {
+		return nil //nolint:nilerr // crontab not installed is a valid no-op, not an error
+	}
+
+	listCmd := exec.Command("crontab", "-u", username, "-l")
+	output, err := listCmd.Output()
+	if err != nil {
+		return nil //nolint:nilerr // user has no crontab is a valid no-op, not an error
+	}
+
+	lines := strings.Split(string(output), "\n")
+	cleaned := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.Contains(line, CronMarker) {
+			continue
+		}
+		cleaned = append(cleaned, line)
+	}
+
+	newCron := strings.TrimSpace(strings.Join(cleaned, "\n"))
+	installCmd := exec.Command("crontab", "-u", username, "-")
+	installCmd.Stdin = strings.NewReader(newCron + "\n")
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("install cleaned crontab: %w (output: %s)", err, string(output))
+	}
+	return nil
 }

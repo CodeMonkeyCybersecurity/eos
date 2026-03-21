@@ -77,9 +77,13 @@ type BackupConfig struct {
 	// HomeDir is resolved at runtime from User
 	HomeDir string
 
+	// AllUsers enables machine-wide backup across detected local user homes.
+	AllUsers bool
+
 	// ExtraScanDirs are additional directories to scan for project-level
 	// AI context files (CLAUDE.md, AGENTS.md, .claude/ dirs)
-	// Default: ["/opt"]
+	// Default per-user: ["/opt"]
+	// Default all-users: ["/opt", "/home"]
 	ExtraScanDirs []string
 
 	// Retention configures snapshot retention policy
@@ -149,6 +153,9 @@ type BackupResult struct {
 
 	// ToolsFound lists which AI tools had data to back up
 	ToolsFound []string
+
+	// UsersScanned lists users whose homes were scanned during this run.
+	UsersScanned []string
 }
 
 // ScheduleResult holds the result of schedule setup.
@@ -203,4 +210,14 @@ type BackupStatus struct {
 
 	// ToolsFound lists AI tools discovered in last run
 	ToolsFound []string `json:"tools_found,omitempty"`
+}
+
+// BackupManifest records exactly what was included in a successful backup run.
+type BackupManifest struct {
+	RunAt         string   `json:"run_at"`
+	SnapshotID    string   `json:"snapshot_id"`
+	UsersScanned  []string `json:"users_scanned,omitempty"`
+	ToolsFound    []string `json:"tools_found,omitempty"`
+	PathsIncluded []string `json:"paths_included,omitempty"`
+	PathsSkipped  []string `json:"paths_skipped,omitempty"`
 }

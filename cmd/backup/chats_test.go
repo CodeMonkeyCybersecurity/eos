@@ -25,6 +25,7 @@ func newChatsTestCommand(t *testing.T) *cobra.Command {
 	cmd.Flags().Bool("list", false, "")
 	cmd.Flags().Bool("dry-run", false, "")
 	cmd.Flags().String("user", "", "")
+	cmd.Flags().Bool("all-users", false, "")
 	cmd.Flags().StringSlice("scan-dirs", []string{"/opt"}, "")
 	cmd.Flags().Bool("verbose", false, "")
 	cmd.Flags().String("keep-within", chatbackup.DefaultKeepWithin, "")
@@ -164,6 +165,7 @@ func TestRunBackupChats_RoutesSetup(t *testing.T) {
 func TestRunBackupChats_MissingFlagsError(t *testing.T) {
 	resetChatbackupFns(t)
 	cmd := &cobra.Command{Use: "chats"}
+	cmd.Flags().Bool("all-users", false, "")
 	err := runBackupChats(newChatsRuntimeContext(), cmd, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dry-run")
@@ -237,6 +239,16 @@ func TestRunBackupChats_ValidationError(t *testing.T) {
 	assert.Contains(t, err.Error(), "mutually exclusive")
 }
 
+func TestRunBackupChats_AllUsersRequiresRoot(t *testing.T) {
+	resetChatbackupFns(t)
+	cmd := newChatsTestCommand(t)
+	require.NoError(t, cmd.Flags().Set("all-users", "true"))
+
+	err := runBackupChats(newChatsRuntimeContext(), cmd, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires root")
+}
+
 func TestRunBackupChats_MapDependencyError(t *testing.T) {
 	resetChatbackupFns(t)
 	cmd := newChatsTestCommand(t)
@@ -308,7 +320,7 @@ func TestRunSetup_MapsErrors(t *testing.T) {
 		return nil, fmt.Errorf("wrapped: %w", chatbackup.ErrResticNotInstalled)
 	}
 
-	err := runSetup(newChatsRuntimeContext(), logger, cmd, "henry", chatbackup.DefaultRetentionPolicy(), false)
+	err := runSetup(newChatsRuntimeContext(), logger, cmd, "henry", false, chatbackup.DefaultRetentionPolicy(), false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "restic")
 }
@@ -318,7 +330,7 @@ func TestRunSetup_MissingCronFlagsError(t *testing.T) {
 	cmd := &cobra.Command{Use: "chats"}
 	logger := otelzap.Ctx(newChatsRuntimeContext().Ctx)
 
-	err := runSetup(newChatsRuntimeContext(), logger, cmd, "henry", chatbackup.DefaultRetentionPolicy(), false)
+	err := runSetup(newChatsRuntimeContext(), logger, cmd, "henry", false, chatbackup.DefaultRetentionPolicy(), false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "backup-cron")
 }
@@ -330,7 +342,7 @@ func TestRunPrune_MapsErrors(t *testing.T) {
 		return fmt.Errorf("wrapped: %w", chatbackup.ErrRepositoryNotInitialized)
 	}
 
-	err := runPrune(newChatsRuntimeContext(), logger, "henry", chatbackup.DefaultRetentionPolicy(), false)
+	err := runPrune(newChatsRuntimeContext(), logger, "henry", false, chatbackup.DefaultRetentionPolicy(), false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--setup")
 }
@@ -342,7 +354,7 @@ func TestRunList_MapsErrors(t *testing.T) {
 		return "", fmt.Errorf("wrapped: %w", chatbackup.ErrResticNotInstalled)
 	}
 
-	err := runList(newChatsRuntimeContext(), logger, "henry")
+	err := runList(newChatsRuntimeContext(), logger, "henry", false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "restic")
 }
@@ -354,7 +366,7 @@ func TestRunBackup_NoDataLogsAndSucceeds(t *testing.T) {
 		return &chatbackup.BackupResult{}, nil
 	}
 
-	err := runBackup(newChatsRuntimeContext(), logger, "henry", chatbackup.DefaultRetentionPolicy(), []string{"/opt"}, false, false)
+	err := runBackup(newChatsRuntimeContext(), logger, "henry", false, chatbackup.DefaultRetentionPolicy(), []string{"/opt"}, false, false)
 	require.NoError(t, err)
 }
 
@@ -369,6 +381,6 @@ func TestRunBackup_DryRunBranch(t *testing.T) {
 		}, nil
 	}
 
-	err := runBackup(newChatsRuntimeContext(), logger, "henry", chatbackup.DefaultRetentionPolicy(), []string{"/opt"}, true, false)
+	err := runBackup(newChatsRuntimeContext(), logger, "henry", false, chatbackup.DefaultRetentionPolicy(), []string{"/opt"}, true, false)
 	require.NoError(t, err)
 }

@@ -77,7 +77,19 @@ if [[ "$joined" == *" forget "* ]]; then
   exit 0
 fi
 if [[ "$joined" == *" snapshots"* ]]; then
+  if [[ "$joined" == *"--json"* ]]; then
+    if [[ "${FAKE_RESTIC_HAS_SNAPSHOTS:-}" == "1" ]]; then
+      echo '[{"id":"snap-test"}]'
+    else
+      echo '[]'
+    fi
+    exit 0
+  fi
   echo "ID        Time"
+  exit 0
+fi
+if [[ "$joined" == *" copy "* ]]; then
+  echo "copied"
   exit 0
 fi
 echo "unsupported args: $*" >&2
@@ -100,6 +112,15 @@ if [[ "$last" == "-" ]]; then
 fi
 echo "unsupported crontab args: $*" >&2
 exit 1
+`
+}
+
+func fakeSystemctlScript() string {
+	return `#!/usr/bin/env bash
+set -euo pipefail
+store="${FAKE_SYSTEMCTL_LOG:?}"
+printf '%s\n' "$*" >> "$store"
+exit 0
 `
 }
 
@@ -145,6 +166,41 @@ func TestRunBackup_DryRunDoesNotRequireRestic(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.NotEmpty(t, result.PathsBackedUp)
+}
+
+func TestRunBackup_WritesManifest(t *testing.T) {
+	prependFakeBin(t, map[string]string{"restic": fakeResticScript()})
+
+	tmp := t.TempDir()
+	dataDir := filepath.Join(tmp, ".claude", "projects")
+	repoPath := filepath.Join(tmp, ResticRepoSubdir)
+	passwordFile := filepath.Join(tmp, ResticPasswordSubdir)
+	manifestFile := filepath.Join(tmp, ".eos", "restic", "chat-archive-manifest.json")
+
+	require.NoError(t, os.MkdirAll(dataDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(dataDir, "session.jsonl"), []byte("{}\n"), 0644))
+	require.NoError(t, os.MkdirAll(repoPath, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "config"), []byte("ok"), 0600))
+	require.NoError(t, os.MkdirAll(filepath.Dir(passwordFile), 0700))
+	require.NoError(t, os.WriteFile(passwordFile, []byte("password"), 0400))
+
+	result, err := RunBackup(newRuntimeContext(), BackupConfig{
+		User:          "henry",
+		HomeDir:       tmp,
+		ExtraScanDirs: []string{},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "snap-test", result.SnapshotID)
+
+	data, err := os.ReadFile(manifestFile)
+	require.NoError(t, err)
+
+	var manifest BackupManifest
+	require.NoError(t, json.Unmarshal(data, &manifest))
+	assert.Equal(t, "snap-test", manifest.SnapshotID)
+	assert.Contains(t, manifest.ToolsFound, "claude-code")
+	assert.Contains(t, manifest.UsersScanned, "henry")
+	assert.NotEmpty(t, manifest.PathsIncluded)
 }
 
 func TestRunBackup_SuccessUpdatesStatus(t *testing.T) {
@@ -197,7 +253,7 @@ func TestRunBackup_LockConflictFails(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(passwordFile), 0700))
 	require.NoError(t, os.WriteFile(passwordFile, []byte("password"), 0400))
 
-	lock, err := acquireBackupLock(lockFile)
+	lock, err := acquireBackupLock(lockFile, "")
 	require.NoError(t, err)
 	defer releaseBackupLock(lock)
 
@@ -258,6 +314,81 @@ func TestSetup_CreatesRepoPasswordAndCron(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(cron), CronMarker)
 	assert.NotContains(t, string(cron), "--user ''")
+}
+
+func TestSetup_AllUsers_CreatesSystemdUnits(t *testing.T) {
+	prependFakeBin(t, map[string]string{
+		"restic":    fakeResticScript(),
+		"systemctl": fakeSystemctlScript(),
+		"crontab":   fakeCrontabScript(),
+	})
+
+	tmp := t.TempDir()
+	passwd := filepath.Join(tmp, "passwd")
+	homeDir := filepath.Join(tmp, "home", "henry")
+	require.NoError(t, os.MkdirAll(homeDir, 0755))
+	require.NoError(t, os.WriteFile(passwd, []byte("henry:x:1000:1000::"+homeDir+":/bin/bash\n"), 0644))
+
+	oldGeteuid := osGeteuid
+	oldPasswdFile := passwdFilePath
+	oldRepo := MachineRepoPath
+	oldPassword := MachinePasswordFile
+	oldStatus := MachineStatusFile
+	oldManifest := MachineManifestFile
+	oldLock := MachineLockFile
+	oldUnits := SystemdUnitDir
+	oldLegacy := findLegacyRepositoriesFn
+
+	osGeteuid = func() int { return 0 }
+	passwdFilePath = passwd
+	MachineRepoPath = filepath.Join(tmp, "var", "backups", "eos", "restic", "chat-archive")
+	MachinePasswordFile = filepath.Join(tmp, "etc", "eos", "restic", "chat-archive-password")
+	MachineStatusFile = filepath.Join(tmp, "var", "lib", "eos", "chat-archive-status.json")
+	MachineManifestFile = filepath.Join(tmp, "var", "lib", "eos", "chat-archive-manifest.json")
+	MachineLockFile = filepath.Join(tmp, "run", "lock", "eos-chat-archive.lock")
+	SystemdUnitDir = filepath.Join(tmp, "systemd")
+	findLegacyRepositoriesFn = func() []storagePaths { return nil }
+
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+		passwdFilePath = oldPasswdFile
+		MachineRepoPath = oldRepo
+		MachinePasswordFile = oldPassword
+		MachineStatusFile = oldStatus
+		MachineManifestFile = oldManifest
+		MachineLockFile = oldLock
+		SystemdUnitDir = oldUnits
+		findLegacyRepositoriesFn = oldLegacy
+	})
+
+	systemctlLog := filepath.Join(tmp, "systemctl.log")
+	t.Setenv("FAKE_SYSTEMCTL_LOG", systemctlLog)
+	cronStore := filepath.Join(tmp, "cron.txt")
+	require.NoError(t, os.WriteFile(cronStore, []byte("# eos-chat-archive: old\n0 * * * * /old\n"), 0600))
+	t.Setenv("FAKE_CRONTAB_FILE", cronStore)
+
+	result, err := Setup(newRuntimeContext(), ScheduleConfig{
+		BackupConfig: BackupConfig{AllUsers: true},
+		BackupCron:   DefaultBackupCron,
+		PruneCron:    DefaultPruneCron,
+	})
+	require.NoError(t, err)
+	assert.True(t, result.CronConfigured)
+
+	for _, unit := range []string{BackupServiceName, BackupTimerName, PruneServiceName, PruneTimerName} {
+		_, err := os.Stat(filepath.Join(SystemdUnitDir, unit))
+		require.NoError(t, err)
+	}
+
+	systemctlCalls, err := os.ReadFile(systemctlLog)
+	require.NoError(t, err)
+	assert.Contains(t, string(systemctlCalls), "daemon-reload")
+	assert.Contains(t, string(systemctlCalls), "enable "+BackupTimerName)
+	assert.Contains(t, string(systemctlCalls), "start "+PruneTimerName)
+
+	cronData, err := os.ReadFile(cronStore)
+	require.NoError(t, err)
+	assert.NotContains(t, string(cronData), CronMarker)
 }
 
 func TestRunPrune_Success(t *testing.T) {
@@ -460,7 +591,7 @@ func TestUpdateStatus_DirectoryCreationFailure(t *testing.T) {
 
 	updateStatus(newSilentLogger(), filepath.Join(parentFile, "status.json"), &BackupResult{
 		SnapshotID: "abc",
-	}, []string{"claude-code"})
+	}, []string{"claude-code"}, "")
 }
 
 func TestSetup_SecondRunReusesPassword(t *testing.T) {
@@ -557,7 +688,7 @@ func TestRunBackup_ResticMissing(t *testing.T) {
 func TestRunBackup_ResolveHomeError(t *testing.T) {
 	_, err := RunBackup(newRuntimeContext(), BackupConfig{User: "__missing_user__"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "resolve home directory")
+	assert.Contains(t, err.Error(), "resolve backup users")
 }
 
 func TestResolveHomeDir_ExistingUserLookup(t *testing.T) {
@@ -572,7 +703,7 @@ func TestAcquireBackupLock_DirectoryError(t *testing.T) {
 	tmp := t.TempDir()
 	parentFile := filepath.Join(tmp, "not-a-dir")
 	require.NoError(t, os.WriteFile(parentFile, []byte("x"), 0600))
-	_, err := acquireBackupLock(filepath.Join(parentFile, "lock"))
+	_, err := acquireBackupLock(filepath.Join(parentFile, "lock"), "")
 	require.Error(t, err)
 }
 
@@ -602,7 +733,7 @@ func TestUpdateStatus_RenameFailure(t *testing.T) {
 	tmp := t.TempDir()
 	statusDir := filepath.Join(tmp, "status-target")
 	require.NoError(t, os.MkdirAll(statusDir, 0700))
-	updateStatus(newSilentLogger(), statusDir, &BackupResult{SnapshotID: "x"}, nil)
+	updateStatus(newSilentLogger(), statusDir, &BackupResult{SnapshotID: "x"}, nil, "")
 }
 
 func TestSetup_ResolveHomeFailure(t *testing.T) {
@@ -612,7 +743,7 @@ func TestSetup_ResolveHomeFailure(t *testing.T) {
 		PruneCron:    DefaultPruneCron,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "resolve home directory")
+	assert.Contains(t, err.Error(), "resolve backup users")
 }
 
 func TestSetup_InitRepoFailure(t *testing.T) {

@@ -24,7 +24,9 @@ ps_capture_run() {
   trap 'rm -f "${stdout_file}" "${stderr_file}"' RETURN
   "$@" >"${stdout_file}" 2>"${stderr_file}" || rc=$?
   PS_LAST_COMMAND_STDOUT="$(cat "${stdout_file}")"
+  export PS_LAST_COMMAND_STDOUT
   PS_LAST_COMMAND_STDERR="$(cat "${stderr_file}")"
+  export PS_LAST_COMMAND_STDERR
   return "${rc}"
 }
 

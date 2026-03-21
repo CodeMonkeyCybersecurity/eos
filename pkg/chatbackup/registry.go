@@ -34,8 +34,10 @@ func DefaultToolRegistry() []ToolSource {
 			Paths: []SourcePath{
 				{
 					Path:        "~/.claude/projects",
-					Includes:    []string{"*.jsonl", "*.json"},
-					Description: "Session transcripts (JSONL) and session indexes",
+					Description: "Session transcripts, indexes, and per-project memory files",
+					// No Includes filter — back up everything: *.jsonl, *.json,
+					// memory/*.md (MEMORY.md, feedback_*.md, etc.), and any
+					// future file types Claude Code adds to projects/
 				},
 				{
 					Path:        "~/.claude/todos",
@@ -50,51 +52,92 @@ func DefaultToolRegistry() []ToolSource {
 					Description: "Implementation plans from plan mode",
 				},
 				{
-					Path:     "~/.claude/settings.json",
-					Includes: []string{"settings.json"},
-					Description: "User settings including permissions, " +
-						"allowed commands",
+					Path:        "~/.claude/sessions",
+					Description: "Active session data",
+				},
+				{
+					Path:        "~/.claude/tasks",
+					Description: "Task tracking data from coding sessions",
+				},
+				{
+					Path:        "~/.claude/plugins",
+					Description: "Installed plugin metadata and marketplace config",
+				},
+				{
+					Path:        "~/.claude/backups",
+					Description: "Claude Code internal backup data",
+				},
+				{
+					Path:        "~/.claude/settings.json",
+					Description: "User settings (permissions, allowed commands)",
+				},
+				{
+					Path:        "~/.claude/settings.local.json",
+					Description: "Local settings overrides (machine-specific)",
+				},
+				{
+					Path:        "~/.claude/config.json",
+					Description: "CLI configuration (model preferences, features)",
+				},
+				{
+					Path:        "~/.claude/.credentials.json",
+					Description: "Claude Code credentials metadata",
+				},
+				{
+					Path:        "~/.claude/history.jsonl",
+					Description: "Command history across sessions",
 				},
 				{
 					Path:        "~/.claude/ide",
 					Description: "IDE integration state",
 				},
-			},
-		},
-		// ─── Claude Code Project Memory ────────────────────────────
-		// These are per-project memory files that persist context
-		{
-			Name:        "claude-code-memory",
-			Description: "Per-project MEMORY.md files that persist AI context across sessions",
-			Paths: []SourcePath{
 				{
-					Path:        "~/.claude/projects",
-					Includes:    []string{"MEMORY.md"},
-					Description: "Per-project memory files",
+					Path:        "~/.claude/paste-cache",
+					Description: "Paste cache for session continuity",
 				},
 			},
 		},
 		// ─── OpenAI Codex CLI ──────────────────────────────────────
 		{
 			Name:        "codex",
-			Description: "OpenAI Codex CLI sessions, config, and state",
+			Description: "OpenAI Codex CLI sessions, config, state databases, and memory",
 			Paths: []SourcePath{
 				{
 					Path:        "~/.codex/sessions",
-					Includes:    []string{"*.jsonl"},
-					Description: "Session transcripts",
+					Description: "Session transcripts and conversation data",
 				},
 				{
 					Path:        "~/.codex/config.toml",
 					Description: "Codex CLI configuration",
 				},
 				{
+					Path:        "~/.codex/auth.json",
+					Description: "Authentication state (tokens, not secrets)",
+				},
+				{
 					Path:        "~/.codex/skills",
 					Description: "Codex custom skills",
 				},
 				{
+					Path:        "~/.codex/memories",
+					Description: "Codex persistent memory across sessions",
+				},
+				{
 					Path:        "~/.codex/shell_snapshots",
 					Description: "Shell state snapshots",
+				},
+				{
+					Path:        "~/.codex/session_index.jsonl",
+					Description: "Session index for cross-referencing conversations",
+				},
+				{
+					Path:        "~/.codex/version.json",
+					Description: "Codex version metadata",
+				},
+				{
+					Path:        "~/.codex",
+					Includes:    []string{"state*.sqlite*", "logs*.sqlite*"},
+					Description: "State and log databases (conversation history, metrics)",
 				},
 			},
 		},
@@ -133,12 +176,8 @@ func DefaultToolRegistry() []ToolSource {
 			Description: "Windsurf IDE global storage and settings",
 			Paths: []SourcePath{
 				{
-					Path:        "~/.config/Windsurf/User/globalStorage",
-					Description: "Windsurf global storage (chat history, state)",
-				},
-				{
-					Path:        "~/.config/Windsurf/User/settings.json",
-					Description: "Windsurf user settings",
+					Path:        "~/.config/Windsurf/User",
+					Description: "Windsurf user state, settings, keybindings, and storage",
 				},
 			},
 		},
@@ -228,16 +267,24 @@ func DefaultToolRegistry() []ToolSource {
 		// ─── Gemini CLI ────────────────────────────────────────────
 		{
 			Name:        "gemini-cli",
-			Description: "Google Gemini CLI agent chat history and config",
+			Description: "Google Gemini CLI agent chat history, config, and session data",
 			Paths: []SourcePath{
 				{
-					Path:        "~/.gemini/tmp",
-					Includes:    []string{"shell_history", "*/shell_history"},
-					Description: "Gemini CLI shell history and session checkpoints",
+					Path:        "~/.gemini/history",
+					Description: "Gemini CLI conversation history",
 				},
 				{
-					Path:        "~/.gemini/config",
-					Description: "Gemini CLI configuration",
+					Path:        "~/.gemini/tmp",
+					Includes:    []string{"shell_history", "*/shell_history", "*/chats/*", "*/checkpoints/*"},
+					Description: "Session checkpoints, shell history, and chat transcripts",
+				},
+				{
+					Path:        "~/.gemini/google_accounts.json",
+					Description: "Google account association metadata",
+				},
+				{
+					Path:        "~/.gemini/oauth_creds.json",
+					Description: "Gemini CLI OAuth credentials",
 				},
 			},
 		},
@@ -303,6 +350,10 @@ func ProjectContextPatterns() []string {
 		"CLAUDE.md",
 		"AGENTS.md",
 		"QUICK-FACTS.md",
+		"MEMORY.md",
+		"memory.md",
+		"MEMORY.mds",
+		"memory.mds",
 		".claude",
 	}
 }
@@ -311,22 +362,31 @@ func ProjectContextPatterns() []string {
 // These are caches, telemetry, and temporary files that waste space.
 func DefaultExcludes() []string {
 	return []string{
-		// Claude Code caches and telemetry
+		// Claude Code caches and telemetry (not valuable for recovery)
 		".claude/downloads",
 		".claude/statsig",
 		".claude/telemetry",
 		".claude/cache",
 		".claude/debug",
 		".claude/shell-snapshots",
-		// Codex temporary files
+		".claude/session-env",
+		".claude/.credentials.json",
+		".claude/stats-cache.json",
+		".claude/mcp-needs-auth-cache.json",
+		// Codex temporary files and caches
 		".codex/tmp",
 		".codex/log",
 		".codex/models_cache.json",
+		".codex/.personality_migration",
+		// Gemini sensitive credentials (must NOT be backed up)
+		".gemini/oauth_creds.json",
 		// General exclusions
 		"*.tmp",
 		"*.log",
 		"node_modules",
 		".git",
 		"__pycache__",
+		// Git worktrees inside .claude (agent worktrees, not user data)
+		"worktrees",
 	}
 }

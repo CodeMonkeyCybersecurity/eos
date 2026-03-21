@@ -89,6 +89,7 @@ func init() {
 	chatsCmd.Flags().Bool("list", false, "List existing snapshots")
 	chatsCmd.Flags().Bool("dry-run", false, "Show what would be backed up without making changes")
 	chatsCmd.Flags().String("user", "", "User whose data to back up (defaults to current user or SUDO_USER)")
+	chatsCmd.Flags().Bool("all-users", false, "Back up AI chat data for all detected local users using the machine-wide repository")
 	chatsCmd.Flags().StringSlice("scan-dirs", []string{"/opt"}, "Additional directories to scan for project-level AI context files")
 	chatsCmd.Flags().Bool("verbose", false, "Show detailed path discovery logging")
 
@@ -105,6 +106,7 @@ func init() {
 
 	chatsCmd.MarkFlagsMutuallyExclusive("setup", "prune", "list")
 	chatsCmd.MarkFlagsMutuallyExclusive("list", "dry-run")
+	chatsCmd.MarkFlagsMutuallyExclusive("user", "all-users")
 }
 
 func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -116,7 +118,11 @@ func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 
 	// Parse user flag with fallback to SUDO_USER
 	username, _ := cmd.Flags().GetString("user")
-	if username == "" {
+	allUsers, err := cmd.Flags().GetBool("all-users")
+	if err != nil {
+		return mapChatbackupError(rc, "read all-users flag", err)
+	}
+	if !allUsers && username == "" {
 		username = resolveCurrentUser()
 	}
 
@@ -155,20 +161,23 @@ func runBackupChats(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	if err := validateModeFlags(doSetup, doPrune, doList, dryRun); err != nil {
 		return mapChatbackupError(rc, "validate mode flags", err)
 	}
+	if allUsers && os.Geteuid() != 0 {
+		return eos_err.NewValidationError("--all-users requires root")
+	}
 
 	switch {
 	case doSetup:
-		return runSetup(rc, logger, cmd, username, retention, dryRun)
+		return runSetup(rc, logger, cmd, username, allUsers, retention, dryRun)
 	case doPrune:
-		return runPrune(rc, logger, username, retention, dryRun)
+		return runPrune(rc, logger, username, allUsers, retention, dryRun)
 	case doList:
-		return runList(rc, logger, username)
+		return runList(rc, logger, username, allUsers)
 	default:
-		return runBackup(rc, logger, username, retention, scanDirs, dryRun, verbose)
+		return runBackup(rc, logger, username, allUsers, retention, scanDirs, dryRun, verbose)
 	}
 }
 
-func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobra.Command, username string, retention chatbackup.RetentionPolicy, dryRun bool) error {
+func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobra.Command, username string, allUsers bool, retention chatbackup.RetentionPolicy, dryRun bool) error {
 	backupCron, err := cmd.Flags().GetString("backup-cron")
 	if err != nil {
 		return mapChatbackupError(rc, "read backup-cron flag", err)
@@ -181,6 +190,7 @@ func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobr
 	config := chatbackup.ScheduleConfig{
 		BackupConfig: chatbackup.BackupConfig{
 			User:      username,
+			AllUsers:  allUsers,
 			Retention: retention,
 			DryRun:    dryRun,
 		},
@@ -213,9 +223,10 @@ func runSetup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, cmd *cobr
 	return nil
 }
 
-func runPrune(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string, retention chatbackup.RetentionPolicy, dryRun bool) error {
+func runPrune(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string, allUsers bool, retention chatbackup.RetentionPolicy, dryRun bool) error {
 	config := chatbackup.BackupConfig{
 		User:      username,
+		AllUsers:  allUsers,
 		Retention: retention,
 		DryRun:    dryRun,
 	}
@@ -228,10 +239,10 @@ func runPrune(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username 
 	return nil
 }
 
-func runList(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string) error {
-	logger.Info("Listing chat archive snapshots", zap.String("user", username))
+func runList(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string, allUsers bool) error {
+	logger.Info("Listing chat archive snapshots", zap.String("user", username), zap.Bool("all_users", allUsers))
 
-	output, err := chatbackupListSnapshotsFn(rc, chatbackup.BackupConfig{User: username})
+	output, err := chatbackupListSnapshotsFn(rc, chatbackup.BackupConfig{User: username, AllUsers: allUsers})
 	if err != nil {
 		return mapChatbackupError(rc, "list chat archive snapshots", err)
 	}
@@ -240,9 +251,10 @@ func runList(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username s
 	return nil
 }
 
-func runBackup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string, retention chatbackup.RetentionPolicy, scanDirs []string, dryRun, verbose bool) error {
+func runBackup(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, username string, allUsers bool, retention chatbackup.RetentionPolicy, scanDirs []string, dryRun, verbose bool) error {
 	config := chatbackup.BackupConfig{
 		User:          username,
+		AllUsers:      allUsers,
 		ExtraScanDirs: scanDirs,
 		Retention:     retention,
 		DryRun:        dryRun,

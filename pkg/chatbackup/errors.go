@@ -11,4 +11,7 @@ var (
 
 	// ErrBackupAlreadyRunning indicates a lock conflict for concurrent backup attempts.
 	ErrBackupAlreadyRunning = errors.New("backup already running")
+
+	// ErrRootRequired indicates machine-wide mode requires root privileges.
+	ErrRootRequired = errors.New("root privileges required")
 )
