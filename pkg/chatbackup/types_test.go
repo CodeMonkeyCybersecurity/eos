@@ -90,13 +90,18 @@ func TestBackupStatus_ZeroValue(t *testing.T) {
 	status := BackupStatus{}
 
 	// Zero value should be safe to use
+	assert.Empty(t, status.LastAttempt)
+	assert.Empty(t, status.LastRunState)
 	assert.Empty(t, status.LastSuccess)
 	assert.Empty(t, status.LastFailure)
+	assert.Empty(t, status.LastError)
 	assert.Empty(t, status.LastSnapshotID)
 	assert.Equal(t, int64(0), status.BytesAdded)
 	assert.Equal(t, 0, status.TotalSnapshots)
 	assert.Equal(t, 0, status.SuccessCount)
 	assert.Equal(t, 0, status.FailureCount)
+	assert.Equal(t, 0, status.PathsBackedUpCount)
+	assert.Equal(t, 0, status.PathsSkippedCount)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

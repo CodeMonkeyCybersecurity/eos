@@ -71,6 +71,11 @@ if [ -z "$PACKAGES_TO_TEST" ]; then
     exit 0
 fi
 
+CHATBACKUP_CHANGED=false
+if echo "$CHANGED_GO_FILES" | grep -Eq '^(pkg/chatbackup/|cmd/backup/chats(\.go|_test\.go)$)'; then
+    CHATBACKUP_CHANGED=true
+fi
+
 # 5. Run tests for changed packages
 print_color $BLUE "\n🧪 Running tests for changed packages..."
 FAILED_TESTS=0
@@ -86,6 +91,23 @@ done
 if [ $FAILED_TESTS -gt 0 ]; then
     print_color $RED "\n $FAILED_TESTS package(s) have failing tests"
     exit 1
+fi
+
+if $CHATBACKUP_CHANGED; then
+    print_color $BLUE "\n Running chatbackup regression guard..."
+    if ! go test ./pkg/chatbackup/... ./cmd/backup/...; then
+        print_color $RED " chatbackup regression guard failed"
+        exit 1
+    fi
+
+    if command -v golangci-lint >/dev/null 2>&1; then
+        if ! golangci-lint run ./pkg/chatbackup/... ./cmd/backup/...; then
+            print_color $RED " chatbackup lint guard failed"
+            exit 1
+        fi
+    else
+        print_color $YELLOW " golangci-lint not found; skipping chatbackup lint guard"
+    fi
 fi
 
 # 6. Quick coverage check for critical packages if modified

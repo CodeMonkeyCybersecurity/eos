@@ -99,7 +99,7 @@ type BackupConfig struct {
 // DefaultBackupConfig returns sensible defaults.
 func DefaultBackupConfig() BackupConfig {
 	return BackupConfig{
-		ExtraScanDirs: []string{"/opt"},
+		ExtraScanDirs: []string{DefaultProjectScanDir},
 		Retention:     DefaultRetentionPolicy(),
 	}
 }
@@ -184,11 +184,21 @@ type ScheduleResult struct {
 
 // BackupStatus tracks backup health for monitoring/alerting.
 type BackupStatus struct {
+	// LastAttempt is the RFC3339 timestamp of the latest backup attempt.
+	LastAttempt string `json:"last_attempt,omitempty"`
+
+	// LastRunState is the outcome of the latest backup attempt.
+	// Values: success, failure, noop
+	LastRunState string `json:"last_run_state,omitempty"`
+
 	// LastSuccess is the RFC3339 timestamp of last successful backup
 	LastSuccess string `json:"last_success,omitempty"`
 
 	// LastFailure is the RFC3339 timestamp of last failed backup
 	LastFailure string `json:"last_failure,omitempty"`
+
+	// LastError is a compact human-readable error for the latest failed attempt.
+	LastError string `json:"last_error,omitempty"`
 
 	// LastSnapshotID is the ID of the most recent snapshot
 	LastSnapshotID string `json:"last_snapshot_id,omitempty"`
@@ -210,6 +220,15 @@ type BackupStatus struct {
 
 	// ToolsFound lists AI tools discovered in last run
 	ToolsFound []string `json:"tools_found,omitempty"`
+
+	// UsersScanned lists users whose homes were scanned in the last run.
+	UsersScanned []string `json:"users_scanned,omitempty"`
+
+	// PathsBackedUpCount is the number of included paths in the last run.
+	PathsBackedUpCount int `json:"paths_backed_up_count,omitempty"`
+
+	// PathsSkippedCount is the number of skipped paths in the last run.
+	PathsSkippedCount int `json:"paths_skipped_count,omitempty"`
 }
 
 // BackupManifest records exactly what was included in a successful backup run.

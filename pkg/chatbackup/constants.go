@@ -30,6 +30,10 @@ const (
 	// RATIONALE: Machine-readable health metrics for monitoring/alerting
 	ResticStatusSubdir = ".eos/restic/chat-archive-status.json"
 
+	// ResticManifestSubdir is the backup manifest file relative to home directory
+	// RATIONALE: Single source of truth for per-run inclusion evidence
+	ResticManifestSubdir = ".eos/restic/chat-archive-manifest.json"
+
 	// ResticLogSubdir is the log file relative to home directory
 	ResticLogSubdir = ".eos/restic/chat-archive.log"
 
@@ -43,6 +47,10 @@ const (
 	// RootUsername is the system root user name.
 	// Used to detect root context and resolve /root home directory.
 	RootUsername = "root"
+
+	// DefaultProjectScanDir is the default filesystem root scanned for
+	// project-level AI context files when callers do not provide overrides.
+	DefaultProjectScanDir = "/opt"
 )
 
 const (

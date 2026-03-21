@@ -174,7 +174,11 @@ func TestIntegration_Backup_StatusFileUpdated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update status
-	updateStatus(logger, statusFile, result, []string{"claude-code"}, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{
+		Result:        result,
+		ToolsFound:    []string{"claude-code"},
+		PathsBackedUp: []string{claudeDir},
+	}, "")
 
 	// Verify status file
 	data, err := os.ReadFile(statusFile)
@@ -295,4 +299,39 @@ func TestIntegration_ListSnapshots_Works(t *testing.T) {
 	output, err := ListSnapshots(rc, BackupConfig{HomeDir: tmpDir})
 	require.NoError(t, err)
 	assert.Contains(t, output, "ID")
+}
+
+func TestIntegration_CopySnapshots_Works(t *testing.T) {
+	requireRestic(t)
+
+	tmpDir := t.TempDir()
+	sourceRepo := filepath.Join(tmpDir, "source-repo")
+	sourcePassword := filepath.Join(tmpDir, "source-password")
+	destinationRepo := filepath.Join(tmpDir, "destination-repo")
+	destinationPassword := filepath.Join(tmpDir, "destination-password")
+	claudeDir := filepath.Join(tmpDir, ".claude", "projects")
+
+	require.NoError(t, os.MkdirAll(claudeDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(claudeDir, "session.jsonl"), []byte(`{"test": true}`+"\n"), 0644))
+	require.NoError(t, generatePassword(sourcePassword))
+	require.NoError(t, generatePassword(destinationPassword))
+
+	rc := newTestRC(t)
+	require.NoError(t, initRepo(rc, sourceRepo, sourcePassword))
+	require.NoError(t, initRepo(rc, destinationRepo, destinationPassword))
+
+	_, err := runResticBackup(rc.Ctx, newSilentLogger(), sourceRepo, sourcePassword, []string{claudeDir})
+	require.NoError(t, err)
+
+	require.NoError(t, copySnapshots(rc, storagePaths{
+		Repo:         sourceRepo,
+		PasswordFile: sourcePassword,
+	}, storagePaths{
+		Repo:         destinationRepo,
+		PasswordFile: destinationPassword,
+	}))
+
+	hasSnapshots, err := repoHasTaggedSnapshots(rc, destinationRepo, destinationPassword)
+	require.NoError(t, err)
+	assert.True(t, hasSnapshots)
 }

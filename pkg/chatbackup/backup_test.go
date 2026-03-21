@@ -2,7 +2,9 @@ package chatbackup
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -308,11 +310,11 @@ func TestDefaultToolRegistry_CoversHostMetadataPaths(t *testing.T) {
 		t.Fatalf("expected %s to include path %s", toolName, path)
 	}
 
-	assertToolPath("claude-code", "~/.claude/.credentials.json")
 	assertToolPath("codex", "~/.codex/auth.json")
 	assertToolPath("codex", "~/.codex/session_index.jsonl")
-	assertToolPath("gemini-cli", "~/.gemini/oauth_creds.json")
 	assertToolPath("windsurf", "~/.config/Windsurf/User")
+	assert.Contains(t, DefaultExcludes(), ".claude/.credentials.json")
+	assert.Contains(t, DefaultExcludes(), ".gemini/oauth_creds.json")
 	assert.Contains(t, ProjectContextPatterns(), "MEMORY.md")
 	assert.Contains(t, ProjectContextPatterns(), "memory.mds")
 }
@@ -452,7 +454,11 @@ func TestUpdateStatus_Success(t *testing.T) {
 		BytesAdded: 1024,
 	}
 
-	updateStatus(logger, statusFile, result, []string{"claude-code"}, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{
+		Result:        result,
+		ToolsFound:    []string{"claude-code"},
+		PathsBackedUp: []string{"/tmp/fake"},
+	}, "")
 
 	// Read and verify
 	data, err := os.ReadFile(statusFile)
@@ -461,12 +467,16 @@ func TestUpdateStatus_Success(t *testing.T) {
 	var status BackupStatus
 	require.NoError(t, json.Unmarshal(data, &status))
 
+	assert.NotEmpty(t, status.LastAttempt)
+	assert.Equal(t, "success", status.LastRunState)
 	assert.NotEmpty(t, status.LastSuccess)
+	assert.Empty(t, status.LastError)
 	assert.Equal(t, "abc123", status.LastSnapshotID)
 	assert.Equal(t, int64(1024), status.BytesAdded)
 	assert.Equal(t, 1, status.SuccessCount)
 	assert.NotEmpty(t, status.FirstBackup)
 	assert.Contains(t, status.ToolsFound, "claude-code")
+	assert.Equal(t, 1, status.PathsBackedUpCount)
 }
 
 func TestUpdateStatus_Failure(t *testing.T) {
@@ -474,7 +484,10 @@ func TestUpdateStatus_Failure(t *testing.T) {
 	statusFile := filepath.Join(tmpDir, "status.json")
 	logger := newSilentLogger()
 
-	updateStatus(logger, statusFile, nil, []string{"claude-code"}, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{
+		RunErr:     assert.AnError,
+		ToolsFound: []string{"claude-code"},
+	}, "")
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -482,7 +495,9 @@ func TestUpdateStatus_Failure(t *testing.T) {
 	var status BackupStatus
 	require.NoError(t, json.Unmarshal(data, &status))
 
+	assert.Equal(t, "failure", status.LastRunState)
 	assert.NotEmpty(t, status.LastFailure)
+	assert.Contains(t, status.LastError, "assert.AnError")
 	assert.Equal(t, 1, status.FailureCount)
 	assert.Empty(t, status.LastSuccess, "success should not be set on failure")
 }
@@ -494,10 +509,10 @@ func TestUpdateStatus_IncrementalCounts(t *testing.T) {
 
 	// Two successes then a failure
 	result := &BackupResult{SnapshotID: "snap1"}
-	updateStatus(logger, statusFile, result, nil, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{Result: result}, "")
 	result2 := &BackupResult{SnapshotID: "snap2"}
-	updateStatus(logger, statusFile, result2, nil, "")
-	updateStatus(logger, statusFile, nil, nil, "") // failure
+	updateStatus(logger, statusFile, backupStatusUpdate{Result: result2}, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{RunErr: assert.AnError}, "") // failure
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -507,6 +522,7 @@ func TestUpdateStatus_IncrementalCounts(t *testing.T) {
 
 	assert.Equal(t, 2, status.SuccessCount)
 	assert.Equal(t, 1, status.FailureCount)
+	assert.Equal(t, "failure", status.LastRunState)
 	assert.Equal(t, "snap2", status.LastSnapshotID)
 }
 
@@ -516,7 +532,7 @@ func TestUpdateStatus_PreservesFirstBackup(t *testing.T) {
 	logger := newSilentLogger()
 
 	result := &BackupResult{SnapshotID: "first"}
-	updateStatus(logger, statusFile, result, nil, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{Result: result}, "")
 
 	data, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -526,7 +542,7 @@ func TestUpdateStatus_PreservesFirstBackup(t *testing.T) {
 
 	// Second backup should NOT overwrite FirstBackup
 	result2 := &BackupResult{SnapshotID: "second"}
-	updateStatus(logger, statusFile, result2, nil, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{Result: result2}, "")
 
 	data2, err := os.ReadFile(statusFile)
 	require.NoError(t, err)
@@ -535,4 +551,282 @@ func TestUpdateStatus_PreservesFirstBackup(t *testing.T) {
 
 	assert.Equal(t, firstBackup, status2.FirstBackup,
 		"first backup timestamp should be preserved")
+}
+
+func TestUpdateStatus_NoopClearsLastErrorWithoutChangingCounters(t *testing.T) {
+	tmpDir := t.TempDir()
+	statusFile := filepath.Join(tmpDir, "status.json")
+	logger := newSilentLogger()
+
+	updateStatus(logger, statusFile, backupStatusUpdate{
+		RunErr:     assert.AnError,
+		ToolsFound: []string{"claude-code"},
+	}, "")
+	updateStatus(logger, statusFile, backupStatusUpdate{
+		ToolsFound:   []string{"claude-code"},
+		UsersScanned: []string{"henry"},
+	}, "")
+
+	data, err := os.ReadFile(statusFile)
+	require.NoError(t, err)
+
+	var status BackupStatus
+	require.NoError(t, json.Unmarshal(data, &status))
+
+	assert.Equal(t, "noop", status.LastRunState)
+	assert.Empty(t, status.LastError)
+	assert.Equal(t, 0, status.SuccessCount)
+	assert.Equal(t, 1, status.FailureCount)
+	assert.Equal(t, []string{"henry"}, status.UsersScanned)
+}
+
+func TestUpdateStatus_CorruptExistingFileStartsFresh(t *testing.T) {
+	tmpDir := t.TempDir()
+	statusFile := filepath.Join(tmpDir, "status.json")
+	require.NoError(t, os.WriteFile(statusFile, []byte("{not-json"), 0600))
+
+	updateStatus(newSilentLogger(), statusFile, backupStatusUpdate{
+		Result:        &BackupResult{SnapshotID: "snap-1"},
+		PathsBackedUp: []string{"/tmp/fake"},
+	}, "")
+
+	data, err := os.ReadFile(statusFile)
+	require.NoError(t, err)
+
+	var status BackupStatus
+	require.NoError(t, json.Unmarshal(data, &status))
+	assert.Equal(t, "success", status.LastRunState)
+	assert.Equal(t, "snap-1", status.LastSnapshotID)
+	assert.Equal(t, 1, status.SuccessCount)
+}
+
+func TestWriteManifest_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	manifestFile := filepath.Join(tmpDir, "manifest.json")
+
+	writeManifest(newSilentLogger(), manifestFile, &BackupResult{
+		SnapshotID:    "snap-1",
+		UsersScanned:  []string{"henry"},
+		ToolsFound:    []string{"claude-code"},
+		PathsBackedUp: []string{"/tmp/project"},
+		PathsSkipped:  []string{"/tmp/missing"},
+	}, "")
+
+	data, err := os.ReadFile(manifestFile)
+	require.NoError(t, err)
+
+	var manifest BackupManifest
+	require.NoError(t, json.Unmarshal(data, &manifest))
+	assert.Equal(t, "snap-1", manifest.SnapshotID)
+	assert.Equal(t, []string{"henry"}, manifest.UsersScanned)
+	assert.Equal(t, []string{"/tmp/project"}, manifest.PathsIncluded)
+	assert.Equal(t, []string{"/tmp/missing"}, manifest.PathsSkipped)
+}
+
+func TestWriteManifest_SkipWhenSnapshotMissing(t *testing.T) {
+	manifestFile := filepath.Join(t.TempDir(), "manifest.json")
+	writeManifest(newSilentLogger(), manifestFile, &BackupResult{}, "")
+	_, err := os.Stat(manifestFile)
+	assert.Error(t, err)
+}
+
+func TestWriteManifest_DirectoryCreationFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	parentFile := filepath.Join(tmpDir, "not-a-dir")
+	require.NoError(t, os.WriteFile(parentFile, []byte("x"), 0600))
+
+	writeManifest(newSilentLogger(), filepath.Join(parentFile, "manifest.json"), &BackupResult{
+		SnapshotID: "snap-1",
+	}, "")
+}
+
+func TestWriteManifest_RenameFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	manifestTarget := filepath.Join(tmpDir, "manifest-target")
+	require.NoError(t, os.MkdirAll(manifestTarget, 0700))
+
+	writeManifest(newSilentLogger(), manifestTarget, &BackupResult{
+		SnapshotID: "snap-1",
+	}, "")
+}
+
+func TestWriteManifest_EnsuresOwnership(t *testing.T) {
+	manifestFile := filepath.Join(t.TempDir(), "manifest.json")
+
+	oldGeteuid := osGeteuid
+	oldLookup := userLookup
+	oldChown := osChown
+	osGeteuid = func() int { return 0 }
+	userLookup = func(string) (*user.User, error) {
+		return &user.User{Uid: "1001", Gid: "1002"}, nil
+	}
+	called := false
+	osChown = func(path string, uid, gid int) error {
+		called = true
+		assert.Equal(t, manifestFile, path)
+		return nil
+	}
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+		userLookup = oldLookup
+		osChown = oldChown
+	})
+
+	writeManifest(newSilentLogger(), manifestFile, &BackupResult{SnapshotID: "snap-1"}, "henry")
+	assert.True(t, called)
+}
+
+func TestPersistBackupRun_WritesManifestOnSuccess(t *testing.T) {
+	tmpDir := t.TempDir()
+	paths := storagePaths{
+		StatusFile:   filepath.Join(tmpDir, "status.json"),
+		ManifestFile: filepath.Join(tmpDir, "manifest.json"),
+	}
+
+	persistBackupRun(newSilentLogger(), paths, "", backupStatusUpdate{
+		Result: &BackupResult{
+			SnapshotID:    "snap-2",
+			UsersScanned:  []string{"henry"},
+			ToolsFound:    []string{"claude-code"},
+			PathsBackedUp: []string{"/tmp/project"},
+		},
+		ToolsFound:    []string{"claude-code"},
+		UsersScanned:  []string{"henry"},
+		PathsBackedUp: []string{"/tmp/project"},
+	})
+
+	_, statusErr := os.Stat(paths.StatusFile)
+	require.NoError(t, statusErr)
+	_, manifestErr := os.Stat(paths.ManifestFile)
+	require.NoError(t, manifestErr)
+}
+
+func TestPersistBackupRun_SkipsManifestOnFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	paths := storagePaths{
+		StatusFile:   filepath.Join(tmpDir, "status.json"),
+		ManifestFile: filepath.Join(tmpDir, "manifest.json"),
+	}
+
+	persistBackupRun(newSilentLogger(), paths, "", backupStatusUpdate{
+		RunErr:        assert.AnError,
+		ToolsFound:    []string{"claude-code"},
+		UsersScanned:  []string{"henry"},
+		PathsBackedUp: []string{"/tmp/project"},
+	})
+
+	_, statusErr := os.Stat(paths.StatusFile)
+	require.NoError(t, statusErr)
+	_, manifestErr := os.Stat(paths.ManifestFile)
+	assert.Error(t, manifestErr)
+}
+
+func TestPersistBackupRun_NoStatusPathIsNoop(t *testing.T) {
+	persistBackupRun(newSilentLogger(), storagePaths{}, "", backupStatusUpdate{
+		Result: &BackupResult{SnapshotID: "snap-3"},
+	})
+}
+
+func TestNormalizeScanDirs_DefaultSingleUser(t *testing.T) {
+	assert.Equal(t, []string{"/opt"}, normalizeScanDirs(BackupConfig{}, []scannedUser{{Username: "henry", HomeDir: "/home/henry"}}))
+}
+
+func TestResolveStoragePaths_SingleUser(t *testing.T) {
+	got, err := resolveStoragePaths(BackupConfig{}, []scannedUser{{Username: "henry", HomeDir: "/home/henry"}})
+	require.NoError(t, err)
+	assert.Equal(t, "/home/henry/"+ResticRepoSubdir, got.Repo)
+	assert.Equal(t, "/home/henry/"+ResticManifestSubdir, got.ManifestFile)
+}
+
+func TestNormalizeScanDirs_AllUsersIncludesHomes(t *testing.T) {
+	got := normalizeScanDirs(BackupConfig{AllUsers: true}, []scannedUser{
+		{Username: "alice", HomeDir: "/home/alice"},
+		{Username: "bob", HomeDir: "/srv/bob"},
+	})
+	assert.Equal(t, []string{"/home", "/home/alice", "/opt", "/srv/bob"}, got)
+}
+
+func TestNormalizeScanDirs_ExplicitOverrideWins(t *testing.T) {
+	got := normalizeScanDirs(BackupConfig{
+		AllUsers:      true,
+		ExtraScanDirs: []string{"/srv", "/srv", "/opt/custom"},
+	}, nil)
+	assert.Equal(t, []string{"/home", "/opt/custom", "/srv"}, got)
+}
+
+func TestOwnershipUser(t *testing.T) {
+	oldGeteuid := osGeteuid
+	osGeteuid = func() int { return 0 }
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+	})
+
+	assert.Equal(t, "henry", ownershipUser(BackupConfig{User: "henry"}))
+	assert.Empty(t, ownershipUser(BackupConfig{AllUsers: true, User: "henry"}))
+	assert.Empty(t, ownershipUser(BackupConfig{User: RootUsername}))
+	assert.Empty(t, ownershipUser(BackupConfig{}))
+}
+
+func TestEnsureOwnership_NoopBranches(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "status.json")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("{}"), 0600))
+
+	require.NoError(t, ensureOwnership(tmpFile, ""))
+
+	oldGeteuid := osGeteuid
+	osGeteuid = func() int { return 1000 }
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+	})
+
+	require.NoError(t, ensureOwnership(tmpFile, "henry"))
+}
+
+func TestAcquireBackupLock_SetsOwnershipForDelegatedUser(t *testing.T) {
+	lockFile := filepath.Join(t.TempDir(), "chatbackup.lock")
+
+	oldGeteuid := osGeteuid
+	oldLookup := userLookup
+	oldChown := osChown
+	osGeteuid = func() int { return 0 }
+	userLookup = func(string) (*user.User, error) {
+		return &user.User{Uid: "1001", Gid: "1002"}, nil
+	}
+	called := false
+	osChown = func(path string, uid, gid int) error {
+		called = true
+		assert.Equal(t, lockFile, path)
+		assert.Equal(t, 1001, uid)
+		assert.Equal(t, 1002, gid)
+		return nil
+	}
+	t.Cleanup(func() {
+		osGeteuid = oldGeteuid
+		userLookup = oldLookup
+		osChown = oldChown
+	})
+
+	lock, err := acquireBackupLock(lockFile, "henry")
+	require.NoError(t, err)
+	assert.True(t, called)
+	releaseBackupLock(lock)
+}
+
+func TestParseID(t *testing.T) {
+	id, err := parseID("42")
+	require.NoError(t, err)
+	assert.Equal(t, 42, id)
+
+	_, err = parseID("not-a-number")
+	require.Error(t, err)
+}
+
+func TestCompactError(t *testing.T) {
+	assert.Empty(t, compactError(nil))
+	longMessage := strings.Repeat("word ", 80)
+	assert.Equal(t, assert.AnError.Error(), compactError(assert.AnError))
+
+	truncated := compactError(errors.New(longMessage))
+	assert.LessOrEqual(t, len(truncated), 240)
+	assert.True(t, strings.HasSuffix(truncated, "..."))
 }

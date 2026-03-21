@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -138,7 +137,7 @@ func Setup(rc *eos_io.RuntimeContext, config ScheduleConfig) (*ScheduleResult, e
 		// INTERVENE: Fix ownership if running as root for another user.
 		if osGeteuid() == 0 && config.User != "" && config.User != RootUsername {
 			eosDir := filepath.Join(homeDir, ".eos")
-			if err := chownToUser(eosDir, config.User); err != nil {
+			if err := ensureOwnershipRecursive(eosDir, config.User); err != nil {
 				logger.Warn("Failed to change ownership of .eos directory",
 					zap.String("path", eosDir),
 					zap.Error(err))
@@ -451,25 +450,31 @@ func RunPrune(rc *eos_io.RuntimeContext, config BackupConfig) error {
 	return nil
 }
 
-// chownToUser changes ownership of a path to a user.
-func chownToUser(path, username string) error {
-	u, err := user.Lookup(username)
+// ensureOwnershipRecursive changes ownership of a path and all children to
+// the given user. It delegates UID/GID resolution to the same userLookup
+// used by ensureOwnership (DRY). Unlike ensureOwnership (single file), this
+// walks the entire tree — needed for .eos directory setup.
+func ensureOwnershipRecursive(path, username string) error {
+	if username == "" || osGeteuid() != 0 {
+		return nil
+	}
+	u, err := userLookup(username)
 	if err != nil {
-		return err
+		return fmt.Errorf("lookup user %q: %w", username, err)
 	}
 	uid, err := strconv.Atoi(u.Uid)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse uid for %q: %w", username, err)
 	}
 	gid, err := strconv.Atoi(u.Gid)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse gid for %q: %w", username, err)
 	}
 	return filepath.Walk(path, func(current string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		return os.Chown(current, uid, gid)
+		return osChown(current, uid, gid)
 	})
 }
 
@@ -516,21 +521,14 @@ func findLegacyRepositories() []storagePaths {
 	sources := make([]storagePaths, 0, len(users))
 	for _, scanned := range users {
 		homeDir := scanned.HomeDir
-		repo := filepath.Join(homeDir, ResticRepoSubdir)
-		password := filepath.Join(homeDir, ResticPasswordSubdir)
-		if _, err := os.Stat(repo); err != nil {
+		paths := userStoragePaths(homeDir)
+		if _, err := os.Stat(paths.Repo); err != nil {
 			continue
 		}
-		if _, err := os.Stat(password); err != nil {
+		if _, err := os.Stat(paths.PasswordFile); err != nil {
 			continue
 		}
-		sources = append(sources, storagePaths{
-			Repo:         repo,
-			PasswordFile: password,
-			StatusFile:   filepath.Join(homeDir, ResticStatusSubdir),
-			ManifestFile: filepath.Join(homeDir, ".eos/restic/chat-archive-manifest.json"),
-			LockFile:     filepath.Join(homeDir, ResticLockSubdir),
-		})
+		sources = append(sources, paths)
 	}
 	return sources
 }

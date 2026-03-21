@@ -56,6 +56,9 @@ run_unit() {
   run_with_timeout 10m bash -c \
     "set -euo pipefail; go test -json -short -count=1 -vet=off ./cmd/backup/... | tee '${lane_dir}/unit-cmd-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 
+  run_with_timeout 5m bash -c \
+    "set -euo pipefail; bash test/ci/test-chatbackup-health.sh | tee '${lane_dir}/unit-chatbackup-health.txt'; test \${PIPESTATUS[0]} -eq 0"
+
   run_with_timeout 15m bash -c \
     "set -euo pipefail; go test -json -short -count=1 -race -vet=off ./pkg/crypto/... ./pkg/interaction/... ./pkg/parse/... ./pkg/verify/... | tee '${race_jsonl}'; test \${PIPESTATUS[0]} -eq 0"
 
@@ -115,7 +118,18 @@ run_integration() {
     return 0
   fi
 
-  # restic no longer needed — chatbackup replaced by pkg/chats (tar.gz + SHA-256 manifest)
+  if ! command -v restic >/dev/null 2>&1; then
+    if [[ -x "${PWD}/.bin/restic" ]]; then
+      export PATH="${PWD}/.bin:${PATH}"
+    elif command -v sudo >/dev/null 2>&1; then
+      echo "Installing restic for chatbackup integration tests"
+      sudo apt-get update
+      sudo apt-get install -y restic
+    else
+      echo "::error::restic not found and no non-interactive install path available"
+      exit 1
+    fi
+  fi
 
   local run_id network_name vault_container pg_container
   run_id="${GITHUB_RUN_ID:-local}-$$"
@@ -127,7 +141,7 @@ run_integration() {
     docker rm -f "${vault_container}" "${pg_container}" >/dev/null 2>&1 || true
     docker network rm "${network_name}" >/dev/null 2>&1 || true
   }
-  trap cleanup EXIT
+  trap "docker rm -f \"${vault_container}\" \"${pg_container}\" >/dev/null 2>&1 || true; docker network rm \"${network_name}\" >/dev/null 2>&1 || true" EXIT
 
   # Remove any leftover containers from a previous aborted run with the same run_id.
   cleanup
@@ -197,11 +211,17 @@ run_integration() {
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee '${lane_dir}/integration-suite.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
+    "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/chatbackup/... | tee '${lane_dir}/integration-chatbackup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/git/... | tee '${lane_dir}/integration-git.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
-  run_with_timeout 20m bash -c \
-    "set -euo pipefail; go test -json -v -timeout=15m ./pkg/chats/... | tee '${lane_dir}/integration-chats.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  if [[ -d pkg/chats ]]; then
+    run_with_timeout 20m bash -c \
+      "set -euo pipefail; go test -json -v -timeout=15m ./pkg/chats/... | tee '${lane_dir}/integration-chats.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+  else
+    echo "Skipping integration-chats: pkg/chats not present"
+  fi
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/vault/... | tee '${lane_dir}/integration-vault.jsonl'; test \${PIPESTATUS[0]} -eq 0"
 

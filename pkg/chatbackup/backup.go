@@ -58,6 +58,8 @@ type resticSummary struct {
 
 var osGeteuid = os.Geteuid
 var passwdFilePath = "/etc/passwd"
+var userLookup = user.Lookup
+var osChown = os.Chown
 
 type storagePaths struct {
 	Repo         string
@@ -72,13 +74,33 @@ type scannedUser struct {
 	HomeDir  string
 }
 
+type backupStatusUpdate struct {
+	Result        *BackupResult
+	RunErr        error
+	ToolsFound    []string
+	UsersScanned  []string
+	PathsBackedUp []string
+	PathsSkipped  []string
+}
+
+func (u backupStatusUpdate) state() string {
+	switch {
+	case u.RunErr != nil:
+		return "failure"
+	case len(u.PathsBackedUp) == 0:
+		return "noop"
+	default:
+		return "success"
+	}
+}
+
 // RunBackup executes a single backup run.
 // It discovers AI tool data, runs restic backup, and returns the result.
 //
 // ASSESS: Resolve paths, check which tools have data
 // INTERVENE: Run restic backup
 // EVALUATE: Parse output, update status file
-func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, error) {
+func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (result *BackupResult, err error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	users, err := resolveBackupUsers(config)
@@ -93,6 +115,25 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 	if err != nil {
 		return nil, &opError{Op: "resolve storage paths", Err: err}
 	}
+	ownerUser := ownershipUser(config)
+	var paths []string
+	var toolsFound []string
+	var skipped []string
+	var usersScanned []string
+
+	defer func() {
+		if config.DryRun {
+			return
+		}
+		persistBackupRun(logger, pathsCfg, ownerUser, backupStatusUpdate{
+			Result:        result,
+			RunErr:        err,
+			ToolsFound:    toolsFound,
+			UsersScanned:  usersScanned,
+			PathsBackedUp: paths,
+			PathsSkipped:  skipped,
+		})
+	}()
 
 	scanDirs := normalizeScanDirs(config, users)
 
@@ -104,7 +145,7 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 
 	// ASSESS: Discover which AI tools have data
 	registry := DefaultToolRegistry()
-	paths, toolsFound, skipped, usersScanned := discoverPathsForUsers(logger, registry, users)
+	paths, toolsFound, skipped, usersScanned = discoverPathsForUsers(logger, registry, users)
 
 	// ASSESS: Discover project-level context files in ExtraScanDirs
 	projectPaths := discoverProjectContext(logger, scanDirs)
@@ -141,7 +182,6 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 
 	// ASSESS: Check restic is available
 	if _, err := exec.LookPath("restic"); err != nil {
-		updateStatus(logger, pathsCfg.StatusFile, nil, toolsFound, ownershipUser(config))
 		return nil, &opError{
 			Op:  "check restic installation",
 			Err: fmt.Errorf("%w", ErrResticNotInstalled),
@@ -150,25 +190,21 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 
 	// ASSESS: Check repository is initialized
 	if err := checkRepoInitialized(rc.Ctx, pathsCfg.Repo, pathsCfg.PasswordFile); err != nil {
-		updateStatus(logger, pathsCfg.StatusFile, nil, toolsFound, ownershipUser(config))
 		return nil, &opError{
 			Op:  "check repository initialization",
 			Err: fmt.Errorf("%w at %s: %v", ErrRepositoryNotInitialized, pathsCfg.Repo, err),
 		}
 	}
 
-	lockHandle, err := acquireBackupLock(pathsCfg.LockFile, ownershipUser(config))
+	lockHandle, err := acquireBackupLock(pathsCfg.LockFile, ownerUser)
 	if err != nil {
-		updateStatus(logger, pathsCfg.StatusFile, nil, toolsFound, ownershipUser(config))
 		return nil, &opError{Op: "acquire backup lock", Err: err}
 	}
 	defer releaseBackupLock(lockHandle)
 
 	// INTERVENE: Run restic backup
-	result, err := runResticBackup(rc.Ctx, logger, pathsCfg.Repo, pathsCfg.PasswordFile, paths)
+	result, err = runResticBackup(rc.Ctx, logger, pathsCfg.Repo, pathsCfg.PasswordFile, paths)
 	if err != nil {
-		// Update status with failure
-		updateStatus(logger, pathsCfg.StatusFile, nil, toolsFound, ownershipUser(config))
 		return nil, fmt.Errorf("restic backup failed: %w", err)
 	}
 
@@ -176,10 +212,6 @@ func RunBackup(rc *eos_io.RuntimeContext, config BackupConfig) (*BackupResult, e
 	result.PathsSkipped = skipped
 	result.ToolsFound = toolsFound
 	result.UsersScanned = usersScanned
-
-	// EVALUATE: Update status file
-	updateStatus(logger, pathsCfg.StatusFile, result, toolsFound, ownershipUser(config))
-	writeManifest(logger, pathsCfg.ManifestFile, result, ownershipUser(config))
 
 	logger.Info("Chat archive backup completed",
 		zap.String("snapshot_id", result.SnapshotID),
@@ -421,8 +453,19 @@ func checkRepoInitialized(ctx context.Context, repoPath, passwordFile string) er
 	return cmd.Run()
 }
 
+func persistBackupRun(logger otelzap.LoggerWithCtx, pathsCfg storagePaths, ownerUser string, update backupStatusUpdate) {
+	if pathsCfg.StatusFile == "" {
+		return
+	}
+
+	updateStatus(logger, pathsCfg.StatusFile, update, ownerUser)
+	if update.RunErr == nil && update.Result != nil && update.Result.SnapshotID != "" {
+		writeManifest(logger, pathsCfg.ManifestFile, update.Result, ownerUser)
+	}
+}
+
 // updateStatus writes the backup status file for monitoring.
-func updateStatus(logger otelzap.LoggerWithCtx, statusFile string, result *BackupResult, toolsFound []string, ownerUser string) {
+func updateStatus(logger otelzap.LoggerWithCtx, statusFile string, update backupStatusUpdate, ownerUser string) {
 	if err := os.MkdirAll(filepath.Dir(statusFile), ResticDirPerm); err != nil {
 		logger.Warn("Failed to create status directory",
 			zap.String("path", filepath.Dir(statusFile)),
@@ -441,21 +484,29 @@ func updateStatus(logger otelzap.LoggerWithCtx, statusFile string, result *Backu
 	}
 
 	now := time.Now().Format(time.RFC3339)
-	status.ToolsFound = toolsFound
+	status.LastAttempt = now
+	status.LastRunState = update.state()
+	status.ToolsFound = update.ToolsFound
+	status.UsersScanned = update.UsersScanned
+	status.PathsBackedUpCount = len(update.PathsBackedUp)
+	status.PathsSkippedCount = len(update.PathsSkipped)
 
-	if result != nil {
+	if update.RunErr != nil {
+		status.LastFailure = now
+		status.LastError = compactError(update.RunErr)
+		status.FailureCount++
+	} else if update.Result != nil && update.Result.SnapshotID != "" {
 		// Success
 		status.LastSuccess = now
-		status.LastSnapshotID = result.SnapshotID
-		status.BytesAdded = result.BytesAdded
+		status.LastSnapshotID = update.Result.SnapshotID
+		status.BytesAdded = update.Result.BytesAdded
+		status.LastError = ""
 		status.SuccessCount++
 		if status.FirstBackup == "" {
 			status.FirstBackup = now
 		}
 	} else {
-		// Failure
-		status.LastFailure = now
-		status.FailureCount++
+		status.LastError = ""
 	}
 
 	data, err := json.MarshalIndent(status, "", "  ")
@@ -486,6 +537,14 @@ func updateStatus(logger otelzap.LoggerWithCtx, statusFile string, result *Backu
 			zap.String("user", ownerUser),
 			zap.Error(err))
 	}
+
+	logger.Info("Updated chat archive backup status",
+		zap.String("path", statusFile),
+		zap.String("state", status.LastRunState),
+		zap.Int("success_count", status.SuccessCount),
+		zap.Int("failure_count", status.FailureCount),
+		zap.Int("paths_backed_up_count", status.PathsBackedUpCount),
+		zap.Int("paths_skipped_count", status.PathsSkippedCount))
 }
 
 func writeManifest(logger otelzap.LoggerWithCtx, manifestFile string, result *BackupResult, ownerUser string) {
@@ -806,40 +865,29 @@ func listScannedUsers() ([]scannedUser, error) {
 
 func resolveStoragePaths(config BackupConfig, users []scannedUser) (storagePaths, error) {
 	if config.AllUsers {
-		return storagePaths{
-			Repo:         MachineRepoPath,
-			PasswordFile: MachinePasswordFile,
-			StatusFile:   MachineStatusFile,
-			ManifestFile: MachineManifestFile,
-			LockFile:     MachineLockFile,
-		}, nil
+		return machineStoragePaths(), nil
 	}
 	if len(users) == 0 {
 		return storagePaths{}, fmt.Errorf("no user scope provided")
 	}
 
-	homeDir := users[0].HomeDir
-	return storagePaths{
-		Repo:         filepath.Join(homeDir, ResticRepoSubdir),
-		PasswordFile: filepath.Join(homeDir, ResticPasswordSubdir),
-		StatusFile:   filepath.Join(homeDir, ResticStatusSubdir),
-		ManifestFile: filepath.Join(homeDir, ".eos/restic/chat-archive-manifest.json"),
-		LockFile:     filepath.Join(homeDir, ResticLockSubdir),
-	}, nil
+	return userStoragePaths(users[0].HomeDir), nil
 }
 
 func normalizeScanDirs(config BackupConfig, users []scannedUser) []string {
-	if config.ExtraScanDirs != nil && (!config.AllUsers || len(config.ExtraScanDirs) != 1 || config.ExtraScanDirs[0] != "/opt") {
-		return dedupeStrings(config.ExtraScanDirs)
+	// Start with explicit dirs if provided, otherwise default to /opt.
+	scanDirs := config.ExtraScanDirs
+	if len(scanDirs) == 0 {
+		scanDirs = []string{DefaultProjectScanDir}
 	}
 
-	if !config.AllUsers {
-		return []string{"/opt"}
-	}
-
-	scanDirs := []string{"/opt", "/home"}
-	for _, u := range users {
-		scanDirs = append(scanDirs, u.HomeDir)
+	// In all-users mode, also scan /home and each user's home directory
+	// so that project-level context files (CLAUDE.md, AGENTS.md) are found.
+	if config.AllUsers {
+		scanDirs = append(scanDirs, "/home")
+		for _, u := range users {
+			scanDirs = append(scanDirs, u.HomeDir)
+		}
 	}
 
 	return dedupeStrings(scanDirs)
@@ -866,11 +914,31 @@ func ownershipUser(config BackupConfig) string {
 	return config.User
 }
 
+func userStoragePaths(homeDir string) storagePaths {
+	return storagePaths{
+		Repo:         filepath.Join(homeDir, ResticRepoSubdir),
+		PasswordFile: filepath.Join(homeDir, ResticPasswordSubdir),
+		StatusFile:   filepath.Join(homeDir, ResticStatusSubdir),
+		ManifestFile: filepath.Join(homeDir, ResticManifestSubdir),
+		LockFile:     filepath.Join(homeDir, ResticLockSubdir),
+	}
+}
+
+func machineStoragePaths() storagePaths {
+	return storagePaths{
+		Repo:         MachineRepoPath,
+		PasswordFile: MachinePasswordFile,
+		StatusFile:   MachineStatusFile,
+		ManifestFile: MachineManifestFile,
+		LockFile:     MachineLockFile,
+	}
+}
+
 func ensureOwnership(path, username string) error {
 	if username == "" || osGeteuid() != 0 {
 		return nil
 	}
-	u, err := user.Lookup(username)
+	u, err := userLookup(username)
 	if err != nil {
 		return fmt.Errorf("lookup user %q: %w", username, err)
 	}
@@ -882,7 +950,7 @@ func ensureOwnership(path, username string) error {
 	if err != nil {
 		return fmt.Errorf("parse gid for %q: %w", username, err)
 	}
-	if err := os.Chown(path, uid, gid); err != nil && !os.IsNotExist(err) {
+	if err := osChown(path, uid, gid); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
@@ -894,4 +962,17 @@ func parseID(value string) (int, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+func compactError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	message := strings.Join(strings.Fields(err.Error()), " ")
+	if len(message) <= 240 {
+		return message
+	}
+
+	return message[:237] + "..."
 }
