@@ -480,7 +480,10 @@ func TestChatErrorHandling(t *testing.T) {
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
 			client: func() *httpclient.Client {
-				c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second})
+				cfg := httpclient.TestConfig()
+				cfg.Timeout = 250 * time.Millisecond
+				cfg.RetryConfig.MaxRetries = 0
+				c, _ := httpclient.NewClient(cfg)
 				return c
 			}(),
 		}
@@ -490,11 +493,9 @@ func TestChatErrorHandling(t *testing.T) {
 			Messages:     []AIMessage{},
 		}
 
-		// This should handle the invalid URL gracefully
 		_, err := assistant.Chat(rc, ctx, "test message")
-		if err != nil {
-			t.Logf("Expected error for invalid URL: %v", err)
-		}
+		assert.Error(t, err, "Should return error for invalid URL")
+		assert.Contains(t, err.Error(), "invalid AI request URL")
 	})
 }
 

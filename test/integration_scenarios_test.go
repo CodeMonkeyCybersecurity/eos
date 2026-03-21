@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 // Integration scenario tests using predefined scenarios
 package test
 

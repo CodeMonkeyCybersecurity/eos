@@ -6,21 +6,51 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-var debugMode bool
+var (
+	debugMode   atomic.Bool
+	outputMu    sync.Mutex
+	errorOutput io.Writer = os.Stderr
+)
 
 func SetDebugMode(enabled bool) {
-	debugMode = enabled
+	debugMode.Store(enabled)
 }
 
 func DebugEnabled() bool {
-	return debugMode
+	return debugMode.Load()
+}
+
+func writeErrorOutput(format string, args ...interface{}) {
+	outputMu.Lock()
+	defer outputMu.Unlock()
+	_, _ = fmt.Fprintf(errorOutput, format, args...)
+}
+
+func setErrorOutput(w io.Writer) func() {
+	outputMu.Lock()
+	previous := errorOutput
+	if w == nil {
+		errorOutput = os.Stderr
+	} else {
+		errorOutput = w
+	}
+	outputMu.Unlock()
+
+	return func() {
+		outputMu.Lock()
+		errorOutput = previous
+		outputMu.Unlock()
+	}
 }
 
 // ExtractSummary extracts a concise error summary from full output.
@@ -95,10 +125,10 @@ func PrintError(ctx context.Context, userMessage string, err error) {
 	if err != nil {
 		if IsExpectedUserError(err) {
 			otelzap.Ctx(ctx).Warn(userMessage, zap.Error(err))
-			_, _ = fmt.Fprintf(os.Stderr, " Notice: %s: %v\n", userMessage, err)
+			writeErrorOutput(" Notice: %s: %v\n", userMessage, err)
 		} else {
 			otelzap.Ctx(ctx).Error(userMessage, zap.Error(err))
-			_, _ = fmt.Fprintf(os.Stderr, " Error: %s: %v\n", userMessage, err)
+			writeErrorOutput(" Error: %s: %v\n", userMessage, err)
 		}
 	}
 }
@@ -106,6 +136,6 @@ func PrintError(ctx context.Context, userMessage string, err error) {
 // ExitWithError prints the error and exits with status 1.
 func ExitWithError(ctx context.Context, userMessage string, err error) {
 	PrintError(ctx, userMessage, err)
-	_, _ = fmt.Fprintln(os.Stderr, " Tip: rerun with --debug for more details.")
+	writeErrorOutput(" Tip: rerun with --debug for more details.\n")
 	os.Exit(1)
 }

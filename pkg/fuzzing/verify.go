@@ -1,9 +1,9 @@
 package fuzzing
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -413,29 +413,23 @@ func verifyOutputHandling(logger otelzap.LoggerWithCtx) error {
 
 func calculateHealthScore(status *FuzzingStatus) float64 {
 	score := 0.0
-	maxScore := 5.0
 
-	// Go version available (1 point)
 	if status.GoVersion != "" {
-		score += 1.0
+		score += 0.2
 	}
 
-	// Fuzzing supported (2 points - most important)
 	if status.FuzzingSupported {
-		score += 2.0
+		score += 0.4
 	}
 
-	// Tests found (1 point)
 	if status.TestsFound > 0 {
-		score += 1.0
+		score += 0.2
 	}
 
-	// Packages verified (1 point)
 	if status.PackagesVerified > 0 {
-		score += 1.0
+		score += 0.2
 	}
 
-	// Penalty for issues (subtract 0.1 per issue)
 	penalty := float64(len(status.Issues)) * 0.1
 	score -= penalty
 
@@ -444,5 +438,9 @@ func calculateHealthScore(status *FuzzingStatus) float64 {
 		score = 0
 	}
 
-	return score / maxScore
+	if score > 1 {
+		score = 1
+	}
+
+	return score
 }

@@ -274,6 +274,7 @@ func TestPrivilegeEscalationPrevention(t *testing.T) {
 		opts := Options{
 			Command: "echo",
 			Args:    []string{"test"},
+			Capture: true,
 		}
 
 		// Command should still execute safely despite malicious PATH

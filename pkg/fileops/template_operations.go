@@ -172,6 +172,10 @@ func (t *TemplateOperations) ProcessTemplate(ctx context.Context, templatePath, 
 		return fmt.Errorf("template path must be absolute: %s", templatePath)
 	}
 
+	if !filepath.IsAbs(outputPath) {
+		return fmt.Errorf("output path must be absolute")
+	}
+
 	// SECURITY: Check template size to prevent resource exhaustion
 	templateInfo, err := t.fileOps.GetFileInfo(ctx, templatePath)
 	if err != nil {
@@ -234,6 +238,10 @@ func (t *TemplateOperations) ProcessTemplate(ctx context.Context, templatePath, 
 		return fmt.Errorf("template output too large: %d bytes", buf.Len())
 	}
 
+	if err := validateRenderedTemplateOutput(buf.String()); err != nil {
+		return err
+	}
+
 	// SECURITY: Write output with restrictive permissions (0640 instead of 0644)
 	if err := t.fileOps.WriteFile(ctx, outputPath, buf.Bytes(), shared.SecureConfigFilePerm); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
@@ -247,5 +255,18 @@ func (t *TemplateOperations) ProcessTemplate(ctx context.Context, templatePath, 
 		zap.String("user", os.Getenv("SUDO_USER")),
 		zap.Time("timestamp", time.Now()))
 
+	return nil
+}
+
+func validateRenderedTemplateOutput(output string) error {
+	if strings.Contains(output, "\x00") {
+		return fmt.Errorf("template output contains null bytes")
+	}
+	if strings.Contains(output, "../") || strings.Contains(output, `..\`) {
+		return fmt.Errorf("template output contains path traversal content")
+	}
+	if strings.Contains(output, "{{") || strings.Contains(output, "}}") {
+		return fmt.Errorf("template output contains unresolved template directives")
+	}
 	return nil
 }

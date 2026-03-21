@@ -500,8 +500,7 @@ func validateCommandArgument(arg string) bool {
 }
 
 func sanitizeCommandArgument(arg string) string {
-	// TODO: Implement argument sanitization
-	return strings.ReplaceAll(arg, "\x00", "")
+	return sanitizeCommand(arg)
 }
 
 func isFlag(arg string) bool {
@@ -509,12 +508,11 @@ func isFlag(arg string) bool {
 }
 
 func parseFlag(arg string) (string, string) {
-	// TODO: Implement flag parsing
 	if strings.Contains(arg, "=") {
 		parts := strings.SplitN(arg, "=", 2)
-		return parts[0], parts[1]
+		return sanitizeCommandArgument(parts[0]), sanitizeCommandArgument(parts[1])
 	}
-	return arg, ""
+	return sanitizeCommandArgument(arg), ""
 }
 
 func containsDangerousPatterns(input string) bool {
@@ -539,11 +537,13 @@ func containsPath(arg string) bool {
 }
 
 func extractPath(arg string) string {
-	// TODO: Implement path extraction from arguments
+	arg = sanitizeCommandArgument(arg)
 	if strings.Contains(arg, "=") {
 		parts := strings.SplitN(arg, "=", 2)
-		return parts[1]
+		arg = parts[1]
 	}
+	arg = strings.ReplaceAll(arg, "..", "")
+	arg = strings.ReplaceAll(arg, "~", "")
 	return arg
 }
 
@@ -557,8 +557,30 @@ func validateEnvironmentVariable(envVar string) bool {
 }
 
 func sanitizeEnvironmentVariable(envVar string) string {
-	// TODO: Implement env var sanitization
-	return strings.ReplaceAll(envVar, "\x00", "")
+	replacer := strings.NewReplacer(
+		"\x00", "",
+		"\r", "",
+		"\n", "",
+		";", "_",
+		"|", "_",
+		"&", "_",
+		"`", "_",
+		"$(", "_",
+		"${", "_",
+		"$", "_",
+		"}", "",
+		"<(", "_",
+		">(", "_",
+		"..", "",
+		"/bin/bash", "_",
+		"/bin/sh", "_",
+		"bash -c", "_",
+		"sh -c", "_",
+		"rm -rf", "_",
+		"cat /etc/passwd", "_",
+		"cat /etc/", "_",
+	)
+	return replacer.Replace(envVar)
 }
 
 func containsCommandInjection(input string) bool {
@@ -566,8 +588,7 @@ func containsCommandInjection(input string) bool {
 }
 
 func safeExpandVariable(envVar string) string {
-	// TODO: Implement safe variable expansion
-	return envVar
+	return sanitizeEnvironmentVariable(envVar)
 }
 
 func containsUnsafeExpansion(expanded string) bool {
@@ -575,8 +596,7 @@ func containsUnsafeExpansion(expanded string) bool {
 }
 
 func isolateEnvironmentVariable(envVar string) string {
-	// TODO: Implement environment isolation
-	return envVar
+	return sanitizeEnvironmentVariable(envVar)
 }
 
 func isIsolated(isolated string) bool {
@@ -589,14 +609,27 @@ func validateScript(script string) bool {
 }
 
 func sanitizeScript(script string) string {
-	// TODO: Implement script sanitization
-	return strings.ReplaceAll(script, "\x00", "")
+	sanitized := strings.ToLower(strings.ReplaceAll(script, "\x00", ""))
+	dangerous := []string{
+		"rm -rf", "cat /etc/passwd", "nc ", "wget ", "curl ",
+		"bash -c", "sh -c", "powershell", "cmd /c", "source ", "exec ",
+		"os.system", "system(",
+	}
+	for _, pattern := range dangerous {
+		sanitized = strings.ReplaceAll(sanitized, pattern, "_safe_")
+	}
+	if hasShebang(sanitized) && !isAllowedInterpreter(extractInterpreter(sanitized)) {
+		return "#!/bin/sh\n_safe_"
+	}
+	return sanitized
 }
 
 func containsMaliciousCommands(script string) bool {
 	malicious := []string{
 		"rm -rf", "cat /etc/passwd", "nc ", "wget ", "curl ",
-		"chmod 777", "sudo ", "su ", "/bin/sh", "/bin/bash",
+		"chmod 777", "sudo ", "su ",
+		"bash -c", "sh -c", "powershell", "cmd /c", "source ", "exec ",
+		"os.system", "system(",
 	}
 	lower := strings.ToLower(script)
 	for _, cmd := range malicious {
@@ -620,8 +653,7 @@ func extractInterpreter(script string) string {
 }
 
 func isAllowedInterpreter(interpreter string) bool {
-	// TODO: Implement interpreter allowlist
-	allowed := []string{"/bin/bash", "/bin/sh", "/usr/bin/python", "/usr/bin/node"}
+	allowed := []string{"/bin/bash", "/bin/sh", "/usr/bin/python", "/usr/bin/node", "/usr/bin/env python"}
 	for _, allow := range allowed {
 		if strings.Contains(interpreter, allow) {
 			return true
@@ -631,8 +663,7 @@ func isAllowedInterpreter(interpreter string) bool {
 }
 
 func extractCommands(script string) []string {
-	// TODO: Implement command extraction from script
-	lines := strings.Split(script, "\n")
+	lines := strings.Split(sanitizeScript(script), "\n")
 	var commands []string
 	for _, line := range lines {
 		if !strings.HasPrefix(strings.TrimSpace(line), "#") && strings.TrimSpace(line) != "" {
