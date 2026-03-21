@@ -334,8 +334,12 @@ func TestHTTPRequestSecurity(t *testing.T) {
 	t.Run("request_timeout_security", func(t *testing.T) {
 		// Create a server that delays response longer than client timeout
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(10 * time.Second) // Delay much longer than client timeout
-			w.WriteHeader(http.StatusOK)
+			select {
+			case <-time.After(10 * time.Second):
+				w.WriteHeader(http.StatusOK)
+			case <-r.Context().Done():
+				return
+			}
 		}))
 		defer server.Close()
 

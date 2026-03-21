@@ -388,30 +388,38 @@ func TestXDGRuntimePath(t *testing.T) {
 func TestPathTraversalPrevention(t *testing.T) {
 	// Set up test environment
 	_ = os.Setenv("XDG_CONFIG_HOME", "/safe/config")
+	_ = os.Setenv("XDG_DATA_HOME", "/safe/data")
+	_ = os.Setenv("XDG_CACHE_HOME", "/safe/cache")
 	defer func() { _ = os.Unsetenv("XDG_CONFIG_HOME") }()
+	defer func() { _ = os.Unsetenv("XDG_DATA_HOME") }()
+	defer func() { _ = os.Unsetenv("XDG_CACHE_HOME") }()
 
 	tests := []struct {
 		name     string
 		app      string
 		file     string
+		base     string
 		testFunc func(string, string) string
 	}{
 		{
 			name:     "config_path_traversal",
 			app:      "../../../etc",
 			file:     "passwd",
+			base:     "/safe/config",
 			testFunc: XDGConfigPath,
 		},
 		{
 			name:     "data_path_traversal",
 			app:      "app",
 			file:     "../../../../../../etc/shadow",
+			base:     "/safe/data",
 			testFunc: XDGDataPath,
 		},
 		{
 			name:     "cache_path_traversal",
 			app:      ".",
 			file:     "../sensitive/data",
+			base:     "/safe/cache",
 			testFunc: XDGCachePath,
 		},
 	}
@@ -420,12 +428,9 @@ func TestPathTraversalPrevention(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.testFunc(tt.app, tt.file)
 
-			// The function should return the path as-is (no sanitization)
-			// This test documents the current behavior - path traversal is NOT prevented
-			assert.Contains(t, result, "..")
-
-			// This is a security issue that should be addressed
-			t.Log("WARNING: Path traversal is not prevented in XDG path functions")
+			assert.NotContains(t, result, "..")
+			assert.NotContains(t, result, `..\`)
+			assert.True(t, strings.HasPrefix(result, tt.base))
 		})
 	}
 }

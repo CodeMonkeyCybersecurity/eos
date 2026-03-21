@@ -59,6 +59,12 @@ func WalkAndSanitize(root string) error {
 		}
 		dir := filepath.Dir(path)
 		oldName := filepath.Base(path)
+
+		// Never attempt to rename the walk root itself.
+		if path == root {
+			return nil
+		}
+
 		newName := SanitizeName(oldName)
 
 		// If the name changed, rename
@@ -85,6 +91,9 @@ func Usage() {
 // -----------------------------------------------------------------------------
 
 func RenameIfNeeded(oldPath string) error {
+	if oldPath == "." || oldPath == string(filepath.Separator) {
+		return nil
+	}
 	dir := filepath.Dir(oldPath)
 	oldName := filepath.Base(oldPath)
 	newName := SanitizeName(oldName)

@@ -1,12 +1,13 @@
 package fuzzing
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -155,6 +156,14 @@ func setupLogDirectory(config *Config, logger otelzap.LoggerWithCtx) error {
 		return fmt.Errorf("failed to create log directory %s: %w", config.LogDir, err)
 	}
 
+	subdirs := []string{"sessions", "reports", "corpus", "crashes", "tmp"}
+	for _, subdir := range subdirs {
+		path := filepath.Join(config.LogDir, subdir)
+		if err := os.MkdirAll(path, shared.ServiceDirPerm); err != nil {
+			return fmt.Errorf("failed to create log subdirectory %s: %w", path, err)
+		}
+	}
+
 	// Check write permissions
 	testFile := filepath.Join(config.LogDir, ".write_test")
 	if err := os.WriteFile(testFile, []byte("test"), shared.ConfigFilePerm); err != nil {
@@ -180,6 +189,7 @@ func applyEnvironmentConfiguration(config *Config, logger otelzap.LoggerWithCtx)
 		"FUZZTIME":      config.Duration.String(),
 		"PARALLEL_JOBS": fmt.Sprintf("%d", config.ParallelJobs),
 		"LOG_DIR":       config.LogDir,
+		"TMPDIR":        filepath.Join(config.LogDir, "tmp"),
 	}
 
 	if config.SecurityFocus {
@@ -251,27 +261,55 @@ func checkGoInstallation(_ otelzap.LoggerWithCtx) error {
 }
 
 func checkGoModule(_ otelzap.LoggerWithCtx) error {
-	if _, err := os.Stat("go.mod"); os.IsNotExist(err) {
-		return fmt.Errorf("go.mod not found - fuzzing must be run from a Go module")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to determine current directory: %w", err)
 	}
-	return nil
+
+	for {
+		if _, err := os.Stat(filepath.Join(cwd, "go.mod")); err == nil {
+			return nil
+		}
+		parent := filepath.Dir(cwd)
+		if parent == cwd {
+			break
+		}
+		cwd = parent
+	}
+
+	return fmt.Errorf("go.mod not found - fuzzing must be run from a Go module")
 }
 
 func checkFuzzTests(logger otelzap.LoggerWithCtx) error {
-	// Check for common fuzz test locations
 	testDirs := []string{"pkg", "cmd"}
 	foundTests := false
+	var matches []string
 
 	for _, dir := range testDirs {
-		if _, err := os.Stat(dir); err == nil {
-			// Look for *fuzz*test.go files
-			matches, err := filepath.Glob(filepath.Join(dir, "**", "*fuzz*test.go"))
-			if err == nil && len(matches) > 0 {
-				foundTests = true
-				logger.Debug("Found fuzz tests", zap.Strings("files", matches[:min(len(matches), 5)]))
-				break
-			}
+		if _, err := os.Stat(dir); err != nil {
+			continue
 		}
+
+		err := filepath.Walk(dir, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil || info == nil || info.IsDir() {
+				return nil
+			}
+			name := strings.ToLower(info.Name())
+			if strings.HasSuffix(name, "_test.go") && strings.Contains(name, "fuzz") {
+				foundTests = true
+				matches = append(matches, path)
+			}
+			return nil
+		})
+		if err != nil {
+			logger.Debug("Failed to inspect fuzz tests",
+				zap.String("dir", dir),
+				zap.Error(err))
+		}
+	}
+
+	if foundTests {
+		logger.Debug("Found fuzz tests", zap.Strings("files", matches[:min(len(matches), 5)]))
 	}
 
 	if !foundTests {

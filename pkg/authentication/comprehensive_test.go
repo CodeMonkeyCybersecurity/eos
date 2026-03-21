@@ -567,10 +567,10 @@ func TestAuthenticationFlow(t *testing.T) {
 // TestTokenValidation tests token validation and lifecycle
 func TestTokenValidation(t *testing.T) {
 	t.Parallel()
-	mockProvider := new(MockAuthProvider)
 
 	t.Run("valid token", func(t *testing.T) {
 		t.Parallel()
+		mockProvider := new(MockAuthProvider)
 		ctx := context.Background()
 		token := generateTestToken()
 
@@ -594,6 +594,7 @@ func TestTokenValidation(t *testing.T) {
 
 	t.Run("expired token", func(t *testing.T) {
 		t.Parallel()
+		mockProvider := new(MockAuthProvider)
 		ctx := context.Background()
 		token := generateTestToken()
 
@@ -615,6 +616,7 @@ func TestTokenValidation(t *testing.T) {
 
 	t.Run("invalid token", func(t *testing.T) {
 		t.Parallel()
+		mockProvider := new(MockAuthProvider)
 		ctx := context.Background()
 		token := "invalid-token"
 
@@ -628,6 +630,7 @@ func TestTokenValidation(t *testing.T) {
 
 	t.Run("revoked token", func(t *testing.T) {
 		t.Parallel()
+		mockProvider := new(MockAuthProvider)
 		ctx := context.Background()
 		token := generateTestToken()
 

@@ -10,6 +10,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func preserveEnv(t *testing.T, keys ...string) {
+	t.Helper()
+
+	originals := make(map[string]*string, len(keys))
+	for _, key := range keys {
+		if value, ok := os.LookupEnv(key); ok {
+			copied := value
+			originals[key] = &copied
+			continue
+		}
+		originals[key] = nil
+	}
+
+	t.Cleanup(func() {
+		for _, key := range keys {
+			if value := originals[key]; value != nil {
+				_ = os.Setenv(key, *value)
+				continue
+			}
+			_ = os.Unsetenv(key)
+		}
+	})
+}
+
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -78,6 +102,8 @@ func TestValidateConfig(t *testing.T) {
 }
 
 func TestConfigureEnvironment(t *testing.T) {
+	preserveEnv(t, "GOMAXPROCS", "FUZZTIME", "PARALLEL_JOBS", "LOG_DIR", "TMPDIR", "SECURITY_FOCUS", "ARCHITECTURE_TESTING", "VERBOSE", "CI_MODE", "CI_PROFILE")
+
 	// Create test runtime context
 	rc := NewTestContext(t)
 

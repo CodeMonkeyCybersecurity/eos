@@ -3,10 +3,10 @@
 package eos_io
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"strings"
 
@@ -97,6 +97,10 @@ func ReadYAML(ctx context.Context, filePath string, out interface{}) error {
 func ParseYAMLString(ctx context.Context, input string) (map[string]interface{}, error) {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug(" Parsing YAML string", zap.Int("length", len(input)))
+
+	if strings.TrimSpace(input) == "" {
+		return map[string]interface{}{}, nil
+	}
 
 	// SECURITY: Check size before parsing to prevent YAML bomb attacks
 	if len(input) > MaxYAMLSize {

@@ -36,7 +36,7 @@ func TestCreateSnapshot_Validation(t *testing.T) {
 				SnapshotPath: "/mnt/snapshots/snap1",
 			},
 			wantError: true,
-			errorMsg:  "not a BTRFS subvolume",
+			errorMsg:  "invalid source path",
 		},
 		{
 			name: "empty snapshot path",
@@ -45,7 +45,7 @@ func TestCreateSnapshot_Validation(t *testing.T) {
 				SnapshotPath: "",
 			},
 			wantError: true,
-			errorMsg:  "not a BTRFS subvolume",
+			errorMsg:  "invalid snapshot path",
 		},
 		{
 			name: "source and snapshot same",
@@ -133,7 +133,7 @@ func TestDeleteSnapshot_Validation(t *testing.T) {
 			snapshotPath: "",
 			force:        false,
 			wantError:    true,
-			errorMsg:     "not a BTRFS subvolume",
+			errorMsg:     "invalid snapshot path",
 		},
 		{
 			name:         "dangerous path",

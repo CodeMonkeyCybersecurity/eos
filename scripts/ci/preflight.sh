@@ -45,3 +45,5 @@ echo "  /dev/zero: $(ls -la /dev/zero)"
 echo "  GOTMPDIR=${GOTMPDIR}"
 echo "  GOCACHE=${GOCACHE}"
 echo "  GOMODCACHE=${GOMODCACHE}"
+
+bash scripts/ci/check-test-tags.sh

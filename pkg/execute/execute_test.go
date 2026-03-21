@@ -173,8 +173,6 @@ func TestRunWithNilContext(t *testing.T) {
 }
 
 func TestRunWithDefaultDryRun(t *testing.T) {
-	t.Parallel()
-
 	// Save original state
 	originalDryRun := DefaultDryRun
 	defer func() { DefaultDryRun = originalDryRun }()

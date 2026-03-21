@@ -29,6 +29,15 @@ type UnifiedClient struct {
 	httpClient *http.Client
 }
 
+var waitForRetry = func(ctx context.Context, delay time.Duration) error {
+	select {
+	case <-time.After(delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // NewUnifiedClient creates a new unified Authentik API client
 // SECURITY: Enforces TLS 1.2+ for all API communication
 // RELIABILITY: Includes retry logic with exponential backoff
@@ -69,6 +78,7 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 	var lastErr error
 	maxRetries := 3
 	baseDelay := time.Second
+	nextDelay := time.Duration(0)
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -76,11 +86,13 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 			// RATIONALE: API knows best when to retry (rate limit windows, maintenance)
 			// SECURITY: Prevents aggressive retry that could trigger IP ban
 			// Note: retryAfter is set below when we get 429/503 response
-			delay := baseDelay * time.Duration(1<<uint(attempt-1)) // Default: exponential backoff
-			select {
-			case <-time.After(delay):
-			case <-ctx.Done():
-				return nil, ctx.Err()
+			delay := nextDelay
+			if delay <= 0 {
+				delay = baseDelay * time.Duration(1<<uint(attempt-1)) // Default: exponential backoff
+			}
+			nextDelay = 0
+			if err := waitForRetry(ctx, delay); err != nil {
+				return nil, err
 			}
 		}
 
@@ -137,17 +149,12 @@ func (c *UnifiedClient) DoRequest(ctx context.Context, method, path string, body
 			if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 				// Retry-After can be seconds (integer) or HTTP date
 				if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil && seconds > 0 {
-					// Wait for specified seconds before next retry
 					retryDelay := time.Duration(seconds) * time.Second
 					// Cap at 5 minutes to prevent indefinite wait
 					if retryDelay > 5*time.Minute {
 						retryDelay = 5 * time.Minute
 					}
-					select {
-					case <-time.After(retryDelay):
-					case <-ctx.Done():
-						return nil, ctx.Err()
-					}
+					nextDelay = retryDelay
 				}
 				// Note: HTTP date format parsing not implemented - use default backoff
 			}

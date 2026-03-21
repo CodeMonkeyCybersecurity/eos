@@ -39,9 +39,10 @@ lane_run_step "sanitize_git_env" ge_unset_git_local_env
 lane_run_step "git_conflict_guard" ensure_no_merge_conflicts
 
 export PATH="$(go env GOPATH)/bin:${PATH}"
-if ! command -v golangci-lint >/dev/null 2>&1; then
-  lane_log "INFO" "ci_debug.bootstrap" "golangci-lint missing; installing pinned v2.0.0" "bootstrap"
-  lane_run_step "install_golangci_lint" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.0
+required_golangci_lint="${GOLANGCI_LINT_VERSION:-v2.11.3}"
+if ! command -v golangci-lint >/dev/null 2>&1 || ! golangci-lint version 2>/dev/null | grep -q "${required_golangci_lint#v}"; then
+  lane_log "INFO" "ci_debug.bootstrap" "golangci-lint missing or outdated; installing pinned release ${required_golangci_lint}" "bootstrap"
+  lane_run_step "install_golangci_lint" bash scripts/ci/install-golangci-lint.sh
 fi
 
 export CI_EVENT_NAME="${CI_EVENT_NAME:-pull_request}"

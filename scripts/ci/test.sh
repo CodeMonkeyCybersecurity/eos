@@ -199,11 +199,11 @@ run_integration() {
   export POSTGRES_URL="postgres://postgres:testpass@127.0.0.1:${pg_port}/testdb?sslmode=disable"
 
   run_with_timeout 20m bash -c \
-    "set -euo pipefail; go test -json -v -timeout=15m ./test/integration_test.go ./test/integration_scenarios_test.go | tee '${lane_dir}/integration-suite.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+    "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./test/integration_test.go ./test/integration_scenarios_test.go | tee '${lane_dir}/integration-suite.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/git/... | tee '${lane_dir}/integration-git.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
-    "set -euo pipefail; go test -json -v -timeout=15m -run Integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
+    "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/backup/... | tee '${lane_dir}/integration-backup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \
     "set -euo pipefail; go test -json -v -timeout=15m -tags=integration ./pkg/chatbackup/... | tee '${lane_dir}/integration-chatbackup.jsonl'; test \${PIPESTATUS[0]} -eq 0"
   run_with_timeout 20m bash -c \

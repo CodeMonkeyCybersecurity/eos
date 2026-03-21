@@ -47,10 +47,10 @@ repos:
   # Local hooks for custom checks
   - repo: local
     hooks:
-      # Enforce local/CI parity lane via mage-compatible entrypoint
+      # Enforce local/CI parity lane via npm wrapper
       - id: ci-debug-parity
-        name: CI debug parity gate (magew ci:debug)
-        entry: ./magew ci:debug
+        name: CI debug parity gate (npm run ci:debug)
+        entry: npm run ci:debug --silent
         language: system
         pass_filenames: false
         require_serial: true
@@ -80,13 +80,13 @@ repos:
         pass_filenames: false
         description: Ensures code compiles successfully
 
-      # Verify E2E tests have build tags
-      - id: verify-e2e-build-tags
-        name: Verify E2E build tags
-        entry: bash -c 'for f in test/e2e/*_test.go; do head -1 "$f" | grep -q "//go:build e2e" || { echo "ERROR: $f missing //go:build e2e tag"; exit 1; }; done'
+      # Verify environment-dependent tests are build-tagged
+      - id: verify-test-build-tags
+        name: Verify test build tags
+        entry: bash scripts/ci/check-test-tags.sh
         language: system
         pass_filenames: false
-        description: Ensures all E2E tests have proper build tags
+        description: Ensures environment-dependent tests keep their explicit build tags
 
       # Check for deprecated benchmark pattern
       - id: check-benchmark-pattern
