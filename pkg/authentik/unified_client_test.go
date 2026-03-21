@@ -29,6 +29,26 @@ import (
 	"time"
 )
 
+func captureRetryDelays(t *testing.T, waiter func(context.Context, time.Duration) error) *[]time.Duration {
+	t.Helper()
+
+	delays := make([]time.Duration, 0, 4)
+	previous := waitForRetry
+	waitForRetry = func(ctx context.Context, delay time.Duration) error {
+		delays = append(delays, delay)
+		if waiter != nil {
+			return waiter(ctx, delay)
+		}
+		return nil
+	}
+
+	t.Cleanup(func() {
+		waitForRetry = previous
+	})
+
+	return &delays
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Mock HTTP Transport
 // ─────────────────────────────────────────────────────────────────────────────
@@ -329,6 +349,8 @@ func TestUnifiedClient_DoRequest_RequestBody(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestUnifiedClient_DoRequest_RetryTransientErrors(t *testing.T) {
+	delays := captureRetryDelays(t, nil)
+
 	tests := []struct {
 		name          string
 		responses     []mockResponse
@@ -385,6 +407,8 @@ func TestUnifiedClient_DoRequest_RetryTransientErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			*delays = (*delays)[:0]
+
 			mockTransport := &mockTransport{
 				responses: tt.responses,
 			}
@@ -409,11 +433,16 @@ func TestUnifiedClient_DoRequest_RetryTransientErrors(t *testing.T) {
 			if actualRetries != tt.expectRetries {
 				t.Errorf("Expected %d retries, got %d", tt.expectRetries, actualRetries)
 			}
+			if len(*delays) != tt.expectRetries {
+				t.Errorf("Expected %d retry waits, got %d", tt.expectRetries, len(*delays))
+			}
 		})
 	}
 }
 
 func TestUnifiedClient_DoRequest_NoRetryDeterministicErrors(t *testing.T) {
+	delays := captureRetryDelays(t, nil)
+
 	tests := []struct {
 		name       string
 		statusCode int
@@ -433,6 +462,8 @@ func TestUnifiedClient_DoRequest_NoRetryDeterministicErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			*delays = (*delays)[:0]
+
 			mockTransport := &mockTransport{
 				responses: []mockResponse{
 					{statusCode: tt.statusCode, body: []byte(`{"error": "test error"}`)},
@@ -466,6 +497,13 @@ func TestUnifiedClient_DoRequest_NoRetryDeterministicErrors(t *testing.T) {
 						tt.statusCode, requestCount)
 				}
 			}
+			if tt.wantRetry {
+				if len(*delays) == 0 {
+					t.Errorf("Expected retry wait for status %d", tt.statusCode)
+				}
+			} else if len(*delays) != 0 {
+				t.Errorf("Expected no retry waits for status %d, got %d", tt.statusCode, len(*delays))
+			}
 		})
 	}
 }
@@ -480,6 +518,8 @@ func TestUnifiedClient_DoRequest_RetryAfterHeader(t *testing.T) {
 	// We use a context with short timeout to prevent tests from blocking for
 	// the full Retry-After duration (which can be 120s+).
 	t.Run("retry_after_small_value_is_respected", func(t *testing.T) {
+		delays := captureRetryDelays(t, nil)
+
 		mockTransport := &mockTransport{
 			responses: []mockResponse{
 				{
@@ -497,22 +537,26 @@ func TestUnifiedClient_DoRequest_RetryAfterHeader(t *testing.T) {
 		client := NewUnifiedClient("https://authentik.example.com", "test-token")
 		client.httpClient.Transport = mockTransport
 
-		start := time.Now()
 		ctx := context.Background()
 		_, err := client.DoRequest(ctx, "GET", "/api/v3/core/users/", nil)
-		elapsed := time.Since(start)
 
 		if err != nil {
 			t.Fatalf("DoRequest failed: %v", err)
 		}
-
-		// Should have waited at least 1 second for Retry-After
-		if elapsed < 1*time.Second {
-			t.Logf("Retry-After delay was %v, expected >= 1s", elapsed)
+		if len(*delays) != 1 {
+			t.Fatalf("Expected 1 retry wait, got %d", len(*delays))
+		}
+		if (*delays)[0] != time.Second {
+			t.Fatalf("Expected Retry-After delay of 1s, got %v", (*delays)[0])
 		}
 	})
 
 	t.Run("retry_after_large_value_is_capped", func(t *testing.T) {
+		delays := captureRetryDelays(t, func(ctx context.Context, _ time.Duration) error {
+			<-ctx.Done()
+			return ctx.Err()
+		})
+
 		// Large Retry-After values are capped at 5 minutes (unified_client.go:143-145)
 		// Use a context with short timeout to verify the cap behavior without
 		// actually waiting 5 minutes.
@@ -533,15 +577,19 @@ func TestUnifiedClient_DoRequest_RetryAfterHeader(t *testing.T) {
 		client := NewUnifiedClient("https://authentik.example.com", "test-token")
 		client.httpClient.Transport = mockTransport
 
-		// Use context with 2s timeout - the Retry-After wait should be cancelled
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		// Use context with short timeout - the retry wait should be cancelled
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		defer cancel()
 
 		_, err := client.DoRequest(ctx, "GET", "/api/v3/core/users/", nil)
-		// Should get context deadline exceeded error because we cancelled before
-		// the Retry-After delay completed
 		if err == nil {
-			t.Log("Request succeeded despite short context timeout (Retry-After may not be respected)")
+			t.Fatal("Expected context deadline exceeded")
+		}
+		if len(*delays) != 1 {
+			t.Fatalf("Expected 1 retry wait, got %d", len(*delays))
+		}
+		if (*delays)[0] != 5*time.Minute {
+			t.Fatalf("Expected capped Retry-After delay of 5m, got %v", (*delays)[0])
 		}
 	})
 }
@@ -590,6 +638,8 @@ func TestUnifiedClient_DoRequest_ContextCancellation(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestUnifiedClient_DoRequest_ResponseParsing(t *testing.T) {
+	delays := captureRetryDelays(t, nil)
+
 	tests := []struct {
 		name       string
 		statusCode int
@@ -627,6 +677,8 @@ func TestUnifiedClient_DoRequest_ResponseParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			*delays = (*delays)[:0]
+
 			mockTransport := &mockTransport{
 				statusCode: tt.statusCode,
 				body:       tt.body,
@@ -653,6 +705,9 @@ func TestUnifiedClient_DoRequest_ResponseParsing(t *testing.T) {
 					t.Errorf("Response body length = %d, want %d", len(respBody), len(tt.body))
 				}
 			}
+			if tt.statusCode >= 500 && len(*delays) == 0 {
+				t.Errorf("Expected retry waits for status %d", tt.statusCode)
+			}
 		})
 	}
 }
@@ -662,6 +717,8 @@ func TestUnifiedClient_DoRequest_ResponseParsing(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func TestUnifiedClient_DoRequest_RealHTTPServer(t *testing.T) {
+	captureRetryDelays(t, nil)
+
 	// Create test HTTP server
 	requestCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

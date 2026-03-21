@@ -1,8 +1,8 @@
 package inspect
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"strings"
 )
@@ -380,7 +380,7 @@ module "wazuh_volumes" {
 
 // generateHetznerResources creates Hetzner-specific configuration
 func (c *TerraformConfig) generateHetznerResources() error {
-	c.Logger.Info("☁️ Generating Hetzner resources")
+	c.Logger.Info("Generating Hetzner resources")
 
 	var tf strings.Builder
 	tf.WriteString(`# Hetzner Cloud Resources

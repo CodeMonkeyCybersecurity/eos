@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -437,6 +438,10 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 		url = ai.baseURL + "/messages"
 	}
 
+	if err := validateRequestURL(url); err != nil {
+		return nil, err
+	}
+
 	// Create HTTP request
 	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
@@ -490,6 +495,23 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 	}
 
 	return &aiResponse, nil
+}
+
+func validateRequestURL(rawURL string) error {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid AI request URL: %w", err)
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("invalid AI request URL scheme %q", parsedURL.Scheme)
+	}
+
+	if parsedURL.Host == "" {
+		return fmt.Errorf("invalid AI request URL host")
+	}
+
+	return nil
 }
 
 // NewConversationContext creates a new conversation context

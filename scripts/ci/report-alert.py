@@ -68,7 +68,11 @@ def main(argv: list[str]) -> int:
             return annotation("error", f"ci:debug failed stage={stage} command={failed_command} message={message}")
         return annotation("notice", "ci:debug status=pass")
 
-    return annotation("warning", f"unknown report-alert profile={profile} report={report_path}")
+    if status == "fail":
+        return annotation("error", f"{profile} failed outcome={outcome} message={message}")
+    if status == "skip":
+        return annotation("warning", f"{profile} skipped outcome={outcome} message={message}")
+    return annotation("notice", f"{profile} passed outcome={outcome}")
 
 
 if __name__ == "__main__":

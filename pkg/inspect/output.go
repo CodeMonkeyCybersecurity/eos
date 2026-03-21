@@ -1,8 +1,8 @@
 package inspect
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"strings"
 	"time"
@@ -265,7 +265,7 @@ locals {
 
 	// Write Hetzner resources with logging
 	if infrastructure.Hetzner != nil {
-		logger.Info("☁️ Generating Hetzner Cloud Terraform resources",
+		logger.Info("Generating Hetzner Cloud Terraform resources",
 			zap.Int("servers", len(infrastructure.Hetzner.Servers)),
 			zap.Int("networks", len(infrastructure.Hetzner.Networks)),
 			zap.Int("firewalls", len(infrastructure.Hetzner.Firewalls)),

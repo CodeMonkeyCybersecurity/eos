@@ -413,7 +413,7 @@ func TestSanitizeName_EdgeCases(t *testing.T) {
 		{
 			name:     "very long filename",
 			input:    strings.Repeat("a", 300),
-			expected: strings.Repeat("a", 300), // No truncation in current implementation
+			expected: strings.Repeat("a", 255),
 		},
 		{
 			name:     "unicode characters",
@@ -458,13 +458,16 @@ func TestSanitizeName_EdgeCases(t *testing.T) {
 		{
 			name:     "tabs and newlines",
 			input:    "file\tname\n.txt",
-			expected: "file\tname\n.txt", // Not currently sanitized
+			expected: "file_name_.txt",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := SanitizeName(tt.input)
+			if tt.name == "very_long_filename" {
+				assert.Len(t, result, 255)
+			}
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -504,7 +507,7 @@ func TestPathOperations(t *testing.T) {
 		{
 			name:         "Windows path",
 			path:         `C:\Users\file.txt`,
-			expectedDir:  `C:\Users\file.txt`, // On unix, backslashes aren't treated as separators
+			expectedDir:  ".",
 			expectedBase: `C:\Users\file.txt`,
 		},
 	}
@@ -523,7 +526,7 @@ func TestPathOperations(t *testing.T) {
 
 			// Verify path construction
 			// Skip platform-specific check for Windows paths on unix
-			if !strings.Contains(tt.path, `\`) {
+			if !strings.Contains(tt.path, `\`) && dir != "." {
 				assert.True(t, strings.HasPrefix(newPath, dir))
 			}
 		})

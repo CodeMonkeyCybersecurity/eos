@@ -4,47 +4,23 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
-	"os"
 	"strings"
 	"testing"
 )
 
-// Helper function to capture stderr output
-func captureStderr(fn func()) string {
-	// Save the original stderr
-	originalStderr := os.Stderr
+func captureErrorOutput(fn func()) string {
+	var buf bytes.Buffer
+	restore := setErrorOutput(&buf)
+	defer restore()
 
-	// Create a pipe to capture stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	// Channel to capture the output
-	outputCh := make(chan string)
-
-	// Start a goroutine to read from the pipe
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		outputCh <- buf.String()
-	}()
-
-	// Execute the function
 	fn()
 
-	// Close the writer and restore stderr
-	_ = w.Close()
-	os.Stderr = originalStderr
-
-	// Get the captured output
-	return <-outputCh
+	return buf.String()
 }
 
 func TestPrintError(t *testing.T) {
-	t.Parallel()
-	// Save original debug mode
-	originalDebug := debugMode
-	defer func() { debugMode = originalDebug }()
+	originalDebug := DebugEnabled()
+	defer SetDebugMode(originalDebug)
 
 	tests := []struct {
 		name         string
@@ -99,9 +75,7 @@ func TestPrintError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			// Set debug mode for this test
-			debugMode = tt.debugMode
+			SetDebugMode(tt.debugMode)
 
 			// For debug mode tests, we can't easily test the Fatal call since it would exit
 			// We'll test non-debug mode which uses structured logging + stderr
@@ -112,8 +86,7 @@ func TestPrintError(t *testing.T) {
 
 			ctx := context.Background()
 
-			// Capture stderr output
-			output := captureStderr(func() {
+			output := captureErrorOutput(func() {
 				PrintError(ctx, tt.userMessage, tt.err)
 			})
 
@@ -134,22 +107,19 @@ func TestPrintError(t *testing.T) {
 }
 
 func TestPrintError_DebugMode(t *testing.T) {
-	t.Parallel()
-	// Save original debug mode
-	originalDebug := debugMode
-	defer func() { debugMode = originalDebug }()
+	originalDebug := DebugEnabled()
+	defer SetDebugMode(originalDebug)
 
 	// Test debug mode behavior without actually calling Fatal
 	// We'll verify the debug mode detection works correctly
 
 	t.Run("debug_enabled_check", func(t *testing.T) {
-		t.Parallel()
-		debugMode = true
+		SetDebugMode(true)
 		if !DebugEnabled() {
 			t.Error("debug should be enabled")
 		}
 
-		debugMode = false
+		SetDebugMode(false)
 		if DebugEnabled() {
 			t.Error("debug should be disabled")
 		}
@@ -162,23 +132,19 @@ func TestPrintError_DebugMode(t *testing.T) {
 // TestExitWithError tests the ExitWithError function
 // Note: This function calls os.Exit(1), so we need to be careful in testing
 func TestExitWithError_Components(t *testing.T) {
-	t.Parallel()
 	// We can't directly test ExitWithError since it calls os.Exit(1)
 	// But we can test its components and verify the output it would produce
 
 	t.Run("output_before_exit", func(t *testing.T) {
-		t.Parallel()
-		// Save original debug mode
-		originalDebug := debugMode
-		defer func() { debugMode = originalDebug }()
-		debugMode = false
+		originalDebug := DebugEnabled()
+		defer SetDebugMode(originalDebug)
+		SetDebugMode(false)
 
 		ctx := context.Background()
 		userMessage := "fatal error occurred"
 		err := errors.New("system failure")
 
-		// Capture what PrintError would output (ExitWithError calls PrintError first)
-		output := captureStderr(func() {
+		output := captureErrorOutput(func() {
 			PrintError(ctx, userMessage, err)
 		})
 
@@ -192,7 +158,6 @@ func TestExitWithError_Components(t *testing.T) {
 	})
 
 	t.Run("debug_tip_format", func(t *testing.T) {
-		t.Parallel()
 		// Test that the debug tip would be correctly formatted
 		expectedTip := " Tip: rerun with --debug for more details."
 
@@ -209,28 +174,24 @@ func TestExitWithError_Components(t *testing.T) {
 
 // TestExitWithError_Integration provides integration testing without actually exiting
 func TestExitWithError_Integration(t *testing.T) {
-	t.Parallel()
 	// Test the full flow except for the os.Exit(1) call
 	// We simulate what ExitWithError does step by step
 
 	t.Run("full_flow_simulation", func(t *testing.T) {
-		t.Parallel()
-		// Save original debug mode
-		originalDebug := debugMode
-		defer func() { debugMode = originalDebug }()
-		debugMode = false
+		originalDebug := DebugEnabled()
+		defer SetDebugMode(originalDebug)
+		SetDebugMode(false)
 
 		ctx := context.Background()
 		userMessage := "critical failure"
 		err := errors.New("database connection lost")
 
-		// Capture the full output that ExitWithError would produce
-		output := captureStderr(func() {
+		output := captureErrorOutput(func() {
 			// Step 1: PrintError
 			PrintError(ctx, userMessage, err)
 
 			// Step 2: Print debug tip (simulated)
-			_, _ = os.Stderr.WriteString(" Tip: rerun with --debug for more details.\n")
+			writeErrorOutput(" Tip: rerun with --debug for more details.\n")
 
 			// Step 3: os.Exit(1) - we skip this to avoid ending the test
 		})
@@ -250,19 +211,17 @@ func TestExitWithError_Integration(t *testing.T) {
 	})
 
 	t.Run("user_error_exit_flow", func(t *testing.T) {
-		t.Parallel()
-		// Test ExitWithError with a user error
-		originalDebug := debugMode
-		defer func() { debugMode = originalDebug }()
-		debugMode = false
+		originalDebug := DebugEnabled()
+		defer SetDebugMode(originalDebug)
+		SetDebugMode(false)
 
 		ctx := context.Background()
 		userMessage := "configuration error"
 		err := NewExpectedError(ctx, errors.New("missing config file"))
 
-		output := captureStderr(func() {
+		output := captureErrorOutput(func() {
 			PrintError(ctx, userMessage, err)
-			_, _ = os.Stderr.WriteString(" Tip: rerun with --debug for more details.\n")
+			writeErrorOutput(" Tip: rerun with --debug for more details.\n")
 		})
 
 		// Should show as a Notice for user errors

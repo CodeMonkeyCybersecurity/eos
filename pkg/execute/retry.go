@@ -124,6 +124,7 @@ func errorTypeString(et ErrorType) string {
 // RetryCommand retries execution with structured logging and proper error handling
 func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	maxAttempts = max(1, maxAttempts)
 
 	logger.Info("Starting command retry execution",
 		zap.String("command", name),

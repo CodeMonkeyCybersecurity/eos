@@ -2,9 +2,9 @@
 package fileops
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"context"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"io"
 	"os"
 	"path/filepath"
@@ -177,6 +177,11 @@ func (f *FileSystemOperations) MoveFile(ctx context.Context, src, dst string) er
 // DeleteFile removes a file
 func (f *FileSystemOperations) DeleteFile(ctx context.Context, path string) error {
 	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			f.logger.Debug("File already absent during delete",
+				zap.String("path", path))
+			return nil
+		}
 		f.logger.Error("Failed to delete file",
 			zap.String("path", path),
 			zap.Error(err))

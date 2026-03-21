@@ -1,8 +1,8 @@
 package btrfs
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"fmt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -119,8 +119,8 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 func CreateSubvolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Validate configuration for security
-	if err := validateBtrfsConfig(config); err != nil {
+	// Validate only the subvolume-related fields for this operation.
+	if err := validateSubvolumeConfig(config); err != nil {
 		return err
 	}
 
@@ -181,6 +181,30 @@ func CreateSubvolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("BTRFS subvolume created successfully",
 		zap.String("path", config.SubvolumePath),
 		zap.Int64("id", info.ID))
+
+	return nil
+}
+
+func validateSubvolumeConfig(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("config is required")
+	}
+
+	if err := validateSubvolumePath(config.SubvolumePath); err != nil {
+		return fmt.Errorf("invalid subvolume path: %w", err)
+	}
+
+	for _, option := range config.MountOptions {
+		if err := validateMountOption(option); err != nil {
+			return fmt.Errorf("invalid mount option: %w", err)
+		}
+	}
+
+	if config.Label != "" {
+		if err := validateLabel(config.Label); err != nil {
+			return fmt.Errorf("invalid label: %w", err)
+		}
+	}
 
 	return nil
 }

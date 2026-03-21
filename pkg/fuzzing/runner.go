@@ -47,7 +47,7 @@ func (r *Runner) DiscoverTests(ctx context.Context) (*TestDiscovery, error) {
 		}
 
 		// Skip vendor and hidden directories
-		if info.IsDir() && (info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".")) {
+		if info.IsDir() && path != "." && (info.Name() == "vendor" || strings.HasPrefix(info.Name(), ".")) {
 			return filepath.SkipDir
 		}
 
@@ -309,8 +309,10 @@ func categorizeTest(test FuzzTest, filePath string) FuzzTest {
 	}
 
 	// Architecture tests
-	if strings.Contains(path, "") ||
-		strings.Contains(path, "terraform") ||
+	if strings.Contains(path, "terraform") ||
+		strings.Contains(path, "nomad") ||
+		strings.Contains(path, "orchestrat") ||
+		strings.Contains(path, "deploy") ||
 		strings.Contains(path, "nomad") ||
 		strings.Contains(name, "orchestrat") ||
 		strings.Contains(name, "deploy") {
@@ -329,7 +331,8 @@ func categorizeTest(test FuzzTest, filePath string) FuzzTest {
 
 func extractPackageName(filePath string) string {
 	// Convert file path to package path
-	dir := filepath.Dir(filePath)
+	normalized := strings.ReplaceAll(filePath, `\`, "/")
+	dir := filepath.Dir(normalized)
 	if dir == "." {
 		return "."
 	}
@@ -479,11 +482,11 @@ func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 
 	// Summary
 	report.WriteString("## Summary\n\n")
-	report.WriteString(fmt.Sprintf("- **Total Tests:** %d\n", session.Summary.TotalTests))
-	report.WriteString(fmt.Sprintf("- **Passed:** %d\n", session.Summary.PassedTests))
-	report.WriteString(fmt.Sprintf("- **Failed:** %d\n", session.Summary.FailedTests))
-	report.WriteString(fmt.Sprintf("- **Success Rate:** %.1f%%\n", session.Summary.SuccessRate*100))
-	report.WriteString(fmt.Sprintf("- **Total Executions:** %d\n", session.Summary.TotalExecutions))
+	report.WriteString(fmt.Sprintf("- Total Tests: %d\n", session.Summary.TotalTests))
+	report.WriteString(fmt.Sprintf("- Passed: %d\n", session.Summary.PassedTests))
+	report.WriteString(fmt.Sprintf("- Failed: %d\n", session.Summary.FailedTests))
+	report.WriteString(fmt.Sprintf("- Success Rate: %.1f%%\n", session.Summary.SuccessRate*100))
+	report.WriteString(fmt.Sprintf("- Total Executions: %d\n", session.Summary.TotalExecutions))
 
 	if session.Summary.SecurityAlert {
 		report.WriteString("\n **SECURITY ALERT:** Crashes detected during fuzzing!\n")
