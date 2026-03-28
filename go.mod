@@ -31,7 +31,7 @@ require (
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/hashicorp/nomad/api v0.0.0-20260226211936-d304b7de5d67
 	github.com/hashicorp/terraform-exec v0.24.0
-	github.com/hashicorp/vault/api v1.22.0
+	github.com/hashicorp/vault/api v1.23.0
 	github.com/hashicorp/vault/api/auth/approle v0.11.0
 	github.com/hashicorp/vault/api/auth/userpass v0.11.0
 	github.com/hetznercloud/hcloud-go/v2 v2.29.0
